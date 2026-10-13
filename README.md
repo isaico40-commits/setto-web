@@ -76,6 +76,14 @@ Si después comprás un dominio (por ejemplo `setto.com.ar`), se conecta en Verc
 
 Pedidos que no vienen de la web (WhatsApp directo, PedidosYa, Rappi, Uber Eats): pestaña **Club → Sumar sellos a mano**.
 
+### Envío a domicilio
+En el checkout el cliente elige **Retiro** o **Envío a domicilio**. Si elige envío, tiene que poner la dirección exacta (y opcionalmente piso/depto/referencia). En el panel el pedido aparece con la etiqueta **Envío a domicilio**, la dirección y un link a Google Maps.
+En **Ajustes → Envío a domicilio** activás o desactivás la opción, ponés un costo fijo (0 = se coordina por WhatsApp) y el aviso que ve el cliente.
+
+### Premio del Club
+El premio se entrega **en el mismo pedido que completa la tarjeta**. Ejemplo con 8 sellos: el cliente con 7 sellos hace su pedido → la web le avisa "este pedido completa tu tarjeta", el panel muestra 🎁 *Completa la tarjeta* con el premio a incluir, y al tocar **Entregado** se canjea solo (la tarjeta vuelve a 0).
+En **Ajustes → Setto Club** definís el premio, los sellos de la tarjeta y un pedido mínimo opcional para sumar sello.
+
 ### Edición especial (sabores de tortas)
 En **Carta → Edición especial**:
 - **Estado:** *Próximamente* (se muestra pero no se puede pedir) o *Disponible ahora* (se puede pedir).

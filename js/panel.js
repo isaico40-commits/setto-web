@@ -77,8 +77,8 @@
     } catch (e) { console.error(e); }
   }
   function viewPedidos() {
-    $("#view").innerHTML = `<h1 class="ph1">Pedidos de take away</h1>
-      <p class="muted">Cuando llega el WhatsApp, buscá el código, revisá que el número del chat sea el mismo y tocá <b>Entregado</b> al retirar.</p>
+    $("#view").innerHTML = `<h1 class="ph1">Pedidos</h1>
+      <p class="muted">Cuando llega el WhatsApp, buscá el código, revisá que el número del chat sea el mismo y tocá <b>Entregado</b> cuando lo retiran o lo reciben.</p>
       <div class="sub">
         ${[["pendiente", "Pendientes"], ["entregado", "Entregados (7 días)"], ["cancelado", "Cancelados"]].map(([k, l]) => `<button class="ptab" data-sub="${k}" aria-selected="${P.sub === k}">${l}</button>`).join("")}
         <input id="oq" placeholder="Buscar código, nombre o celular" value="${esc(P.q)}">
@@ -93,11 +93,16 @@
     if (!list.length) { box.innerHTML = `<div class="empty-p" style="grid-column:1/-1"><img src="img/mochito-lie.png" alt=""><b>${P.sub === "pendiente" ? "No hay pedidos pendientes" : "Nada por acá"}</b><span>${P.sub === "pendiente" ? "Cuando alguien pida desde la web, aparece acá al instante." : ""}</span></div>`; return; }
     const club = P.settings.club || {};
     box.innerHTML = list.map((o) => {
-      const c = P.confirm[o.id] || (P.confirm[o.id] = { phone: pretty(o.phone), n: club.activo === false ? 0 : (club.sellos_por_pedido ?? 1) });
+      const prodTotal = (o.items || []).filter((i) => i.id !== "envio").reduce((a, i) => a + (i.subtotal || 0), 0);
+      const c = P.confirm[o.id] || (P.confirm[o.id] = { phone: pretty(o.phone), n: club.activo === false || prodTotal < (Number(club.minimo) || 0) ? 0 : (club.sellos_por_pedido ?? 1) });
+      const env = o.modo === "envio";
       return `<article class="pcard" data-oid="${o.id}">
         <div class="ohead"><span class="ocode num">${esc(o.code)}</span><span class="ago">${ago(o.created_at)}</span><span class="st ${o.status}">${o.status}</span></div>
         <div class="who2"><b>${esc(o.nombre)}</b><span class="num">${esc(pretty(o.phone))}</span><a class="chat" href="https://wa.me/${esc(o.phone)}" target="_blank" rel="noopener">Abrir chat</a></div>
-        <div class="meta"><span>Retiro: <b>${esc(o.retiro || "—")}</b></span><span>Pago: <b>${esc(o.pago || "—")}</b></span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}</div>
+        <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}</div>
+        ${env ? `<div class="dirbox"><b>${esc(o.direccion || "")}</b><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.direccion || "") + ", Mar del Plata")}" target="_blank" rel="noopener">Ver en Maps</a></div>` : ""}
+        ${o.premio && o.status === "pendiente" ? `<div class="premiobox">Este pedido completa la tarjeta del Club: <b>incluí ${esc(o.premio_txt || (P.settings.club || {}).premio || "el premio")}</b>. Al tocar Entregado se canjea solo.</div>` : ""}
+        <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>Pago: <b>${esc(o.pago || "—")}</b></span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}</div>
         <div class="olines">${(o.items || []).map((i) => `<div><span>${i.qty}× ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""}</span><span class="num">${money(i.subtotal)}</span></div>`).join("")}</div>
         <div class="otot"><span>Total</span><span class="num">${money(o.total)}</span></div>
         ${o.status === "pendiente" ? `<div class="confirm">
@@ -249,6 +254,13 @@
           <div class="checks"><label><input type="checkbox" name="activo" ${club.activo !== false ? "checked" : ""}> Mostrar el Club en la web</label></div>
           <div class="row2"><label>Sellos para el premio<input class="inp" name="meta" type="number" min="2" max="20" value="${club.meta || 8}"></label><label>Sellos por pedido (sugerido)<input class="inp" name="spp" type="number" min="0" max="10" value="${club.sellos_por_pedido ?? 1}"></label></div>
           <label>Premio<input class="inp" name="premio" value="${esc(club.premio || "")}" placeholder="Ej: un mochi de regalo"></label>
+          <label>Pedido mínimo para sumar sello (0 = sin mínimo)<input class="inp" name="minimo" type="number" min="0" step="500" value="${club.minimo || 0}"></label>
+          <span class="hintp">El premio se entrega en el mismo pedido que completa la tarjeta.</span>
+          <button class="btn solid">Guardar</button></form>
+        <form class="pcard" data-set="envio"><b>Envío a domicilio</b>
+          <div class="checks"><label><input type="checkbox" name="activo" ${(S.envio || {}).activo ? "checked" : ""}> Ofrecer envío en la web</label></div>
+          <label>Costo fijo del envío (0 = a coordinar por WhatsApp)<input class="inp" name="costo" type="number" min="0" step="100" value="${(S.envio || {}).costo || 0}"></label>
+          <label>Aviso para el cliente<textarea class="inp" name="aviso">${esc((S.envio || {}).aviso || "")}</textarea></label>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="pagos"><b>Formas de pago</b>
           <label>Una por línea<textarea class="inp" name="pagos">${esc((S.pagos || []).join("\n"))}</textarea></label>
@@ -274,7 +286,8 @@
         const dias = [0, 1, 2, 3, 4, 5, 6].filter((i) => f["d" + i]);
         await API.saveSetting("retiro", { dias, rangos: rangos.map(([a, b]) => [a.padStart(5, "0"), b.padStart(5, "0")]), cadaMin: Math.max(5, +f.cada || 30), anticipacionMin: Math.max(0, +f.antic || 0) });
       }
-      if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: Math.max(0, Math.min(10, +f.spp)), premio: (f.premio || "").trim() });
+      if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: Math.max(0, Math.min(10, +f.spp)), premio: (f.premio || "").trim(), minimo: Math.max(0, +f.minimo || 0) });
+      if (k === "envio") await API.saveSetting("envio", { activo: !!f.activo, costo: Math.max(0, +f.costo || 0), aviso: (f.aviso || "").trim() });
       if (k === "pagos") await API.saveSetting("pagos", (f.pagos || "").split("\n").map((s) => s.trim()).filter(Boolean));
       if (k === "apps") await API.saveSetting("apps", [0, 1, 2, 3].map((i) => ({ nombre: (f["an" + i] || "").trim(), url: (f["au" + i] || "").trim() })).filter((a) => a.nombre));
       await loadBase(); toast("Guardado"); viewAjustes();
@@ -296,7 +309,7 @@
       if (b.dataset.cn) { c.n = Math.max(0, Math.min(10, c.n + +b.dataset.cn)); drawOrders(); }
       if (b.dataset.deliver !== undefined) {
         b.disabled = true;
-        try { const r = await API.confirmOrder(id, c.phone, c.n); toast(c.n ? `Entregado · ${pretty(r.phone)} tiene ${r.sellos} sello(s)` : "Entregado"); delete P.confirm[id]; refreshOrders(false); }
+        try { const r = await API.confirmOrder(id, c.phone, c.n); toast(r.canje ? `Entregado · premio canjeado · la tarjeta vuelve a ${r.sellos}` : c.n ? `Entregado · ${pretty(r.phone)} tiene ${r.sellos} sello(s)` : "Entregado"); delete P.confirm[id]; refreshOrders(false); }
         catch (err) { toast(err.message); b.disabled = false; }
       }
       if (b.dataset.cancel !== undefined) {

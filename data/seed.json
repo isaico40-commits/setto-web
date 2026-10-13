@@ -5,40 +5,245 @@
     "instagram": "setto.project",
     "links": "https://setto-project.carrd.co/",
     "apps": [
-      { "nombre": "PedidosYa", "url": "https://www.pedidosya.com.ar/restaurantes/mar-del-plata/setto-1cd26341-e766-46b7-a4e5-1d19e284a9f2-menu" },
-      { "nombre": "Rappi", "url": "https://www.rappi.com.ar/restaurantes/delivery/110807-setto" },
-      { "nombre": "Uber Eats", "url": "https://www.ubereats.com/store/setto/6nnRIYyuW8-VwdbWxClQ3A" }
+      {
+        "nombre": "PedidosYa",
+        "url": "https://www.pedidosya.com.ar/restaurantes/mar-del-plata/setto-1cd26341-e766-46b7-a4e5-1d19e284a9f2-menu"
+      },
+      {
+        "nombre": "Rappi",
+        "url": "https://www.rappi.com.ar/restaurantes/delivery/110807-setto"
+      },
+      {
+        "nombre": "Uber Eats",
+        "url": "https://www.ubereats.com/store/setto/6nnRIYyuW8-VwdbWxClQ3A"
+      }
     ],
-    "pagos": ["Transferencia / Mercado Pago", "Efectivo al retirar"],
-    "retiro": { "dias": [0,1,2,3,4,5,6], "rangos": [["10:00","13:00"],["14:30","21:00"]], "cadaMin": 30, "anticipacionMin": 40 },
+    "pagos": [
+      "Transferencia / Mercado Pago",
+      "Efectivo al retirar"
+    ],
+    "retiro": {
+      "dias": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "rangos": [
+        [
+          "10:00",
+          "13:00"
+        ],
+        [
+          "14:30",
+          "21:00"
+        ]
+      ],
+      "cadaMin": 30,
+      "anticipacionMin": 40
+    },
     "especial": {
       "estado": "proximamente",
       "chip": "Próxima edición · fecha a confirmar",
       "intro": "Mochis inspirados en tortas. Salen una vez al mes y la fecha la anunciamos en Instagram."
     },
-    "club": { "meta": 8, "premio": "Premio a definir", "sellos_por_pedido": 1, "activo": true }
+    "club": {
+      "meta": 8,
+      "premio": "Premio a definir",
+      "sellos_por_pedido": 1,
+      "activo": true,
+      "minimo": 0
+    },
+    "envio": {
+      "activo": true,
+      "costo": 0,
+      "aviso": "Envíos en Mar del Plata. El costo del envío se coordina por WhatsApp según la zona."
+    }
   },
   "products": [
-    { "id":"esp-lemon", "categoria":"especial", "nombre":"Lemon Pie", "descripcion":"Mochi inspirado en el lemon pie.", "img":"", "precio":0, "orden":1 },
-    { "id":"esp-cheesecake", "categoria":"especial", "nombre":"Cheesecake de frutos rojos", "descripcion":"Mochi inspirado en el cheesecake de frutos rojos.", "img":"", "precio":0, "orden":2 },
-    { "id":"esp-bariloche", "categoria":"especial", "nombre":"Chocolate Bariloche y frutos rojos", "descripcion":"Mochi inspirado en la torta de chocolate Bariloche con frutos rojos.", "img":"", "precio":0, "orden":3 },
-    { "id":"esp-chocotorta", "categoria":"especial", "nombre":"Chocotorta", "descripcion":"Mochi inspirado en la chocotorta.", "img":"", "precio":0, "orden":4 },
-
-    { "id":"set-sakura", "categoria":"set", "nombre":"Sakura Set", "codigo":"Set 01", "tema":"Matcha & cereza", "set_bebida":"dirty-strawberry", "set_mochi":"mochi-sakura", "img":"img/set-sakura.webp", "precio_12":9900, "precio_16":10900, "orden":1 },
-    { "id":"set-yoru", "categoria":"set", "nombre":"Yoru Set", "codigo":"Set 02", "tema":"Espresso & chocolate", "set_bebida":"dirty-classic", "set_mochi":"mochi-chocolate", "img":"img/set-yoru.webp", "precio_12":8000, "precio_16":9000, "orden":2 },
-    { "id":"set-murasaki", "categoria":"set", "nombre":"Murasaki Set", "codigo":"Set 03", "tema":"Lavender & frutilla", "set_bebida":"dirty-lavender", "set_mochi":"mochi-frutilla", "img":"img/set-murasaki.webp", "precio_12":9900, "precio_16":10900, "orden":3 },
-
-    { "id":"dirty-classic", "categoria":"dirty", "nombre":"Dirty Classic", "descripcion":"Simple syrup, leche, espresso, cold foam.", "img":"img/dirty-classic.webp", "precio_12":4000, "precio_16":5000, "orden":1 },
-    { "id":"dirty-strawberry", "categoria":"dirty", "nombre":"Strawberry Matcha Dirty", "descripcion":"Simple syrup, pulpa de frutilla, leche, matcha, cold foam.", "img":"img/dirty-strawberry.webp", "precio_12":6000, "precio_16":7000, "orden":2 },
-    { "id":"dirty-lavender", "categoria":"dirty", "nombre":"Lavender Matcha Dirty", "descripcion":"Lavender syrup, matcha, leche, cold foam.", "img":"img/dirty-lavender.webp", "precio_12":6000, "precio_16":7000, "orden":3 },
-    { "id":"dirty-coconut", "categoria":"dirty", "nombre":"Coconut Dirty", "descripcion":"Coconut syrup, espresso, leche, coconut foam.", "img":"img/dirty-coconut.webp", "precio_12":6000, "precio_16":7000, "orden":4 },
-    { "id":"dirty-caramel", "categoria":"dirty", "nombre":"Caramel Vanilla Dirty", "descripcion":"Vanilla syrup, caramel syrup, leche, espresso, vanilla foam.", "img":"img/dirty-caramel.webp", "precio_12":6000, "precio_16":7000, "orden":5 },
-
-    { "id":"mochi-frutilla", "categoria":"mochi", "nombre":"Frutilla", "descripcion":"Masa mochi rellena de crema y corazón de frutilla.", "img":"img/mochi-frutilla.webp", "precio":5000, "orden":1 },
-    { "id":"mochi-chocolate", "categoria":"mochi", "nombre":"Chocolate", "descripcion":"Masa mochi rellena de crema y corazón de chocolate.", "img":"img/mochi-chocolate.webp", "precio":5000, "orden":2 },
-    { "id":"mochi-oreo", "categoria":"mochi", "nombre":"Oreo", "descripcion":"Masa mochi rellena de crema y oreos.", "img":"img/mochi-oreo.webp", "precio":5000, "orden":3 },
-    { "id":"mochi-sakura", "categoria":"mochi", "nombre":"Sakura", "descripcion":"Masa mochi rellena de matcha y corazón de cerezas.", "img":"img/mochi-sakura.webp", "precio":5000, "orden":4 },
-    { "id":"mochi-banana", "categoria":"mochi", "nombre":"Banana Split", "descripcion":"Masa mochi rellena de crema con banana caramelizada y dulce de leche repostero.", "img":"img/mochi-banana.webp", "precio":5000, "rotativo":true, "orden":5 },
-    { "id":"mochi-tiramisu", "categoria":"mochi", "nombre":"Tiramisú", "descripcion":"Masa mochi rellena de tiramisú.", "img":"img/mochi-tiramisu.webp", "precio":5000, "rotativo":true, "orden":6 }
+    {
+      "id": "esp-lemon",
+      "categoria": "especial",
+      "nombre": "Lemon Pie",
+      "descripcion": "Mochi inspirado en el lemon pie.",
+      "img": "",
+      "precio": 0,
+      "orden": 1
+    },
+    {
+      "id": "esp-cheesecake",
+      "categoria": "especial",
+      "nombre": "Cheesecake de frutos rojos",
+      "descripcion": "Mochi inspirado en el cheesecake de frutos rojos.",
+      "img": "",
+      "precio": 0,
+      "orden": 2
+    },
+    {
+      "id": "esp-bariloche",
+      "categoria": "especial",
+      "nombre": "Chocolate Bariloche y frutos rojos",
+      "descripcion": "Mochi inspirado en la torta de chocolate Bariloche con frutos rojos.",
+      "img": "",
+      "precio": 0,
+      "orden": 3
+    },
+    {
+      "id": "esp-chocotorta",
+      "categoria": "especial",
+      "nombre": "Chocotorta",
+      "descripcion": "Mochi inspirado en la chocotorta.",
+      "img": "",
+      "precio": 0,
+      "orden": 4
+    },
+    {
+      "id": "set-sakura",
+      "categoria": "set",
+      "nombre": "Sakura Set",
+      "codigo": "Set 01",
+      "tema": "Matcha & cereza",
+      "set_bebida": "dirty-strawberry",
+      "set_mochi": "mochi-sakura",
+      "img": "img/set-sakura.webp",
+      "precio_12": 9900,
+      "precio_16": 10900,
+      "orden": 1
+    },
+    {
+      "id": "set-yoru",
+      "categoria": "set",
+      "nombre": "Yoru Set",
+      "codigo": "Set 02",
+      "tema": "Espresso & chocolate",
+      "set_bebida": "dirty-classic",
+      "set_mochi": "mochi-chocolate",
+      "img": "img/set-yoru.webp",
+      "precio_12": 8000,
+      "precio_16": 9000,
+      "orden": 2
+    },
+    {
+      "id": "set-murasaki",
+      "categoria": "set",
+      "nombre": "Murasaki Set",
+      "codigo": "Set 03",
+      "tema": "Lavender & frutilla",
+      "set_bebida": "dirty-lavender",
+      "set_mochi": "mochi-frutilla",
+      "img": "img/set-murasaki.webp",
+      "precio_12": 9900,
+      "precio_16": 10900,
+      "orden": 3
+    },
+    {
+      "id": "dirty-classic",
+      "categoria": "dirty",
+      "nombre": "Dirty Classic",
+      "descripcion": "Simple syrup, leche, espresso, cold foam.",
+      "img": "img/dirty-classic.webp",
+      "precio_12": 4000,
+      "precio_16": 5000,
+      "orden": 1
+    },
+    {
+      "id": "dirty-strawberry",
+      "categoria": "dirty",
+      "nombre": "Strawberry Matcha Dirty",
+      "descripcion": "Simple syrup, pulpa de frutilla, leche, matcha, cold foam.",
+      "img": "img/dirty-strawberry.webp",
+      "precio_12": 6000,
+      "precio_16": 7000,
+      "orden": 2
+    },
+    {
+      "id": "dirty-lavender",
+      "categoria": "dirty",
+      "nombre": "Lavender Matcha Dirty",
+      "descripcion": "Lavender syrup, matcha, leche, cold foam.",
+      "img": "img/dirty-lavender.webp",
+      "precio_12": 6000,
+      "precio_16": 7000,
+      "orden": 3
+    },
+    {
+      "id": "dirty-coconut",
+      "categoria": "dirty",
+      "nombre": "Coconut Dirty",
+      "descripcion": "Coconut syrup, espresso, leche, coconut foam.",
+      "img": "img/dirty-coconut.webp",
+      "precio_12": 6000,
+      "precio_16": 7000,
+      "orden": 4
+    },
+    {
+      "id": "dirty-caramel",
+      "categoria": "dirty",
+      "nombre": "Caramel Vanilla Dirty",
+      "descripcion": "Vanilla syrup, caramel syrup, leche, espresso, vanilla foam.",
+      "img": "img/dirty-caramel.webp",
+      "precio_12": 6000,
+      "precio_16": 7000,
+      "orden": 5
+    },
+    {
+      "id": "mochi-frutilla",
+      "categoria": "mochi",
+      "nombre": "Frutilla",
+      "descripcion": "Masa mochi rellena de crema y corazón de frutilla.",
+      "img": "img/mochi-frutilla.webp",
+      "precio": 5000,
+      "orden": 1
+    },
+    {
+      "id": "mochi-chocolate",
+      "categoria": "mochi",
+      "nombre": "Chocolate",
+      "descripcion": "Masa mochi rellena de crema y corazón de chocolate.",
+      "img": "img/mochi-chocolate.webp",
+      "precio": 5000,
+      "orden": 2
+    },
+    {
+      "id": "mochi-oreo",
+      "categoria": "mochi",
+      "nombre": "Oreo",
+      "descripcion": "Masa mochi rellena de crema y oreos.",
+      "img": "img/mochi-oreo.webp",
+      "precio": 5000,
+      "orden": 3
+    },
+    {
+      "id": "mochi-sakura",
+      "categoria": "mochi",
+      "nombre": "Sakura",
+      "descripcion": "Masa mochi rellena de matcha y corazón de cerezas.",
+      "img": "img/mochi-sakura.webp",
+      "precio": 5000,
+      "orden": 4
+    },
+    {
+      "id": "mochi-banana",
+      "categoria": "mochi",
+      "nombre": "Banana Split",
+      "descripcion": "Masa mochi rellena de crema con banana caramelizada y dulce de leche repostero.",
+      "img": "img/mochi-banana.webp",
+      "precio": 5000,
+      "rotativo": true,
+      "orden": 5
+    },
+    {
+      "id": "mochi-tiramisu",
+      "categoria": "mochi",
+      "nombre": "Tiramisú",
+      "descripcion": "Masa mochi rellena de tiramisú.",
+      "img": "img/mochi-tiramisu.webp",
+      "precio": 5000,
+      "rotativo": true,
+      "orden": 6
+    }
   ]
 }

@@ -45,16 +45,18 @@
   }
   function clubLine() {
     if (!clubOn()) return "";
+    const min = Number(club().minimo) || 0;
+    if (min > 0 && total() < min) return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div>Sumá <b>${money(min - total())}</b> más y este pedido suma ${sellosTxt(spp())} del Setto Club.</div></div>`;
     const n = spp(), meta = club().meta || 8, premio = club().premio && club().premio !== "Premio a definir" ? club().premio : "tu premio";
     const c = cardCache && cardCache.tel === API.normPhone(form.tel) ? cardCache.data : null;
     let txt, pct = null;
     if (c && c.existe) {
       const after = c.sellos + n;
       pct = Math.min(100, Math.round((after / meta) * 100));
-      txt = after >= meta ? `<b>¡Con este pedido completás la tarjeta!</b> Pedí ${esc(premio)} en tu próxima compra.`
+      txt = after >= meta ? `<b>¡Este pedido completa tu tarjeta!</b> Viene con ${esc(premio)}.`
         : `Tenés <b>${c.sellos} de ${meta}</b> sellos. Con este pedido llegás a <b>${after}</b>.`;
     } else {
-      txt = `Este pedido suma <b>${sellosTxt(n)}</b> del Setto Club al retirarlo. Con ${meta} sellos: ${esc(premio)}.`;
+      txt = `Este pedido suma <b>${sellosTxt(n)}</b> del Setto Club. El pedido que completa los ${meta} sellos viene con ${esc(premio)}.`;
     }
     return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div style="flex:1">${txt}${pct !== null ? `<div class="clubbar"><i style="width:${pct}%"></i></div>` : ""}</div></div>`;
   }
@@ -154,7 +156,7 @@
   function renderClubInfo() {
     const c = S.club || {};
     $("#club").hidden = c.activo === false;
-    $("#clubPremio").textContent = `Con ${c.meta || 8} sellos: ${c.premio || "premio a definir"}.`;
+    $("#clubPremio").textContent = `El pedido que completa los ${c.meta || 8} sellos viene con ${c.premio && c.premio !== "Premio a definir" ? c.premio : "premio"}.` + (c.minimo > 0 ? ` Suman sello los pedidos desde ${money(c.minimo)}.` : "");
     $("#heroClub").hidden = !clubOn();
     $("#heroClub span").innerHTML = `Cada pedido desde la web suma ${sellosTxt(spp())} del <b>Setto Club</b>`;
     $("#mnavClub").hidden = !clubOn();
@@ -243,15 +245,21 @@
     return out;
   }
   let view = "cart", sending = false;
-  let form = { nombre: "", tel: "", hora: "", pago: "", nota: "" };
-  try { const f = JSON.parse(localStorage.getItem("setto-form") || "null"); if (f) { form.nombre = f.nombre || ""; form.tel = f.tel || ""; } } catch (_) {}
+  let form = { nombre: "", tel: "", hora: "", pago: "", nota: "", modo: "retiro", dir: "", dirExtra: "" };
+  try { const f = JSON.parse(localStorage.getItem("setto-form") || "null"); if (f) { form.nombre = f.nombre || ""; form.tel = f.tel || ""; form.dir = f.dir || ""; form.dirExtra = f.dirExtra || ""; } } catch (_) {}
   let lastOrder = null;
   try { lastOrder = JSON.parse(sessionStorage.getItem("setto-last-order") || "null"); } catch (_) {}
 
   function buildMessage(o) {
     const lines = o.items.map((c) => `• ${c.qty}× ${c.nombre}${c.size ? ` (${c.size})` : ""} — ${money(c.subtotal)}`);
-    return `¡Hola Setto! Te paso mi pedido ${o.code} para retirar:\n\n${lines.join("\n")}\n\nTotal: ${money(o.total)}\n\nNombre: ${o.nombre}\nRetiro: ${o.retiro}\nPago: ${o.pago}` + (o.nota ? `\nNota: ${o.nota}` : "");
+    const envio = o.modo === "envio";
+    const entrega = envio ? `Envío: ${o.retiro}\nDirección: ${o.direccion}` + (Number(o.costo_envio) > 0 ? "" : "\n(Costo de envío a coordinar)") : `Retiro: ${o.retiro}`;
+    const premio = o.premio ? `\n\n🎁 Con este pedido completo mi tarjeta del Setto Club: ${o.premio_txt || "premio"}` : "";
+    return `¡Hola Setto! Te paso mi pedido ${o.code} ${envio ? "con envío a domicilio" : "para retirar"}:\n\n${lines.join("\n")}\n\nTotal: ${money(o.total)}${premio}\n\nNombre: ${o.nombre}\n${entrega}\nPago: ${o.pago}` + (o.nota ? `\nNota: ${o.nota}` : "");
   }
+  const envioOn = () => !!(S.envio && S.envio.activo);
+  const envioCosto = () => (envioOn() && form.modo === "envio" ? Math.max(0, Number(S.envio.costo) || 0) : 0);
+  const fullDir = () => [form.dir.trim(), form.dirExtra.trim()].filter(Boolean).join(" · ");
   const waLink = (msg) => `https://wa.me/${S.whatsapp}?text=${encodeURIComponent(msg)}`;
 
   function openDrawer() {
@@ -270,27 +278,35 @@
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
         <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("");
       foot.innerHTML = `${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
-        <p class="muted" style="font-size:.78rem;text-align:center">¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats.</p>`;
+        <p class="muted" style="font-size:.78rem;text-align:center">${envioOn() ? "Retiro o envío a domicilio: lo elegís en el próximo paso." : "¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats."}</p>`;
     }
     if (view === "checkout") {
-      $("#dTitle").textContent = "Retiro";
+      $("#dTitle").textContent = "Entrega";
       if (!form.pago) form.pago = (S.pagos || [])[0] || "";
-      const r = S.retiro || {};
+      if (!envioOn()) form.modo = "retiro";
+      const r = S.retiro || {}, isEnv = form.modo === "envio", costo = Math.max(0, Number((S.envio || {}).costo) || 0);
       body.innerHTML = `
+        ${envioOn() ? `<div class="modo" role="radiogroup" aria-label="Forma de entrega">
+          <button data-modo="retiro" role="radio" aria-checked="${!isEnv}"><b>Retiro</b><small>Pasás a buscarlo</small></button>
+          <button data-modo="envio" role="radio" aria-checked="${isEnv}"><b>Envío a domicilio</b><small>${costo > 0 ? "Costo " + money(costo) : "Costo a coordinar"}</small></button>
+        </div>` : ""}
+        ${isEnv ? `<label class="f" for="fDir">Dirección exacta<input id="fDir" autocomplete="street-address" value="${esc(form.dir)}" placeholder="Calle y número"><span class="hintf">${esc((S.envio || {}).aviso || "")}</span></label>
+          <label class="f" for="fDir2">Piso, depto o referencia (opcional)<input id="fDir2" value="${esc(form.dirExtra)}" placeholder="Ej: 3° B, timbre 2, entre Colón y Moreno"></label>` : ""}
         <label class="f" for="fNombre">Nombre<input id="fNombre" autocomplete="given-name" value="${esc(form.nombre)}" placeholder="Cómo te llamamos"></label>
         <label class="f" for="fTel">Tu celular (WhatsApp)<input id="fTel" type="tel" inputmode="tel" autocomplete="tel" value="${esc(form.tel)}" placeholder="223 347-1277"><span class="hintf">Con este número sumás sellos del Setto Club.</span></label>
-        <label class="f" for="fHora">Horario de retiro<select id="fHora"><option value="">Elegí un horario</option>${slots().map((o) => `<option ${o === form.hora ? "selected" : ""}>${esc(o)}</option>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>
+        <label class="f" for="fHora">${isEnv ? "Horario de entrega" : "Horario de retiro"}<select id="fHora"><option value="">Elegí un horario</option>${slots().map((o) => `<option ${o === form.hora ? "selected" : ""}>${esc(o)}</option>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>
         <div class="f"><span>Forma de pago</span><div class="chips">${(S.pagos || []).map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">El pago se coordina por WhatsApp.</span></div>
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: leche de almendras">${esc(form.nota)}</textarea></label>
         <div id="fErr" class="err" hidden></div>`;
-      foot.innerHTML = `${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
-      [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"]].forEach(([id, k]) => $("#" + id).addEventListener("input", (e) => { form[k] = e.target.value; }));
+      foot.innerHTML = `${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(total() + envioCosto())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
+      [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; }); });
       $("#fTel").addEventListener("change", async () => { if (await loadCard()) { const cl = $("#dFoot .clubline"); if (cl && view === "checkout") cl.outerHTML = clubLine(); } });
     }
     if (view === "sent" && lastOrder) {
       $("#dTitle").textContent = "Último paso";
       body.innerHTML = `<div class="ok"><img src="img/mochito-cup.png" alt=""><span class="eyebrow">Tu código de pedido</span><div class="coderow num">${esc(lastOrder.code)}</div>
-        <p class="muted" style="font-size:.9rem">Enviá el mensaje por WhatsApp. El pedido queda confirmado cuando te respondemos con la dirección y el pago. Al retirarlo sumás un sello del Setto Club.</p></div>
+        ${lastOrder.premio ? `<div class="clubline" style="width:100%;text-align:left"><img src="img/mochito-run.png" alt=""><div><b>¡Completaste tu tarjeta!</b> Este pedido viene con ${esc(lastOrder.premio_txt || "tu premio")}.</div></div>` : ""}
+        <p class="muted" style="font-size:.9rem">${lastOrder.modo === "envio" ? "Enviá el mensaje por WhatsApp. Te confirmamos el horario, el costo del envío y el pago." : "Enviá el mensaje por WhatsApp. El pedido queda confirmado cuando te respondemos con la dirección y el pago."}${clubOn() ? " Cuando lo recibís, sumás tu sello del Setto Club." : ""}</p></div>
         <div class="msg" id="msgText">${esc(lastOrder.message)}</div>`;
       foot.innerHTML = `<a class="btn wa big" href="${waLink(lastOrder.message)}" target="_blank" rel="noopener">Abrir WhatsApp</a>
         <button class="btn big" id="copyMsg">Copiar mensaje</button>
@@ -303,13 +319,16 @@
     if (!form.nombre.trim()) err.push("tu nombre");
     if (!API.normPhone(form.tel)) err.push("un celular válido");
     if (!form.hora) err.push("un horario");
+    if (form.modo === "envio" && form.dir.trim().length < 5) err.push("la dirección de entrega");
     if (err.length) { el.hidden = false; el.textContent = "Falta " + err.join(", ") + "."; return; }
     if (sending) return; sending = true; drawFootOnly();
     try {
-      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty })), retiro: form.hora, pago: form.pago, nota: form.nota.trim() });
+      const isEnv = form.modo === "envio";
+      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null });
       const full = { ...o, nombre: form.nombre.trim(), retiro: form.hora, pago: form.pago, nota: form.nota.trim() };
-      lastOrder = { code: o.code, message: buildMessage(full) };
-      try { sessionStorage.setItem("setto-last-order", JSON.stringify(lastOrder)); localStorage.setItem("setto-form", JSON.stringify({ nombre: form.nombre, tel: form.tel })); } catch (_) {}
+      lastOrder = { code: o.code, message: buildMessage(full), modo: o.modo || "retiro", premio: !!o.premio, premio_txt: o.premio_txt };
+      cardCache = null;
+      try { sessionStorage.setItem("setto-last-order", JSON.stringify(lastOrder)); localStorage.setItem("setto-form", JSON.stringify({ nombre: form.nombre, tel: form.tel, dir: form.dir, dirExtra: form.dirExtra })); } catch (_) {}
       cart = []; save(); form.hora = ""; form.nota = ""; renderBadge();
       view = "sent"; sending = false; drawDrawer();
       const link = waLink(lastOrder.message);
@@ -334,6 +353,7 @@
       const falta = Math.max(0, c.meta - c.sellos);
       msg.textContent = !c.existe ? "Todavía no tenés sellos con este número. Se suman cuando retirás un pedido hecho desde la web."
         : falta === 0 ? `¡Completaste la tarjeta! Avisanos en tu próximo pedido para canjear: ${c.premio || "tu premio"}.`
+        : falta <= (S.club && S.club.sellos_por_pedido || 1) ? `Tenés ${c.sellos} de ${c.meta} sellos. ¡Tu próximo pedido viene con ${c.premio || "premio"}!`
         : `Tenés ${c.sellos} de ${c.meta} sellos. Te ${falta === 1 ? "falta 1" : "faltan " + falta} para ${c.premio || "el premio"}.`;
       try { localStorage.setItem("setto-form", JSON.stringify({ nombre: form.nombre, tel })); } catch (_) {}
     } catch (err) { msg.textContent = err.message || "No pudimos consultar la tarjeta."; }
@@ -357,6 +377,7 @@
     if (b.id === "toCheckout") { view = "checkout"; drawDrawer(); }
     if (b.dataset.pago) { form.pago = b.dataset.pago; document.querySelectorAll("[data-pago]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); }
     if (b.id === "toWA") sendOrder();
+    if (b.dataset.modo) { form.modo = b.dataset.modo; drawDrawer(); if (form.modo === "envio") setTimeout(() => { const d = $("#fDir"); if (d && !d.value) d.focus(); }, 30); }
     if (b.id === "copyMsg") {
       const txt = lastOrder ? lastOrder.message : "";
       const fallback = () => { const r = document.createRange(); r.selectNodeContents($("#msgText")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast("Seleccionado: copialo con tu teclado"); };

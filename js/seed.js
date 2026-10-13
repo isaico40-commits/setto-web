@@ -55,7 +55,13 @@ window.SETTO_SEED = {
    "meta": 8,
    "premio": "Premio a definir",
    "sellos_por_pedido": 1,
-   "activo": true
+   "activo": true,
+   "minimo": 0
+  },
+  "envio": {
+   "activo": true,
+   "costo": 0,
+   "aviso": "Envíos en Mar del Plata. El costo del envío se coordina por WhatsApp según la zona."
   }
  },
  "products": [

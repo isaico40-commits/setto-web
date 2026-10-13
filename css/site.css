@@ -331,3 +331,10 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .clubbar i{display:block;height:100%;background:var(--turquesa);border-radius:999px}
 .clubtag{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:600;color:var(--turquesa)}
 .clubtag::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--menta) url(../img/mochito-run.png) center/12px no-repeat;border:1.5px solid var(--turquesa)}
+
+/* retiro / envío */
+.modo{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.modo button{display:grid;gap:2px;text-align:left;border:1.5px solid color-mix(in srgb,var(--turquesa) 45%,transparent);background:var(--card);border-radius:14px;padding:10px 12px;color:var(--ink)}
+.modo button b{font-weight:600;font-size:.92rem}
+.modo button small{font-size:.76rem;color:var(--ink-2)}
+.modo button[aria-checked="true"]{border:2px solid var(--turquesa);background:color-mix(in srgb,var(--menta) 55%,var(--card))}

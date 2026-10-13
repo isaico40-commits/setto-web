@@ -52,8 +52,11 @@
 
   const demo = {
     async loadAll() { const db = dbLoad(); return { settings: db.settings, products: db.products }; },
-    async createOrder({ nombre, phone, items, retiro, pago, nota }) {
-      const db = dbLoad(), ph = normPhone(phone), esp = db.settings.especial || {};
+    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion }) {
+      const db = dbLoad(), ph = normPhone(phone), esp = db.settings.especial || {}, envio = db.settings.envio || {}, club = db.settings.club || {};
+      modo = modo === "envio" ? "envio" : "retiro";
+      if (modo === "envio" && !envio.activo) throw new Error("Por ahora no hacemos envíos desde la web");
+      if (modo === "envio" && String(direccion || "").trim().length < 5) throw new Error("Falta la dirección de entrega");
       if (!String(nombre || "").trim()) throw new Error("Falta tu nombre");
       if (!ph) throw new Error("El celular no parece válido");
       if (!items || !items.length) throw new Error("El pedido está vacío");
@@ -75,11 +78,16 @@
         total += price * qty;
         lines.push({ id: pr.id, nombre: name, size, qty, precio: price, subtotal: price * qty });
       }
+      const sub = total, costo = modo === "envio" ? Math.max(0, Number(envio.costo) || 0) : 0;
+      if (costo > 0) { lines.push({ id: "envio", nombre: "Envío", size: null, qty: 1, precio: costo, subtotal: costo }); total += costo; }
+      const cust = db.customers.find((x) => x.phone === ph), spp = club.sellos_por_pedido ?? 1, meta = club.meta || 8;
+      const premio = club.activo !== false && spp > 0 && sub >= (Number(club.minimo) || 0) && (cust ? cust.sellos : 0) + spp >= meta;
       let code; do { code = "STT-" + String(Math.floor(Math.random() * 10000)).padStart(4, "0"); }
       while (db.orders.some((o) => o.code === code && o.status === "pendiente"));
-      const o = { id: uid(), code, nombre: String(nombre).trim(), phone: ph, items: lines, total, retiro, pago, nota: nota || null, status: "pendiente", sellos: 0, created_at: new Date().toISOString() };
+      const o = { id: uid(), code, nombre: String(nombre).trim(), phone: ph, items: lines, total, retiro, pago, nota: nota || null, status: "pendiente", sellos: 0, created_at: new Date().toISOString(),
+        modo, direccion: modo === "envio" ? String(direccion).trim() : null, premio, premio_txt: premio ? club.premio || "Premio" : null };
       db.orders.unshift(o); dbSave(db);
-      return { id: o.id, code, total, items: lines, phone: ph };
+      return { id: o.id, code, total, items: lines, phone: ph, modo, direccion: o.direccion, costo_envio: costo, premio, premio_txt: o.premio_txt, meta };
     },
     async getCard(phone) {
       const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("El celular no parece válido");
@@ -105,7 +113,13 @@
       if (!c) { c = { phone: ph, nombre: o.nombre, sellos: 0, canjes: 0, created_at: new Date().toISOString() }; db.customers.push(c); }
       c.sellos += n; c.updated_at = new Date().toISOString();
       if (n) db.events.unshift({ phone: ph, delta: n, motivo: "Pedido " + o.code, created_at: new Date().toISOString() });
-      dbSave(db); return { phone: ph, sellos: c.sellos };
+      const club = db.settings.club || {}, meta = club.meta || 8; let canje = false;
+      if (n > 0 && club.activo !== false && c.sellos >= meta) {
+        c.sellos -= meta; c.canjes += 1; canje = true;
+        db.events.unshift({ phone: ph, delta: -meta, motivo: "Premio entregado en " + o.code, created_at: new Date().toISOString() });
+      }
+      o.premio = canje;
+      dbSave(db); return { phone: ph, sellos: c.sellos, canje, premio: club.premio };
     },
     async cancelOrder(id) {
       const db = dbLoad(), o = db.orders.find((x) => x.id === id);
@@ -166,10 +180,10 @@
       const settings = {}; s.data.forEach((r) => (settings[r.key] = r.value));
       return { settings, products: p.data };
     },
-    async createOrder({ nombre, phone, items, retiro, pago, nota }) {
-      const { data, error } = await sb.rpc("create_order", {
+    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion }) {
+      const { data, error } = await sb.rpc("create_order_v2", {
         p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty })),
-        p_retiro: retiro, p_pago: pago, p_nota: nota || null,
+        p_retiro: retiro, p_pago: pago, p_nota: nota || null, p_modo: modo || "retiro", p_direccion: direccion || null,
       });
       fail(error); return data;
     },
