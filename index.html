@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Setto · Dirty lattes y mochis en Mar del Plata</title>
+<meta name="description" content="Cafetería artesanal de inspiración asiática que nace desde casa en Mar del Plata. Dirty lattes fríos, mochis rellenos y sets. Pedí para retirar por WhatsApp o por delivery.">
+<meta property="og:title" content="Setto · Dirty lattes y mochis en Mar del Plata">
+<meta property="og:description" content="Dirty lattes fríos, mochis rellenos y sets. Take away y delivery en Mar del Plata.">
+<meta property="og:image" content="img/set-sakura.webp">
+<meta name="theme-color" content="#FAF4E8">
+<link rel="icon" href="img/mochito-cup.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,600&display=swap">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+<div class="proto" id="demoBar" hidden>Modo demo · los pedidos y sellos se guardan solo en este navegador</div>
+<div class="proto" id="errBar" hidden></div>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="#inicio" aria-label="Setto, inicio"><img src="img/logo.png" alt="Setto"></a>
+    <nav aria-label="Principal">
+      <a href="#especial">Edición especial</a>
+      <a href="#sets">Sets</a>
+      <a href="#carta">Carta</a>
+      <a href="#pedir">Cómo pedir</a>
+      <a href="#club">Setto Club</a>
+    </nav>
+    <button class="btn cartbtn" id="openCart" aria-label="Abrir tu pedido">Tu pedido <span class="count num" id="cartCount">0</span></button>
+  </div>
+</header>
+
+<main id="inicio">
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="tagline"><i></i>Take away y delivery en Mar del Plata</span>
+        <h1>Dirty lattes y mochis, <span>desde casa</span></h1>
+        <p class="lead">Elegí tu set, mandanos el pedido por WhatsApp y pasá a buscarlo. Si preferís delivery, también estamos en tus apps.</p>
+        <div class="ctas">
+          <a class="btn glow big" href="#sets">Armar mi pedido</a>
+          <a class="btn big" href="#carta">Ver la carta</a>
+        </div>
+      </div>
+      <div class="stage" aria-hidden="true">
+        <div class="blob"></div>
+        <img class="mito" src="img/mochito-cup.png" alt="">
+        <img class="p1" src="img/dirty-lavender.webp" alt="">
+        <img class="p2" src="img/dirty-caramel.webp" alt="">
+        <img class="p3" src="img/mochi-sakura.webp" alt="">
+      </div>
+    </div>
+  </section>
+
+  <div class="band" aria-hidden="true"><div class="track" id="track"></div></div>
+
+  <section class="blk" id="especial" aria-labelledby="t-esp">
+    <div class="wrap">
+      <div class="head">
+        <span class="chip" id="espChip"></span>
+        <h2 id="t-esp">Edición especial</h2>
+        <p id="espIntro"></p>
+      </div>
+      <div class="rail" id="espGrid" style="--cols:4;--w:70%"></div>
+      <div class="hint"><span class="dots" data-for="espGrid"></span><span>Deslizá para ver más</span></div>
+      <div id="espSoon"></div>
+    </div>
+  </section>
+
+  <section class="blk alt" id="sets" aria-labelledby="t-sets">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow">Disponibilidad limitada</span><h2 id="t-sets">Sets</h2>
+      </div>
+      <div class="rail" id="setsGrid" style="--cols:3;--w:84%"></div>
+      <div class="hint"><span class="dots" data-for="setsGrid"></span><span>Deslizá para ver más</span></div>
+      <p class="setsnote">Una bebida y un mochi que van juntos, más barato que por separado. Combinaciones por tiempo limitado.</p>
+    </div>
+  </section>
+
+  <section class="blk" id="carta" aria-labelledby="t-carta">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow">Elegí una categoría</span><h2 id="t-carta">La carta</h2>
+        <p id="cartaEyebrow">Fríos · Cualquier tipo de leche incluida</p>
+      </div>
+      <div class="switch" role="tablist" aria-label="Categorías de la carta">
+        <button class="sw" role="tab" id="tab-dirty" aria-selected="true" aria-controls="panel">
+          <span class="sw-th"><img src="img/dirty-strawberry.webp" alt=""></span>
+          <span class="sw-tx"><b>Dirty lattes</b><small id="cntDirty">5 sabores · fríos</small></span>
+          <span class="sw-go" aria-hidden="true">→</span>
+        </button>
+        <button class="sw" role="tab" id="tab-mochi" aria-selected="false" aria-controls="panel">
+          <span class="sw-th"><img src="img/mochi-oreo.webp" alt=""></span>
+          <span class="sw-tx"><b>Mochis</b><small id="cntMochi">6 sabores · por unidad</small></span>
+          <span class="sw-go" aria-hidden="true">→</span>
+        </button>
+      </div>
+      <div id="panel" role="tabpanel" aria-labelledby="tab-dirty">
+        <div class="rail" id="grid" style="--cols:4;--w:68%"></div>
+        <div class="hint"><span class="dots" data-for="grid"></span><span>Deslizá para ver más</span></div>
+        <div id="panelExtra"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk alt" id="pedir" aria-labelledby="t-pedir">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow">Todo en un lugar</span><h2 id="t-pedir">Cómo pedir</h2>
+        <p>Retiro con pedido por WhatsApp o delivery por la app que ya usás.</p>
+      </div>
+      <div class="channels">
+        <div class="ch-main" style="background:var(--bg)">
+          <span class="eyebrow">Take away · Precio de carta</span>
+          <h3>Retirá tu pedido</h3>
+          <ol class="steps">
+            <li>Sumá sets, dirty lattes o mochis a tu pedido.</li>
+            <li>Elegí horario y forma de pago.</li>
+            <li>Se abre WhatsApp con el pedido escrito: lo enviás y te confirmamos dirección y pago.</li>
+          </ol>
+          <div style="position:relative;z-index:1"><a class="btn solid" href="#sets">Empezar pedido</a></div>
+          <p class="note">Pidiendo acá pagás el precio de la carta. En las apps el precio es más alto por sus comisiones.</p>
+          <img class="mito" src="img/mochito-run.png" alt="">
+        </div>
+        <div class="apps" id="apps"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk" id="club" aria-labelledby="t-club">
+    <div class="wrap club">
+      <div>
+        <span class="eyebrow">Tarjeta de sellos</span>
+        <h2 id="t-club" style="font-size:clamp(2.3rem,5vw,3.6rem);margin-top:8px">Setto Club</h2>
+        <p class="muted" style="margin-top:14px;max-width:46ch" id="clubIntro">Cada pedido que hacés desde esta web suma un sello cuando lo retirás.</p>
+        <div class="next">
+          <div><span class="k">1</span><span><b>Pedí desde la web</b><small>Tu pedido llega a nuestro WhatsApp con un código.</small></span></div>
+          <div><span class="k">2</span><span><b>Retiralo</b><small>Cuando lo entregamos, sumamos el sello a tu celular.</small></span></div>
+          <div><span class="k">3</span><span><b>Completá la tarjeta</b><small id="clubPremio">Y canjeá tu premio en el próximo pedido.</small></span></div>
+        </div>
+      </div>
+      <div class="stampcard">
+        <div class="row1"><img src="img/logo.png" alt="Setto"><span class="eyebrow">Club</span></div>
+        <form class="cardq" id="cardForm" novalidate>
+          <label class="f" for="cardPhone">Tu celular<input id="cardPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 347-1277"></label>
+          <button class="btn solid" type="submit">Ver mis sellos</button>
+        </form>
+        <div class="stamps" id="stamps"></div>
+        <p class="muted" id="cardMsg" style="font-size:.84rem;margin-top:14px">Ingresá el celular con el que hacés tus pedidos.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="box"><img class="logo" src="img/logo.png" alt="Setto"><p>Cafetería artesanal de inspiración asiática contemporánea que nace desde casa en Mar del Plata.</p></div>
+    <div class="box"><b>Take away</b><p>Pedido por WhatsApp. La dirección de retiro te la pasamos al confirmar.</p><p style="margin-top:6px" id="footHours"></p></div>
+    <div class="box"><b>Contacto</b><p>WhatsApp <b style="display:inline;color:var(--ink);user-select:all" id="waNum"></b></p><p style="margin-top:6px">Instagram <b style="display:inline;color:var(--ink)">@setto.project</b></p><p style="margin-top:6px"><a href="https://setto-project.carrd.co/" target="_blank" rel="noopener" style="color:var(--turquesa);font-weight:600">Todos nuestros links ↗</a></p></div>
+    <p class="fine"><a href="panel.html" style="color:inherit;text-decoration:none">·</a> Precios en pesos argentinos. Sets y sabores rotativos sujetos a disponibilidad.</p>
+  </div>
+</footer>
+
+<div class="mbar" id="mbar"><button class="btn solid big" id="mbarBtn"><span>Ver pedido</span><span class="num" id="mbarTot"></span></button></div>
+<div class="scrim" id="scrim"></div>
+
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sTitle"></div>
+
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dTitle">
+  <div class="dh"><button class="back" id="dBack" hidden>← Volver</button><h2 id="dTitle">Tu pedido</h2><button class="x" id="dClose" aria-label="Cerrar">✕</button></div>
+  <div class="db" id="dBody"></div>
+  <div class="df" id="dFoot"></div>
+</aside>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/api.js"></script>
+<script src="js/site.js"></script>
+</body>
+</html>
