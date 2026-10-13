@@ -30,7 +30,16 @@
       <a href="#club">Setto Club</a>
     </nav>
     <button class="btn cartbtn" id="openCart" aria-label="Abrir tu pedido">Tu pedido <span class="count num" id="cartCount">0</span></button>
+    <button class="burger" id="burger" aria-label="Abrir menú" aria-expanded="false" aria-controls="mnav"><span></span><span></span><span></span></button>
   </div>
+  <nav class="mnav" id="mnav" aria-label="Menú" hidden>
+    <a href="#especial">Edición especial</a>
+    <a href="#sets">Sets</a>
+    <a href="#carta">Carta</a>
+    <a href="#pedir">Cómo pedir</a>
+    <a href="#club">Setto Club <small id="mnavClub">Sumá sellos</small></a>
+    <div class="mnav-foot"><span>WhatsApp <b id="mnavWa"></b></span><span>Instagram <b>@setto.project</b></span></div>
+  </nav>
 </header>
 
 <main id="inicio">
@@ -38,6 +47,7 @@
     <div class="wrap">
       <div>
         <span class="tagline"><i></i>Take away y delivery en Mar del Plata</span>
+        <a class="clubpill" href="#club" id="heroClub" hidden><img src="img/mochito-run.png" alt=""><span>Cada pedido desde la web suma sellos del <b>Setto Club</b></span></a>
         <h1>Dirty lattes y mochis, <span>desde casa</span></h1>
         <p class="lead">Elegí tu set, mandanos el pedido por WhatsApp y pasá a buscarlo. Si preferís delivery, también estamos en tus apps.</p>
         <div class="ctas">

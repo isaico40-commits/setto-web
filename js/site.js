@@ -32,6 +32,33 @@
   const suelto = (s, sz) => { const { b, m } = setParts(s); return (b ? Number(b.precios[sz]) : 0) + (m ? Number(m.precio) : 0); };
   const descOf = (p) => { if (p.categoria !== "set") return p.desc; const { b, m } = setParts(p); return (b ? b.nombre : "Bebida") + " + mochi " + (m ? m.nombre.toLowerCase() : ""); };
 
+  /* ---------- Setto Club: helpers ---------- */
+  const club = () => S.club || {};
+  const clubOn = () => club().activo !== false && (club().sellos_por_pedido ?? 1) > 0;
+  const spp = () => club().sellos_por_pedido ?? 1;
+  const sellosTxt = (n) => n + (n === 1 ? " sello" : " sellos");
+  let cardCache = null; // {tel, data}
+  async function loadCard(force) {
+    const tel = API.normPhone(form.tel); if (!tel || !clubOn()) return null;
+    if (!force && cardCache && cardCache.tel === tel) return cardCache.data;
+    try { const d = await API.getCard(tel); cardCache = { tel, data: d }; return d; } catch (_) { return null; }
+  }
+  function clubLine() {
+    if (!clubOn()) return "";
+    const n = spp(), meta = club().meta || 8, premio = club().premio && club().premio !== "Premio a definir" ? club().premio : "tu premio";
+    const c = cardCache && cardCache.tel === API.normPhone(form.tel) ? cardCache.data : null;
+    let txt, pct = null;
+    if (c && c.existe) {
+      const after = c.sellos + n;
+      pct = Math.min(100, Math.round((after / meta) * 100));
+      txt = after >= meta ? `<b>¡Con este pedido completás la tarjeta!</b> Pedí ${esc(premio)} en tu próxima compra.`
+        : `Tenés <b>${c.sellos} de ${meta}</b> sellos. Con este pedido llegás a <b>${after}</b>.`;
+    } else {
+      txt = `Este pedido suma <b>${sellosTxt(n)}</b> del Setto Club al retirarlo. Con ${meta} sellos: ${esc(premio)}.`;
+    }
+    return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div style="flex:1">${txt}${pct !== null ? `<div class="clubbar"><i style="width:${pct}%"></i></div>` : ""}</div></div>`;
+  }
+
   /* ---------- carrito ---------- */
   let cart = [];
   try { cart = JSON.parse(localStorage.getItem("setto-cart") || "[]"); } catch (e) { cart = []; }
@@ -55,6 +82,7 @@
   /* ---------- render ---------- */
   function renderBand() {
     const words = ["Un set diferente cada día", "Dirty lattes fríos", "Mochis rellenos", "Take away en Mar del Plata", "Cualquier leche incluida"];
+    if (S.club && clubOn()) words.splice(1, 0, "Cada pedido suma sellos del Setto Club");
     $("#track").innerHTML = [...words, ...words].map((w) => `<span>${w}</span>`).join("");
   }
   function renderApps() {
@@ -127,6 +155,9 @@
     const c = S.club || {};
     $("#club").hidden = c.activo === false;
     $("#clubPremio").textContent = `Con ${c.meta || 8} sellos: ${c.premio || "premio a definir"}.`;
+    $("#heroClub").hidden = !clubOn();
+    $("#heroClub span").innerHTML = `Cada pedido desde la web suma ${sellosTxt(spp())} del <b>Setto Club</b>`;
+    $("#mnavClub").hidden = !clubOn();
     drawStamps(0, c.meta || 8, true);
   }
   function drawStamps(n, meta, ejemplo) {
@@ -143,6 +174,7 @@
     HORARIO = "De " + r.rangos.map(([a, b]) => a.replace(":00", "") + " a " + b.replace(":00", "")).join(" y de ") + " hs.";
     $("#footHours").textContent = "Retiro: " + HORARIO.charAt(0).toLowerCase() + HORARIO.slice(1);
     $("#waNum").textContent = S.whatsapp_visible || API.prettyPhone(S.whatsapp);
+    $("#mnavWa").textContent = S.whatsapp_visible || API.prettyPhone(S.whatsapp);
   }
   function renderBadge() {
     $("#cartCount").textContent = units();
@@ -185,6 +217,7 @@
         <h3 id="sTitle">${esc(nameOf(p))}</h3>
         <p class="muted">${esc(descOf(p))}${k === "dirty" ? " Cualquier tipo de leche incluida." : ""}</p>
         ${opts}
+        ${clubOn() && !blocked ? `<span class="clubtag">Tu pedido suma ${sellosTxt(spp())} del Setto Club</span>` : ""}
         <div class="act"><div class="qty" style="margin:0"><button data-sq="-1" aria-label="Restar uno">−</button><span class="num" style="min-width:18px;text-align:center">${qty}</span><button data-sq="1" aria-label="Sumar uno">+</button></div>
         ${blocked ? `<span class="btn big" style="flex:1;opacity:.7;box-shadow:none;background:var(--bg-2);color:var(--ink);cursor:default">${p.agotado ? "Agotado" : "Todavía no disponible"}</span>` : `<button class="btn solid big" id="sheetAdd">Agregar · <span class="num">${money(priceOf(p, sz) * qty)}</span></button>`}</div>
       </div>`;
@@ -221,7 +254,11 @@
   }
   const waLink = (msg) => `https://wa.me/${S.whatsapp}?text=${encodeURIComponent(msg)}`;
 
-  function openDrawer() { view = lastOrder && view === "sent" ? "sent" : "cart"; $("#drawer").classList.add("on"); $("#scrim").classList.add("on"); drawDrawer(); renderBadge(); setTimeout(() => $("#dClose").focus(), 50); }
+  function openDrawer() {
+    view = lastOrder && view === "sent" ? "sent" : "cart"; $("#drawer").classList.add("on"); $("#scrim").classList.add("on"); drawDrawer(); renderBadge(); setTimeout(() => $("#dClose").focus(), 50);
+    closeMenu();
+    if (API.normPhone(form.tel) && !(cardCache && cardCache.tel === API.normPhone(form.tel))) loadCard().then(() => { if (view === "cart" && $("#drawer").classList.contains("on")) drawDrawer(); });
+  }
   function closeDrawer() { $("#drawer").classList.remove("on"); $("#scrim").classList.remove("on"); if (view === "sent") { view = "cart"; } renderBadge(); }
   function drawDrawer() {
     const body = $("#dBody"), foot = $("#dFoot");
@@ -232,7 +269,7 @@
       body.innerHTML = cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b><small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
         <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("");
-      foot.innerHTML = `<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
+      foot.innerHTML = `${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
         <p class="muted" style="font-size:.78rem;text-align:center">¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats.</p>`;
     }
     if (view === "checkout") {
@@ -246,8 +283,9 @@
         <div class="f"><span>Forma de pago</span><div class="chips">${(S.pagos || []).map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">El pago se coordina por WhatsApp.</span></div>
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: leche de almendras">${esc(form.nota)}</textarea></label>
         <div id="fErr" class="err" hidden></div>`;
-      foot.innerHTML = `<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
+      foot.innerHTML = `${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
       [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"]].forEach(([id, k]) => $("#" + id).addEventListener("input", (e) => { form[k] = e.target.value; }));
+      $("#fTel").addEventListener("change", async () => { if (await loadCard()) { const cl = $("#dFoot .clubline"); if (cl && view === "checkout") cl.outerHTML = clubLine(); } });
     }
     if (view === "sent" && lastOrder) {
       $("#dTitle").textContent = "Último paso";
@@ -326,8 +364,16 @@
     }
     if (b.id === "newOrder") { lastOrder = null; try { sessionStorage.removeItem("setto-last-order"); } catch (_) {} view = "cart"; closeDrawer(); location.hash = "#sets"; }
   });
+  /* ---------- menú mobile ---------- */
+  function closeMenu() { const m = $("#mnav"); if (!m || m.hidden) return; m.hidden = true; $("#burger").setAttribute("aria-expanded", "false"); $("#burger").setAttribute("aria-label", "Abrir menú"); }
+  $("#burger").addEventListener("click", () => {
+    const m = $("#mnav"), open = m.hidden; m.hidden = !open;
+    $("#burger").setAttribute("aria-expanded", String(open)); $("#burger").setAttribute("aria-label", open ? "Cerrar menú" : "Abrir menú");
+  });
+  $("#mnav").addEventListener("click", (e) => { if (e.target.closest("a")) closeMenu(); });
+
   $("#scrim").addEventListener("click", () => { closeSheet(); closeDrawer(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeSheet(); closeDrawer(); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeSheet(); closeDrawer(); closeMenu(); } });
 
   /* ---------- arranque ---------- */
   function loading() {
@@ -339,7 +385,7 @@
     try {
       const { settings, products } = await API.loadAll();
       S = settings; adapt(products); syncCart();
-      renderApps(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
+      renderBand(); renderApps(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
     } catch (e) {

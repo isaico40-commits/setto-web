@@ -1,3 +1,4 @@
+[hidden]{display:none!important}
 /* Layout: limpio estilo Crumbl. Fondo crema claro, secciones destacadas en crema oscuro, texto negro cálido; turquesa solo en botones/separadores; coral como contraste. Mobile: carruseles con scroll-snap. */
 :root{
   --bg:#FAF4E8; --bg-2:#F1E4CA; --card:#FFFDF8;
@@ -33,10 +34,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1.5px solid color-mix(in srgb,var(--turquesa) 35%,transparent)}
 .top .wrap{display:flex;align-items:center;gap:20px;height:66px}
 .top .logo img{height:30px;width:auto}
-.top nav{display:flex;gap:26px;margin-inline:auto;font-weight:500;font-size:.92rem}
-.top nav a{text-decoration:none;padding-block:4px;border-bottom:2px solid transparent}
-.top nav a:hover{border-color:var(--coral)}
-@media (max-width:760px){.top nav{display:none}.top .cartbtn{margin-left:auto}}
+.top .wrap>nav{display:flex;gap:26px;margin-inline:auto;font-weight:500;font-size:.92rem}
+.top .wrap>nav a{text-decoration:none;padding-block:4px;border-bottom:2px solid transparent}
+.top .wrap>nav a:hover{border-color:var(--coral)}
+@media (max-width:760px){.top .wrap>nav{display:none}.top .cartbtn{margin-left:auto}}
 
 /* botones (estilo sticker) */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:var(--line);border-radius:var(--pill);background:var(--card);color:var(--ink);box-shadow:var(--sombra-chica);padding:11px 20px;font-weight:600;font-size:.94rem;text-decoration:none;transition:transform .08s,box-shadow .08s,background .15s;white-space:nowrap}
@@ -306,3 +307,27 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .coderow{display:flex;align-items:center;justify-content:center;gap:10px;font-family:var(--display);font-size:2rem;color:var(--ink)}
 .set .ph.foto::before{display:none}
 .set .ph.foto img{width:100%;height:100%;max-height:none;object-fit:cover}
+
+/* menú hamburguesa (mobile) */
+.burger{display:none;width:42px;height:42px;border-radius:50%;border:var(--line);background:var(--card);box-shadow:var(--sombra-chica);flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0;flex:none}
+.burger span{display:block;width:18px;height:2px;border-radius:2px;background:var(--turquesa);transition:transform .2s,opacity .2s}
+.burger[aria-expanded="true"] span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.burger[aria-expanded="true"] span:nth-child(2){opacity:0}
+.burger[aria-expanded="true"] span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.mnav{display:grid;gap:2px;padding:8px 20px 18px;background:var(--bg);border-top:1.5px solid color-mix(in srgb,var(--turquesa) 25%,transparent)}
+.mnav a{display:flex;justify-content:space-between;align-items:center;gap:10px;font-family:var(--display);font-size:1.5rem;text-decoration:none;color:var(--ink);padding:12px 2px;border-bottom:1px solid color-mix(in srgb,var(--turquesa) 18%,transparent)}
+.mnav a small{font-family:var(--texto);font-size:.72rem;font-weight:700;letter-spacing:.04em;background:var(--coral);border-radius:999px;padding:3px 10px;color:var(--ink)}
+.mnav-foot{display:grid;gap:4px;margin-top:12px;font-size:.85rem;color:var(--ink-2)}
+.mnav-foot b{color:var(--ink);font-weight:600}
+@media (max-width:760px){.burger{display:inline-flex}.top .wrap{gap:10px}.top .cartbtn{padding:9px 14px}}
+@media (min-width:761px){.mnav{display:none!important}}
+/* Club visible en todo el recorrido */
+.clubpill{display:flex;align-items:center;gap:10px;margin-top:12px;width:fit-content;max-width:100%;text-decoration:none;color:var(--ink);background:var(--card);border:1.5px dashed var(--turquesa);border-radius:999px;padding:5px 14px 5px 6px;font-size:.84rem}
+.clubpill img{width:30px;height:30px;object-fit:contain;flex:none}
+.clubline{display:flex;align-items:center;gap:10px;background:var(--menta);border-radius:14px;padding:10px 12px;font-size:.84rem;color:var(--ink)}
+.clubline img{width:34px;flex:none}
+.clubline b{font-weight:700}
+.clubbar{height:8px;border-radius:999px;background:color-mix(in srgb,var(--turquesa) 18%,transparent);overflow:hidden;margin-top:6px}
+.clubbar i{display:block;height:100%;background:var(--turquesa);border-radius:999px}
+.clubtag{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:600;color:var(--turquesa)}
+.clubtag::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--menta) url(../img/mochito-run.png) center/12px no-repeat;border:1.5px solid var(--turquesa)}
