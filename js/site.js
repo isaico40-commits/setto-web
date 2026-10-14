@@ -23,6 +23,10 @@
     SETS = by("set"); DIRTY = by("dirty"); MOCHIS = by("mochi"); ESP = by("especial");
   }
 
+  /* ---------- estrellas por producto (reseñas publicadas) ---------- */
+  let RATINGS = {};
+  const rateTag = (p) => { const r = RATINGS[p.id]; if (!r || !r.cantidad) return ""; return `<span class="rate" aria-label="${r.promedio} de 5, ${r.cantidad} reseña${r.cantidad > 1 ? "s" : ""}"><i>★</i>${String(r.promedio).replace(".", ",")} <small>(${r.cantidad})</small></span>`; };
+
   /* ---------- stock visible (sale de la caja del equipo) ---------- */
   let STOCK = null;
   const umbral = () => Math.max(1, Number((S.stock_web || {}).umbral) || 3);
@@ -31,13 +35,23 @@
     const id = p.categoria === "set" ? p.set_mochi : p.id;
     return Object.prototype.hasOwnProperty.call(STOCK, id) ? Number(STOCK[id]) : null;
   };
-  const stockBadge = (p) => { const n = stockDe(p); if (n === null || p.agotado) return ""; return n <= 0 ? '<span class="badge">Sin stock hoy</span>' : n <= umbral() ? '<span class="badge low">¡Últimos!</span>' : ""; };
-  const stockLine = (p) => {
-    const n = stockDe(p); if (n === null || p.agotado) return "";
+  // lo que ve el cliente = stock − lo que ya tiene en su carrito (contador en vivo)
+  const libreDe = (p) => { const n = stockDe(p); if (n === null) return null; const mid = p.categoria === "set" ? p.set_mochi : p.id; return n - enCarrito(mid); };
+  const badgeInner = (p) => { const n = stockDe(p), l = libreDe(p); if (n === null || p.agotado) return ""; return n <= 0 ? '<span class="badge">Sin stock hoy</span>' : l <= 0 ? '<span class="badge low">En tu pedido</span>' : l <= umbral() ? '<span class="badge low">¡Últimos!</span>' : ""; };
+  const lineInner = (p) => {
+    const n = stockDe(p), l = libreDe(p); if (n === null || p.agotado) return "";
     if (n <= 0) return '<p class="stk out">Sin stock por ahora · consultanos por WhatsApp</p>';
-    if (p.categoria === "set") return n <= umbral() ? `<p class="stk low">Quedan ${n} para este set</p>` : "";
-    return n <= umbral() ? `<p class="stk low">Quedan ${n} · ¡últimos!</p>` : `<p class="stk">${n} disponibles hoy</p>`;
+    if (l <= 0) return `<p class="stk low">Ya tenés ${n === 1 ? "el último" : `los ${n} que quedan`} en tu pedido</p>`;
+    const num = `<b class="num stkn">${l}</b>`;
+    if (p.categoria === "set") return `<p class="stk ${l <= umbral() ? "low" : ""}">${l === 1 ? "Queda" : "Quedan"} ${num} para este set</p>`;
+    return l <= umbral() ? `<p class="stk low">${l === 1 ? "Queda" : "Quedan"} ${num} · ¡últimos!</p>` : `<p class="stk">${num} disponibles hoy</p>`;
   };
+  const stockBadge = (p) => `<span class="stkw" data-stkb="${esc(p.id)}">${badgeInner(p)}</span>`;
+  const stockLine = (p) => `<div class="stkw" data-stkl="${esc(p.id)}">${lineInner(p)}</div>`;
+  function refreshStockUI() {
+    document.querySelectorAll("[data-stkb]").forEach((el) => { const p = find(el.dataset.stkb); if (p) el.innerHTML = badgeInner(p); });
+    document.querySelectorAll("[data-stkl]").forEach((el) => { const p = find(el.dataset.stkl); if (!p) return; const prev = el.textContent; el.innerHTML = lineInner(p); if (prev && prev !== el.textContent) { el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); } });
+  }
 
   /* el stock frena: no se puede pedir más de lo que hay (la base también lo controla) */
   const mochiDe = (p) => (!p ? null : p.categoria === "set" ? p.set_mochi : ["mochi", "especial"].includes(p.categoria) ? p.id : null);
@@ -198,7 +212,7 @@
         <h3>${esc(s.nombre)}</h3>
         <p class="code">${esc(s.codigo || "")}${s.tema ? " ✦ " + esc(s.tema) : ""}</p>
         <p class="combo">${esc(descOf(s))}</p>${stockLine(s)}
-        <div class="foot"><span class="from num">Desde<b>${money(ahora)}${ahorro > 0 ? `<s>${money(antes)}</s>` : ""}</b></span>
+        <div class="foot"><span class="from num">Desde<b>${money(ahora)}${ahorro > 0 ? `<s>${money(antes)}</s>` : ""}</b>${rateTag(s)}</span>
         ${sinStock(s) ? "" : `<button class="add" data-open="${s.id}" aria-label="Elegir tamaño de ${esc(s.nombre)}">+</button>`}</div>
       </article>`;
     }).join("");
@@ -213,7 +227,7 @@
     $("#cartaEyebrow").textContent = tab === "dirty" ? "Fríos · Elegí tu leche y personalizalo" : "Por unidad · Algunos sabores son rotativos";
     $("#grid").innerHTML = list.map((p) => {
       const agot = p.agotado;
-      const precio = tab === "dirty" ? `<span class="from num">Desde<b>${money(p.precios["12 oz"])}</b></span>` : `<span class="from num">Unidad<b>${money(p.precio)}</b></span>`;
+      const precio = tab === "dirty" ? `<span class="from num">Desde<b>${money(p.precios["12 oz"])}</b>${rateTag(p)}</span>` : `<span class="from num">Unidad<b>${money(p.precio)}</b>${rateTag(p)}</span>`;
       const sb = tab === "mochi" ? stockBadge(p) : "";
       const badge = agot ? '<span class="badge">Agotado</span>' : sb ? sb : p.rotativo ? '<span class="badge">Rotativo</span>' : "";
       return `<article class="item">
@@ -256,6 +270,7 @@
     $("#navWa").href = `https://wa.me/${S.whatsapp}?text=${encodeURIComponent("¡Hola Setto! Tengo una consulta.")}`;
   }
   function renderBadge() {
+    try { refreshStockUI(); } catch (_) {}
     $("#cartCount").textContent = units();
     $("#mbar").classList.toggle("on", units() > 0 && !$("#drawer").classList.contains("on") && !$("#sheet").classList.contains("on"));
     $("#mbarTot").textContent = money(total()) + " · " + units() + (units() === 1 ? " ítem" : " ítems");
@@ -296,7 +311,7 @@
     $("#sheet").innerHTML = `<div class="sph"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
       <div class="sb">
         ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
-        <h3 id="sTitle">${esc(nameOf(p))}</h3>
+        <h3 id="sTitle">${esc(nameOf(p))}</h3>${rateTag(p)}
         <p class="muted">${esc(descOf(p))}</p>
         ${k === "premium" && !espOpen() ? "" : stockLine(p)}
         ${opts}
@@ -542,7 +557,10 @@
   function rvForm(code) {
     return `<div class="rv-form" data-rvcode="${esc(code)}"><b style="font-size:.9rem">¿Qué tal estuvo?</b>
       <div class="stars" role="radiogroup" aria-label="Puntaje">${[1, 2, 3, 4, 5].map((n) => `<button type="button" data-star="${n}" aria-pressed="false" aria-label="${n} estrella${n > 1 ? "s" : ""}">★</button>`).join("")}</div>
-      <textarea maxlength="400" placeholder="Contanos qué pediste y qué te pareció (opcional)"></textarea>
+      <textarea maxlength="400" placeholder="Contanos qué te pareció (opcional)"></textarea>
+      <label class="rv-foto"><input type="file" accept="image/*" data-rvfoto hidden><span class="rv-prev">📷</span><span><b>Sumá una foto de tu pedido</b><small>Opcional · se ve con tu reseña</small></span></label>
+      <label class="rv-ig"><span>@</span><input type="text" maxlength="40" placeholder="tu usuario de Instagram (opcional)" autocapitalize="off" autocomplete="off" data-rvig></label>
+      <small class="muted" style="font-size:.76rem">Se publica tu nombre con la inicial del apellido, tu foto y tu usuario si los agregás. Nunca tu teléfono.</small>
       <span class="rv-err" hidden></span>
       <div class="trk-acts" style="margin:0"><button class="btn solid" data-rvsend>Enviar reseña</button><button class="back" data-rvcancel>Ahora no</button></div></div>`;
   }
@@ -560,18 +578,39 @@
       const err = f.querySelector(".rv-err"), r = +f.dataset.rating || 0;
       if (!r) { err.hidden = false; err.textContent = "Tocá las estrellas para puntuar."; return; }
       t.disabled = true; t.textContent = "Enviando…";
-      try { await API.createReview(f.dataset.rvcode, telDe(f.dataset.rvcode), r, f.querySelector("textarea").value);
+      try {
+        let foto = null; const file = f._foto;
+        if (file) { t.textContent = "Subiendo foto…"; foto = await API.uploadReviewPhoto(await achicarFoto(file)); }
+        t.textContent = "Enviando…";
+        await API.createReview(f.dataset.rvcode, telDe(f.dataset.rvcode), r, f.querySelector("textarea").value, foto, f.querySelector("[data-rvig]").value);
         f.outerHTML = `<p style="margin-top:10px"><b>¡Gracias!</b> La publicamos cuando la revisemos.</p>`; setTimeout(verSeguimiento, 4000);
       } catch (ex) { err.hidden = false; err.textContent = ex.message; t.disabled = false; t.textContent = "Enviar reseña"; }
     }
   });
+  async function achicarFoto(file, max = 1200) {
+    let src; try { src = await createImageBitmap(file); } catch (_) { src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("No pudimos leer esa foto")); im.src = URL.createObjectURL(file); }); }
+    const k = Math.min(1, max / Math.max(src.width, src.height)), cv = document.createElement("canvas");
+    cv.width = Math.round(src.width * k); cv.height = Math.round(src.height * k); cv.getContext("2d").drawImage(src, 0, 0, cv.width, cv.height);
+    const as = (t, q) => new Promise((r) => cv.toBlob(r, t, q)); let b = await as("image/webp", 0.8); if (!b || b.type !== "image/webp") b = await as("image/jpeg", 0.82); return b;
+  }
+  document.addEventListener("change", (e) => {
+    const inp = e.target.closest("[data-rvfoto]"); if (!inp || !inp.files || !inp.files[0]) return;
+    const f = inp.closest(".rv-form"), file = inp.files[0];
+    if (!/^image\//.test(file.type)) { const er = f.querySelector(".rv-err"); er.hidden = false; er.textContent = "Elegí una imagen."; return; }
+    f._foto = file; f.querySelector(".rv-prev").innerHTML = `<img src="${URL.createObjectURL(file)}" alt="Tu foto">`; f.querySelector(".rv-foto b").textContent = "Foto lista · tocá para cambiarla";
+  });
+  const haceTxt = (iso) => { const d = Math.floor((Date.now() - new Date(iso)) / 864e5); return d <= 0 ? "hoy" : d === 1 ? "ayer" : d < 30 ? `hace ${d} días` : new Date(iso).toLocaleDateString("es-AR", { day: "numeric", month: "short" }); };
   async function renderResenas() {
     try {
       const d = await API.publicReviews(); const sec = $("#resenas");
       if (!d || !d.items || !d.items.length) { sec.hidden = true; return; }
       sec.hidden = false;
       $("#resProm").textContent = d.cantidad >= 3 ? `★ ${String(d.promedio).replace(".", ",")} · ${d.cantidad} reseñas` : "Reseñas reales";
-      $("#resGrid").innerHTML = d.items.map((r) => `<article class="rv"><span class="st" aria-label="${r.rating} de 5">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</span><p>${esc(r.texto)}</p><b>${esc(r.nombre)}</b></article>`).join("");
+      $("#resGrid").innerHTML = d.items.map((r) => `<article class="rv">${r.foto ? `<img class="rv-img" src="${esc(r.foto)}" alt="Foto del pedido de ${esc(r.nombre)}" loading="lazy">` : ""}
+        <div class="rv-top"><span class="st" aria-label="${r.rating} de 5">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</span><span class="rv-when">${haceTxt(r.fecha)}</span></div>
+        ${r.texto ? `<p>${esc(r.texto)}</p>` : ""}
+        <div class="rv-who"><span class="rv-av">${esc((r.nombre || "?")[0])}</span><span><b>${esc(r.nombre)}</b>${r.instagram ? `<a href="https://instagram.com/${encodeURIComponent(r.instagram)}" target="_blank" rel="noopener nofollow">@${esc(r.instagram)}</a>` : ""}</span></div>
+        <span class="rv-ver">✓ Compra verificada${r.pedido && r.pedido.length ? ` · pidió ${esc(r.pedido.slice(0, 3).join(", "))}` : ""}</span></article>`).join("");
     } catch (_) {}
   }
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-trackx]"); if (!x) return; try { localStorage.setItem("setto-trk-ocultos", JSON.stringify([...ocultosTrk(), x.dataset.trackx].slice(-20))); } catch (_) {} verSeguimiento(); });
@@ -588,6 +627,7 @@
       const { settings, products } = await API.loadAll();
       STOCK = await stockP;
       verSeguimiento(); renderResenas();
+      API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
       S = settings; adapt(products); syncCart();
       renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;

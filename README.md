@@ -105,6 +105,9 @@ En el panel, cada pedido pendiente tiene **Estado que ve el cliente**: Recibido 
 Cuando un pedido pasa a **Entregado**, el cliente ve en su seguimiento **Ver mis sellos** y **Dejar reseña** (estrellas + texto opcional). Solo puede dejar reseña quien recibió el pedido: una por pedido, dentro de los 14 días.
 En el panel, pestaña **Reseñas**: **Publicar** u **Ocultar**. En la web, en "Lo que dicen", solo se ven las publicadas que tienen texto, con nombre e inicial (nunca el teléfono). El promedio aparece desde 3 reseñas.
 
+- **Foto e Instagram (opcionales):** el cliente puede sumar una foto de su pedido y su usuario de Instagram. Cada reseña publicada muestra "✓ Compra verificada · pidió …" con lo que pidió de verdad. Revisá la foto antes de publicar.
+- **Estrellas en la carta:** cada producto muestra su promedio y cantidad de reseñas publicadas de pedidos que lo incluían.
+
 ### Avisar por WhatsApp
 Cada pedido pendiente tiene **Avisar por WhatsApp**: abre el chat del cliente con el mensaje del estado actual (recibido, en preparación, listo o en camino). Lo mandás vos con un toque, sin costo.
 
