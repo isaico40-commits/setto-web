@@ -224,6 +224,7 @@
       <p class="muted">Cada tarjeta se guarda por separado con su botón <b>Guardar</b>. Los cambios se ven en la web al instante. Las tarjetas con borde rosa tienen cambios sin guardar.</p>
       ${CATS.map(([c, l]) => `<section class="sec"><h2>${l}</h2>
         ${c === "especial" ? `<div class="pcard" id="espCfg" style="margin-bottom:16px"><div class="row2">
+            <label>Título de la sección<input data-esp="titulo" value="${esc(E.titulo || "")}" placeholder="Edición especial · Ej: Edición Halloween"></label>
             <label>Estado<select data-esp="estado"><option value="proximamente" ${E.estado !== "disponible" ? "selected" : ""}>Próximamente (no se puede pedir)</option><option value="disponible" ${E.estado === "disponible" ? "selected" : ""}>Disponible ahora (se puede pedir)</option></select></label>
             <label>Etiqueta de arriba<input data-esp="chip" value="${esc(E.chip || "")}" placeholder="Ej: Edición de noviembre · del 14 al 16"></label></div>
             <label>Texto debajo del título<textarea data-esp="intro">${esc(E.intro || "")}</textarea></label>
@@ -332,6 +333,11 @@
                 <label class="btn">Subir foto<input type="file" accept="image/*" data-upimg="si${i}" data-upmax="1600" hidden></label>${x.img || x.titulo ? `<button type="button" class="linkbtn warn" data-slx="${i}">Quitar</button>` : ""}</div></div></div>`; }).join("")}
           <label>Cambia cada (segundos)<input class="inp" name="intervalo" type="number" min="3" max="15" value="${(S.hero || {}).intervalo || 5}" style="width:120px"></label>
           <button class="btn solid">Guardar portada</button></form>
+        <form class="pcard" data-set="tema"><b>Decoración de temporada</b>
+          <label>Tema<select class="inp" name="nombre"><option value="">Ninguno</option><option value="halloween" ${(S.tema || {}).nombre === "halloween" ? "selected" : ""}>Halloween 🎃</option></select></label>
+          <label>Aviso arriba de la web (opcional)<input class="inp" name="aviso" maxlength="70" value="${esc((S.tema || {}).aviso || "")}" placeholder="Ej: Edición Halloween · del 29/10 al 2/11"></label>
+          <span class="hintp">Cambia colores y suma detalles de la temporada. Se saca eligiendo "Ninguno".</span>
+          <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="mochi_info"><b>¿Qué es un mochi?</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${(S.mochi_info || {}).activo !== false ? "checked" : ""}> Mostrar la sección</label></div>
           <label>Título<input class="inp" name="titulo" value="${esc((S.mochi_info || {}).titulo || "¿Qué es un mochi?")}"></label>
@@ -395,6 +401,7 @@
         if (!slides.length) throw new Error("Dejá al menos un slide con foto o título");
         await API.saveSetting("hero", { slides, intervalo: Math.max(3, Math.min(15, +f.intervalo || 5)) });
       }
+      if (k === "tema") await API.saveSetting("tema", { nombre: f.nombre || "", aviso: (f.aviso || "").trim() });
       if (k === "mochi_info") await API.saveSetting("mochi_info", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "¿Qué es un mochi?", texto: (f.texto || "").trim(),
         puntos: (f.puntos || "").split("\n").map((s) => s.trim()).filter(Boolean), img: (f.img || "").trim(), ajuste: f.ajuste === "foto" ? "foto" : "recorte" });
       if (k === "ventajas") await API.saveSetting("ventajas", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "Pedir acá te conviene",
@@ -442,7 +449,7 @@
     /* carta */
     if (b.dataset.saveesp !== undefined) {
       const box = $("#espCfg"), v = (k) => box.querySelector(`[data-esp="${k}"]`).value;
-      try { await API.saveSetting("especial", { estado: v("estado"), chip: v("chip").trim(), intro: v("intro").trim() }); await loadBase(); toast("Sección guardada"); } catch (err) { toast(err.message); }
+      try { await API.saveSetting("especial", { titulo: v("titulo").trim(), estado: v("estado"), chip: v("chip").trim(), intro: v("intro").trim() }); await loadBase(); toast("Sección guardada"); } catch (err) { toast(err.message); }
     }
     if (b.dataset.addp) {
       const c = b.dataset.addp, base = { especial: "esp", set: "set", dirty: "dirty", mochi: "mochi" }[c];

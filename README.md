@@ -129,6 +129,10 @@ Cada pedido pendiente tiene **Avisar por WhatsApp**: abre el chat del cliente co
 En **Ajustes → Portada** cargás hasta 5 slides (foto, título corto, una línea) y cada cuántos segundos cambian. *Recorte* es para fotos de producto sin fondo (van sobre el círculo coral); *Foto* llena todo el espacio.
 En **Ajustes → ¿Qué es un mochi?** editás título, texto, puntos (`título | detalle`) y la foto, o la ocultás.
 
+### Decoración de temporada (Halloween)
+En **Ajustes → Decoración de temporada** elegís *Halloween 🎃* y, si querés, un aviso arriba de la web (ej. "Edición Halloween · del 29/10 al 2/11"). Cambia colores de la cinta y de la Edición especial, y suma murciélagos, telaraña y calabaza en la portada. Se saca eligiendo *Ninguno*.
+Los sabores de la edición se cargan en **Carta → Edición especial** (título de la sección, estado, etiqueta y sabores). Para que no se mezclen, desmarcá *Visible en la web* en los sabores de tortas hasta que salgan.
+
 ### Edición especial (sabores de tortas)
 En **Carta → Edición especial**:
 - **Estado:** *Próximamente* (se muestra pero no se puede pedir) o *Disponible ahora* (se puede pedir).

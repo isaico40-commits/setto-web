@@ -45,6 +45,7 @@
   </nav>
 </header>
 
+<div class="tema-aviso" id="temaAviso" hidden></div>
 <main id="inicio">
   <section class="seguimiento" id="seguimiento" aria-live="polite" hidden></section>
   <section class="hero2" aria-roledescription="carrusel" aria-label="Destacados">
@@ -75,7 +76,7 @@
         <p id="espIntro"></p>
       </div>
       <div class="rail" id="espGrid" style="--cols:4;--w:70%"></div>
-      <div class="hint"><span class="dots" data-for="espGrid"></span><span>Deslizá para ver más</span></div>
+      <div class="hint"><span class="dots" data-for="espGrid"></span><span>Deslizá</span></div>
       <div id="espSoon"></div>
     </div>
   </section>
@@ -86,8 +87,8 @@
         <span class="eyebrow">Disponibilidad limitada</span><h2 id="t-sets">Sets</h2>
       </div>
       <div class="rail" id="setsGrid" style="--cols:3;--w:84%"></div>
-      <div class="hint"><span class="dots" data-for="setsGrid"></span><span>Deslizá para ver más</span></div>
-      <p class="setsnote">Una bebida y un mochi que van juntos, más barato que por separado. Combinaciones por tiempo limitado.</p>
+      <div class="hint"><span class="dots" data-for="setsGrid"></span><span>Deslizá</span></div>
+      <p class="setsnote">Bebida + mochi, más barato que por separado.</p>
     </div>
   </section>
 
@@ -124,7 +125,7 @@
       </div>
       <div id="panel" role="tabpanel" aria-labelledby="tab-dirty">
         <div class="rail" id="grid" style="--cols:4;--w:68%"></div>
-        <div class="hint"><span class="dots" data-for="grid"></span><span>Deslizá para ver más</span></div>
+        <div class="hint"><span class="dots" data-for="grid"></span><span>Deslizá</span></div>
         <div id="panelExtra"></div>
       </div>
     </div>
@@ -156,7 +157,7 @@
 
   <section class="blk alt" id="resenas" aria-labelledby="t-res" hidden>
     <div class="wrap">
-      <div class="head"><span class="eyebrow" id="resProm"></span><h2 id="t-res">Lo que dicen</h2><p>Reseñas de personas que ya recibieron su pedido.</p></div>
+      <div class="head"><span class="eyebrow" id="resProm"></span><h2 id="t-res">Lo que dicen</h2><p>De personas que ya recibieron su pedido.</p></div>
       <div class="rail" id="resGrid" style="--cols:3;--w:82%"></div>
       <div style="text-align:center;margin-top:18px"><button class="btn" id="verResenas">Ver todas las reseñas</button></div>
     </div>
@@ -167,10 +168,10 @@
       <div>
         <span class="eyebrow">Tarjeta de sellos</span>
         <h2 id="t-club" style="font-size:clamp(2.3rem,5vw,3.6rem);margin-top:8px">Setto Club</h2>
-        <p class="muted" style="margin-top:14px;max-width:46ch" id="clubIntro">Cada pedido que hacés desde esta web suma un sello cuando lo recibís.</p>
+        <p class="muted" style="margin-top:14px;max-width:46ch" id="clubIntro">Cada pedido desde la web suma un sello.</p>
         <div class="next">
-          <div><span class="k">1</span><span><b>Pedí desde la web</b><small>Tu pedido llega a nuestro WhatsApp con un código.</small></span></div>
-          <div><span class="k">2</span><span><b>Recibilo</b><small>Cuando te lo entregamos, sumamos el sello a tu celular.</small></span></div>
+          <div><span class="k">1</span><span><b>Pedí desde la web</b></span></div>
+          <div><span class="k">2</span><span><b>Recibilo y sumás el sello</b></span></div>
           <div><span class="k">3</span><span><b>Completá la tarjeta</b><small id="clubPremio">El pedido que la completa viene con premio.</small></span></div>
         </div>
       </div>
@@ -181,7 +182,7 @@
           <button class="btn solid" type="submit">Ver mis sellos</button>
         </form>
         <div class="stamps" id="stamps"></div>
-        <p class="muted" id="cardMsg" style="font-size:.84rem;margin-top:14px">Ingresá el celular con el que hacés tus pedidos.</p>
+        <p class="muted" id="cardMsg" style="font-size:.84rem;margin-top:14px">Con el celular de tus pedidos.</p>
       </div>
     </div>
   </section>
@@ -199,10 +200,10 @@
 
 <footer>
   <div class="wrap">
-    <div class="box"><img class="logo" src="img/logo.png" alt="Setto"><p>Cafetería artesanal de inspiración asiática contemporánea que nace desde casa en Mar del Plata.</p></div>
-    <div class="box"><b>Retiro y envíos</b><p>Pedido por WhatsApp. La dirección de retiro o el costo del envío te los confirmamos al responder.</p><p style="margin-top:6px" id="footHours"></p></div>
+    <div class="box"><img class="logo" src="img/logo.png" alt="Setto"><p>Asian inspired home cafe en Mar del Plata.</p></div>
+    <div class="box"><b>Retiro y envíos</b><p>Dirección de retiro y costo de envío, por WhatsApp.</p><p style="margin-top:6px" id="footHours"></p></div>
     <div class="box"><b>Contacto</b><p>WhatsApp <b style="display:inline;color:var(--ink);user-select:all" id="waNum"></b></p><p style="margin-top:6px">Instagram <b style="display:inline;color:var(--ink)">@setto.project</b></p><p style="margin-top:6px"><a href="https://setto-project.carrd.co/" target="_blank" rel="noopener" style="color:var(--turquesa);font-weight:600">Todos nuestros links ↗</a></p></div>
-    <p class="fine"><a href="panel.html" style="color:inherit;text-decoration:none">·</a> Precios en pesos argentinos. Sets y sabores rotativos sujetos a disponibilidad.</p>
+    <p class="fine"><a href="panel.html" style="color:inherit;text-decoration:none">·</a> Precios en pesos. Sabores sujetos a disponibilidad.</p>
   </div>
 </footer>
 

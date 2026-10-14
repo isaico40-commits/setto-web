@@ -40,7 +40,7 @@
   const badgeInner = (p) => { const n = stockDe(p), l = libreDe(p); if (n === null || p.agotado) return ""; return n <= 0 ? '<span class="badge">Sin stock hoy</span>' : l <= 0 ? '<span class="badge low">En tu pedido</span>' : l <= umbral() ? '<span class="badge low">¡Últimos!</span>' : ""; };
   const lineInner = (p) => {
     const n = stockDe(p), l = libreDe(p); if (n === null || p.agotado) return "";
-    if (n <= 0) return '<p class="stk out">Sin stock por ahora · consultanos por WhatsApp</p>';
+    if (n <= 0) return '<p class="stk out">Sin stock por ahora</p>';
     if (l <= 0) return `<p class="stk low">Ya tenés ${n === 1 ? "el último" : `los ${n} que quedan`} en tu pedido</p>`;
     const num = `<b class="num stkn">${l}</b>`;
     if (p.categoria === "set") return `<p class="stk ${l <= umbral() ? "low" : ""}">${l === 1 ? "Queda" : "Quedan"} ${num} para este set</p>`;
@@ -218,6 +218,21 @@
   }
   document.addEventListener("click", (e) => { if (e.target.closest("[data-gomochi]")) { tab = "mochi"; renderCarta(); } });
 
+  /* ---------- decoración de temporada (Panel → Ajustes) ---------- */
+  const BAT = '<svg viewBox="0 0 64 28" aria-hidden="true"><path d="M32 9c1.6-3 3.2-4 4.4-4-.6 1.4-.6 2.6 0 3.6 3-3.6 8.6-5.4 14.6-4.2-2.2 1.2-3.4 3-3.4 5 3-1.2 7.6-.6 11.4 2.6-3.4.2-6 1.6-7.4 4-2.6-1.8-6.4-2-9.6-.4-2 1-3.4 3.2-4 6.4-1.2-2.6-3.2-4-6-4s-4.8 1.4-6 4c-.6-3.2-2-5.4-4-6.4-3.2-1.6-7-1.4-9.6.4-1.4-2.4-4-3.8-7.4-4 3.8-3.2 8.4-3.8 11.4-2.6 0-2-1.2-3.8-3.4-5 6-1.2 11.6.6 14.6 4.2.6-1 .6-2.2 0-3.6 1.2 0 2.8 1 4.4 4z" fill="currentColor"/></svg>';
+  const PUMPKIN = '<svg viewBox="0 0 64 60" aria-hidden="true"><path d="M30 10c0-5 3-8 7-9-2 3-2 6-1 9" fill="none" stroke="#3f5b2f" stroke-width="4" stroke-linecap="round"/><ellipse cx="20" cy="36" rx="14" ry="20" fill="#e8742a"/><ellipse cx="44" cy="36" rx="14" ry="20" fill="#e8742a"/><ellipse cx="32" cy="36" rx="13" ry="21" fill="#f08c3e"/><path d="M24 33l4-5 4 5zm8 0l4-5 4 5zm-9 10c3 3 6 4 9 4s6-1 9-4l-3 1-2-2-2 2-2-2-2 2-2-2-2 2z" fill="#3a2410"/></svg>';
+  const WEB = '<svg viewBox="0 0 100 100" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M0 0L100 100M0 0L50 100M0 0L100 50M0 0L0 100M0 0L100 0"/><path d="M0 22Q12 14 22 0M0 44Q26 30 44 0M0 68Q40 46 68 0M0 92Q55 62 92 0"/></svg>';
+  function renderTema() {
+    const t = S.tema || {}, hw = t.nombre === "halloween";
+    document.body.classList.toggle("t-halloween", hw);
+    const av = $("#temaAviso"); av.hidden = !(hw && t.aviso); if (!av.hidden) av.innerHTML = `${PUMPKIN}<span>${esc(t.aviso)}</span>${PUMPKIN}`;
+    document.querySelectorAll(".deco").forEach((d) => d.remove());
+    if (!hw) return;
+    const box = $("#heroBox");
+    if (box) box.insertAdjacentHTML("beforeend", `<span class="deco deco-web">${WEB}</span><span class="deco deco-bat b1">${BAT}</span><span class="deco deco-bat b2">${BAT}</span><span class="deco deco-bat b3">${BAT}</span><span class="deco deco-pk">${PUMPKIN}</span>`);
+    const esp = $("#especial .head"); if (esp) esp.insertAdjacentHTML("afterbegin", `<span class="deco deco-pk2">${PUMPKIN}</span>`);
+  }
+
   function renderBand() {
     const words = ["Probá un set distinto cada día", "Dirty lattes fríos", "Mochis rellenos", "Take away en Mar del Plata", "Elegí tu leche"];
     if (S.club && clubOn()) words.splice(1, 0, "Cada pedido suma sellos del Setto Club");
@@ -239,6 +254,8 @@
   function renderEspecial() {
     const E = S.especial || {}, items = on(ESP), open = espOpen();
     $("#espChip").textContent = E.chip || (open ? "Disponible ahora" : "Próxima edición");
+    $("#t-esp").textContent = E.titulo || "Edición especial";
+    document.querySelectorAll('a[href="#especial"]').forEach((a) => (a.textContent = E.titulo || "Edición especial"));
     $("#espIntro").textContent = E.intro || "";
     $("#espGrid").innerHTML = items.map((p) => {
       const foto = !!p.img, canBuy = open && !p.agotado && !sinStock(p) && Number(p.precio) > 0;
@@ -251,7 +268,7 @@
         ${canBuy ? `<button class="add" data-quick="${p.id}" aria-label="Sumar ${esc(nameOf(p))}">+</button>` : ""}</div>
       </article>`;
     }).join("");
-    $("#espSoon").innerHTML = open ? "" : `<div class="prem-soon"><img src="img/mochito-run.png" alt=""><div><b>Todavía no salió la próxima edición</b><p>Seguinos en Instagram <strong>@${esc(S.instagram || "setto.project")}</strong> para enterarte el día que sale.</p></div></div>`;
+    $("#espSoon").innerHTML = open ? "" : `<div class="prem-soon"><img src="img/mochito-run.png" alt=""><div><b>Todavía no salió</b><p>Avisamos en Instagram <strong>@${esc(S.instagram || "setto.project")}</strong>.</p></div></div>`;
     $("#especial").hidden = items.length === 0;
     dots("espGrid");
   }
@@ -428,7 +445,7 @@
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
         <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("");
       foot.innerHTML = `${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
-        <p class="muted" style="font-size:.78rem;text-align:center">${envioOn() ? "Retiro o envío a domicilio: lo elegís en el próximo paso." : "¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats."}</p>`;
+        <p class="muted" style="font-size:.78rem;text-align:center">${envioOn() ? "Retiro o envío: lo elegís después." : "¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats."}</p>`;
     }
     if (view === "checkout") {
       $("#dTitle").textContent = "Entrega";
@@ -447,7 +464,7 @@
         <label class="f" for="fNombre">Nombre<input id="fNombre" autocomplete="given-name" value="${esc(form.nombre)}" placeholder="Cómo te llamamos"></label>
         <label class="f" for="fTel">Tu celular (WhatsApp)<input id="fTel" type="tel" inputmode="tel" autocomplete="tel" value="${esc(form.tel)}" placeholder="223 347-1277"><span class="hintf">Con este número sumás sellos del Setto Club.</span></label>
         <label class="f" for="fHora">${isEnv ? "Horario de entrega" : "Horario de retiro"}<select id="fHora"><option value="">Elegí un horario</option>${slots().map((o) => `<option ${o === form.hora ? "selected" : ""}>${esc(o)}</option>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>
-        <div class="f"><span>Forma de pago</span><div class="chips">${pagosVer.map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">${form.modo === "envio" ? "Con envío a domicilio se paga solo por transferencia, antes de despachar el pedido." : "El pago se coordina por WhatsApp."}</span></div>
+        <div class="f"><span>Forma de pago</span><div class="chips">${pagosVer.map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">${form.modo === "envio" ? "Con envío, solo transferencia." : "El pago se coordina por WhatsApp."}</span></div>
         ${premioPicker()}
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>
         <div id="fErr" class="err" hidden></div>`;
@@ -464,9 +481,9 @@
       const est = trackVivos.find((x) => x.code === lastOrder.code) || { code: lastOrder.code, status: "pendiente", etapa: "recibido", modo: lastOrder.modo, retiro: "" };
       body.innerHTML = `<div class="ok"><img src="img/mochito-cup.png" alt=""><span class="eyebrow">Tu código de pedido</span><div class="coderow num">${esc(lastOrder.code)}</div>
         ${lastOrder.premio ? `<div class="clubline" style="width:100%;text-align:left"><img src="img/mochito-run.png" alt=""><div><b>¡Completaste tu tarjeta!</b> Tu premio: ${esc(lastOrder.premio_txt || "a confirmar")}.</div></div>` : ""}
-        <p class="muted" style="font-size:.9rem">${lastOrder.modo === "envio" ? "Enviá el mensaje por WhatsApp. Te confirmamos el horario, el costo del envío y el pago." : "Enviá el mensaje por WhatsApp. El pedido queda confirmado cuando te respondemos con la dirección y el pago."}${clubOn() ? " Cuando lo recibís, sumás tu sello del Setto Club." : ""}</p></div>
+        <p class="muted" style="font-size:.9rem">${lastOrder.modo === "envio" ? "Mandanos el WhatsApp y te confirmamos envío y pago." : "Mandanos el WhatsApp y te confirmamos dirección y pago."}${clubOn() ? " Al recibirlo sumás tu sello." : ""}</p></div>
         <div class="dtrk sent-trk">${trackCard(est)}</div>
-        <p class="muted" style="font-size:.84rem;text-align:center">El estado se actualiza solo: te avisamos acá cuando esté listo. En tu mensaje de WhatsApp va el link para volver a esta pantalla.</p>
+        <p class="muted" style="font-size:.84rem;text-align:center">Te avisamos acá cuando esté listo. El link para volver va en tu WhatsApp.</p>
         <div class="msg" id="msgText" hidden>${esc(lastOrder.message)}</div>`;
       foot.innerHTML = `<a class="btn wa big" href="${waLink(lastOrder.message)}" target="_blank" rel="noopener" data-resend>${lastOrder.enviado ? "Reenviar mensaje por WhatsApp" : "Enviar por WhatsApp"}</a>
         <div style="display:flex;justify-content:center;gap:18px"><button class="back" id="copyMsg">Copiar mensaje</button><button class="back" id="newOrder">Hacer otro pedido</button></div>`;
@@ -522,7 +539,7 @@
       const c = await API.getCard(tel);
       drawStamps(c.sellos, c.meta, false);
       const falta = Math.max(0, c.meta - c.sellos);
-      msg.textContent = !c.existe ? "Todavía no tenés sellos con este número. Se suman cuando retirás un pedido hecho desde la web."
+      msg.textContent = !c.existe ? "Todavía no tenés sellos. Se suman al recibir un pedido de la web."
         : falta === 0 ? `¡Completaste la tarjeta! Avisanos en tu próximo pedido para canjear: ${c.premio || "tu premio"}.`
         : falta <= (S.club && S.club.sellos_por_pedido || 1) ? `Tenés ${c.sellos} de ${c.meta} sellos. ¡Tu próximo pedido viene con ${premioTxt()}!`
         : `Tenés ${c.sellos} de ${c.meta} sellos. Te ${falta === 1 ? "falta 1" : "faltan " + falta} para ${premioTxt()}.`;
@@ -614,11 +631,11 @@
     const env = o.modo === "envio";
     const pasos = ["Recibido", "En preparación", env ? "En camino" : "Listo para retirar", "Entregado"];
     const idx = o.status === "entregado" ? 3 : o.etapa === "listo" ? 2 : o.etapa === "preparando" ? 1 : 0;
-    const txt = o.status === "cancelado" ? "Este pedido se canceló. Si tenés dudas, escribinos por WhatsApp."
+    const txt = o.status === "cancelado" ? "Pedido cancelado. ¿Dudas? Escribinos por WhatsApp."
       : o.status === "entregado" ? `¡Entregado! Que lo disfrutes.${o.sellos > 0 ? ` Sumaste ${sellosTxt(o.sellos)} al Setto Club.` : ""}`
       : idx === 2 ? (env ? "Tu pedido salió y va en camino." : "¡Está listo! Ya podés pasar a buscarlo.")
       : idx === 1 ? "Lo estamos preparando."
-      : "Lo recibimos. Si todavía no mandaste el WhatsApp, mandalo así lo confirmamos.";
+      : "Recibido. Mandanos el WhatsApp para confirmarlo.";
     return `<div class="trk ${o.status}"><div class="trk-h"><span class="eyebrow">Tu pedido</span><b class="num">${esc(o.code)}</b><span class="trk-r">${esc(o.retiro || "")}</span>${o.status !== "pendiente" ? `<button class="trk-x" data-trackx="${esc(o.code)}" aria-label="Ocultar">✕</button>` : ""}</div>
       ${o.status === "cancelado" ? "" : `<ol class="trk-steps">${pasos.map((p, i) => `<li class="${i < idx ? "done" : i === idx ? "now" : ""}"><i></i><span>${p}</span></li>`).join("")}</ol>`}
       <p>${txt}</p>
@@ -630,7 +647,7 @@
       <textarea maxlength="400" placeholder="Contanos qué te pareció (opcional)"></textarea>
       <label class="rv-foto"><input type="file" accept="image/*" data-rvfoto hidden><span class="rv-prev">📷</span><span><b>Sumá una foto de tu pedido</b><small>Opcional · se ve con tu reseña</small></span></label>
       <label class="rv-ig"><span>@</span><input type="text" maxlength="40" placeholder="tu usuario de Instagram (opcional)" autocapitalize="off" autocomplete="off" data-rvig></label>
-      <small class="muted" style="font-size:.76rem">Se publica tu nombre con la inicial del apellido, tu foto y tu usuario si los agregás. Nunca tu teléfono.</small>
+      <small class="muted" style="font-size:.76rem">Mostramos tu nombre, foto y usuario. Nunca tu teléfono.</small>
       <span class="rv-err" hidden></span>
       <div class="trk-acts" style="margin:0"><button class="btn solid" data-rvsend>Enviar reseña</button><button class="back" data-rvcancel>Ahora no</button></div></div>`;
   }
@@ -729,11 +746,11 @@
       verSeguimiento(); renderResenas();
       API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
       S = settings; adapt(products); syncCart();
-      renderHero(); renderQueEs(); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
+      renderTema(); renderHero(); renderQueEs(); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
     } catch (e) {
-      const bar = $("#errBar"); bar.hidden = false; bar.textContent = "No pudimos cargar la carta. Escribinos por WhatsApp mientras lo resolvemos.";
+      const bar = $("#errBar"); bar.hidden = false; bar.textContent = "No pudimos cargar la carta. Escribinos por WhatsApp.";
       ["espGrid", "setsGrid", "grid"].forEach((id) => (document.getElementById(id).innerHTML = ""));
       console.error(e);
     }
