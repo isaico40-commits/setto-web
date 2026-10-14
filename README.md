@@ -83,7 +83,7 @@ En **Ajustes → Envío a domicilio** activás o desactivás la opción, ponés 
 ### Premio del Club
 El premio se entrega **en el mismo pedido que completa la tarjeta**. Ejemplo con 8 sellos: el cliente con 7 sellos hace su pedido y en el checkout **elige su premio**:
 - **Un set de regalo** (cualquier set activo, en 12 oz): se suma al pedido a $0.
-- **35% off en ese pedido**: se descuenta del total de productos (sin envío), redondeado a $10.
+- **25% off en ese pedido**: se descuenta del total de productos (sin envío), redondeado a $10.
 
 Sin elegir, la web no deja enviar. El panel muestra 🎁 *Completa la tarjeta* con el premio elegido, y al tocar **Entregado** se canjea solo (la tarjeta vuelve a 0).
 En **Ajustes → Setto Club** definís los sellos de la tarjeta, el texto del premio, si se ofrece el set, el % de descuento (0 = no se ofrece), un tope en $ para el descuento (0 = sin tope) y un pedido mínimo opcional para sumar sello.

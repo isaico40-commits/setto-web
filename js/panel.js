@@ -253,7 +253,7 @@
         <form class="pcard" data-set="club"><b>Setto Club</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${club.activo !== false ? "checked" : ""}> Mostrar el Club en la web</label></div>
           <div class="row2"><label>Sellos para el premio<input class="inp" name="meta" type="number" min="2" max="20" value="${club.meta || 8}"></label><label>Sellos por pedido (sugerido)<input class="inp" name="spp" type="number" min="0" max="10" value="${club.sellos_por_pedido ?? 1}"></label></div>
-          <label>Texto del premio (lo ve el cliente)<input class="inp" name="premio" value="${esc(club.premio || "")}" placeholder="Ej: un set de regalo o 35% off en ese pedido"></label>
+          <label>Texto del premio (solo se usa si no ofrecés set ni descuento)<input class="inp" name="premio" value="${esc(club.premio || "")}" placeholder="Ej: un set de regalo o 35% off en ese pedido"></label>
           <div class="checks"><label><input type="checkbox" name="pset" ${club.premio_set !== false ? "checked" : ""}> Opción: un set de regalo (12 oz)</label></div>
           <div class="row2"><label>Opción: % de descuento (0 = no ofrecer)<input class="inp" name="pdesc" type="number" min="0" max="100" value="${club.premio_descuento ?? 35}"></label>
           <label>Tope del descuento en $ (0 = sin tope)<input class="inp" name="ptope" type="number" min="0" step="500" value="${club.premio_tope || 0}"></label></div>

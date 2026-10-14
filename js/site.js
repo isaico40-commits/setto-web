@@ -44,7 +44,14 @@
     if (!force && cardCache && cardCache.tel === tel) return cardCache.data;
     try { const d = await API.getCard(tel); cardCache = { tel, data: d }; return d; } catch (_) { return null; }
   }
-  const premioTxt = () => (club().premio && club().premio !== "Premio a definir" ? lcFirst(club().premio) : "tu premio");
+  function premioTxt() {
+    const c = club(), sets = c.premio_set === false ? [] : on(SETS).map((s) => s.nombre.replace(/ Set$/, ""));
+    const d = c.premio_descuento ?? 35, tope = Number(c.premio_tope) || 0, op = [];
+    if (sets.length) op.push(`un set de regalo (${sets.length > 1 ? sets.slice(0, -1).join(", ") + " o " + sets.slice(-1) : sets[0]}, en 12 oz)`);
+    if (d > 0) op.push(`${d}% off en ese pedido${tope > 0 ? ` (hasta ${money(tope)})` : ""}`);
+    if (op.length) return op.join(" o ");
+    return c.premio && c.premio !== "Premio a definir" ? lcFirst(c.premio) : "tu premio";
+  }
   function completes() {
     if (!clubOn()) return false;
     const c = cardCache && cardCache.tel === API.normPhone(form.tel) ? cardCache.data : null;
@@ -60,7 +67,7 @@
     if (!completes()) return "";
     const sets = club().premio_set === false ? [] : on(SETS).filter((s) => !s.agotado);
     const opts = sets.map((s) => `<button data-premio="set:${esc(s.id)}" aria-pressed="${form.premio === "set:" + s.id}">${esc(s.nombre)} de regalo</button>`);
-    if (premioDesc() > 0) opts.push(`<button data-premio="descuento" aria-pressed="${form.premio === "descuento"}">${premioDesc()}% off en este pedido</button>`);
+    if (premioDesc() > 0) opts.push(`<button data-premio="descuento" aria-pressed="${form.premio === "descuento"}">${premioDesc()}% off en este pedido${Number(club().premio_tope) > 0 ? ` (hasta ${money(club().premio_tope)})` : ""}</button>`);
     return `<div class="f premio-pick"><span>🎁 ¡Este pedido completa tu tarjeta! Elegí tu premio</span><div class="chips">${opts.join("")}</div>${sets.length ? '<span class="hintf">El set de regalo va en 12 oz.</span>' : ""}</div>`;
   }
   function clubLine() {
@@ -103,7 +110,7 @@
 
   /* ---------- render ---------- */
   function renderBand() {
-    const words = ["Un set diferente cada día", "Dirty lattes fríos", "Mochis rellenos", "Take away en Mar del Plata", "Cualquier leche incluida"];
+    const words = ["Probá un set distinto cada día", "Dirty lattes fríos", "Mochis rellenos", "Take away en Mar del Plata", "Cualquier leche incluida"];
     if (S.club && clubOn()) words.splice(1, 0, "Cada pedido suma sellos del Setto Club");
     $("#track").innerHTML = [...words, ...words].map((w) => `<span>${w}</span>`).join("");
   }
@@ -136,10 +143,10 @@
   }
   function renderSets() {
     $("#setsGrid").innerHTML = on(SETS).map((s) => {
-      const ahora = s.precios["12 oz"], antes = suelto(s, "12 oz"), ahorro = antes - ahora;
+      const ahora = s.precios["12 oz"], antes = suelto(s, "12 oz"), ahorro = antes - ahora, pct = antes > 0 ? Math.round((ahorro / antes) * 100) : 0;
       return `<article class="set">
         <button class="ph ${s.foto ? "foto" : ""}" data-open="${s.id}" aria-label="Ver ${esc(s.nombre)}"><img src="${esc(s.img || "img/mochito-lie.png")}" alt="${esc(descOf(s))}" loading="lazy"></button>
-        ${ahorro > 0 ? `<span class="off num">Ahorrás ${money(ahorro)}</span>` : ""}
+        ${pct > 0 ? `<span class="off num">${pct}% off</span>` : ""}
         <h3>${esc(s.nombre)}</h3>
         <p class="code">${esc(s.codigo || "")}${s.tema ? " ✦ " + esc(s.tema) : ""}</p>
         <p class="combo">${esc(descOf(s))}</p>
@@ -229,7 +236,7 @@
     const { p, sz, qty } = sheetState, k = kind(p);
     const opts = unit(p) ? "" : `<div><span class="eyebrow">Tamaño</span><div class="opts" style="margin-top:8px">${["12 oz", "16 oz"].map((oz) => {
       const sv = k === "set" ? suelto(p, oz) : 0, pv = p.precios[oz];
-      const pr = k === "set" && sv > pv ? `<s>${money(sv)}</s>${money(pv)}` : money(pv);
+      const pr = k === "set" && sv > pv ? `<s>${money(sv)}</s>${money(pv)} <em class="pct">−${Math.round(((sv - pv) / sv) * 100)}%</em>` : money(pv);
       return `<button class="opt" data-sz="${oz}" aria-pressed="${oz === sz}"><span class="rd"></span><b>${oz.toUpperCase()}</b><span class="pp num">${pr}</span></button>`;
     }).join("")}</div></div>`;
     const blocked = p.agotado || (k === "premium" && (!espOpen() || !(Number(p.precio) > 0)));

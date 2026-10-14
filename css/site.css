@@ -58,9 +58,10 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;backgroun
 
 /* hero */
 .hero .wrap{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;padding-block:48px 64px}
-.hero h1{font-size:clamp(2.7rem,6vw,4.7rem);margin-top:16px}
+.hero h1{font-size:clamp(2.4rem,5.4vw,4.3rem);margin-top:16px;max-width:14ch}
+.hero .sub{margin-top:12px;font-size:clamp(1.15rem,2vw,1.4rem);font-weight:700;color:var(--turquesa)}
 .hero h1 span{color:var(--turquesa)}
-.hero .lead{margin-top:18px;font-size:1.08rem;max-width:36ch;color:var(--ink-2)}
+.hero .lead{margin-top:10px;font-size:1.08rem;max-width:36ch;color:var(--ink-2)}
 .hero .ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
 .tagline{display:inline-flex;align-items:center;gap:8px;background:var(--coral-2);border-radius:var(--pill);padding:5px 14px;font-size:.8rem;font-weight:600;color:var(--ink)}
 .tagline i{width:8px;height:8px;border-radius:50%;background:var(--turquesa)}
@@ -341,3 +342,5 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 
 .premio-pick{background:var(--coral-2);border-radius:14px;padding:12px}
 .premio-pick .chips button[aria-pressed="true"]{background:var(--turquesa);color:#fff}
+.hero .clubpill{margin-top:16px}
+.pp .pct{font-style:normal;font-size:.72rem;font-weight:700;color:var(--turquesa);margin-left:4px}
