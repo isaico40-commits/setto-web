@@ -113,6 +113,8 @@ En el panel, pestaña **Reseñas**: **Publicar** u **Ocultar**. En la web, en "L
 - **Foto e Instagram (opcionales):** el cliente puede sumar una foto de su pedido y su usuario de Instagram. Cada reseña publicada muestra "✓ Compra verificada · pidió …" con lo que pidió de verdad. Revisá la foto antes de publicar.
 - **Estrellas en la carta:** cada producto muestra su promedio y cantidad de reseñas publicadas de pedidos que lo incluían.
 
+- **Todas las reseñas:** botón "Ver todas las reseñas" y link "Reseñas" en el menú: promedio, barras por estrellas, filtros (con foto, con comentario, por estrellas) e incluye las que son solo puntaje.
+
 ### Avisar por WhatsApp
 Cada pedido pendiente tiene **Avisar por WhatsApp**: abre el chat del cliente con el mensaje del estado actual (recibido, en preparación, listo o en camino). Lo mandás vos con un toque, sin costo.
 

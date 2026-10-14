@@ -183,6 +183,14 @@
           return { nombre: nom(r.nombre), rating: r.rating, texto: r.texto, foto: r.foto, instagram: r.instagram, fecha: r.created_at, pedido: [...new Set(o.items.filter((i) => !["envio", "premio"].includes(i.id)).map((i) => i.nombre))] }; }) };
     },
     async listReviews() { return (dbLoad().reviews || []).slice(0, 100); },
+    async publicReviewsAll(offset = 0) {
+      const db = dbLoad(), ok = (db.reviews || []).filter((r) => r.estado === "aprobada"), por = {};
+      ok.forEach((r) => (por[r.rating] = (por[r.rating] || 0) + 1));
+      const nom = (n) => { const [a, b] = String(n).trim().split(/\s+/); return a.charAt(0).toUpperCase() + a.slice(1) + (b ? " " + b[0].toUpperCase() + "." : ""); };
+      return { cantidad: ok.length, promedio: ok.length ? Math.round((ok.reduce((s, r) => s + r.rating, 0) / ok.length) * 10) / 10 : null, por_estrella: por,
+        items: ok.slice(offset, offset + 50).map((r) => { const o = db.orders.find((x) => x.id === r.order_id) || { items: [] };
+          return { nombre: nom(r.nombre), rating: r.rating, texto: r.texto, foto: r.foto, instagram: r.instagram, fecha: r.created_at, pedido: [...new Set(o.items.filter((i) => !["envio", "premio"].includes(i.id)).map((i) => i.nombre))] }; }) };
+    },
     async setReviewEstado(id, estado) { const db = dbLoad(), r = (db.reviews || []).find((x) => x.id === id); if (r) { r.estado = estado; dbSave(db); } },
     async addStamps(phone, nombre, delta, motivo) {
       const db = dbLoad(), ph = normPhone(phone);
@@ -276,6 +284,7 @@
     },
     async productRatings() { const { data, error } = await sb.rpc("product_ratings"); if (error) return {}; return data || {}; },
     async publicReviews() { const { data, error } = await sb.rpc("public_reviews"); fail(error); return data; },
+    async publicReviewsAll(offset = 0) { const { data, error } = await sb.rpc("public_reviews_all", { p_offset: offset }); fail(error); return data; },
     async listReviews() { const { data, error } = await sb.from("reviews").select("*").order("created_at", { ascending: false }).limit(100); fail(error); return data; },
     async setReviewEstado(id, estado) { const { error } = await sb.from("reviews").update({ estado }).eq("id", id); fail(error); },
     async addStamps(phone, nombre, delta, motivo) { const { data, error } = await sb.rpc("add_stamps", { p_phone: phone, p_nombre: nombre || null, p_delta: delta, p_motivo: motivo || null }); fail(error); return data; },

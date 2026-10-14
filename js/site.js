@@ -620,17 +620,46 @@
     f._foto = file; f.querySelector(".rv-prev").innerHTML = `<img src="${URL.createObjectURL(file)}" alt="Tu foto">`; f.querySelector(".rv-foto b").textContent = "Foto lista · tocá para cambiarla";
   });
   const haceTxt = (iso) => { const d = Math.floor((Date.now() - new Date(iso)) / 864e5); return d <= 0 ? "hoy" : d === 1 ? "ayer" : d < 30 ? `hace ${d} días` : new Date(iso).toLocaleDateString("es-AR", { day: "numeric", month: "short" }); };
-  async function renderResenas() {
-    try {
-      const d = await API.publicReviews(); const sec = $("#resenas");
-      if (!d || !d.items || !d.items.length) { sec.hidden = true; return; }
-      sec.hidden = false;
-      $("#resProm").textContent = d.cantidad >= 3 ? `★ ${String(d.promedio).replace(".", ",")} · ${d.cantidad} reseñas` : "Reseñas reales";
-      $("#resGrid").innerHTML = d.items.map((r) => `<article class="rv">${r.foto ? `<img class="rv-img" src="${esc(r.foto)}" alt="Foto del pedido de ${esc(r.nombre)}" loading="lazy">` : ""}
+  const rvCard = (r) => `<article class="rv">${r.foto ? `<img class="rv-img" src="${esc(r.foto)}" alt="Foto del pedido de ${esc(r.nombre)}" loading="lazy">` : ""}
         <div class="rv-top"><span class="st" aria-label="${r.rating} de 5">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</span><span class="rv-when">${haceTxt(r.fecha)}</span></div>
         ${r.texto ? `<p>${esc(r.texto)}</p>` : ""}
         <div class="rv-who"><span class="rv-av">${esc((r.nombre || "?")[0])}</span><span><b>${esc(r.nombre)}</b>${r.instagram ? `<a href="https://instagram.com/${encodeURIComponent(r.instagram)}" target="_blank" rel="noopener nofollow">@${esc(r.instagram)}</a>` : ""}</span></div>
-        <span class="rv-ver">✓ Compra verificada${r.pedido && r.pedido.length ? ` · pidió ${esc(r.pedido.slice(0, 3).join(", "))}` : ""}</span></article>`).join("");
+        <span class="rv-ver">✓ Compra verificada${r.pedido && r.pedido.length ? ` · pidió ${esc(r.pedido.slice(0, 3).join(", "))}` : ""}</span></article>`;
+  /* ---------- todas las reseñas ---------- */
+  const AR = { items: [], off: 0, fil: "todas", data: null };
+  async function abrirResenas() {
+    const el = $("#allRev"); el.hidden = false; document.body.style.overflow = "hidden"; $("#arList").innerHTML = '<p class="loading">Cargando…</p>';
+    try { const d = await API.publicReviewsAll(0); AR.data = d; AR.items = d.items || []; AR.off = AR.items.length; dibujarAR(); } catch (e) { $("#arList").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+    setTimeout(() => $("#arClose").focus(), 50);
+  }
+  function cerrarResenas() { $("#allRev").hidden = true; document.body.style.overflow = ""; }
+  function dibujarAR() {
+    const d = AR.data || {}, n = d.cantidad || 0, por = d.por_estrella || {};
+    $("#arSum").innerHTML = n ? `<div class="ar-sum"><div class="ar-big"><b>${String(d.promedio).replace(".", ",")}</b><span class="st">${"★".repeat(Math.round(d.promedio))}${"☆".repeat(5 - Math.round(d.promedio))}</span><small>${n} reseña${n > 1 ? "s" : ""} de compras verificadas</small></div>
+      <div class="ar-bars">${[5, 4, 3, 2, 1].map((k) => `<div><span>${k}★</span><i><em style="width:${n ? Math.round(((por[k] || 0) / n) * 100) : 0}%"></em></i><span class="num">${por[k] || 0}</span></div>`).join("")}</div></div>` : '<p class="muted">Todavía no hay reseñas publicadas.</p>';
+    const fotos = AR.items.filter((r) => r.foto).length;
+    $("#arFil").innerHTML = [["todas", "Todas"], ["foto", `Con foto (${fotos})`], ["texto", "Con comentario"], ["5", "5★"], ["4", "4★"], ["3m", "3★ o menos"]].map(([k, l]) => `<button data-arf="${k}" aria-pressed="${AR.fil === k}">${l}</button>`).join("");
+    const f = AR.fil, list = AR.items.filter((r) => f === "todas" || (f === "foto" && r.foto) || (f === "texto" && r.texto) || (f === "3m" && r.rating <= 3) || String(r.rating) === f);
+    $("#arList").innerHTML = list.length ? list.map(rvCard).join("") : '<p class="muted" style="grid-column:1/-1;text-align:center">No hay reseñas con este filtro.</p>';
+    $("#arMore").hidden = AR.items.length >= n;
+  }
+  document.addEventListener("click", async (e) => {
+    if (e.target.closest("#verResenas")) return abrirResenas();
+    if (e.target.closest("[data-navres]")) { e.preventDefault(); closeMenu(); return abrirResenas(); }
+    if (e.target.closest("#arClose") || e.target.id === "allRev") return cerrarResenas();
+    const f = e.target.closest("[data-arf]"); if (f) { AR.fil = f.dataset.arf; dibujarAR(); return; }
+    if (e.target.closest("#arMore")) { try { const d = await API.publicReviewsAll(AR.off); AR.items = AR.items.concat(d.items || []); AR.off = AR.items.length; dibujarAR(); } catch (_) {} }
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#allRev").hidden) cerrarResenas(); });
+
+  async function renderResenas() {
+    try {
+      const d = await API.publicReviews(); const sec = $("#resenas");
+      if (!d || !d.cantidad) { sec.hidden = true; return; }
+      sec.hidden = false; $("#resGrid").hidden = !(d.items && d.items.length);
+      $("#verResenas").textContent = `Ver todas las reseñas (${d.cantidad})`;
+      $("#resProm").textContent = `★ ${String(d.promedio).replace(".", ",")} · ${d.cantidad} reseña${d.cantidad > 1 ? "s" : ""} verificada${d.cantidad > 1 ? "s" : ""}`;
+      $("#resGrid").innerHTML = (d.items || []).map(rvCard).join("");
     } catch (_) {}
   }
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-trackx]"); if (!x) return; try { localStorage.setItem("setto-trk-ocultos", JSON.stringify([...ocultosTrk(), x.dataset.trackx].slice(-20))); } catch (_) {} verSeguimiento(); });
