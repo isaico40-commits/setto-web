@@ -90,3 +90,4 @@ main.pmain{padding-block:24px 80px}
 .dirbox a{font-size:.82rem;font-weight:600;color:var(--turquesa)}
 .premiobox{background:var(--coral-2);border-radius:12px;padding:10px 12px;font-size:.88rem}
 .olines small.det{display:block;color:var(--turquesa,#296A67);font-weight:600;font-size:.78rem}
+.applogo{display:flex;align-items:center;gap:10px;margin:-2px 0 6px}.applogo .lprev{width:44px;height:44px;border-radius:12px;background:#fff;border:1px solid #0002;display:grid;place-items:center;font-size:.6rem;color:#0008;overflow:hidden;text-align:center}.applogo .lprev img{width:100%;height:100%;object-fit:contain}.applogo .btn{padding:6px 12px;font-size:.8rem}

@@ -346,3 +346,26 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .pp .pct{font-style:normal;font-size:.72rem;font-weight:700;color:var(--turquesa);margin-left:4px}
 .line small.det{display:block;color:var(--turquesa);font-weight:600;font-size:.76rem;margin-top:2px}
 .chips button .num{font-weight:500;opacity:.8}
+
+/* WhatsApp en navbar */
+.top .wacta{margin-left:auto;padding:9px 16px;background:var(--card);color:var(--turquesa)}
+.top .wacta + .cartbtn{margin-left:0}
+@media (max-width:760px){.top .wacta{margin-left:auto;width:42px;height:42px;padding:0;border-radius:50%}.top .wacta span{display:none}.top .wacta + .cartbtn{margin-left:0}}
+/* hero: tercer botón */
+.btn.ghost{background:transparent;box-shadow:none;border-style:dashed}
+.btn.ghost:hover{background:var(--card)}
+@media (max-width:560px){.hero .ctas .btn{flex:1 1 auto}}
+/* Pedir acá te conviene */
+.conviene{background:var(--turquesa);color:#FFFDF8;border-radius:var(--r);padding:26px;margin-bottom:22px}
+.conviene h3{font-size:clamp(1.6rem,3.4vw,2.2rem);color:#FFFDF8;text-align:center}
+.conviene .cv-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px}
+.conviene .cv{background:rgba(255,253,248,.1);border:1.5px solid rgba(255,253,248,.28);border-radius:18px;padding:16px}
+.conviene .cv b{display:block;font-size:1.05rem}
+.conviene .cv span{display:block;font-size:.88rem;opacity:.9;margin-top:6px;line-height:1.4}
+.conviene .cv i{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--coral,#f8a29a);color:var(--ink);font-style:normal;font-weight:800;font-size:.85rem;margin-bottom:10px}
+@media (max-width:900px){.conviene .cv-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:520px){.conviene{padding:20px 16px}.conviene .cv-grid{grid-template-columns:1fr}}
+/* logos de apps */
+.app .ico img{width:100%;height:100%;object-fit:contain;border-radius:12px}
+.app .ico.logo{background:#fff;overflow:hidden}
+@media (min-width:821px){.hero .ctas{gap:10px;flex-wrap:nowrap}.hero .ctas .btn.big{padding-inline:20px}}

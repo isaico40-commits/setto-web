@@ -266,6 +266,11 @@
           <label>Opciones para sacar (una por línea)<textarea class="inp" name="sin" rows="3">${esc(((S.personalizacion || {}).sin || []).join("\n"))}</textarea></label>
           <span class="hintp">El recargo se suma al precio de la bebida o del set.</span>
           <button class="btn solid">Guardar</button></form>
+        <form class="pcard" data-set="ventajas"><b>Pedir acá te conviene</b>
+          <div class="checks"><label><input type="checkbox" name="activo" ${(S.ventajas || {}).activo !== false ? "checked" : ""}> Mostrar en "Cómo pedir"</label></div>
+          <label>Título<input class="inp" name="titulo" value="${esc((S.ventajas || {}).titulo || "Pedir acá te conviene")}"></label>
+          <label>Motivos: uno por línea, título | detalle<textarea class="inp" name="items" rows="5">${esc(((S.ventajas || {}).items || []).map((x) => x.titulo + (x.detalle ? " | " + x.detalle : "")).join("\n"))}</textarea></label>
+          <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="envio"><b>Envío a domicilio</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${(S.envio || {}).activo ? "checked" : ""}> Ofrecer envío en la web</label></div>
           <label>Costo fijo del envío (0 = a coordinar por WhatsApp)<input class="inp" name="costo" type="number" min="0" step="100" value="${(S.envio || {}).costo || 0}"></label>
@@ -276,7 +281,9 @@
           <label>Una por línea<textarea class="inp" name="pagos">${esc((S.pagos || []).join("\n"))}</textarea></label>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="apps"><b>Apps de delivery</b>
-          ${[0, 1, 2, 3].map((i) => { const a = (S.apps || [])[i] || {}; return `<div class="row2"><label>Nombre<input class="inp" name="an${i}" value="${esc(a.nombre || "")}"></label><label>Link<input class="inp" name="au${i}" value="${esc(a.url || "")}"></label></div>`; }).join("")}
+          ${[0, 1, 2, 3].map((i) => { const a = (S.apps || [])[i] || {}; return `<div class="row2"><label>Nombre<input class="inp" name="an${i}" value="${esc(a.nombre || "")}"></label><label>Link<input class="inp" name="au${i}" value="${esc(a.url || "")}"></label></div>
+            <div class="applogo"><span class="lprev">${a.logo ? `<img src="${esc(a.logo)}" alt="">` : "Sin logo"}</span><input type="hidden" name="al${i}" value="${esc(a.logo || "")}"><label class="btn">Subir logo<input type="file" accept="image/*" data-applogo="${i}" hidden></label>${a.logo ? `<button type="button" class="linkbtn" data-applogo-x="${i}">Quitar</button>` : ""}</div>`; }).join("")}
+          <span class="hintp">Logo: usá el ícono oficial de cada app (cuadrado). Después tocá Guardar.</span>
           <span class="hintp">Dejá vacío el nombre para ocultar una fila.</span>
           <button class="btn solid">Guardar</button></form>
         ${API.DEMO ? `<div class="pcard"><b>Modo demo</b><p class="hintp">Borra pedidos, clientes y cambios de prueba de este navegador.</p><button class="btn" id="resetDemo">Reiniciar demo</button></div>` : ""}
@@ -302,9 +309,11 @@
         const leches = (f.leches || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const [n, pr] = s.split("|").map((x) => x.trim()); return { nombre: n, precio: Math.max(0, Math.round(+String(pr || "0").replace(/[^0-9.,]/g, "").replace(/\.(?=\d{3})/g, "").replace(",", ".")) || 0) }; }).filter((l) => l.nombre);
         await API.saveSetting("personalizacion", { activo: !!f.activo, leches, sin: (f.sin || "").split("\n").map((s) => s.trim()).filter(Boolean) });
       }
+      if (k === "ventajas") await API.saveSetting("ventajas", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "Pedir acá te conviene",
+        items: (f.items || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const [t, ...d] = s.split("|"); return { titulo: t.trim(), detalle: d.join("|").trim() }; }) });
       if (k === "envio") await API.saveSetting("envio", { activo: !!f.activo, costo: Math.max(0, +f.costo || 0), aviso: (f.aviso || "").trim(), pago: f.pago || "Transferencia / Mercado Pago" });
       if (k === "pagos") await API.saveSetting("pagos", (f.pagos || "").split("\n").map((s) => s.trim()).filter(Boolean));
-      if (k === "apps") await API.saveSetting("apps", [0, 1, 2, 3].map((i) => ({ nombre: (f["an" + i] || "").trim(), url: (f["au" + i] || "").trim() })).filter((a) => a.nombre));
+      if (k === "apps") await API.saveSetting("apps", [0, 1, 2, 3].map((i) => ({ nombre: (f["an" + i] || "").trim(), url: (f["au" + i] || "").trim(), logo: (f["al" + i] || "").trim() })).filter((a) => a.nombre));
       await loadBase(); toast("Guardado"); viewAjustes();
     } catch (e) { toast(e.message); }
   }
@@ -390,6 +399,12 @@
   });
   document.addEventListener("change", async (e) => {
     const t = e.target;
+    if (t.matches("[data-applogo]") && t.files && t.files[0]) {
+      const i = t.dataset.applogo, row = t.closest(".applogo"); toast("Subiendo logo…");
+      try { const blob = await squareBlob(t.files[0], 256); const url = await API.uploadPhoto(blob, "app-logo-" + i); row.querySelector(`[name=al${i}]`).value = url; row.querySelector(".lprev").innerHTML = `<img src="${url}" alt="">`; toast("Logo listo · tocá Guardar"); }
+      catch (err) { toast(err.message || "No se pudo subir el logo"); }
+      return;
+    }
     if (t.matches("[data-photo]") && t.files && t.files[0]) {
       const id = t.closest("[data-pid]").dataset.pid, base = P.products.find((x) => x.id === id);
       toast("Subiendo foto…");
@@ -397,6 +412,7 @@
       catch (err) { toast(err.message || "No se pudo subir la foto"); }
     }
   });
+  document.addEventListener("click", (e) => { const x = e.target.closest("[data-applogo-x]"); if (!x) return; const row = x.closest(".applogo"); row.querySelector(`[name=al${x.dataset.applogoX}]`).value = ""; row.querySelector(".lprev").textContent = "Sin logo"; x.remove(); });
   document.addEventListener("submit", (e) => { if (e.target.matches("form[data-set]")) { e.preventDefault(); saveAjuste(e.target); } });
 
   /* =================== ARRANQUE =================== */

@@ -95,6 +95,28 @@
         "Sin endulzante",
         "Sin hielo"
       ]
+    },
+    "ventajas": {
+      "activo": true,
+      "titulo": "Pedir acá te conviene",
+      "items": [
+        {
+          "titulo": "Más económico",
+          "detalle": "Ahorrás hasta un 20% frente a pedir lo mismo por las apps de delivery."
+        },
+        {
+          "titulo": "Sumás sellos",
+          "detalle": "Cada pedido suma al Setto Club. Al completar la tarjeta elegís un set de regalo o 25% off."
+        },
+        {
+          "titulo": "Lo armás a tu gusto",
+          "detalle": "Elegís tamaño, leche y qué sacarle a tu bebida."
+        },
+        {
+          "titulo": "Directo con nosotros",
+          "detalle": "Tu pedido llega a nuestro WhatsApp, sin intermediarios."
+        }
+      ]
     }
   },
   "products": [

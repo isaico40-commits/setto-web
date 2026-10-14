@@ -132,9 +132,14 @@
     $("#apps").innerHTML = '<span class="eyebrow" style="padding-inline:4px">Delivery por apps</span>' + (S.apps || []).map((a) => {
       const ok = !!a.url;
       return `<a class="app ${ok ? "" : "pend"}" ${ok ? `href="${esc(a.url)}" target="_blank" rel="noopener"` : 'aria-disabled="true"'}>
-        <span class="ico">${esc((a.nombre || "?")[0])}</span><span><b>${esc(a.nombre)}</b><small>${ok ? "Delivery a domicilio" : "Link pendiente"}</small></span>
+        <span class="ico ${a.logo ? "logo" : ""}">${a.logo ? `<img src="${esc(a.logo)}" alt="Logo de ${esc(a.nombre)}">` : esc((a.nombre || "?")[0])}</span><span><b>${esc(a.nombre)}</b><small>${ok ? "Delivery a domicilio" : "Link pendiente"}</small></span>
         <span class="go" aria-hidden="true">${ok ? "↗" : "…"}</span></a>`;
     }).join("") + '<p class="fine">El envío, sus tiempos y su costo los maneja cada app.</p>';
+  }
+  function renderConviene() {
+    const v = S.ventajas || {}, items = (v.items || []).filter((x) => x && x.titulo);
+    const el = $("#conviene"); el.hidden = !items.length || v.activo === false; if (el.hidden) return;
+    el.innerHTML = `<h3>${esc(v.titulo || "Pedir acá te conviene")}</h3><div class="cv-grid">${items.map((x, i) => `<div class="cv"><i>${i + 1}</i><b>${esc(x.titulo)}</b>${x.detalle ? `<span>${esc(x.detalle)}</span>` : ""}</div>`).join("")}</div>`;
   }
   function renderEspecial() {
     const E = S.especial || {}, items = on(ESP), open = espOpen();
@@ -218,6 +223,7 @@
     $("#footHours").textContent = "Retiro: " + HORARIO.charAt(0).toLowerCase() + HORARIO.slice(1);
     $("#waNum").textContent = S.whatsapp_visible || API.prettyPhone(S.whatsapp);
     $("#mnavWa").textContent = S.whatsapp_visible || API.prettyPhone(S.whatsapp);
+    $("#navWa").href = `https://wa.me/${S.whatsapp}?text=${encodeURIComponent("¡Hola Setto! Tengo una consulta.")}`;
   }
   function renderBadge() {
     $("#cartCount").textContent = units();
@@ -465,7 +471,7 @@
     try {
       const { settings, products } = await API.loadAll();
       S = settings; adapt(products); syncCart();
-      renderBand(); renderApps(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
+      renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
     } catch (e) {

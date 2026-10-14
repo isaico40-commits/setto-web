@@ -93,6 +93,10 @@ En **Ajustes → Setto Club** definís los sellos de la tarjeta, el texto del pr
 En los dirty y en los sets el cliente elige la leche (con recargo) y puede marcar "Sin cold foam", "Sin endulzante" o "Sin hielo". El recargo se suma al precio y se calcula en la base. En el WhatsApp y en el panel cada bebida muestra lo que eligió.
 En **Ajustes → Personalización de bebidas** cambiás las leches (una por línea, `Nombre | recargo`, la primera es la de base) y las opciones para sacar.
 
+### Pedir acá te conviene y logos de apps
+En **Ajustes → Pedir acá te conviene** editás el título y los motivos (uno por línea, `título | detalle`) que se ven arriba de "Cómo pedir".
+En **Ajustes → Apps de delivery** podés subir el logo oficial de cada app (cuadrado). Sin logo se ve la inicial.
+
 ### Edición especial (sabores de tortas)
 En **Carta → Edición especial**:
 - **Estado:** *Próximamente* (se muestra pero no se puede pedir) o *Disponible ahora* (se puede pedir).
