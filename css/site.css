@@ -443,3 +443,5 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .rv-foto span{min-width:0}
 .rv-form,.rv-form *{box-sizing:border-box}.rv-form{width:100%;max-width:100%}.rv-form textarea,.rv-ig,.rv-foto{width:100%;max-width:100%}
 .rv-form{grid-template-columns:minmax(0,1fr)}.rv-form > *{min-width:0}
+.sent-trk{width:100%;margin:4px 0 0}
+.sent-trk .trk{text-align:left}

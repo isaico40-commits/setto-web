@@ -352,11 +352,13 @@
     const envio = o.modo === "envio";
     const entrega = envio ? `Envío: ${o.retiro}\nDirección: ${o.direccion}` + (Number(o.costo_envio) > 0 ? "" : "\n(Costo de envío a coordinar)") : `Retiro: ${o.retiro}`;
     const premio = o.premio ? `\n\n🎁 Con este pedido completo mi tarjeta del Setto Club: ${o.premio_txt || "premio"}` : "";
-    return `¡Hola Setto! Te paso mi pedido ${o.code} ${envio ? "con envío a domicilio" : "para retirar"}:\n\n${lines.join("\n")}\n\nTotal: ${money(o.total)}${premio}\n\nNombre: ${o.nombre}\n${entrega}\nPago: ${o.pago}` + (o.nota ? `\nNota: ${o.nota}` : "");
+    return `¡Hola Setto! Te paso mi pedido ${o.code} ${envio ? "con envío a domicilio" : "para retirar"}:\n\n${lines.join("\n")}\n\nTotal: ${money(o.total)}${premio}\n\nNombre: ${o.nombre}\n${entrega}\nPago: ${o.pago}` + (o.nota ? `\nNota: ${o.nota}` : "")
+      + (o.track ? `\n\n📍 Sigo mi pedido acá: ${linkSeguir(o.track)}` : "");
   }
   const envioOn = () => !!(S.envio && S.envio.activo);
   const envioCosto = () => (envioOn() && form.modo === "envio" ? Math.max(0, Number(S.envio.costo) || 0) : 0);
   const fullDir = () => [form.dir.trim(), form.dirExtra.trim()].filter(Boolean).join(" · ");
+  const linkSeguir = (t) => `${location.origin}${location.pathname.replace(/index\.html$/, "")}?seguir=${t}`;
   const waLink = (msg) => `https://wa.me/${S.whatsapp}?text=${encodeURIComponent(msg)}`;
 
   function openDrawer() {
@@ -408,14 +410,15 @@
     }
     if (view === "sent" && lastOrder) {
       $("#dTitle").textContent = "Último paso";
+      const est = trackVivos.find((x) => x.code === lastOrder.code) || { code: lastOrder.code, status: "pendiente", etapa: "recibido", modo: lastOrder.modo, retiro: "" };
       body.innerHTML = `<div class="ok"><img src="img/mochito-cup.png" alt=""><span class="eyebrow">Tu código de pedido</span><div class="coderow num">${esc(lastOrder.code)}</div>
         ${lastOrder.premio ? `<div class="clubline" style="width:100%;text-align:left"><img src="img/mochito-run.png" alt=""><div><b>¡Completaste tu tarjeta!</b> Tu premio: ${esc(lastOrder.premio_txt || "a confirmar")}.</div></div>` : ""}
         <p class="muted" style="font-size:.9rem">${lastOrder.modo === "envio" ? "Enviá el mensaje por WhatsApp. Te confirmamos el horario, el costo del envío y el pago." : "Enviá el mensaje por WhatsApp. El pedido queda confirmado cuando te respondemos con la dirección y el pago."}${clubOn() ? " Cuando lo recibís, sumás tu sello del Setto Club." : ""}</p></div>
-        <div class="msg" id="msgText">${esc(lastOrder.message)}</div>
-        <p class="muted" style="font-size:.8rem;text-align:center">Podés seguir el estado de tu pedido arriba de todo en la web.</p>`;
-      foot.innerHTML = `<a class="btn wa big" href="${waLink(lastOrder.message)}" target="_blank" rel="noopener">Abrir WhatsApp</a>
-        <button class="btn big" id="copyMsg">Copiar mensaje</button>
-        <button class="back" id="newOrder" style="justify-self:center">Hacer otro pedido</button>`;
+        <div class="dtrk sent-trk">${trackCard(est)}</div>
+        <p class="muted" style="font-size:.84rem;text-align:center">El estado se actualiza solo: te avisamos acá cuando esté listo. En tu mensaje de WhatsApp va el link para volver a esta pantalla.</p>
+        <div class="msg" id="msgText" hidden>${esc(lastOrder.message)}</div>`;
+      foot.innerHTML = `<a class="btn wa big" href="${waLink(lastOrder.message)}" target="_blank" rel="noopener" data-resend>${lastOrder.enviado ? "Reenviar mensaje por WhatsApp" : "Enviar por WhatsApp"}</a>
+        <div style="display:flex;justify-content:center;gap:18px"><button class="back" id="copyMsg">Copiar mensaje</button><button class="back" id="newOrder">Hacer otro pedido</button></div>`;
     }
   }
 
@@ -433,10 +436,14 @@
     try {
       const isEnv = form.modo === "envio";
       const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [] })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null });
-      const full = { ...o, nombre: form.nombre.trim(), retiro: form.hora, pago: form.pago, nota: form.nota.trim() };
-      lastOrder = { code: o.code, message: buildMessage(full), modo: o.modo || "retiro", premio: !!o.premio, premio_txt: o.premio_txt };
+      const ph = o.phone || API.normPhone(form.tel);
+      let track = o.track || null;
+      if (!track) { try { const st = await API.orderStatus([o.code], ph); track = (st.find((x) => x.code === o.code) || {}).track || null; } catch (_) {} }
+      const full = { ...o, track, nombre: form.nombre.trim(), retiro: form.hora, pago: form.pago, nota: form.nota.trim() };
+      lastOrder = { code: o.code, track, message: buildMessage(full), modo: o.modo || "retiro", premio: !!o.premio, premio_txt: o.premio_txt, enviado: true };
       cardCache = null;
-      guardarSeguimiento({ code: o.code, phone: o.phone || API.normPhone(form.tel), at: Date.now() });
+      trackVivos = [{ code: o.code, status: "pendiente", etapa: "recibido", modo: o.modo || "retiro", retiro: form.hora, created_at: new Date().toISOString(), track }, ...trackVivos.filter((x) => x.code !== o.code)];
+      guardarSeguimiento({ code: o.code, phone: ph, track, at: Date.now() });
       refrescarStock();
       try { sessionStorage.setItem("setto-last-order", JSON.stringify(lastOrder)); localStorage.setItem("setto-form", JSON.stringify({ nombre: form.nombre, tel: form.tel, dir: form.dir, dirExtra: form.dirExtra })); } catch (_) {}
       cart = []; save(); form.hora = ""; form.nota = ""; form.premio = ""; renderBadge();
@@ -518,23 +525,35 @@
 
   /* ---------- seguimiento de pedidos ---------- */
   const SKEY = "setto-mis-pedidos";
-  const misPedidos = () => { try { return JSON.parse(localStorage.getItem(SKEY) || "[]").filter((x) => Date.now() - x.at < 3 * 864e5); } catch (_) { return []; } };
-  function guardarSeguimiento(o) { try { const l = misPedidos().filter((x) => x.code !== o.code); l.unshift(o); localStorage.setItem(SKEY, JSON.stringify(l.slice(0, 5))); } catch (_) {} verSeguimiento(); }
+  const misPedidos = () => { try { return JSON.parse(localStorage.getItem(SKEY) || "[]").filter((x) => Date.now() - x.at < 14 * 864e5); } catch (_) { return []; } };
+  function guardarSeguimiento(o) { try { const l = misPedidos().filter((x) => !((o.code && x.code === o.code) || (o.track && x.track === o.track))); l.unshift(o); localStorage.setItem(SKEY, JSON.stringify(l.slice(0, 8))); } catch (_) {} verSeguimiento(); }
+  // llega desde el link del WhatsApp: ?seguir=CODIGO → guarda el pedido en este celular y lo muestra
+  (function desdeLink() {
+    const t = new URLSearchParams(location.search).get("seguir"); if (!t || !/^[A-Za-z0-9-]{16,64}$/.test(t)) return;
+    try { const l = misPedidos().filter((x) => x.track !== t); l.unshift({ code: "", phone: "", track: t, at: Date.now() }); localStorage.setItem(SKEY, JSON.stringify(l.slice(0, 8))); } catch (_) {}
+    try { history.replaceState(null, "", location.pathname + location.hash); } catch (_) {}
+    window.scrollTo(0, 0);
+  })();
   let trackT = null, trackVivos = [];
-  const telDe = (code) => (misPedidos().find((x) => x.code === code) || {}).phone || "";
+  const telDe = (code) => (trackVivos.find((x) => x.code === code) || {}).phone || (misPedidos().find((x) => x.code === code) || {}).phone || "";
+  const trackDe = (code) => (trackVivos.find((x) => x.code === code) || {}).track || (misPedidos().find((x) => x.code === code) || {}).track || "";
   const ocultosTrk = () => { try { return JSON.parse(localStorage.getItem("setto-trk-ocultos") || "[]"); } catch (_) { return []; } };
   const trackHtml = () => (trackVivos.length ? `<div class="dtrk">${trackVivos.map(trackCard).join("")}</div>` : "");
   async function verSeguimiento() {
     clearTimeout(trackT);
     const l = misPedidos(), box = $("#seguimiento"); if (!l.length) { box.hidden = true; return; }
-    const byPhone = {}; l.forEach((x) => (byPhone[x.phone] = byPhone[x.phone] || []).push(x.code));
+    const byPhone = {}; l.filter((x) => !x.track && x.phone).forEach((x) => (byPhone[x.phone] = byPhone[x.phone] || []).push(x.code));
+    const tracks = l.filter((x) => x.track).map((x) => x.track);
     let data = [];
-    try { data = (await Promise.all(Object.entries(byPhone).map(([ph, codes]) => API.orderStatus(codes, ph)))).flat(); } catch (_) { return; }
+    try {
+      const parts = await Promise.all([tracks.length && API.trackStatus ? API.trackStatus(tracks) : [], ...Object.entries(byPhone).map(([ph, codes]) => API.orderStatus(codes, ph))]);
+      const seen = new Set(); data = parts.flat().filter((o) => o && !seen.has(o.code) && seen.add(o.code));
+    } catch (_) { return; }
     // pendientes; entregados sin reseña (3 días); el resto hasta 3 horas
     const ocultos = ocultosTrk();
     const vivos = data.filter((o) => !ocultos.includes(o.code) && (o.status === "pendiente" || (o.status === "entregado" && !o.resena) || Date.now() - new Date(o.created_at) < 3 * 36e5)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
     trackVivos = vivos;
-    if (view === "cart" && $("#drawer").classList.contains("on")) drawDrawer();
+    if ((view === "cart" || view === "sent") && $("#drawer").classList.contains("on")) drawDrawer();
     if (!vivos.length) { box.hidden = true; return; }
     if (box.querySelector(".rv-form")) return; // no pisar una reseña a medio escribir
     box.hidden = false; box.innerHTML = `<div class="wrap">${vivos.map(trackCard).join("")}</div>`;
@@ -582,7 +601,8 @@
         let foto = null; const file = f._foto;
         if (file) { t.textContent = "Subiendo foto…"; foto = await API.uploadReviewPhoto(await achicarFoto(file)); }
         t.textContent = "Enviando…";
-        await API.createReview(f.dataset.rvcode, telDe(f.dataset.rvcode), r, f.querySelector("textarea").value, foto, f.querySelector("[data-rvig]").value);
+        const tr = trackDe(f.dataset.rvcode), ig = f.querySelector("[data-rvig]").value, tx = f.querySelector("textarea").value;
+        if (tr && API.createReviewTrack) await API.createReviewTrack(tr, r, tx, foto, ig); else await API.createReview(f.dataset.rvcode, telDe(f.dataset.rvcode), r, tx, foto, ig);
         f.outerHTML = `<p style="margin-top:10px"><b>¡Gracias!</b> La publicamos cuando la revisemos.</p>`; setTimeout(verSeguimiento, 4000);
       } catch (ex) { err.hidden = false; err.textContent = ex.message; t.disabled = false; t.textContent = "Enviar reseña"; }
     }

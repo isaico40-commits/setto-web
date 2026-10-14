@@ -101,6 +101,11 @@ En **Ajustes → Apps de delivery** podés subir el logo oficial de cada app (cu
 Después de enviar, el cliente ve arriba de la web el estado de su pedido (se actualiza cada 30 segundos y al volver a la pestaña): **Recibido → En preparación → Listo para retirar / En camino → Entregado**. Si cancelás, le aparece cancelado.
 En el panel, cada pedido pendiente tiene **Estado que ve el cliente**: Recibido / En preparación / Listo (o En camino). Al tocar **Entregado ✓** pasa a Entregado.
 
+### Link de seguimiento
+Cada pedido tiene un link propio (`/?seguir=…`). Va al final del WhatsApp que manda el cliente y en los avisos de estado del panel. Al abrirlo, en cualquier celular, ve el estado del pedido arriba de la web, sin escribir nada.
+Después de enviar, la pantalla final muestra el estado en vivo y el botón **Reenviar mensaje por WhatsApp**.
+Al tocar **Entregado ✓** en el panel aparece **Pedir reseña por WhatsApp**: abre el chat del cliente con el link para dejar su reseña (con foto) y ver sus sellos. También está en cada pedido de la pestaña Entregados.
+
 ### Reseñas
 Cuando un pedido pasa a **Entregado**, el cliente ve en su seguimiento **Ver mis sellos** y **Dejar reseña** (estrellas + texto opcional). Solo puede dejar reseña quien recibió el pedido: una por pedido, dentro de los 14 días.
 En el panel, pestaña **Reseñas**: **Publicar** u **Ocultar**. En la web, en "Lo que dicen", solo se ven las publicadas que tienen texto, con nombre e inicial (nunca el teléfono). El promedio aparece desde 3 reseñas.

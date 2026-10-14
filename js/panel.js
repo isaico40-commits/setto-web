@@ -68,7 +68,13 @@
   }
 
   /* =================== PEDIDOS =================== */
-  function avisoTxt(o) {
+  const linkSeguir = (o) => (o.track ? `${location.origin}/?seguir=${o.track}` : `${location.origin}/`);
+  function resenaTxt(o) {
+    const n = (o.nombre || "").split(" ")[0], s = Number(o.sellos) || 0;
+    return `¡Gracias por tu pedido, ${n}! 🙌${s > 0 ? ` Sumaste ${s === 1 ? "1 sello" : s + " sellos"} al Setto Club.` : ""}\n\nSi te gustó, nos ayuda un montón que dejes tu reseña (con foto si querés) y ahí mismo ves tus sellos:\n${linkSeguir(o)}`;
+  }
+  function avisoTxt(o) { return avisoBase(o) + `\n\nSeguí tu pedido acá: ${linkSeguir(o)}`; }
+  function avisoBase(o) {
     const env = o.modo === "envio", e = o.etapa || "recibido", n = (o.nombre || "").split(" ")[0];
     if (e === "listo") return env ? `¡Hola ${n}! Tu pedido ${o.code} de Setto ya salió y va en camino 🛵` : `¡Hola ${n}! Tu pedido ${o.code} de Setto está listo. Ya podés pasar a buscarlo 🙌`;
     if (e === "preparando") return `¡Hola ${n}! Ya estamos preparando tu pedido ${o.code} de Setto.`;
@@ -112,10 +118,18 @@
         ${[["pendiente", "Pendientes"], ["entregado", "Entregados (7 días)"], ["cancelado", "Cancelados"]].map(([k, l]) => `<button class="ptab" data-sub="${k}" aria-selected="${P.sub === k}">${l}</button>`).join("")}
         <input id="oq" placeholder="Buscar código, nombre o celular" value="${esc(P.q)}">
       </div>
+      <div class="justdel" id="justDel" hidden></div>
       <div class="pgrid" id="olist"><p class="muted">Cargando…</p></div>`;
     refreshOrders(false);
   }
+  function drawJust() {
+    const el = $("#justDel"); if (!el) return; const o = P.justDelivered;
+    el.hidden = !o; if (!o) return;
+    el.innerHTML = `<div><b>Entregado ${esc(o.code)} · ${esc((o.nombre || "").split(" ")[0])}</b><span>Mandale el link para que deje su reseña y vea sus sellos.</span></div>
+      <a class="btn solid" target="_blank" rel="noopener" data-justgo href="https://wa.me/${esc(o.phone)}?text=${encodeURIComponent(resenaTxt(o))}">Pedir reseña por WhatsApp</a><button class="linkbtn" data-justx>Ahora no</button>`;
+  }
   function drawOrders() {
+    drawJust();
     const box = $("#olist"); if (!box) return;
     const q = P.q.trim().toLowerCase().replace(/\s/g, "");
     const list = P.orders.filter((o) => !q || (o.code + o.nombre + o.phone).toLowerCase().replace(/\s/g, "").includes(q.replace(/^stt-?/, "")) || o.code.toLowerCase().includes(q));
@@ -138,9 +152,10 @@
             <label>Número del chat de WhatsApp<input class="inp" data-cphone value="${esc(c.phone)}" inputmode="tel"></label>
             <div class="acts"><span style="font-size:.85rem;font-weight:600">Sellos a sumar</span><span class="stepper"><button data-cn="-1" aria-label="Menos">−</button><span>${c.n}</span><button data-cn="1" aria-label="Más">+</button></span></div>
             <div class="acts etapas"><span style="font-size:.85rem;font-weight:600">Estado que ve el cliente</span>${[["recibido", "Recibido"], ["preparando", "En preparación"], ["listo", env ? "En camino" : "Listo para retirar"]].map(([k, l]) => `<button class="chipb" data-etapa="${k}" aria-pressed="${(o.etapa || "recibido") === k}">${l}</button>`).join("")}</div>
-            <a class="linkbtn" target="_blank" rel="noopener" href="https://wa.me/${esc(o.phone)}?text=${encodeURIComponent(avisoTxt(o))}">Avisar por WhatsApp: “${esc(avisoTxt(o).slice(0, 48))}…”</a>
+            <a class="linkbtn" target="_blank" rel="noopener" href="https://wa.me/${esc(o.phone)}?text=${encodeURIComponent(avisoTxt(o))}">Avisar por WhatsApp: “${esc(avisoBase(o).slice(0, 48))}…”</a>
             <div class="acts"><button class="btn solid" data-deliver>Entregado ✓</button><button class="linkbtn warn" data-cancel>${P.cancelArm === o.id ? "¿Seguro? Tocá de nuevo para cancelar" : "Cancelar pedido"}</button></div>
-          </div>` : o.status === "entregado" ? `<p class="hintp">Entregado ${o.closed_at ? ago(o.closed_at) : ""} · ${o.sellos || 0} sello(s) sumado(s) a ${esc(pretty(o.phone))}</p>` : ""}
+          </div>` : o.status === "entregado" ? `<p class="hintp">Entregado ${o.closed_at ? ago(o.closed_at) : ""} · ${o.sellos || 0} sello(s) sumado(s) a ${esc(pretty(o.phone))}</p>
+            <a class="btn solid" style="margin-top:8px" target="_blank" rel="noopener" href="https://wa.me/${esc(o.phone)}?text=${encodeURIComponent(resenaTxt(o))}">Pedir reseña por WhatsApp</a>` : ""}
       </article>`;
     }).join("");
   }
@@ -376,7 +391,8 @@
       if (b.dataset.cn) { c.n = Math.max(0, Math.min(10, c.n + +b.dataset.cn)); drawOrders(); }
       if (b.dataset.deliver !== undefined) {
         b.disabled = true;
-        try { const r = await API.confirmOrder(id, c.phone, c.n); toast((r.canje ? `Entregado · premio canjeado · la tarjeta vuelve a ${r.sellos}` : c.n ? `Entregado · ${pretty(r.phone)} tiene ${r.sellos} sello(s)` : "Entregado") + " · cargado en la caja"); delete P.confirm[id]; refreshOrders(false); }
+        const od = P.orders.find((x) => x.id === id);
+        try { const r = await API.confirmOrder(id, c.phone, c.n); if (od) P.justDelivered = { ...od, phone: r.phone || od.phone, sellos: c.n }; toast((r.canje ? `Entregado · premio canjeado · la tarjeta vuelve a ${r.sellos}` : c.n ? `Entregado · ${pretty(r.phone)} tiene ${r.sellos} sello(s)` : "Entregado") + " · cargado en la caja"); delete P.confirm[id]; refreshOrders(false); }
         catch (err) { toast(err.message); b.disabled = false; }
       }
       if (b.dataset.cancel !== undefined) {
@@ -456,6 +472,7 @@
     }
   });
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-applogo-x]"); if (!x) return; const row = x.closest(".applogo"); row.querySelector(`[name=al${x.dataset.applogoX}]`).value = ""; row.querySelector(".lprev").textContent = "Sin logo"; x.remove(); });
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-justx],[data-justgo]")) { setTimeout(() => { P.justDelivered = null; drawJust(); }, 300); } });
   document.addEventListener("submit", (e) => { if (e.target.matches("form[data-set]")) { e.preventDefault(); saveAjuste(e.target); } });
 
   /* =================== ARRANQUE =================== */

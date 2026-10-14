@@ -93,3 +93,4 @@ main.pmain{padding-block:24px 80px}
 .applogo{display:flex;align-items:center;gap:10px;margin:-2px 0 6px}.applogo .lprev{width:44px;height:44px;border-radius:12px;background:#fff;border:1px solid #0002;display:grid;place-items:center;font-size:.6rem;color:#0008;overflow:hidden;text-align:center}.applogo .lprev img{width:100%;height:100%;object-fit:contain}.applogo .btn{padding:6px 12px;font-size:.8rem}
 a.ptab{text-decoration:none}
 .etapas{flex-wrap:wrap;gap:6px}.chipb{border:1.5px solid #296A67;background:#fff;color:#296A67;border-radius:99px;padding:6px 12px;font-weight:600;font-size:.82rem;cursor:pointer}.chipb[aria-pressed="true"]{background:#296A67;color:#fff}
+.justdel{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:#e6f0ef;border:1.5px solid #296A67;border-radius:18px;padding:14px 16px;margin:14px 0}.justdel>div{display:grid;flex:1 1 220px}.justdel span{font-size:.85rem;color:#4a4a4a}

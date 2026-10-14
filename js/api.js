@@ -106,7 +106,7 @@
       while (db.orders.some((o) => o.code === code && o.status === "pendiente"));
       const o = { id: uid(), code, nombre: String(nombre).trim(), phone: ph, items: lines, total, retiro, pago, nota: nota || null, status: "pendiente", sellos: 0, created_at: new Date().toISOString(),
         modo, direccion: modo === "envio" ? String(direccion).trim() : null, premio, premio_txt: ptxt };
-      o.etapa = "recibido"; db.orders.unshift(o); dbSave(db);
+      o.etapa = "recibido"; o.track = uid().replace(/-/g, ""); db.orders.unshift(o); dbSave(db);
       return { id: o.id, code, total, items: lines, phone: ph, modo, direccion: o.direccion, costo_envio: costo, premio, premio_txt: ptxt, descuento: off, meta };
     },
     async getStock() { return null; },
@@ -151,8 +151,13 @@
     async orderStatus(codes, phone) {
       const db = dbLoad(), ph = normPhone(phone), since = Date.now() - 3 * 864e5;
       return db.orders.filter((o) => o.phone === ph && codes.includes(o.code) && new Date(o.created_at) > since)
-        .map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, resena: (db.reviews || []).some((r) => r.order_id === o.id) }));
+        .map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, track: o.track, resena: (db.reviews || []).some((r) => r.order_id === o.id) }));
     },
+    async trackStatus(tracks) {
+      const db = dbLoad();
+      return db.orders.filter((o) => o.track && tracks.includes(o.track)).map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, track: o.track, phone: o.phone, resena: (db.reviews || []).some((r) => r.order_id === o.id) }));
+    },
+    async createReviewTrack(track, rating, texto, foto, instagram) { const o = dbLoad().orders.find((x) => x.track === track); if (!o) throw new Error("No encontramos ese pedido"); return this.createReview(o.code, o.phone, rating, texto, foto, instagram); },
     async uploadReviewPhoto(blob) { return await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); }); },
     async productRatings() {
       const db = dbLoad(), out = {};
@@ -260,6 +265,8 @@
     async cancelOrder(id) { const { error } = await sb.rpc("cancel_order", { p_id: id }); fail(error); },
     async setEtapa(id, etapa) { const { error } = await sb.rpc("set_order_etapa", { p_id: id, p_etapa: etapa }); fail(error); },
     async orderStatus(codes, phone) { const { data, error } = await sb.rpc("get_order_status", { p_codes: codes, p_phone: phone }); fail(error); return data || []; },
+    async trackStatus(tracks) { const { data, error } = await sb.rpc("track_status", { p_tracks: tracks }); fail(error); return data || []; },
+    async createReviewTrack(track, rating, texto, foto, instagram) { const { error } = await sb.rpc("create_review_track", { p_track: track, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); },
     async createReview(code, phone, rating, texto, foto, instagram) { const { error } = await sb.rpc("create_review_v2", { p_code: code, p_phone: phone, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); },
     async uploadReviewPhoto(blob) {
       const ext = (blob.type || "").includes("webp") ? "webp" : "jpg", path = `r/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
