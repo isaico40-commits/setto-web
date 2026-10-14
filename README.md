@@ -108,6 +108,28 @@ En **Carta → Edición especial**:
 
 ---
 
+## Caja del equipo (`/caja`)
+
+Reemplaza la app de Apps Script y la planilla "SETTO — Gastos, ingresos y resultados". Mismo login que el panel; cada celular elige una vez quién es (Isa, Alan o Lucas) y todo queda a su nombre.
+
+**Instalar (una vez):** en Supabase → SQL Editor, correr `supabase/migrations/006_caja.sql` (tablas) y después `007_caja_historial.sql` (todo lo cargado en la planilla hasta el 14/10/2026). Se pueden correr de nuevo sin duplicar nada.
+
+**Cómo funciona:** solo se guardan movimientos. Los saldos, lo que Setto le debe a cada socio, el resumen del mes y el stock los calcula la base a partir de los movimientos, así que no se pueden desincronizar. Los movimientos no se borran: se **anulan** con motivo, y cada edición queda en el historial.
+
+| Tipo | Qué hace |
+|---|---|
+| Entrada | Suma a una cuenta (ventas, liquidaciones de PedidosYa/Rappi/Uber) |
+| Gasto | Resta de una cuenta, o si lo pagó un socio de su bolsillo, Setto le queda debiendo |
+| Aporte de socio | Un socio pone plata; Setto le queda debiendo |
+| Devolución a socio | Setto le devuelve; baja la deuda |
+| Retiro de ganancias | Un socio se lleva ganancias (no es deuda) |
+| Transferencia | Pasa plata entre cuentas (ej. depositar efectivo en MP) |
+| Ajuste por conteo | Se genera solo con el botón **Contar**: ponés lo que hay y se carga la diferencia |
+
+Además: **Stock** (Café / Produ, con traslados y conteos), **Tareas** y **Lista de compras** (al tildar algo, ofrece cargar el gasto y lo deja enlazado). En Movimientos se puede descargar cada mes en CSV.
+
+---
+
 ## Seguridad (lo importante)
 - Los **precios se calculan en la base**, no en el navegador. Si alguien modifica la página para cambiar un precio, el pedido se guarda igual con el precio real.
 - Los clientes **no pueden ver pedidos ni datos de otros clientes**. Al consultar la tarjeta solo ven la cantidad de sellos de ese número.
@@ -135,6 +157,7 @@ js/config.js        ← acá van las claves de Supabase
 js/api.js           conexión a Supabase / modo demo
 js/site.js          lógica del sitio
 js/panel.js         lógica del panel
+caja.html / js/caja.js / css/caja.css   caja del equipo
 js/seed.js          carta inicial para el modo demo
 data/seed.json      carta inicial (fuente)
 supabase/schema.sql tablas, seguridad, funciones y carta inicial

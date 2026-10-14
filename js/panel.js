@@ -54,6 +54,7 @@
         <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.png" alt="Setto"></a><span class="tag">Panel</span>
         <nav class="ptabs" role="tablist">
           ${[["pedidos", "Pedidos"], ["club", "Club"], ["carta", "Carta"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : ""}</button>`).join("")}
+          <a class="ptab" href="caja.html">Caja</a>
         </nav>
         <span class="who">${esc(P.user && P.user.email || "")}<button id="logout">Salir</button></span>
       </div></header>
