@@ -23,6 +23,22 @@
     SETS = by("set"); DIRTY = by("dirty"); MOCHIS = by("mochi"); ESP = by("especial");
   }
 
+  /* ---------- stock visible (sale de la caja del equipo) ---------- */
+  let STOCK = null;
+  const umbral = () => Math.max(1, Number((S.stock_web || {}).umbral) || 3);
+  const stockDe = (p) => {
+    if (!STOCK || !p) return null;
+    const id = p.categoria === "set" ? p.set_mochi : p.id;
+    return Object.prototype.hasOwnProperty.call(STOCK, id) ? Number(STOCK[id]) : null;
+  };
+  const stockBadge = (p) => { const n = stockDe(p); if (n === null || p.agotado) return ""; return n <= 0 ? '<span class="badge">Sin stock hoy</span>' : n <= umbral() ? '<span class="badge low">¡Últimos!</span>' : ""; };
+  const stockLine = (p) => {
+    const n = stockDe(p); if (n === null || p.agotado) return "";
+    if (n <= 0) return '<p class="stk out">Sin stock por ahora · consultanos por WhatsApp</p>';
+    if (p.categoria === "set") return n <= umbral() ? `<p class="stk low">Quedan ${n} para este set</p>` : "";
+    return n <= umbral() ? `<p class="stk low">Quedan ${n} · ¡últimos!</p>` : `<p class="stk">${n} disponibles hoy</p>`;
+  };
+
   const find = (id) => [...SETS, ...DIRTY, ...MOCHIS, ...ESP].find((x) => x.id === id);
   const kind = (p) => p.categoria === "especial" ? "premium" : p.categoria;
   const unit = (p) => kind(p) === "mochi" || kind(p) === "premium";
@@ -148,10 +164,10 @@
     $("#espGrid").innerHTML = items.map((p) => {
       const foto = !!p.img, canBuy = open && !p.agotado && Number(p.precio) > 0;
       const pic = foto ? `<img src="${esc(p.img)}" alt="Mochi ${esc(p.nombre)}" loading="lazy">` : `<span class="pend"><img src="img/mochito-lie.png" alt="">Foto en camino</span>`;
-      const tag = p.agotado ? '<span class="badge">Agotado</span>' : !open ? '<span class="badge">Próximamente</span>' : "";
+      const tag = p.agotado ? '<span class="badge">Agotado</span>' : !open ? '<span class="badge">Próximamente</span>' : stockBadge(p);
       return `<article class="prem ${p.agotado ? "agotado" : ""}">
         <button class="ph ${foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${tag}${pic}</button>
-        <h3>${esc(p.nombre)}</h3><p class="desc">${esc(p.desc)}</p>
+        <h3>${esc(p.nombre)}</h3><p class="desc">${esc(p.desc)}</p>${open ? stockLine(p) : ""}
         <div class="row">${Number(p.precio) > 0 ? `<span class="price num">${money(p.precio)}</span>` : `<span class="muted" style="font-size:.85rem">Precio a confirmar</span>`}
         ${canBuy ? `<button class="add" data-quick="${p.id}" aria-label="Sumar ${esc(nameOf(p))}">+</button>` : ""}</div>
       </article>`;
@@ -165,10 +181,10 @@
       const ahora = s.precios["12 oz"], antes = suelto(s, "12 oz"), ahorro = antes - ahora, pct = antes > 0 ? Math.round((ahorro / antes) * 100) : 0;
       return `<article class="set">
         <button class="ph ${s.foto ? "foto" : ""}" data-open="${s.id}" aria-label="Ver ${esc(s.nombre)}"><img src="${esc(s.img || "img/mochito-lie.png")}" alt="${esc(descOf(s))}" loading="lazy"></button>
-        ${pct > 0 ? `<span class="off num">${pct}% off</span>` : ""}
+        ${pct > 0 ? `<span class="off num">${pct}% off</span>` : ""}${stockBadge(s)}
         <h3>${esc(s.nombre)}</h3>
         <p class="code">${esc(s.codigo || "")}${s.tema ? " ✦ " + esc(s.tema) : ""}</p>
-        <p class="combo">${esc(descOf(s))}</p>
+        <p class="combo">${esc(descOf(s))}</p>${stockLine(s)}
         <div class="foot"><span class="from num">Desde<b>${money(ahora)}${ahorro > 0 ? `<s>${money(antes)}</s>` : ""}</b></span>
         <button class="add" data-open="${s.id}" aria-label="Elegir tamaño de ${esc(s.nombre)}">+</button></div>
       </article>`;
@@ -185,10 +201,11 @@
     $("#grid").innerHTML = list.map((p) => {
       const agot = p.agotado;
       const precio = tab === "dirty" ? `<span class="from num">Desde<b>${money(p.precios["12 oz"])}</b></span>` : `<span class="from num">Unidad<b>${money(p.precio)}</b></span>`;
-      const badge = agot ? '<span class="badge">Agotado</span>' : p.rotativo ? '<span class="badge">Rotativo</span>' : "";
+      const sb = tab === "mochi" ? stockBadge(p) : "";
+      const badge = agot ? '<span class="badge">Agotado</span>' : sb ? sb : p.rotativo ? '<span class="badge">Rotativo</span>' : "";
       return `<article class="item">
         <button class="ph ${p.foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(nameOf(p))}">${badge}<img src="${esc(p.img || "img/mochito-lie.png")}" alt="${esc(tab === "dirty" ? p.nombre + " en vaso transparente" : "Mochi de " + p.nombre + " entero y cortado")}" loading="lazy"></button>
-        <h3>${esc(p.nombre)}</h3><p class="desc">${esc(p.desc)}</p>
+        <h3>${esc(p.nombre)}</h3><p class="desc">${esc(p.desc)}</p>${tab === "mochi" ? stockLine(p) : ""}
         <div class="row">${precio}${agot ? "" : `<button class="add" style="margin-left:auto" ${tab === "dirty" ? `data-open="${p.id}"` : `data-quick="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>`}</div>
       </article>`;
     }).join("") + (tab === "dirty"
@@ -267,6 +284,7 @@
         ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
         <h3 id="sTitle">${esc(nameOf(p))}</h3>
         <p class="muted">${esc(descOf(p))}</p>
+        ${k === "premium" && !espOpen() ? "" : stockLine(p)}
         ${opts}
         ${custom}
         ${clubOn() && !blocked ? `<span class="clubtag">Tu pedido suma ${sellosTxt(spp())} del Setto Club</span>` : ""}
@@ -469,7 +487,9 @@
     $("#demoBar").hidden = !API.DEMO;
     renderBand(); loading();
     try {
+      const stockP = API.getStock ? API.getStock().catch(() => null) : Promise.resolve(null);
       const { settings, products } = await API.loadAll();
+      STOCK = await stockP;
       S = settings; adapt(products); syncCart();
       renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;

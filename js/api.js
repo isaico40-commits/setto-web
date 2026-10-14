@@ -109,6 +109,7 @@
       db.orders.unshift(o); dbSave(db);
       return { id: o.id, code, total, items: lines, phone: ph, modo, direccion: o.direccion, costo_envio: costo, premio, premio_txt: ptxt, descuento: off, meta };
     },
+    async getStock() { return null; },
     async getCard(phone) {
       const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("El celular no parece válido");
       const c = db.customers.find((x) => x.phone === ph), club = db.settings.club || {};
@@ -208,6 +209,8 @@
       fail(error); return data;
     },
     async getCard(phone) { const { data, error } = await sb.rpc("get_card", { p_phone: phone }); fail(error); return data; },
+    /* {producto: unidades en el Café} o null si el stock en la web está apagado */
+    async getStock() { const { data, error } = await sb.rpc("stock_publico"); if (error) return null; return data; },
     async session() { const { data } = await sb.auth.getSession(); return data.session ? data.session.user : null; },
     async signIn(email, password) { const { data, error } = await sb.auth.signInWithPassword({ email, password }); fail(error); return data.user; },
     async signOut() { await sb.auth.signOut(); },
