@@ -53,10 +53,13 @@ window.SETTO_SEED = {
   },
   "club": {
    "meta": 8,
-   "premio": "Premio a definir",
+   "premio": "Un set de regalo o 35% off en ese pedido",
    "sellos_por_pedido": 1,
    "activo": true,
-   "minimo": 0
+   "minimo": 0,
+   "premio_set": true,
+   "premio_descuento": 35,
+   "premio_tope": 0
   },
   "envio": {
    "activo": true,

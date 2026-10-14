@@ -338,3 +338,6 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .modo button b{font-weight:600;font-size:.92rem}
 .modo button small{font-size:.76rem;color:var(--ink-2)}
 .modo button[aria-checked="true"]{border:2px solid var(--turquesa);background:color-mix(in srgb,var(--menta) 55%,var(--card))}
+
+.premio-pick{background:var(--coral-2);border-radius:14px;padding:12px}
+.premio-pick .chips button[aria-pressed="true"]{background:var(--turquesa);color:#fff}

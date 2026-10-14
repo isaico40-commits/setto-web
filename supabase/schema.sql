@@ -251,9 +251,9 @@ grant execute on function public.redeem_reward(text) to authenticated;
 --   p_items: [{"id":"set-sakura","size":"12 oz","qty":1}, ...]
 --   p_modo: 'retiro' | 'envio'   ·   p_direccion: obligatoria si es envío
 -- ---------------------------------------------------------------------
-create or replace function public.create_order_v2(
+create or replace function public.create_order_v3(
   p_nombre text, p_phone text, p_items jsonb, p_retiro text, p_pago text, p_nota text,
-  p_modo text default 'retiro', p_direccion text default null
+  p_modo text default 'retiro', p_direccion text default null, p_premio text default null
 ) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
@@ -281,6 +281,12 @@ declare
   v_spp    integer := coalesce((v_club->>'sellos_por_pedido')::int, 1);
   v_min    integer := coalesce((v_club->>'minimo')::int, 0);
   v_premio boolean := false;
+  v_desc   integer := coalesce((v_club->>'premio_descuento')::int, 35);
+  v_tope   integer := coalesce((v_club->>'premio_tope')::int, 0);
+  v_pset   boolean := coalesce((v_club->>'premio_set')::boolean, true);
+  v_off    integer := 0;
+  v_ptxt   text;
+  ps       products%rowtype;
 begin
   if coalesce(trim(p_nombre), '') = '' or length(p_nombre) > 60 then raise exception 'Falta tu nombre'; end if;
   if v_phone is null then raise exception 'El celular no parece válido'; end if;
@@ -334,6 +340,24 @@ begin
   v_sellos := coalesce(v_sellos, 0);
   v_premio := coalesce((v_club->>'activo')::boolean, true) and v_spp > 0 and v_sub >= v_min and v_sellos + v_spp >= v_meta;
 
+  -- Premio elegido por el cliente: un set de regalo o un % de descuento en este pedido
+  if v_premio then
+    if p_premio = 'descuento' and v_desc > 0 then
+      v_off := (round(v_sub * v_desc / 100.0 / 10.0) * 10)::int;
+      if v_tope > 0 then v_off := least(v_off, v_tope); end if;
+      v_ptxt := v_desc || '% off en este pedido';
+      v_lines := v_lines || jsonb_build_object('id', 'premio', 'nombre', 'Premio Setto Club: ' || v_ptxt, 'size', null, 'qty', 1, 'precio', -v_off, 'subtotal', -v_off);
+      v_total := v_total - v_off;
+    elsif p_premio like 'set:%' and v_pset then
+      select * into ps from products where id = substr(p_premio, 5) and categoria = 'set' and activo and not agotado;
+      if not found then raise exception 'Ese set no está disponible, elegí otro premio'; end if;
+      v_ptxt := ps.nombre || ' (12 oz) de regalo';
+      v_lines := v_lines || jsonb_build_object('id', 'premio', 'nombre', 'Premio Setto Club: ' || v_ptxt, 'size', '12 oz', 'qty', 1, 'precio', 0, 'subtotal', 0);
+    else
+      raise exception 'Elegí tu premio del Setto Club';
+    end if;
+  end if;
+
   loop
     v_code := 'STT-' || lpad((floor(random() * 10000))::int::text, 4, '0');
     exit when not exists (select 1 from orders where code = v_code and status = 'pendiente');
@@ -343,12 +367,12 @@ begin
 
   insert into orders (code, nombre, phone, items, total, retiro, pago, nota, modo, direccion, premio, premio_txt)
   values (v_code, trim(p_nombre), v_phone, v_lines, v_total, p_retiro, p_pago, nullif(trim(coalesce(p_nota,'')), ''),
-          v_modo, v_dir, v_premio, case when v_premio then coalesce(v_club->>'premio', 'Premio') end)
+          v_modo, v_dir, v_premio, v_ptxt)
   returning id into v_id;
 
   return jsonb_build_object('id', v_id, 'code', v_code, 'total', v_total, 'items', v_lines, 'phone', v_phone,
     'modo', v_modo, 'direccion', v_dir, 'costo_envio', v_costo,
-    'premio', v_premio, 'premio_txt', case when v_premio then v_club->>'premio' end,
+    'premio', v_premio, 'premio_txt', v_ptxt, 'descuento', v_off,
     'sellos_antes', v_sellos, 'meta', v_meta);
 end $$;
 
@@ -392,8 +416,8 @@ begin
   return jsonb_build_object('phone', v_phone, 'sellos', v_total, 'canje', v_canje, 'premio', v_club->>'premio');
 end $$;
 
-revoke all on function public.create_order_v2(text,text,jsonb,text,text,text,text,text) from public;
-grant execute on function public.create_order_v2(text,text,jsonb,text,text,text,text,text) to anon, authenticated;
+revoke all on function public.create_order_v3(text,text,jsonb,text,text,text,text,text,text) from public;
+grant execute on function public.create_order_v3(text,text,jsonb,text,text,text,text,text,text) to anon, authenticated;
 revoke all on function public.confirm_order(uuid,text,integer) from public, anon;
 grant execute on function public.confirm_order(uuid,text,integer) to authenticated;
 
@@ -435,7 +459,7 @@ insert into public.settings (key, value) values ('apps', '[{"nombre": "PedidosYa
 insert into public.settings (key, value) values ('pagos', '["Transferencia / Mercado Pago", "Efectivo al retirar"]'::jsonb) on conflict (key) do nothing;
 insert into public.settings (key, value) values ('retiro', '{"dias": [0, 1, 2, 3, 4, 5, 6], "rangos": [["10:00", "13:00"], ["14:30", "21:00"]], "cadaMin": 30, "anticipacionMin": 40}'::jsonb) on conflict (key) do nothing;
 insert into public.settings (key, value) values ('especial', '{"estado": "proximamente", "chip": "Próxima edición · fecha a confirmar", "intro": "Mochis inspirados en tortas. Salen una vez al mes y la fecha la anunciamos en Instagram."}'::jsonb) on conflict (key) do nothing;
-insert into public.settings (key, value) values ('club', '{"meta": 8, "premio": "Premio a definir", "sellos_por_pedido": 1, "activo": true, "minimo": 0}'::jsonb) on conflict (key) do nothing;
+insert into public.settings (key, value) values ('club', '{"meta": 8, "premio": "Un set de regalo o 35% off en ese pedido", "sellos_por_pedido": 1, "activo": true, "minimo": 0, "premio_set": true, "premio_descuento": 35, "premio_tope": 0}'::jsonb) on conflict (key) do nothing;
 insert into public.settings (key, value) values ('envio', '{"activo": true, "costo": 0, "aviso": "Envíos en Mar del Plata. El costo del envío se coordina por WhatsApp según la zona."}'::jsonb) on conflict (key) do nothing;
 insert into public.products (id, categoria, nombre, descripcion, img, precio, precio_12, precio_16, codigo, tema, set_bebida, set_mochi, rotativo, agotado, activo, orden) values ('esp-lemon', 'especial', 'Lemon Pie', 'Mochi inspirado en el lemon pie.', '', 0, null, null, null, null, null, null, false, false, true, 1) on conflict (id) do nothing;
 insert into public.products (id, categoria, nombre, descripcion, img, precio, precio_12, precio_16, codigo, tema, set_bebida, set_mochi, rotativo, agotado, activo, orden) values ('esp-cheesecake', 'especial', 'Cheesecake de frutos rojos', 'Mochi inspirado en el cheesecake de frutos rojos.', '', 0, null, null, null, null, null, null, false, false, true, 2) on conflict (id) do nothing;

@@ -3,7 +3,7 @@
   const API = window.SettoAPI;
   const $ = (s, r = document) => r.querySelector(s);
   const app = $("#app");
-  const money = (n) => "$" + Number(n || 0).toLocaleString("es-AR");
+  const money = (n) => (Number(n) < 0 ? "−$" : "$") + Math.abs(Number(n || 0)).toLocaleString("es-AR");
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const pretty = API.prettyPhone;
   let toastT;
@@ -101,7 +101,7 @@
         <div class="who2"><b>${esc(o.nombre)}</b><span class="num">${esc(pretty(o.phone))}</span><a class="chat" href="https://wa.me/${esc(o.phone)}" target="_blank" rel="noopener">Abrir chat</a></div>
         <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}</div>
         ${env ? `<div class="dirbox"><b>${esc(o.direccion || "")}</b><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.direccion || "") + ", Mar del Plata")}" target="_blank" rel="noopener">Ver en Maps</a></div>` : ""}
-        ${o.premio && o.status === "pendiente" ? `<div class="premiobox">Este pedido completa la tarjeta del Club: <b>incluí ${esc(o.premio_txt || (P.settings.club || {}).premio || "el premio")}</b>. Al tocar Entregado se canjea solo.</div>` : ""}
+        ${o.premio && o.status === "pendiente" ? `<div class="premiobox">Este pedido completa la tarjeta del Club. Premio elegido: <b>${esc(o.premio_txt || "a confirmar con el cliente")}</b>${/off/.test(o.premio_txt || "") ? " (ya descontado del total)" : ""}. Al tocar Entregado se canjea solo.</div>` : ""}
         <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>Pago: <b>${esc(o.pago || "—")}</b></span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}</div>
         <div class="olines">${(o.items || []).map((i) => `<div><span>${i.qty}× ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""}</span><span class="num">${money(i.subtotal)}</span></div>`).join("")}</div>
         <div class="otot"><span>Total</span><span class="num">${money(o.total)}</span></div>
@@ -253,7 +253,10 @@
         <form class="pcard" data-set="club"><b>Setto Club</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${club.activo !== false ? "checked" : ""}> Mostrar el Club en la web</label></div>
           <div class="row2"><label>Sellos para el premio<input class="inp" name="meta" type="number" min="2" max="20" value="${club.meta || 8}"></label><label>Sellos por pedido (sugerido)<input class="inp" name="spp" type="number" min="0" max="10" value="${club.sellos_por_pedido ?? 1}"></label></div>
-          <label>Premio<input class="inp" name="premio" value="${esc(club.premio || "")}" placeholder="Ej: un mochi de regalo"></label>
+          <label>Texto del premio (lo ve el cliente)<input class="inp" name="premio" value="${esc(club.premio || "")}" placeholder="Ej: un set de regalo o 35% off en ese pedido"></label>
+          <div class="checks"><label><input type="checkbox" name="pset" ${club.premio_set !== false ? "checked" : ""}> Opción: un set de regalo (12 oz)</label></div>
+          <div class="row2"><label>Opción: % de descuento (0 = no ofrecer)<input class="inp" name="pdesc" type="number" min="0" max="100" value="${club.premio_descuento ?? 35}"></label>
+          <label>Tope del descuento en $ (0 = sin tope)<input class="inp" name="ptope" type="number" min="0" step="500" value="${club.premio_tope || 0}"></label></div>
           <label>Pedido mínimo para sumar sello (0 = sin mínimo)<input class="inp" name="minimo" type="number" min="0" step="500" value="${club.minimo || 0}"></label>
           <span class="hintp">El premio se entrega en el mismo pedido que completa la tarjeta.</span>
           <button class="btn solid">Guardar</button></form>
@@ -286,7 +289,8 @@
         const dias = [0, 1, 2, 3, 4, 5, 6].filter((i) => f["d" + i]);
         await API.saveSetting("retiro", { dias, rangos: rangos.map(([a, b]) => [a.padStart(5, "0"), b.padStart(5, "0")]), cadaMin: Math.max(5, +f.cada || 30), anticipacionMin: Math.max(0, +f.antic || 0) });
       }
-      if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: Math.max(0, Math.min(10, +f.spp)), premio: (f.premio || "").trim(), minimo: Math.max(0, +f.minimo || 0) });
+      if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: Math.max(0, Math.min(10, +f.spp)), premio: (f.premio || "").trim(), minimo: Math.max(0, +f.minimo || 0),
+        premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0) });
       if (k === "envio") await API.saveSetting("envio", { activo: !!f.activo, costo: Math.max(0, +f.costo || 0), aviso: (f.aviso || "").trim() });
       if (k === "pagos") await API.saveSetting("pagos", (f.pagos || "").split("\n").map((s) => s.trim()).filter(Boolean));
       if (k === "apps") await API.saveSetting("apps", [0, 1, 2, 3].map((i) => ({ nombre: (f["an" + i] || "").trim(), url: (f["au" + i] || "").trim() })).filter((a) => a.nombre));

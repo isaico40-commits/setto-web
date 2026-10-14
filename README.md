@@ -81,8 +81,12 @@ En el checkout el cliente elige **Retiro** o **Envío a domicilio**. Si elige en
 En **Ajustes → Envío a domicilio** activás o desactivás la opción, ponés un costo fijo (0 = se coordina por WhatsApp) y el aviso que ve el cliente.
 
 ### Premio del Club
-El premio se entrega **en el mismo pedido que completa la tarjeta**. Ejemplo con 8 sellos: el cliente con 7 sellos hace su pedido → la web le avisa "este pedido completa tu tarjeta", el panel muestra 🎁 *Completa la tarjeta* con el premio a incluir, y al tocar **Entregado** se canjea solo (la tarjeta vuelve a 0).
-En **Ajustes → Setto Club** definís el premio, los sellos de la tarjeta y un pedido mínimo opcional para sumar sello.
+El premio se entrega **en el mismo pedido que completa la tarjeta**. Ejemplo con 8 sellos: el cliente con 7 sellos hace su pedido y en el checkout **elige su premio**:
+- **Un set de regalo** (cualquier set activo, en 12 oz): se suma al pedido a $0.
+- **35% off en ese pedido**: se descuenta del total de productos (sin envío), redondeado a $10.
+
+Sin elegir, la web no deja enviar. El panel muestra 🎁 *Completa la tarjeta* con el premio elegido, y al tocar **Entregado** se canjea solo (la tarjeta vuelve a 0).
+En **Ajustes → Setto Club** definís los sellos de la tarjeta, el texto del premio, si se ofrece el set, el % de descuento (0 = no se ofrece), un tope en $ para el descuento (0 = sin tope) y un pedido mínimo opcional para sumar sello.
 
 ### Edición especial (sabores de tortas)
 En **Carta → Edición especial**:
