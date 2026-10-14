@@ -47,26 +47,20 @@
 
 <main id="inicio">
   <section class="seguimiento" id="seguimiento" aria-live="polite" hidden></section>
-  <section class="hero">
+  <section class="hero2" aria-roledescription="carrusel" aria-label="Destacados">
     <div class="wrap">
-      <div>
-        <span class="tagline"><i></i>Home cafe · Mar del Plata</span>
-        <h1>Algo único puede transformarse en algo <span>diario</span></h1>
-        <p class="sub">Dirty lattes y mochis</p>
-        <p class="lead">Elegí tu set y mandanos el pedido por WhatsApp: pasás a buscarlo o te lo llevamos. También estamos en tus apps de delivery.</p>
-        <div class="ctas">
-          <a class="btn glow big" href="#sets">Armar mi pedido</a>
-          <a class="btn big" href="#carta">Ver la carta</a>
-          <a class="btn big ghost" href="#apps">Pedir por apps</a>
+      <div class="h2box" id="heroBox">
+        <div class="h2slides" id="heroSlides"></div>
+        <div class="h2txt">
+          <span class="tagline"><i></i>Home cafe · Mar del Plata</span>
+          <h1 id="heroTitle">Asian Inspired Home Cafe</h1>
+          <p class="lead" id="heroText">Dirty lattes y mochis en Mar del Plata.</p>
+          <div class="ctas">
+            <a class="btn glow big" href="#sets">Armar mi pedido</a>
+            <a class="btn big ghost" href="#apps">Pedir por apps</a>
+          </div>
+          <div class="h2dots" id="heroDots" role="tablist" aria-label="Elegir slide"></div>
         </div>
-        <a class="clubpill" href="#club" id="heroClub" hidden><img src="img/mochito-run.png" alt=""><span>Cada pedido desde la web suma sellos del <b>Setto Club</b></span></a>
-      </div>
-      <div class="stage" aria-hidden="true">
-        <div class="blob"></div>
-        <img class="mito" src="img/mochito-cup.png" alt="">
-        <img class="p1" src="img/dirty-lavender.webp" alt="">
-        <img class="p2" src="img/dirty-caramel.webp" alt="">
-        <img class="p3" src="img/mochi-sakura.webp" alt="">
       </div>
     </div>
   </section>
@@ -94,6 +88,19 @@
       <div class="rail" id="setsGrid" style="--cols:3;--w:84%"></div>
       <div class="hint"><span class="dots" data-for="setsGrid"></span><span>Deslizá para ver más</span></div>
       <p class="setsnote">Una bebida y un mochi que van juntos, más barato que por separado. Combinaciones por tiempo limitado.</p>
+    </div>
+  </section>
+
+  <section class="blk mochiq" id="quees" aria-labelledby="t-quees" hidden>
+    <div class="wrap mq">
+      <div class="mq-img"><img id="mqImg" src="img/mochi-sakura.webp" alt="Mochi cortado al medio: masa por fuera, crema y relleno por dentro" loading="lazy"></div>
+      <div class="mq-txt">
+        <span class="eyebrow">Para los que recién llegan</span>
+        <h2 id="t-quees">¿Qué es un mochi?</h2>
+        <p id="mqText"></p>
+        <ul class="mq-list" id="mqList"></ul>
+        <a class="btn solid" href="#carta" data-gomochi>Ver los mochis</a>
+      </div>
     </div>
   </section>
 
@@ -127,20 +134,19 @@
     <div class="wrap">
       <div class="head">
         <span class="eyebrow">Todo en un lugar</span><h2 id="t-pedir">Cómo pedir</h2>
-        <p>Retiro con pedido por WhatsApp o delivery por la app que ya usás.</p>
+        <p>Retiro, envío o tu app de delivery.</p>
       </div>
       <div class="conviene" id="conviene" hidden></div>
       <div class="channels">
         <div class="ch-main" style="background:var(--bg)">
-          <span class="eyebrow">Retiro o envío · Precio de carta</span>
+          <span class="eyebrow">Retiro o envío · Sin comisiones</span>
           <h3>Pedí directo a Setto</h3>
           <ol class="steps">
-            <li>Sumá sets, dirty lattes o mochis a tu pedido.</li>
-            <li>Elegí retiro o envío a domicilio, horario y forma de pago.</li>
-            <li>Se abre WhatsApp con el pedido escrito: lo enviás y te confirmamos horario y pago.</li>
+            <li>Elegí lo que querés.</li>
+            <li>Retiro o envío, horario y pago.</li>
+            <li>Enviá el WhatsApp y listo.</li>
           </ol>
           <div style="position:relative;z-index:1"><a class="btn solid" href="#sets">Empezar pedido</a></div>
-          <p class="note">Pidiendo acá pagás el precio de la carta. En las apps el precio es más alto por sus comisiones.</p>
           <img class="mito" src="img/mochito-run.png" alt="">
         </div>
         <div class="apps" id="apps"></div>

@@ -102,20 +102,20 @@ window.SETTO_SEED = {
    "titulo": "Pedir acá te conviene",
    "items": [
     {
-     "titulo": "Más económico",
-     "detalle": "Ahorrás hasta un 20% frente a pedir lo mismo por las apps de delivery."
+     "titulo": "Más barato",
+     "detalle": "Hasta 20% menos que en las apps."
     },
     {
      "titulo": "Sumás sellos",
-     "detalle": "Cada pedido suma al Setto Club. Al completar la tarjeta elegís un set de regalo o 25% off."
+     "detalle": "Completá la tarjeta y elegí tu premio."
     },
     {
-     "titulo": "Lo armás a tu gusto",
-     "detalle": "Elegís tamaño, leche y qué sacarle a tu bebida."
+     "titulo": "A tu gusto",
+     "detalle": "Elegís tamaño, leche y extras."
     },
     {
-     "titulo": "Directo con nosotros",
-     "detalle": "Tu pedido llega a nuestro WhatsApp, sin intermediarios."
+     "titulo": "Directo",
+     "detalle": "Tu pedido llega a nuestro WhatsApp."
     }
    ]
   }

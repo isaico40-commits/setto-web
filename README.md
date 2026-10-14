@@ -125,6 +125,10 @@ Cada pedido pendiente tiene **Avisar por WhatsApp**: abre el chat del cliente co
 - **Anular en la caja el ingreso de un pedido web** devuelve sus mochis al Café.
 - En **Caja → Stock**, cada mochi muestra cuántos hay reservados en pedidos pendientes y cuántos ve la web.
 
+### Portada y ¿Qué es un mochi?
+En **Ajustes → Portada** cargás hasta 5 slides (foto, título corto, una línea) y cada cuántos segundos cambian. *Recorte* es para fotos de producto sin fondo (van sobre el círculo coral); *Foto* llena todo el espacio.
+En **Ajustes → ¿Qué es un mochi?** editás título, texto, puntos (`título | detalle`) y la foto, o la ocultás.
+
 ### Edición especial (sabores de tortas)
 En **Carta → Edición especial**:
 - **Estado:** *Próximamente* (se muestra pero no se puede pedir) o *Disponible ahora* (se puede pedir).

@@ -267,6 +267,12 @@
     const p = P.drafts[id] || P.products.find((x) => x.id === id); if (!p) { el.remove(); return; }
     const y = window.scrollY; el.outerHTML = cardP(p); window.scrollTo(0, y);
   }
+  async function fitBlob(file, max = 1600) { // achica sin recortar
+    let src; try { src = await createImageBitmap(file); } catch (_) { src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(file); }); }
+    const k = Math.min(1, max / Math.max(src.width, src.height)), cv = document.createElement("canvas");
+    cv.width = Math.round(src.width * k); cv.height = Math.round(src.height * k); cv.getContext("2d").drawImage(src, 0, 0, cv.width, cv.height);
+    const as = (t, q) => new Promise((r) => cv.toBlob(r, t, q)); let b = await as("image/webp", 0.84); if (!b || b.type !== "image/webp") b = await as("image/jpeg", 0.86); return b;
+  }
   async function squareBlob(file, size = 900) {
     let src;
     try { src = await createImageBitmap(file); }
@@ -311,6 +317,29 @@
           <label>Leches: una por línea, nombre | recargo (la primera es la de base)<textarea class="inp" name="leches" rows="5">${esc(((S.personalizacion || {}).leches || []).map((l) => l.nombre + " | " + (l.precio || 0)).join("\n"))}</textarea></label>
           <label>Opciones para sacar (una por línea)<textarea class="inp" name="sin" rows="3">${esc(((S.personalizacion || {}).sin || []).join("\n"))}</textarea></label>
           <span class="hintp">El recargo se suma al precio de la bebida o del set.</span>
+          <button class="btn solid">Guardar</button></form>
+        <form class="pcard wide" data-set="hero"><b>Portada (slides del inicio)</b>
+          <span class="hintp">Hasta 5 slides. Cada uno: foto, título corto y una línea. "Recorte" = producto sin fondo (sobre el círculo); "Foto" = foto completa que llena el espacio.</span>
+          ${[0, 1, 2, 3, 4].map((i) => { const x = ((S.hero || {}).slides || [])[i] || (i < 3 && !((S.hero || {}).slides || []).length ? [
+              { img: "img/set-sakura.webp", titulo: "Asian Inspired Home Cafe", texto: "Dirty lattes y mochis en Mar del Plata.", ajuste: "recorte" },
+              { img: "img/set-yoru.webp", titulo: "Un set distinto cada día", texto: "Una bebida y un mochi que van juntos.", ajuste: "recorte" },
+              { img: "img/mochi-sakura.webp", titulo: "Mochis rellenos", texto: "Masa suave por fuera, crema por dentro.", ajuste: "recorte" }][i] : {});
+            return `<div class="slrow"><span class="upprev">${x.img ? `<img src="${esc(x.img)}" alt="">` : `Slide ${i + 1}`}</span>
+              <div class="slf"><input type="hidden" name="si${i}" value="${esc(x.img || "")}">
+                <label>Título<input class="inp" name="st${i}" maxlength="40" value="${esc(x.titulo || "")}" placeholder="Ej: Asian Inspired Home Cafe"></label>
+                <label>Línea corta (opcional)<input class="inp" name="sx${i}" maxlength="70" value="${esc(x.texto || "")}"></label>
+                <div class="acts"><select class="inp" name="sa${i}" style="width:auto"><option value="recorte" ${x.ajuste !== "foto" ? "selected" : ""}>Recorte</option><option value="foto" ${x.ajuste === "foto" ? "selected" : ""}>Foto</option></select>
+                <label class="btn">Subir foto<input type="file" accept="image/*" data-upimg="si${i}" data-upmax="1600" hidden></label>${x.img || x.titulo ? `<button type="button" class="linkbtn warn" data-slx="${i}">Quitar</button>` : ""}</div></div></div>`; }).join("")}
+          <label>Cambia cada (segundos)<input class="inp" name="intervalo" type="number" min="3" max="15" value="${(S.hero || {}).intervalo || 5}" style="width:120px"></label>
+          <button class="btn solid">Guardar portada</button></form>
+        <form class="pcard" data-set="mochi_info"><b>¿Qué es un mochi?</b>
+          <div class="checks"><label><input type="checkbox" name="activo" ${(S.mochi_info || {}).activo !== false ? "checked" : ""}> Mostrar la sección</label></div>
+          <label>Título<input class="inp" name="titulo" value="${esc((S.mochi_info || {}).titulo || "¿Qué es un mochi?")}"></label>
+          <label>Texto (1 o 2 líneas)<textarea class="inp" name="texto" rows="2">${esc((S.mochi_info || {}).texto ?? "Un bocado de origen japonés: masa suave y elástica por fuera, relleno cremoso por dentro.")}</textarea></label>
+          <label>Puntos: uno por línea, título | detalle<textarea class="inp" name="puntos" rows="4">${esc(((S.mochi_info || {}).puntos || ["La masa | harina de arroz glutinoso y leche.", "El relleno | crema y un corazón de sabor: frutilla, chocolate, oreo y más.", "La textura | suave y elástica por fuera, cremosa por dentro."]).join("\n"))}</textarea></label>
+          <div class="acts"><span class="upprev">${(S.mochi_info || {}).img ? `<img src="${esc(S.mochi_info.img)}" alt="">` : "Foto"}</span><input type="hidden" name="img" value="${esc((S.mochi_info || {}).img || "")}">
+            <select class="inp" name="ajuste" style="width:auto"><option value="recorte" ${(S.mochi_info || {}).ajuste !== "foto" ? "selected" : ""}>Recorte</option><option value="foto" ${(S.mochi_info || {}).ajuste === "foto" ? "selected" : ""}>Foto</option></select>
+            <label class="btn">Subir foto<input type="file" accept="image/*" data-upimg="img" data-upmax="1400" hidden></label></div>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="ventajas"><b>Pedir acá te conviene</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${(S.ventajas || {}).activo !== false ? "checked" : ""}> Mostrar en "Cómo pedir"</label></div>
@@ -361,6 +390,13 @@
         const leches = (f.leches || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const [n, pr] = s.split("|").map((x) => x.trim()); return { nombre: n, precio: Math.max(0, Math.round(+String(pr || "0").replace(/[^0-9.,]/g, "").replace(/\.(?=\d{3})/g, "").replace(",", ".")) || 0) }; }).filter((l) => l.nombre);
         await API.saveSetting("personalizacion", { activo: !!f.activo, leches, sin: (f.sin || "").split("\n").map((s) => s.trim()).filter(Boolean) });
       }
+      if (k === "hero") {
+        const slides = [0, 1, 2, 3, 4].map((i) => ({ img: (f["si" + i] || "").trim(), titulo: (f["st" + i] || "").trim(), texto: (f["sx" + i] || "").trim(), ajuste: f["sa" + i] === "foto" ? "foto" : "recorte" })).filter((x) => x.img || x.titulo);
+        if (!slides.length) throw new Error("Dejá al menos un slide con foto o título");
+        await API.saveSetting("hero", { slides, intervalo: Math.max(3, Math.min(15, +f.intervalo || 5)) });
+      }
+      if (k === "mochi_info") await API.saveSetting("mochi_info", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "¿Qué es un mochi?", texto: (f.texto || "").trim(),
+        puntos: (f.puntos || "").split("\n").map((s) => s.trim()).filter(Boolean), img: (f.img || "").trim(), ajuste: f.ajuste === "foto" ? "foto" : "recorte" });
       if (k === "ventajas") await API.saveSetting("ventajas", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "Pedir acá te conviene",
         items: (f.items || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const [t, ...d] = s.split("|"); return { titulo: t.trim(), detalle: d.join("|").trim() }; }) });
       if (k === "envio") await API.saveSetting("envio", { activo: !!f.activo, costo: Math.max(0, +f.costo || 0), aviso: (f.aviso || "").trim(), pago: f.pago || "Transferencia / Mercado Pago" });
@@ -458,6 +494,13 @@
   });
   document.addEventListener("change", async (e) => {
     const t = e.target;
+    if (t.matches("[data-upimg]") && t.files && t.files[0]) {
+      const form = t.closest("form"), name = t.dataset.upimg, max = +t.dataset.upmax || 1600; toast("Subiendo foto…");
+      try { const blob = await fitBlob(t.files[0], max); const url = await API.uploadPhoto(blob, "web-" + name); form.querySelector(`[name="${name}"]`).value = url;
+        const prev = t.closest(".slrow, .acts").querySelector(".upprev") || t.closest(".slrow").querySelector(".upprev"); if (prev) prev.innerHTML = `<img src="${url}" alt="">`; toast("Foto lista · tocá Guardar"); }
+      catch (err) { toast(err.message || "No se pudo subir la foto"); }
+      return;
+    }
     if (t.matches("[data-applogo]") && t.files && t.files[0]) {
       const i = t.dataset.applogo, row = t.closest(".applogo"); toast("Subiendo logo…");
       try { const blob = await squareBlob(t.files[0], 256); const url = await API.uploadPhoto(blob, "app-logo-" + i); row.querySelector(`[name=al${i}]`).value = url; row.querySelector(".lprev").innerHTML = `<img src="${url}" alt="">`; toast("Logo listo · tocá Guardar"); }
@@ -471,6 +514,7 @@
       catch (err) { toast(err.message || "No se pudo subir la foto"); }
     }
   });
+  document.addEventListener("click", (e) => { const x = e.target.closest("[data-slx]"); if (!x) return; const r = x.closest(".slrow"), i = x.dataset.slx; ["si", "st", "sx"].forEach((p) => (r.querySelector(`[name=${p}${i}]`).value = "")); r.querySelector(".upprev").textContent = "Vacío · tocá Guardar"; x.remove(); });
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-applogo-x]"); if (!x) return; const row = x.closest(".applogo"); row.querySelector(`[name=al${x.dataset.applogoX}]`).value = ""; row.querySelector(".lprev").textContent = "Sin logo"; x.remove(); });
   document.addEventListener("click", (e) => { if (e.target.closest("[data-justx],[data-justgo]")) { setTimeout(() => { P.justDelivered = null; drawJust(); }, 300); } });
   document.addEventListener("submit", (e) => { if (e.target.matches("form[data-set]")) { e.preventDefault(); saveAjuste(e.target); } });

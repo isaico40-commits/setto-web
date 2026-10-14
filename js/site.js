@@ -166,6 +166,58 @@
   function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 2000); }
 
   /* ---------- render ---------- */
+  /* ---------- hero con slides (se edita en Panel → Ajustes) ---------- */
+  const HERO_DEF = [
+    { img: "img/set-sakura.webp", titulo: "Asian Inspired Home Cafe", texto: "Dirty lattes y mochis en Mar del Plata.", ajuste: "recorte" },
+    { img: "img/set-yoru.webp", titulo: "Un set distinto cada día", texto: "Una bebida y un mochi que van juntos.", ajuste: "recorte" },
+    { img: "img/mochi-sakura.webp", titulo: "Mochis rellenos", texto: "Masa suave por fuera, crema por dentro.", ajuste: "recorte" },
+  ];
+  let heroI = 0, heroT = null, HS = [];
+  function renderHero() {
+    const h = S.hero || {}; HS = (h.slides || []).filter((x) => x && (x.img || x.titulo)); if (!HS.length) HS = HERO_DEF;
+    $("#heroSlides").innerHTML = HS.map((x, i) => `<div class="h2s ${x.ajuste === "foto" ? "foto" : "recorte"} ${i === 0 ? "on" : ""}" aria-hidden="${i !== 0}"><img src="${esc(x.img || "img/mochito-lie.png")}" alt="${esc(x.alt || x.titulo || "Setto")}" ${i ? 'loading="lazy"' : ""}></div>`).join("");
+    $("#heroDots").innerHTML = HS.length > 1 ? HS.map((_, i) => `<button role="tab" aria-selected="${i === 0}" aria-label="Slide ${i + 1}" data-hero="${i}"></button>`).join("") : "";
+    heroI = 0; heroTexto(0, true); heroAuto();
+  }
+  function heroTexto(i, sinFade) {
+    const x = HS[i] || {}, t = $(".h2txt");
+    const put = () => { $("#heroTitle").textContent = x.titulo || "Asian Inspired Home Cafe"; $("#heroText").textContent = x.texto || ""; $("#heroText").hidden = !x.texto; t.classList.remove("fade"); };
+    if (sinFade) return put(); t.classList.add("fade"); setTimeout(put, 300);
+  }
+  function heroIr(i) {
+    if (!HS.length) return; heroI = (i + HS.length) % HS.length;
+    document.querySelectorAll(".h2s").forEach((el, k) => { el.classList.toggle("on", k === heroI); el.setAttribute("aria-hidden", String(k !== heroI)); });
+    document.querySelectorAll("[data-hero]").forEach((d, k) => d.setAttribute("aria-selected", String(k === heroI)));
+    heroTexto(heroI);
+  }
+  function heroAuto() {
+    clearInterval(heroT); if (HS.length < 2 || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    heroT = setInterval(() => { if (!document.hidden) heroIr(heroI + 1); }, Math.max(3, Number((S.hero || {}).intervalo) || 5) * 1000);
+  }
+  document.addEventListener("click", (e) => { const d = e.target.closest("[data-hero]"); if (d) { heroIr(+d.dataset.hero); heroAuto(); } });
+  (function swipeHero() {
+    let x0 = null; const box = document.getElementById("heroBox"); if (!box) return;
+    box.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+    box.addEventListener("touchend", (e) => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) { heroIr(heroI + (dx < 0 ? 1 : -1)); heroAuto(); } x0 = null; });
+  })();
+
+  /* ---------- ¿Qué es un mochi? (se edita en Panel → Ajustes) ---------- */
+  const MQ_DEF = {
+    activo: true,
+    texto: "Un bocado de origen japonés: masa suave y elástica por fuera, relleno cremoso por dentro.",
+    puntos: ["La masa | harina de arroz glutinoso y leche.", "El relleno | crema y un corazón de sabor: frutilla, chocolate, oreo y más.", "La textura | suave y elástica por fuera, cremosa por dentro."],
+    img: "", ajuste: "recorte",
+  };
+  function renderQueEs() {
+    const m = { ...MQ_DEF, ...(S.mochi_info || {}) }; const sec = $("#quees");
+    sec.hidden = m.activo === false; if (sec.hidden) return;
+    if (m.titulo) $("#t-quees").textContent = m.titulo;
+    $("#mqText").textContent = m.texto || ""; $("#mqText").hidden = !m.texto;
+    $("#mqList").innerHTML = (m.puntos || []).filter(Boolean).map((p) => { const [a, ...b] = String(p).split("|"); return b.length ? `<li><span><b>${esc(a.trim())}:</b> ${esc(b.join("|").trim())}</span></li>` : `<li><span>${esc(a.trim())}</span></li>`; }).join("");
+    const img = $("#mqImg"); if (m.img) { img.src = m.img; img.classList.toggle("foto", m.ajuste === "foto"); }
+  }
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-gomochi]")) { tab = "mochi"; renderCarta(); } });
+
   function renderBand() {
     const words = ["Probá un set distinto cada día", "Dirty lattes fríos", "Mochis rellenos", "Take away en Mar del Plata", "Elegí tu leche"];
     if (S.club && clubOn()) words.splice(1, 0, "Cada pedido suma sellos del Setto Club");
@@ -247,8 +299,7 @@
     const c = S.club || {};
     $("#club").hidden = c.activo === false;
     $("#clubPremio").textContent = `El pedido que completa los ${c.meta || 8} sellos viene con ${premioTxt()}.` + (c.minimo > 0 ? ` Suman sello los pedidos desde ${money(c.minimo)}.` : "");
-    $("#heroClub").hidden = !clubOn();
-    $("#heroClub span").innerHTML = `Cada pedido desde la web suma ${sellosTxt(spp())} del <b>Setto Club</b>`;
+
     $("#mnavClub").hidden = !clubOn();
     drawStamps(0, c.meta || 8, true);
   }
@@ -678,7 +729,7 @@
       verSeguimiento(); renderResenas();
       API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
       S = settings; adapt(products); syncCart();
-      renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
+      renderHero(); renderQueEs(); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
     } catch (e) {
