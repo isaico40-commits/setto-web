@@ -472,3 +472,28 @@ insert into public.products (id, categoria, nombre, descripcion, img, precio, pr
 insert into public.products (id, categoria, nombre, descripcion, img, precio, precio_12, precio_16, codigo, tema, set_bebida, set_mochi, rotativo, agotado, activo, orden) values ('mochi-sakura', 'mochi', 'Sakura', 'Masa mochi rellena de matcha y corazón de cerezas.', 'img/mochi-sakura.webp', 5000, null, null, null, null, null, null, false, false, true, 4) on conflict (id) do nothing;
 insert into public.products (id, categoria, nombre, descripcion, img, precio, precio_12, precio_16, codigo, tema, set_bebida, set_mochi, rotativo, agotado, activo, orden) values ('mochi-banana', 'mochi', 'Banana Split', 'Masa mochi rellena de crema con banana caramelizada y dulce de leche repostero.', 'img/mochi-banana.webp', 5000, null, null, null, null, null, null, true, false, true, 5) on conflict (id) do nothing;
 insert into public.products (id, categoria, nombre, descripcion, img, precio, precio_12, precio_16, codigo, tema, set_bebida, set_mochi, rotativo, agotado, activo, orden) values ('mochi-tiramisu', 'mochi', 'Tiramisú', 'Masa mochi rellena de tiramisú.', 'img/mochi-tiramisu.webp', 5000, null, null, null, null, null, null, true, false, true, 6) on conflict (id) do nothing;
+
+-- Seguimiento del pedido
+alter table public.orders add column if not exists etapa text not null default 'recibido' check (etapa in ('recibido','preparando','listo'));
+-- Etapa del pedido (la ve el cliente en la web): recibido → preparando → listo
+create or replace function public.set_order_etapa(p_id uuid, p_etapa text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_staff() then raise exception 'Solo el equipo puede hacer esto'; end if;
+  if p_etapa not in ('recibido','preparando','listo') then raise exception 'Etapa inválida'; end if;
+  update orders set etapa = p_etapa where id = p_id and status = 'pendiente';
+  if not found then raise exception 'El pedido no está pendiente'; end if;
+end $$;
+revoke all on function public.set_order_etapa(uuid,text) from public, anon;
+grant execute on function public.set_order_etapa(uuid,text) to authenticated;
+
+-- PÚBLICO · Seguimiento: el cliente ve el estado de SUS pedidos (código + celular, últimos 3 días)
+create or replace function public.get_order_status(p_codes text[], p_phone text) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('code', code, 'status', status, 'etapa', etapa, 'modo', modo, 'retiro', retiro,
+           'total', total, 'created_at', created_at) order by created_at desc), '[]'::jsonb)
+  from (select * from orders where phone = public.norm_phone(p_phone) and code = any(p_codes[1:5])
+          and created_at > now() - interval '3 days' order by created_at desc limit 5) o;
+$$;
+revoke all on function public.get_order_status(text[],text) from public;
+grant execute on function public.get_order_status(text[],text) to anon, authenticated;

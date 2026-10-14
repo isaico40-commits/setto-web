@@ -396,7 +396,8 @@
       body.innerHTML = `<div class="ok"><img src="img/mochito-cup.png" alt=""><span class="eyebrow">Tu código de pedido</span><div class="coderow num">${esc(lastOrder.code)}</div>
         ${lastOrder.premio ? `<div class="clubline" style="width:100%;text-align:left"><img src="img/mochito-run.png" alt=""><div><b>¡Completaste tu tarjeta!</b> Tu premio: ${esc(lastOrder.premio_txt || "a confirmar")}.</div></div>` : ""}
         <p class="muted" style="font-size:.9rem">${lastOrder.modo === "envio" ? "Enviá el mensaje por WhatsApp. Te confirmamos el horario, el costo del envío y el pago." : "Enviá el mensaje por WhatsApp. El pedido queda confirmado cuando te respondemos con la dirección y el pago."}${clubOn() ? " Cuando lo recibís, sumás tu sello del Setto Club." : ""}</p></div>
-        <div class="msg" id="msgText">${esc(lastOrder.message)}</div>`;
+        <div class="msg" id="msgText">${esc(lastOrder.message)}</div>
+        <p class="muted" style="font-size:.8rem;text-align:center">Podés seguir el estado de tu pedido arriba de todo en la web.</p>`;
       foot.innerHTML = `<a class="btn wa big" href="${waLink(lastOrder.message)}" target="_blank" rel="noopener">Abrir WhatsApp</a>
         <button class="btn big" id="copyMsg">Copiar mensaje</button>
         <button class="back" id="newOrder" style="justify-self:center">Hacer otro pedido</button>`;
@@ -420,6 +421,8 @@
       const full = { ...o, nombre: form.nombre.trim(), retiro: form.hora, pago: form.pago, nota: form.nota.trim() };
       lastOrder = { code: o.code, message: buildMessage(full), modo: o.modo || "retiro", premio: !!o.premio, premio_txt: o.premio_txt };
       cardCache = null;
+      guardarSeguimiento({ code: o.code, phone: o.phone || API.normPhone(form.tel), at: Date.now() });
+      refrescarStock();
       try { sessionStorage.setItem("setto-last-order", JSON.stringify(lastOrder)); localStorage.setItem("setto-form", JSON.stringify({ nombre: form.nombre, tel: form.tel, dir: form.dir, dirExtra: form.dirExtra })); } catch (_) {}
       cart = []; save(); form.hora = ""; form.nota = ""; form.premio = ""; renderBadge();
       view = "sent"; sending = false; drawDrawer();
@@ -481,7 +484,7 @@
       const fallback = () => { const r = document.createRange(); r.selectNodeContents($("#msgText")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast("Seleccionado: copialo con tu teclado"); };
       try { navigator.clipboard.writeText(txt).then(() => toast("Mensaje copiado"), fallback); } catch (_) { fallback(); }
     }
-    if (b.id === "newOrder") { lastOrder = null; try { sessionStorage.removeItem("setto-last-order"); } catch (_) {} view = "cart"; closeDrawer(); location.hash = "#sets"; }
+    if (b.id === "newOrder") { refrescarStock(); lastOrder = null; try { sessionStorage.removeItem("setto-last-order"); } catch (_) {} view = "cart"; closeDrawer(); location.hash = "#sets"; }
   });
   /* ---------- menú mobile ---------- */
   function closeMenu() { const m = $("#mnav"); if (!m || m.hidden) return; m.hidden = true; $("#burger").setAttribute("aria-expanded", "false"); $("#burger").setAttribute("aria-label", "Abrir menú"); }
@@ -494,6 +497,42 @@
   $("#scrim").addEventListener("click", () => { closeSheet(); closeDrawer(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeSheet(); closeDrawer(); closeMenu(); } });
 
+  /* ---------- stock en vivo ---------- */
+  async function refrescarStock() { if (!API.getStock) return; try { STOCK = await API.getStock(); renderEspecial(); renderSets(); renderCarta(); renderBadge(); } catch (_) {} }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { refrescarStock(); if (misPedidos().length) verSeguimiento(); } });
+
+  /* ---------- seguimiento de pedidos ---------- */
+  const SKEY = "setto-mis-pedidos";
+  const misPedidos = () => { try { return JSON.parse(localStorage.getItem(SKEY) || "[]").filter((x) => Date.now() - x.at < 3 * 864e5); } catch (_) { return []; } };
+  function guardarSeguimiento(o) { try { const l = misPedidos().filter((x) => x.code !== o.code); l.unshift(o); localStorage.setItem(SKEY, JSON.stringify(l.slice(0, 5))); } catch (_) {} verSeguimiento(); }
+  let trackT = null;
+  async function verSeguimiento() {
+    clearTimeout(trackT);
+    const l = misPedidos(), box = $("#seguimiento"); if (!l.length) { box.hidden = true; return; }
+    const byPhone = {}; l.forEach((x) => (byPhone[x.phone] = byPhone[x.phone] || []).push(x.code));
+    let data = [];
+    try { data = (await Promise.all(Object.entries(byPhone).map(([ph, codes]) => API.orderStatus(codes, ph)))).flat(); } catch (_) { return; }
+    // los entregados o cancelados se muestran hasta 3 horas
+    const vivos = data.filter((o) => o.status === "pendiente" || Date.now() - new Date(o.created_at) < 3 * 36e5).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    if (!vivos.length) { box.hidden = true; return; }
+    box.hidden = false; box.innerHTML = `<div class="wrap">${vivos.map(trackCard).join("")}</div>`;
+    if (vivos.some((o) => o.status === "pendiente")) trackT = setTimeout(verSeguimiento, 30000);
+  }
+  function trackCard(o) {
+    const env = o.modo === "envio";
+    const pasos = ["Recibido", "En preparación", env ? "En camino" : "Listo para retirar", "Entregado"];
+    const idx = o.status === "entregado" ? 3 : o.etapa === "listo" ? 2 : o.etapa === "preparando" ? 1 : 0;
+    const txt = o.status === "cancelado" ? "Este pedido se canceló. Si tenés dudas, escribinos por WhatsApp."
+      : o.status === "entregado" ? "¡Entregado! Que lo disfrutes."
+      : idx === 2 ? (env ? "Tu pedido salió y va en camino." : "¡Está listo! Ya podés pasar a buscarlo.")
+      : idx === 1 ? "Lo estamos preparando."
+      : "Lo recibimos. Si todavía no mandaste el WhatsApp, mandalo así lo confirmamos.";
+    return `<div class="trk ${o.status}"><div class="trk-h"><span class="eyebrow">Tu pedido</span><b class="num">${esc(o.code)}</b><span class="trk-r">${esc(o.retiro || "")}</span>${o.status !== "pendiente" ? `<button class="trk-x" data-trackx="${esc(o.code)}" aria-label="Ocultar">✕</button>` : ""}</div>
+      ${o.status === "cancelado" ? "" : `<ol class="trk-steps">${pasos.map((p, i) => `<li class="${i < idx ? "done" : i === idx ? "now" : ""}"><i></i><span>${p}</span></li>`).join("")}</ol>`}
+      <p>${txt}</p></div>`;
+  }
+  document.addEventListener("click", (e) => { const x = e.target.closest("[data-trackx]"); if (!x) return; try { localStorage.setItem(SKEY, JSON.stringify(misPedidos().filter((o) => o.code !== x.dataset.trackx))); } catch (_) {} verSeguimiento(); });
+
   /* ---------- arranque ---------- */
   function loading() {
     ["espGrid", "setsGrid", "grid"].forEach((id) => (document.getElementById(id).innerHTML = '<p class="loading">Cargando la carta…</p>'));
@@ -505,6 +544,7 @@
       const stockP = API.getStock ? API.getStock().catch(() => null) : Promise.resolve(null);
       const { settings, products } = await API.loadAll();
       STOCK = await stockP;
+      verSeguimiento();
       S = settings; adapt(products); syncCart();
       renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;

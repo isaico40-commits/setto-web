@@ -109,6 +109,7 @@
         ${o.status === "pendiente" ? `<div class="confirm">
             <label>Número del chat de WhatsApp<input class="inp" data-cphone value="${esc(c.phone)}" inputmode="tel"></label>
             <div class="acts"><span style="font-size:.85rem;font-weight:600">Sellos a sumar</span><span class="stepper"><button data-cn="-1" aria-label="Menos">−</button><span>${c.n}</span><button data-cn="1" aria-label="Más">+</button></span></div>
+            <div class="acts etapas"><span style="font-size:.85rem;font-weight:600">Estado que ve el cliente</span>${[["recibido", "Recibido"], ["preparando", "En preparación"], ["listo", env ? "En camino" : "Listo para retirar"]].map(([k, l]) => `<button class="chipb" data-etapa="${k}" aria-pressed="${(o.etapa || "recibido") === k}">${l}</button>`).join("")}</div>
             <div class="acts"><button class="btn solid" data-deliver>Entregado ✓</button><button class="linkbtn warn" data-cancel>${P.cancelArm === o.id ? "¿Seguro? Tocá de nuevo para cancelar" : "Cancelar pedido"}</button></div>
           </div>` : o.status === "entregado" ? `<p class="hintp">Entregado ${o.closed_at ? ago(o.closed_at) : ""} · ${o.sellos || 0} sello(s) sumado(s) a ${esc(pretty(o.phone))}</p>` : ""}
       </article>`;
@@ -338,6 +339,11 @@
     const oc = b.closest("[data-oid]");
     if (oc) {
       const id = oc.dataset.oid, c = P.confirm[id];
+      if (b.dataset.etapa) {
+        const o = P.orders.find((x) => x.id === id); b.disabled = true;
+        try { await API.setEtapa(id, b.dataset.etapa); if (o) o.etapa = b.dataset.etapa; drawOrders(); toast("Estado actualizado · el cliente lo ve en la web"); }
+        catch (err) { toast(err.message); b.disabled = false; }
+      }
       if (b.dataset.cn) { c.n = Math.max(0, Math.min(10, c.n + +b.dataset.cn)); drawOrders(); }
       if (b.dataset.deliver !== undefined) {
         b.disabled = true;

@@ -106,7 +106,7 @@
       while (db.orders.some((o) => o.code === code && o.status === "pendiente"));
       const o = { id: uid(), code, nombre: String(nombre).trim(), phone: ph, items: lines, total, retiro, pago, nota: nota || null, status: "pendiente", sellos: 0, created_at: new Date().toISOString(),
         modo, direccion: modo === "envio" ? String(direccion).trim() : null, premio, premio_txt: ptxt };
-      db.orders.unshift(o); dbSave(db);
+      o.etapa = "recibido"; db.orders.unshift(o); dbSave(db);
       return { id: o.id, code, total, items: lines, phone: ph, modo, direccion: o.direccion, costo_envio: costo, premio, premio_txt: ptxt, descuento: off, meta };
     },
     async getStock() { return null; },
@@ -146,6 +146,12 @@
       const db = dbLoad(), o = db.orders.find((x) => x.id === id);
       if (!o || o.status !== "pendiente") throw new Error("El pedido no está pendiente");
       o.status = "cancelado"; o.closed_at = new Date().toISOString(); dbSave(db);
+    },
+    async setEtapa(id, etapa) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o || o.status !== "pendiente") throw new Error("El pedido no está pendiente"); o.etapa = etapa; dbSave(db); },
+    async orderStatus(codes, phone) {
+      const db = dbLoad(), ph = normPhone(phone), since = Date.now() - 3 * 864e5;
+      return db.orders.filter((o) => o.phone === ph && codes.includes(o.code) && new Date(o.created_at) > since)
+        .map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at }));
     },
     async addStamps(phone, nombre, delta, motivo) {
       const db = dbLoad(), ph = normPhone(phone);
@@ -226,6 +232,8 @@
     },
     async confirmOrder(id, phone, n) { const { data, error } = await sb.rpc("confirm_order", { p_id: id, p_phone: phone, p_sellos: n }); fail(error); return data; },
     async cancelOrder(id) { const { error } = await sb.rpc("cancel_order", { p_id: id }); fail(error); },
+    async setEtapa(id, etapa) { const { error } = await sb.rpc("set_order_etapa", { p_id: id, p_etapa: etapa }); fail(error); },
+    async orderStatus(codes, phone) { const { data, error } = await sb.rpc("get_order_status", { p_codes: codes, p_phone: phone }); fail(error); return data || []; },
     async addStamps(phone, nombre, delta, motivo) { const { data, error } = await sb.rpc("add_stamps", { p_phone: phone, p_nombre: nombre || null, p_delta: delta, p_motivo: motivo || null }); fail(error); return data; },
     async redeem(phone) { const { data, error } = await sb.rpc("redeem_reward", { p_phone: phone }); fail(error); return data; },
     async findCustomer(phone) {

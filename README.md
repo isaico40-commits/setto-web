@@ -97,6 +97,10 @@ En **Ajustes → Personalización de bebidas** cambiás las leches (una por lín
 En **Ajustes → Pedir acá te conviene** editás el título y los motivos (uno por línea, `título | detalle`) que se ven arriba de "Cómo pedir".
 En **Ajustes → Apps de delivery** podés subir el logo oficial de cada app (cuadrado). Sin logo se ve la inicial.
 
+### Seguimiento del pedido
+Después de enviar, el cliente ve arriba de la web el estado de su pedido (se actualiza cada 30 segundos y al volver a la pestaña): **Recibido → En preparación → Listo para retirar / En camino → Entregado**. Si cancelás, le aparece cancelado.
+En el panel, cada pedido pendiente tiene **Estado que ve el cliente**: Recibido / En preparación / Listo (o En camino). Al tocar **Entregado ✓** pasa a Entregado.
+
 ### Edición especial (sabores de tortas)
 En **Carta → Edición especial**:
 - **Estado:** *Próximamente* (se muestra pero no se puede pedir) o *Disponible ahora* (se puede pedir).

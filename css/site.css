@@ -375,3 +375,19 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .stk::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
 .stk.low{color:#8a2a22}
 .stk.out{color:var(--ink-2)}
+
+/* Seguimiento del pedido */
+.seguimiento{background:var(--bg-2);border-bottom:1.5px solid color-mix(in srgb,var(--turquesa) 30%,transparent)}
+.seguimiento .wrap{display:grid;gap:10px;padding-block:12px}
+.trk{background:var(--card);border:1.5px solid var(--turquesa);border-radius:18px;padding:14px 16px}
+.trk.cancelado{border-color:#b85b52}
+.trk-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.trk-h b{font-size:1.1rem}
+.trk-r{font-size:.82rem;color:var(--ink-2)}
+.trk-x{margin-left:auto;border:0;background:none;font-size:1rem;color:var(--ink-2);cursor:pointer}
+.trk-steps{list-style:none;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:12px 0 8px;padding:0}
+.trk-steps li{display:grid;gap:6px;font-size:.76rem;color:var(--ink-2);text-align:center}
+.trk-steps li i{height:6px;border-radius:99px;background:color-mix(in srgb,var(--turquesa) 18%,transparent)}
+.trk-steps li.done i,.trk-steps li.now i{background:var(--turquesa)}
+.trk-steps li.now span{color:var(--ink);font-weight:700}
+.trk p{font-size:.9rem;margin:0}
