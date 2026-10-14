@@ -281,7 +281,8 @@
         <form class="pcard" data-set="stock_web"><b>Stock en la web</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${(S.stock_web || {}).activo !== false ? "checked" : ""}> Mostrar cuántos mochis quedan</label></div>
           <label>Mostrar "¡Últimos!" cuando queden (o menos)<input class="inp" name="umbral" type="number" min="1" max="50" value="${(S.stock_web || {}).umbral || 3}"></label>
-          <span class="hintp">Se toma el stock del Café, el que cargan en la Caja. Los pedidos entregados lo descuentan solos.</span>
+          <div class="checks"><label><input type="checkbox" name="bloquear" ${(S.stock_web || {}).bloquear !== false ? "checked" : ""}> No dejar pedir más de lo que hay</label></div>
+          <span class="hintp">Se toma el stock del Café, el que cargan en la Caja, menos lo que ya está pedido y pendiente. Los pedidos entregados lo descuentan solos.</span>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="pagos"><b>Formas de pago</b>
           <label>Una por línea<textarea class="inp" name="pagos">${esc((S.pagos || []).join("\n"))}</textarea></label>
@@ -318,7 +319,7 @@
       if (k === "ventajas") await API.saveSetting("ventajas", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "Pedir acá te conviene",
         items: (f.items || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const [t, ...d] = s.split("|"); return { titulo: t.trim(), detalle: d.join("|").trim() }; }) });
       if (k === "envio") await API.saveSetting("envio", { activo: !!f.activo, costo: Math.max(0, +f.costo || 0), aviso: (f.aviso || "").trim(), pago: f.pago || "Transferencia / Mercado Pago" });
-      if (k === "stock_web") await API.saveSetting("stock_web", { activo: !!f.activo, umbral: Math.max(1, Math.min(50, +f.umbral || 3)) });
+      if (k === "stock_web") await API.saveSetting("stock_web", { activo: !!f.activo, bloquear: !!f.bloquear, umbral: Math.max(1, Math.min(50, +f.umbral || 3)) });
       if (k === "pagos") await API.saveSetting("pagos", (f.pagos || "").split("\n").map((s) => s.trim()).filter(Boolean));
       if (k === "apps") await API.saveSetting("apps", [0, 1, 2, 3].map((i) => ({ nombre: (f["an" + i] || "").trim(), url: (f["au" + i] || "").trim(), logo: (f["al" + i] || "").trim() })).filter((a) => a.nombre));
       await loadBase(); toast("Guardado"); viewAjustes();

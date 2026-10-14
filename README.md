@@ -128,7 +128,7 @@ Reemplaza la app de Apps Script y la planilla "SETTO — Gastos, ingresos y resu
 
 **Pedidos web → caja y stock (`008_pedidos_a_caja_y_stock_web.sql`):** al tocar **Entregado** en el panel se carga sola la entrada en la caja (total de productos, sin envío: el envío lo paga el cliente aparte a Uber). "Efectivo al retirar" va a Efectivo; tarjeta y transferencia van a Mercado Pago. Se descuenta del stock del Café cada mochi, el mochi de cada set y el del set de regalo del Club. No hace falta cargar esos pedidos a mano. Los de PedidosYa, Rappi y Uber Eats se siguen cargando con la liquidación.
 
-**Stock en la web:** los mochis, la edición especial (cuando está disponible) y los sets muestran cuántos quedan en el Café, con cartel "¡Últimos!" cuando quedan pocos y "Sin stock hoy" en 0. Se prende/apaga y se cambia el umbral en **Panel → Ajustes → Stock en la web**.
+**Stock en la web:** los mochis, la edición especial (cuando está disponible) y los sets muestran cuántos quedan en el Café, con cartel "¡Últimos!" cuando quedan pocos y "Sin stock hoy" en 0. Se prende/apaga y se cambia el umbral en **Panel → Ajustes → Stock en la web**. Desde `009_stock_bloquea_pedidos.sql` también frena: no se puede pedir más de lo disponible (stock del Café menos lo pedido y pendiente). Lo controla la base, no solo la página. Se apaga en Ajustes → "No dejar pedir más de lo que hay".
 
 Además: **Stock** (Café / Produ, con traslados y conteos), **Tareas** y **Lista de compras** (al tildar algo, ofrece cargar el gasto y lo deja enlazado). En Movimientos se puede descargar cada mes en CSV.
 
