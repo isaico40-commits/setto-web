@@ -79,6 +79,7 @@ Pedidos que no vienen de la web (WhatsApp directo, PedidosYa, Rappi, Uber Eats):
 ### Envío a domicilio
 En el checkout el cliente elige **Retiro** o **Envío a domicilio**. Si elige envío, tiene que poner la dirección exacta (y opcionalmente piso/depto/referencia). En el panel el pedido aparece con la etiqueta **Envío a domicilio**, la dirección y un link a Google Maps.
 En **Ajustes → Envío a domicilio** activás o desactivás la opción, ponés un costo fijo (0 = se coordina por WhatsApp) y el aviso que ve el cliente.
+Con envío, la única forma de pago es **transferencia** (el envío lo hace Uber y no cobra los productos). La base rechaza un pedido con envío y otro medio de pago. En el mismo ajuste elegís cuál es esa forma de pago.
 
 ### Premio del Club
 El premio se entrega **en el mismo pedido que completa la tarjeta**. Ejemplo con 8 sellos: el cliente con 7 sellos hace su pedido y en el checkout **elige su premio**:

@@ -305,6 +305,9 @@ begin
     if v_dir is null or length(v_dir) < 5 then raise exception 'Falta la dirección de entrega'; end if;
     if length(v_dir) > 200 then raise exception 'La dirección es demasiado larga'; end if;
     v_costo := greatest(0, coalesce((v_envio->>'costo')::int, 0));
+    if coalesce(p_pago, '') <> coalesce(nullif(v_envio->>'pago', ''), 'Transferencia / Mercado Pago') then
+      raise exception 'Con envío a domicilio el pago es solo por transferencia';
+    end if;
   else
     v_dir := null;
   end if;
@@ -448,7 +451,7 @@ insert into public.settings (key, value) values ('pagos', '["Transferencia / Mer
 insert into public.settings (key, value) values ('retiro', '{"dias": [0, 1, 2, 3, 4, 5, 6], "rangos": [["10:00", "13:00"], ["14:30", "21:00"]], "cadaMin": 30, "anticipacionMin": 40}'::jsonb) on conflict (key) do nothing;
 insert into public.settings (key, value) values ('especial', '{"estado": "proximamente", "chip": "Próxima edición · fecha a confirmar", "intro": "Mochis inspirados en tortas. Salen una vez al mes y la fecha la anunciamos en Instagram."}'::jsonb) on conflict (key) do nothing;
 insert into public.settings (key, value) values ('club', '{"meta": 8, "premio": "Un set de regalo o 25% off en ese pedido", "sellos_por_pedido": 1, "activo": true, "minimo": 0, "premio_set": true, "premio_descuento": 25, "premio_tope": 0}'::jsonb) on conflict (key) do nothing;
-insert into public.settings (key, value) values ('envio', '{"activo": true, "costo": 0, "aviso": "Envíos en Mar del Plata. El costo del envío se coordina por WhatsApp según la zona."}'::jsonb) on conflict (key) do nothing;
+insert into public.settings (key, value) values ('envio', '{"activo": true, "costo": 0, "aviso": "Envíos en Mar del Plata. El costo del envío se coordina por WhatsApp según la zona.", "pago": "Transferencia / Mercado Pago"}'::jsonb) on conflict (key) do nothing;
 insert into public.settings (key, value) values ('personalizacion', '{"activo": true, "leches": [{"nombre": "Leche entera", "precio": 0}, {"nombre": "Leche de avena", "precio": 400}, {"nombre": "Leche de quinoa", "precio": 600}, {"nombre": "Leche de almendra", "precio": 700}, {"nombre": "Leche de coco", "precio": 1000}], "sin": ["Sin cold foam", "Sin endulzante", "Sin hielo"]}'::jsonb) on conflict (key) do nothing;
 insert into public.products (id, categoria, nombre, descripcion, img, precio, precio_12, precio_16, codigo, tema, set_bebida, set_mochi, rotativo, agotado, activo, orden) values ('esp-lemon', 'especial', 'Lemon Pie', 'Mochi inspirado en el lemon pie.', '', 0, null, null, null, null, null, null, false, false, true, 1) on conflict (id) do nothing;
 insert into public.products (id, categoria, nombre, descripcion, img, precio, precio_12, precio_16, codigo, tema, set_bebida, set_mochi, rotativo, agotado, activo, orden) values ('esp-cheesecake', 'especial', 'Cheesecake de frutos rojos', 'Mochi inspirado en el cheesecake de frutos rojos.', '', 0, null, null, null, null, null, null, false, false, true, 2) on conflict (id) do nothing;

@@ -57,6 +57,7 @@
       modo = modo === "envio" ? "envio" : "retiro";
       if (modo === "envio" && !envio.activo) throw new Error("Por ahora no hacemos envíos desde la web");
       if (modo === "envio" && String(direccion || "").trim().length < 5) throw new Error("Falta la dirección de entrega");
+      if (modo === "envio" && pago !== (envio.pago || "Transferencia / Mercado Pago")) throw new Error("Con envío a domicilio el pago es solo por transferencia");
       if (!String(nombre || "").trim()) throw new Error("Falta tu nombre");
       if (!ph) throw new Error("El celular no parece válido");
       if (!items || !items.length) throw new Error("El pedido está vacío");

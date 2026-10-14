@@ -269,6 +269,7 @@
         <form class="pcard" data-set="envio"><b>Envío a domicilio</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${(S.envio || {}).activo ? "checked" : ""}> Ofrecer envío en la web</label></div>
           <label>Costo fijo del envío (0 = a coordinar por WhatsApp)<input class="inp" name="costo" type="number" min="0" step="100" value="${(S.envio || {}).costo || 0}"></label>
+          <label>Única forma de pago con envío<select class="inp" name="pago">${(S.pagos || []).map((p) => `<option ${p === ((S.envio || {}).pago || "Transferencia / Mercado Pago") ? "selected" : ""}>${esc(p)}</option>`).join("")}</select></label>
           <label>Aviso para el cliente<textarea class="inp" name="aviso">${esc((S.envio || {}).aviso || "")}</textarea></label>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="pagos"><b>Formas de pago</b>
@@ -301,7 +302,7 @@
         const leches = (f.leches || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const [n, pr] = s.split("|").map((x) => x.trim()); return { nombre: n, precio: Math.max(0, Math.round(+String(pr || "0").replace(/[^0-9.,]/g, "").replace(/\.(?=\d{3})/g, "").replace(",", ".")) || 0) }; }).filter((l) => l.nombre);
         await API.saveSetting("personalizacion", { activo: !!f.activo, leches, sin: (f.sin || "").split("\n").map((s) => s.trim()).filter(Boolean) });
       }
-      if (k === "envio") await API.saveSetting("envio", { activo: !!f.activo, costo: Math.max(0, +f.costo || 0), aviso: (f.aviso || "").trim() });
+      if (k === "envio") await API.saveSetting("envio", { activo: !!f.activo, costo: Math.max(0, +f.costo || 0), aviso: (f.aviso || "").trim(), pago: f.pago || "Transferencia / Mercado Pago" });
       if (k === "pagos") await API.saveSetting("pagos", (f.pagos || "").split("\n").map((s) => s.trim()).filter(Boolean));
       if (k === "apps") await API.saveSetting("apps", [0, 1, 2, 3].map((i) => ({ nombre: (f["an" + i] || "").trim(), url: (f["au" + i] || "").trim() })).filter((a) => a.nombre));
       await loadBase(); toast("Guardado"); viewAjustes();

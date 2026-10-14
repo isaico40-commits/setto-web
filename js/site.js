@@ -326,8 +326,10 @@
     }
     if (view === "checkout") {
       $("#dTitle").textContent = "Entrega";
-      if (!form.pago) form.pago = (S.pagos || [])[0] || "";
       if (!envioOn()) form.modo = "retiro";
+      const pagoEnvio = (S.envio || {}).pago || "Transferencia / Mercado Pago";
+      const pagosVer = form.modo === "envio" ? [pagoEnvio] : S.pagos || [];
+      if (!pagosVer.includes(form.pago)) form.pago = pagosVer[0] || "";
       const r = S.retiro || {}, isEnv = form.modo === "envio", costo = Math.max(0, Number((S.envio || {}).costo) || 0);
       body.innerHTML = `
         ${envioOn() ? `<div class="modo" role="radiogroup" aria-label="Forma de entrega">
@@ -339,13 +341,17 @@
         <label class="f" for="fNombre">Nombre<input id="fNombre" autocomplete="given-name" value="${esc(form.nombre)}" placeholder="Cómo te llamamos"></label>
         <label class="f" for="fTel">Tu celular (WhatsApp)<input id="fTel" type="tel" inputmode="tel" autocomplete="tel" value="${esc(form.tel)}" placeholder="223 347-1277"><span class="hintf">Con este número sumás sellos del Setto Club.</span></label>
         <label class="f" for="fHora">${isEnv ? "Horario de entrega" : "Horario de retiro"}<select id="fHora"><option value="">Elegí un horario</option>${slots().map((o) => `<option ${o === form.hora ? "selected" : ""}>${esc(o)}</option>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>
-        <div class="f"><span>Forma de pago</span><div class="chips">${(S.pagos || []).map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">El pago se coordina por WhatsApp.</span></div>
+        <div class="f"><span>Forma de pago</span><div class="chips">${pagosVer.map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">${form.modo === "envio" ? "Con envío a domicilio se paga solo por transferencia, antes de despachar el pedido." : "El pago se coordina por WhatsApp."}</span></div>
         ${premioPicker()}
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>
         <div id="fErr" class="err" hidden></div>`;
       foot.innerHTML = `${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(total() + envioCosto() - (completes() ? premioOff() : 0))}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
       [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; }); });
-      $("#fTel").addEventListener("change", async () => { if (await loadCard() && view === "checkout") drawDrawer(); });
+      $("#fTel").addEventListener("change", async () => {
+        if (!(await loadCard()) || view !== "checkout") return;
+        if (completes() && !$(".premio-pick")) return drawDrawer(); // aparece el selector de premio
+        const cl = $("#dFoot .clubline"); if (cl) cl.outerHTML = clubLine(); // sin redibujar el botón de enviar
+      });
     }
     if (view === "sent" && lastOrder) {
       $("#dTitle").textContent = "Último paso";

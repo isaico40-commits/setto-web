@@ -64,7 +64,8 @@ window.SETTO_SEED = {
   "envio": {
    "activo": true,
    "costo": 0,
-   "aviso": "Envíos en Mar del Plata. El costo del envío se coordina por WhatsApp según la zona."
+   "aviso": "Envíos en Mar del Plata. El costo del envío se coordina por WhatsApp según la zona.",
+   "pago": "Transferencia / Mercado Pago"
   },
   "personalizacion": {
    "activo": true,
