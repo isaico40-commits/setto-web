@@ -108,6 +108,13 @@ En el panel, pestaña **Reseñas**: **Publicar** u **Ocultar**. En la web, en "L
 ### Avisar por WhatsApp
 Cada pedido pendiente tiene **Avisar por WhatsApp**: abre el chat del cliente con el mensaje del estado actual (recibido, en preparación, listo o en camino). Lo mandás vos con un toque, sin costo.
 
+### Stock y pedidos
+- **Pedido pendiente:** reserva sus mochis. La web muestra el disponible (Café − reservado) y la base frena lo que no alcanza.
+- **Cancelar un pedido pendiente** en el panel libera la reserva al instante: vuelve a la web y a la pestaña Stock.
+- **Entregado:** descuenta los mochis del Café y carga el ingreso en la caja.
+- **Anular en la caja el ingreso de un pedido web** devuelve sus mochis al Café.
+- En **Caja → Stock**, cada mochi muestra cuántos hay reservados en pedidos pendientes y cuántos ve la web.
+
 ### Edición especial (sabores de tortas)
 En **Carta → Edición especial**:
 - **Estado:** *Próximamente* (se muestra pero no se puede pedir) o *Disponible ahora* (se puede pedir).

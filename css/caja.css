@@ -178,3 +178,4 @@ main.cmain{padding-block:18px 30px}
 
 .loading{padding:60px 0;text-align:center;color:var(--ink-2)}
 @media (max-width:380px){.kpis{grid-template-columns:1fr 1fr}.kpi.res{grid-column:1/-1}.who-grid{grid-template-columns:1fr 1fr 1fr}}
+.hintp.reserva{display:block;color:#296A67}

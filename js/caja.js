@@ -103,6 +103,8 @@
       sb.from("caja_compras").select("*").order("created_at", { ascending: false }).limit(300),
     ]);
     [S.cuentas, S.socios, S.cats, S.saldos, S.deudas, S.movs, S.stock, S.tareas, S.compras] = r.map(fail);
+    // reservado en pedidos web pendientes y disponible en la web (si falla, la pestaña sigue igual)
+    try { const { data } = await sb.rpc("caja_stock_reservas"); S.reservas = {}; (data || []).forEach((x) => (S.reservas[x.item_id] = x)); } catch (_) { S.reservas = {}; }
   }
   let reloadT;
   function softReload() { clearTimeout(reloadT); reloadT = setTimeout(async () => { try { await loadAll(); render(); } catch (e) { console.error(e); } }, 250); }
@@ -139,6 +141,7 @@
     sb.channel("caja-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "caja_movimientos" }, softReload)
       .on("postgres_changes", { event: "*", schema: "public", table: "caja_stock_mov" }, softReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, softReload)
       .on("postgres_changes", { event: "*", schema: "public", table: "caja_tareas" }, softReload)
       .on("postgres_changes", { event: "*", schema: "public", table: "caja_compras" }, softReload)
       .subscribe();
@@ -461,6 +464,7 @@
         return `<div class="sitem ${low ? "low" : ""}" data-item="${i.id}"><div class="top"><b>${esc(i.nombre)}</b>${low ? '<span class="pri urg">poco</span>' : ""}<button data-smas="${i.id}">Más</button></div>
           <div class="places">${["cafe", "produ"].map((l) => `<div class="place"><span class="n"><span>${LUG[l]}</span><b class="num">${i[l]}</b></span>
             <span class="stp"><button data-sq="${i.id}|${l}|-1" aria-label="Restar uno en ${LUG[l]}">−</button><button class="p" data-sq="${i.id}|${l}|1" aria-label="Sumar uno en ${LUG[l]}">+</button></span></div>`).join("")}</div>
+          ${(() => { const rv = (S.reservas || {})[i.id]; return rv ? `<span class="hintp reserva">${rv.reservado > 0 ? `<b>${rv.reservado}</b> reservado${rv.reservado > 1 ? "s" : ""} en pedidos web pendientes · ` : ""}En la web: <b>${Math.max(0, rv.disponible)}</b></span>` : ""; })()}
           ${i.actualizado ? `<span class="hintp">Último cambio ${cuando(i.actualizado)}</span>` : ""}</div>`;
       }).join("") || `<div class="emptyc"><img src="img/mochito-lie.png" alt=""><span>No hay productos en el stock.</span></div>`}</div>
       <div class="toolsrow"><button class="ghost" data-snew>+ Agregar producto</button><button class="ghost" data-shist>Ver últimos cambios</button></div>`;
