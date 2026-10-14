@@ -103,7 +103,7 @@
         ${env ? `<div class="dirbox"><b>${esc(o.direccion || "")}</b><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.direccion || "") + ", Mar del Plata")}" target="_blank" rel="noopener">Ver en Maps</a></div>` : ""}
         ${o.premio && o.status === "pendiente" ? `<div class="premiobox">Este pedido completa la tarjeta del Club. Premio elegido: <b>${esc(o.premio_txt || "a confirmar con el cliente")}</b>${/off/.test(o.premio_txt || "") ? " (ya descontado del total)" : ""}. Al tocar Entregado se canjea solo.</div>` : ""}
         <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>Pago: <b>${esc(o.pago || "—")}</b></span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}</div>
-        <div class="olines">${(o.items || []).map((i) => `<div><span>${i.qty}× ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""}</span><span class="num">${money(i.subtotal)}</span></div>`).join("")}</div>
+        <div class="olines">${(o.items || []).map((i) => `<div><span>${i.qty}× ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""}${i.detalle ? `<small class="det">${esc(i.detalle)}</small>` : ""}</span><span class="num">${money(i.subtotal)}</span></div>`).join("")}</div>
         <div class="otot"><span>Total</span><span class="num">${money(o.total)}</span></div>
         ${o.status === "pendiente" ? `<div class="confirm">
             <label>Número del chat de WhatsApp<input class="inp" data-cphone value="${esc(c.phone)}" inputmode="tel"></label>
@@ -260,6 +260,12 @@
           <label>Pedido mínimo para sumar sello (0 = sin mínimo)<input class="inp" name="minimo" type="number" min="0" step="500" value="${club.minimo || 0}"></label>
           <span class="hintp">El premio se entrega en el mismo pedido que completa la tarjeta.</span>
           <button class="btn solid">Guardar</button></form>
+        <form class="pcard" data-set="personalizacion"><b>Personalización de bebidas</b>
+          <div class="checks"><label><input type="checkbox" name="activo" ${(S.personalizacion || {}).activo !== false ? "checked" : ""}> Dejar personalizar dirty y sets</label></div>
+          <label>Leches: una por línea, nombre | recargo (la primera es la de base)<textarea class="inp" name="leches" rows="5">${esc(((S.personalizacion || {}).leches || []).map((l) => l.nombre + " | " + (l.precio || 0)).join("\n"))}</textarea></label>
+          <label>Opciones para sacar (una por línea)<textarea class="inp" name="sin" rows="3">${esc(((S.personalizacion || {}).sin || []).join("\n"))}</textarea></label>
+          <span class="hintp">El recargo se suma al precio de la bebida o del set.</span>
+          <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="envio"><b>Envío a domicilio</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${(S.envio || {}).activo ? "checked" : ""}> Ofrecer envío en la web</label></div>
           <label>Costo fijo del envío (0 = a coordinar por WhatsApp)<input class="inp" name="costo" type="number" min="0" step="100" value="${(S.envio || {}).costo || 0}"></label>
@@ -291,6 +297,10 @@
       }
       if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: Math.max(0, Math.min(10, +f.spp)), premio: (f.premio || "").trim(), minimo: Math.max(0, +f.minimo || 0),
         premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0) });
+      if (k === "personalizacion") {
+        const leches = (f.leches || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const [n, pr] = s.split("|").map((x) => x.trim()); return { nombre: n, precio: Math.max(0, Math.round(+String(pr || "0").replace(/[^0-9.,]/g, "").replace(/\.(?=\d{3})/g, "").replace(",", ".")) || 0) }; }).filter((l) => l.nombre);
+        await API.saveSetting("personalizacion", { activo: !!f.activo, leches, sin: (f.sin || "").split("\n").map((s) => s.trim()).filter(Boolean) });
+      }
       if (k === "envio") await API.saveSetting("envio", { activo: !!f.activo, costo: Math.max(0, +f.costo || 0), aviso: (f.aviso || "").trim() });
       if (k === "pagos") await API.saveSetting("pagos", (f.pagos || "").split("\n").map((s) => s.trim()).filter(Boolean));
       if (k === "apps") await API.saveSetting("apps", [0, 1, 2, 3].map((i) => ({ nombre: (f["an" + i] || "").trim(), url: (f["au" + i] || "").trim() })).filter((a) => a.nombre));

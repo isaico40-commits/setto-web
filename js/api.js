@@ -53,7 +53,7 @@
   const demo = {
     async loadAll() { const db = dbLoad(); return { settings: db.settings, products: db.products }; },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio: elegido }) {
-      const db = dbLoad(), ph = normPhone(phone), esp = db.settings.especial || {}, envio = db.settings.envio || {}, club = db.settings.club || {};
+      const db = dbLoad(), ph = normPhone(phone), esp = db.settings.especial || {}, envio = db.settings.envio || {}, club = db.settings.club || {}, pers = db.settings.personalizacion || {};
       modo = modo === "envio" ? "envio" : "retiro";
       if (modo === "envio" && !envio.activo) throw new Error("Por ahora no hacemos envíos desde la web");
       if (modo === "envio" && String(direccion || "").trim().length < 5) throw new Error("Falta la dirección de entrega");
@@ -75,8 +75,15 @@
         }
         if (pr.agotado) throw new Error(pr.nombre + " está agotado");
         if (!(price > 0)) throw new Error(pr.nombre + " todavía no tiene precio");
+        let leche = null, sin = [], det = null;
+        if ((pr.categoria === "set" || pr.categoria === "dirty") && pers.activo !== false) {
+          leche = String(it.leche || "").trim() || null;
+          if (leche) { const l = (pers.leches || []).find((x) => x.nombre === leche); if (!l) throw new Error("Esa leche ya no está disponible, elegí otra"); price += Math.max(0, Number(l.precio) || 0); if (Number(l.precio) > 0 || leche !== ((pers.leches || [])[0] || {}).nombre) det = leche; }
+          for (const x of it.sin || []) { if (!(pers.sin || []).includes(x)) throw new Error("Opción no disponible: " + x); if (!sin.includes(x)) sin.push(x); }
+          if (sin.length) det = [det, ...sin].filter(Boolean).join(" · ");
+        }
         total += price * qty;
-        lines.push({ id: pr.id, nombre: name, size, qty, precio: price, subtotal: price * qty });
+        lines.push({ id: pr.id, nombre: name, size, qty, precio: price, subtotal: price * qty, leche, sin, detalle: det });
       }
       const sub = total, costo = modo === "envio" ? Math.max(0, Number(envio.costo) || 0) : 0;
       if (costo > 0) { lines.push({ id: "envio", nombre: "Envío", size: null, qty: 1, precio: costo, subtotal: costo }); total += costo; }
@@ -193,8 +200,8 @@
       return { settings, products: p.data };
     },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio }) {
-      const { data, error } = await sb.rpc("create_order_v3", {
-        p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty })),
+      const { data, error } = await sb.rpc("create_order_v4", {
+        p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty, leche: i.leche || null, sin: i.sin || [] })),
         p_retiro: retiro, p_pago: pago, p_nota: nota || null, p_modo: modo || "retiro", p_direccion: direccion || null, p_premio: premio || null,
       });
       fail(error); return data;

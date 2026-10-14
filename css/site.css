@@ -344,3 +344,5 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .premio-pick .chips button[aria-pressed="true"]{background:var(--turquesa);color:#fff}
 .hero .clubpill{margin-top:16px}
 .pp .pct{font-style:normal;font-size:.72rem;font-weight:700;color:var(--turquesa);margin-left:4px}
+.line small.det{display:block;color:var(--turquesa);font-weight:600;font-size:.76rem;margin-top:2px}
+.chips button .num{font-weight:500;opacity:.8}

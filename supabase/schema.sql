@@ -251,7 +251,7 @@ grant execute on function public.redeem_reward(text) to authenticated;
 --   p_items: [{"id":"set-sakura","size":"12 oz","qty":1}, ...]
 --   p_modo: 'retiro' | 'envio'   ·   p_direccion: obligatoria si es envío
 -- ---------------------------------------------------------------------
-create or replace function public.create_order_v3(
+create or replace function public.create_order_v4(
   p_nombre text, p_phone text, p_items jsonb, p_retiro text, p_pago text, p_nota text,
   p_modo text default 'retiro', p_direccion text default null, p_premio text default null
 ) returns jsonb
@@ -287,6 +287,12 @@ declare
   v_off    integer := 0;
   v_ptxt   text;
   ps       products%rowtype;
+  v_pers   jsonb := coalesce((select value from settings where key = 'personalizacion'), '{}'::jsonb);
+  v_leche  text;
+  v_lprec  integer;
+  v_sin    jsonb;
+  v_det    text;
+  s        text;
 begin
   if coalesce(trim(p_nombre), '') = '' or length(p_nombre) > 60 then raise exception 'Falta tu nombre'; end if;
   if v_phone is null then raise exception 'El celular no parece válido'; end if;
@@ -326,8 +332,29 @@ begin
     if pr.agotado then raise exception '% está agotado', pr.nombre; end if;
     if coalesce(v_price, 0) <= 0 then raise exception '% todavía no tiene precio', pr.nombre; end if;
 
+    -- Personalización de la bebida (dirty y sets): leche con recargo y opciones "sin"
+    v_det := null; v_leche := null; v_sin := '[]'::jsonb;
+    if pr.categoria in ('set','dirty') and coalesce((v_pers->>'activo')::boolean, true) then
+      v_leche := nullif(trim(coalesce(it->>'leche', '')), '');
+      if v_leche is not null then
+        select (l->>'precio')::int into v_lprec from jsonb_array_elements(coalesce(v_pers->'leches', '[]'::jsonb)) l where l->>'nombre' = v_leche limit 1;
+        if not found then raise exception 'Esa leche ya no está disponible, elegí otra'; end if;
+        v_price := v_price + greatest(0, coalesce(v_lprec, 0));
+        if coalesce(v_lprec, 0) > 0 or v_leche <> coalesce((v_pers->'leches'->0->>'nombre'), '') then v_det := v_leche; end if;
+      end if;
+      if jsonb_typeof(it->'sin') = 'array' then
+        for s in select jsonb_array_elements_text(it->'sin') loop
+          if not (coalesce(v_pers->'sin', '[]'::jsonb) ? s) then raise exception 'Opción no disponible: %', s; end if;
+          if not (v_sin ? s) then v_sin := v_sin || to_jsonb(s); end if;
+        end loop;
+        if jsonb_array_length(v_sin) > 0 then
+          v_det := concat_ws(' · ', v_det, (select string_agg(x, ' · ') from jsonb_array_elements_text(v_sin) x));
+        end if;
+      end if;
+    end if;
+
     v_sub := v_sub + v_price * v_qty;
-    v_lines := v_lines || jsonb_build_object('id', pr.id, 'nombre', v_name, 'size', v_size, 'qty', v_qty, 'precio', v_price, 'subtotal', v_price * v_qty);
+    v_lines := v_lines || jsonb_build_object('id', pr.id, 'nombre', v_name, 'size', v_size, 'qty', v_qty, 'precio', v_price, 'subtotal', v_price * v_qty, 'leche', v_leche, 'sin', v_sin, 'detalle', v_det);
   end loop;
 
   if v_costo > 0 then
@@ -376,48 +403,9 @@ begin
     'sellos_antes', v_sellos, 'meta', v_meta);
 end $$;
 
--- ---------------------------------------------------------------------
--- EQUIPO · Confirmar pedido entregado y sumar sellos.
---   Si con estos sellos completa la tarjeta, el premio se entrega en ESTE pedido:
---   se descuenta la meta y se suma un canje automáticamente.
--- ---------------------------------------------------------------------
-create or replace function public.confirm_order(p_id uuid, p_phone text, p_sellos integer) returns jsonb
-language plpgsql security definer set search_path = public as $$
-declare
-  o       orders%rowtype;
-  v_phone text := public.norm_phone(p_phone);
-  v_n     integer := greatest(0, least(10, coalesce(p_sellos, 0)));
-  v_club  jsonb := coalesce((select value from settings where key = 'club'), '{}'::jsonb);
-  v_meta  integer := coalesce(((select value from settings where key = 'club')->>'meta')::int, 8);
-  v_total integer;
-  v_canje boolean := false;
-begin
-  if not public.is_staff() then raise exception 'Solo el equipo puede hacer esto'; end if;
-  if v_phone is null then raise exception 'Número de celular inválido'; end if;
-  select * into o from orders where id = p_id for update;
-  if not found then raise exception 'Pedido no encontrado'; end if;
-  if o.status <> 'pendiente' then raise exception 'Ese pedido ya estaba %', o.status; end if;
 
-  insert into customers (phone, nombre, sellos) values (v_phone, o.nombre, v_n)
-  on conflict (phone) do update set sellos = customers.sellos + v_n, nombre = coalesce(customers.nombre, excluded.nombre), updated_at = now()
-  returning sellos into v_total;
-  if v_n > 0 then
-    insert into stamp_events (phone, delta, motivo, order_id, created_by) values (v_phone, v_n, 'Pedido ' || o.code, o.id, auth.uid());
-  end if;
-
-  if v_n > 0 and coalesce((v_club->>'activo')::boolean, true) and v_total >= v_meta then
-    update customers set sellos = sellos - v_meta, canjes = canjes + 1, updated_at = now() where phone = v_phone returning sellos into v_total;
-    insert into stamp_events (phone, delta, motivo, order_id, created_by) values (v_phone, -v_meta, 'Premio entregado en ' || o.code, o.id, auth.uid());
-    v_canje := true;
-  end if;
-
-  update orders set status = 'entregado', phone = v_phone, sellos = v_n, premio = v_canje,
-    closed_at = now(), closed_by = auth.uid() where id = p_id;
-  return jsonb_build_object('phone', v_phone, 'sellos', v_total, 'canje', v_canje, 'premio', v_club->>'premio');
-end $$;
-
-revoke all on function public.create_order_v3(text,text,jsonb,text,text,text,text,text,text) from public;
-grant execute on function public.create_order_v3(text,text,jsonb,text,text,text,text,text,text) to anon, authenticated;
+revoke all on function public.create_order_v4(text,text,jsonb,text,text,text,text,text,text) from public;
+grant execute on function public.create_order_v4(text,text,jsonb,text,text,text,text,text,text) to anon, authenticated;
 revoke all on function public.confirm_order(uuid,text,integer) from public, anon;
 grant execute on function public.confirm_order(uuid,text,integer) to authenticated;
 
@@ -461,6 +449,7 @@ insert into public.settings (key, value) values ('retiro', '{"dias": [0, 1, 2, 3
 insert into public.settings (key, value) values ('especial', '{"estado": "proximamente", "chip": "Próxima edición · fecha a confirmar", "intro": "Mochis inspirados en tortas. Salen una vez al mes y la fecha la anunciamos en Instagram."}'::jsonb) on conflict (key) do nothing;
 insert into public.settings (key, value) values ('club', '{"meta": 8, "premio": "Un set de regalo o 25% off en ese pedido", "sellos_por_pedido": 1, "activo": true, "minimo": 0, "premio_set": true, "premio_descuento": 25, "premio_tope": 0}'::jsonb) on conflict (key) do nothing;
 insert into public.settings (key, value) values ('envio', '{"activo": true, "costo": 0, "aviso": "Envíos en Mar del Plata. El costo del envío se coordina por WhatsApp según la zona."}'::jsonb) on conflict (key) do nothing;
+insert into public.settings (key, value) values ('personalizacion', '{"activo": true, "leches": [{"nombre": "Leche entera", "precio": 0}, {"nombre": "Leche de avena", "precio": 400}, {"nombre": "Leche de quinoa", "precio": 600}, {"nombre": "Leche de almendra", "precio": 700}, {"nombre": "Leche de coco", "precio": 1000}], "sin": ["Sin cold foam", "Sin endulzante", "Sin hielo"]}'::jsonb) on conflict (key) do nothing;
 insert into public.products (id, categoria, nombre, descripcion, img, precio, precio_12, precio_16, codigo, tema, set_bebida, set_mochi, rotativo, agotado, activo, orden) values ('esp-lemon', 'especial', 'Lemon Pie', 'Mochi inspirado en el lemon pie.', '', 0, null, null, null, null, null, null, false, false, true, 1) on conflict (id) do nothing;
 insert into public.products (id, categoria, nombre, descripcion, img, precio, precio_12, precio_16, codigo, tema, set_bebida, set_mochi, rotativo, agotado, activo, orden) values ('esp-cheesecake', 'especial', 'Cheesecake de frutos rojos', 'Mochi inspirado en el cheesecake de frutos rojos.', '', 0, null, null, null, null, null, null, false, false, true, 2) on conflict (id) do nothing;
 insert into public.products (id, categoria, nombre, descripcion, img, precio, precio_12, precio_16, codigo, tema, set_bebida, set_mochi, rotativo, agotado, activo, orden) values ('esp-bariloche', 'especial', 'Chocolate Bariloche y frutos rojos', 'Mochi inspirado en la torta de chocolate Bariloche con frutos rojos.', '', 0, null, null, null, null, null, null, false, false, true, 3) on conflict (id) do nothing;

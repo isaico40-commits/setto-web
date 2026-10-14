@@ -88,6 +88,10 @@ El premio se entrega **en el mismo pedido que completa la tarjeta**. Ejemplo con
 Sin elegir, la web no deja enviar. El panel muestra 🎁 *Completa la tarjeta* con el premio elegido, y al tocar **Entregado** se canjea solo (la tarjeta vuelve a 0).
 En **Ajustes → Setto Club** definís los sellos de la tarjeta, el texto del premio, si se ofrece el set, el % de descuento (0 = no se ofrece), un tope en $ para el descuento (0 = sin tope) y un pedido mínimo opcional para sumar sello.
 
+### Personalización de bebidas
+En los dirty y en los sets el cliente elige la leche (con recargo) y puede marcar "Sin cold foam", "Sin endulzante" o "Sin hielo". El recargo se suma al precio y se calcula en la base. En el WhatsApp y en el panel cada bebida muestra lo que eligió.
+En **Ajustes → Personalización de bebidas** cambiás las leches (una por línea, `Nombre | recargo`, la primera es la de base) y las opciones para sacar.
+
 ### Edición especial (sabores de tortas)
 En **Carta → Edición especial**:
 - **Estado:** *Próximamente* (se muestra pero no se puede pedir) o *Disponible ahora* (se puede pedir).

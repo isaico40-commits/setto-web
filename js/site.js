@@ -94,15 +94,29 @@
   const save = () => { try { localStorage.setItem("setto-cart", JSON.stringify(cart)); } catch (e) {} };
   const total = () => cart.reduce((s, c) => s + c.precio * c.qty, 0);
   const units = () => cart.reduce((s, c) => s + c.qty, 0);
+  const pers = () => S.personalizacion || {};
+  const leches = () => (pers().activo === false ? [] : pers().leches || []);
+  const sinOpts = () => (pers().activo === false ? [] : pers().sin || []);
+  const persOn = (p) => ["set", "dirty"].includes(kind(p)) && (leches().length > 0 || sinOpts().length > 0);
+  const lechePrecio = (n) => { const l = leches().find((x) => x.nombre === n); return l ? Number(l.precio) || 0 : 0; };
+  const detalleOf = (leche, sin) => [leche && (lechePrecio(leche) > 0 || leche !== (leches()[0] || {}).nombre) ? leche : "", ...(sin || [])].filter(Boolean).join(" · ");
   function syncCart() { // si cambió la carta, actualiza precios y saca lo que ya no existe
-    cart = cart.filter((c) => { const p = find(c.id); if (!p || p.activo === false) return false; const pr = priceOf(p, c.size); if (!(pr > 0)) return false; c.precio = pr; c.nombre = nameOf(p); return true; });
+    cart = cart.filter((c) => {
+      const p = find(c.id); if (!p || p.activo === false) return false; const pr = priceOf(p, c.size); if (!(pr > 0)) return false;
+      if (persOn(p)) {
+        if (c.leche && !leches().some((l) => l.nombre === c.leche)) c.leche = (leches()[0] || {}).nombre || "";
+        c.sin = (c.sin || []).filter((x) => sinOpts().includes(x));
+      } else { c.leche = ""; c.sin = []; }
+      c.precio = pr + lechePrecio(c.leche); c.detalle = detalleOf(c.leche, c.sin); c.nombre = nameOf(p); return true;
+    });
     save();
   }
-  function addItem(p, sz, qty = 1) {
-    const key = p.id + "|" + (sz || "");
+  function addItem(p, sz, qty = 1, leche = "", sin = []) {
+    if (!persOn(p)) { leche = ""; sin = []; }
+    const key = p.id + "|" + (sz || "") + "|" + leche + "|" + sin.join(",");
     const ex = cart.find((c) => c.key === key);
     if (ex) ex.qty += qty;
-    else cart.push({ key, id: p.id, nombre: nameOf(p), size: sz || "", precio: priceOf(p, sz), img: p.img || "img/mochito-lie.png", qty });
+    else cart.push({ key, id: p.id, nombre: nameOf(p), size: sz || "", leche, sin: [...sin], detalle: detalleOf(leche, sin), precio: priceOf(p, sz) + lechePrecio(leche), img: p.img || "img/mochito-lie.png", qty });
     save(); renderBadge(); toast("Sumado: " + nameOf(p) + (sz ? " · " + sz : ""));
   }
   let toastT;
@@ -110,7 +124,7 @@
 
   /* ---------- render ---------- */
   function renderBand() {
-    const words = ["Probá un set distinto cada día", "Dirty lattes fríos", "Mochis rellenos", "Take away en Mar del Plata", "Cualquier leche incluida"];
+    const words = ["Probá un set distinto cada día", "Dirty lattes fríos", "Mochis rellenos", "Take away en Mar del Plata", "Elegí tu leche"];
     if (S.club && clubOn()) words.splice(1, 0, "Cada pedido suma sellos del Setto Club");
     $("#track").innerHTML = [...words, ...words].map((w) => `<span>${w}</span>`).join("");
   }
@@ -162,7 +176,7 @@
     const list = on(tab === "dirty" ? DIRTY : MOCHIS);
     $("#cntDirty").textContent = on(DIRTY).length + " sabores · fríos";
     $("#cntMochi").textContent = on(MOCHIS).length + " sabores · por unidad";
-    $("#cartaEyebrow").textContent = tab === "dirty" ? "Fríos · Cualquier tipo de leche incluida" : "Por unidad · Algunos sabores son rotativos";
+    $("#cartaEyebrow").textContent = tab === "dirty" ? "Fríos · Elegí tu leche y personalizalo" : "Por unidad · Algunos sabores son rotativos";
     $("#grid").innerHTML = list.map((p) => {
       const agot = p.agotado;
       const precio = tab === "dirty" ? `<span class="from num">Desde<b>${money(p.precios["12 oz"])}</b></span>` : `<span class="from num">Unidad<b>${money(p.precio)}</b></span>`;
@@ -227,13 +241,15 @@
   let sheetState = null;
   function openSheet(id) {
     const p = find(id); if (!p) return;
-    sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1 };
+    sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1, leche: persOn(p) ? (leches()[0] || {}).nombre || "" : "", sin: [] };
     drawSheet();
     $("#sheet").classList.add("on"); $("#scrim").classList.add("on"); renderBadge();
     setTimeout(() => $("#sheet .x").focus(), 60);
   }
   function drawSheet() {
-    const { p, sz, qty } = sheetState, k = kind(p);
+    const { p, sz, qty, leche, sin } = sheetState, k = kind(p);
+    const custom = persOn(p) ? `${leches().length ? `<div><span class="eyebrow">Leche${k === "set" ? " de la bebida" : ""}</span><div class="chips lechas" style="margin-top:8px">${leches().map((l) => `<button data-leche="${esc(l.nombre)}" aria-pressed="${l.nombre === leche}">${esc(l.nombre)}${Number(l.precio) > 0 ? ` <span class="num">+${money(l.precio)}</span>` : ""}</button>`).join("")}</div></div>` : ""}
+      ${sinOpts().length ? `<div><span class="eyebrow">¿Algo para sacar?</span><div class="chips" style="margin-top:8px">${sinOpts().map((x) => `<button data-sin="${esc(x)}" aria-pressed="${sin.includes(x)}">${esc(x)}</button>`).join("")}</div></div>` : ""}` : "";
     const opts = unit(p) ? "" : `<div><span class="eyebrow">Tamaño</span><div class="opts" style="margin-top:8px">${["12 oz", "16 oz"].map((oz) => {
       const sv = k === "set" ? suelto(p, oz) : 0, pv = p.precios[oz];
       const pr = k === "set" && sv > pv ? `<s>${money(sv)}</s>${money(pv)} <em class="pct">−${Math.round(((sv - pv) / sv) * 100)}%</em>` : money(pv);
@@ -244,11 +260,12 @@
       <div class="sb">
         ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
         <h3 id="sTitle">${esc(nameOf(p))}</h3>
-        <p class="muted">${esc(descOf(p))}${k === "dirty" ? " Cualquier tipo de leche incluida." : ""}</p>
+        <p class="muted">${esc(descOf(p))}</p>
         ${opts}
+        ${custom}
         ${clubOn() && !blocked ? `<span class="clubtag">Tu pedido suma ${sellosTxt(spp())} del Setto Club</span>` : ""}
         <div class="act"><div class="qty" style="margin:0"><button data-sq="-1" aria-label="Restar uno">−</button><span class="num" style="min-width:18px;text-align:center">${qty}</span><button data-sq="1" aria-label="Sumar uno">+</button></div>
-        ${blocked ? `<span class="btn big" style="flex:1;opacity:.7;box-shadow:none;background:var(--bg-2);color:var(--ink);cursor:default">${p.agotado ? "Agotado" : "Todavía no disponible"}</span>` : `<button class="btn solid big" id="sheetAdd">Agregar · <span class="num">${money(priceOf(p, sz) * qty)}</span></button>`}</div>
+        ${blocked ? `<span class="btn big" style="flex:1;opacity:.7;box-shadow:none;background:var(--bg-2);color:var(--ink);cursor:default">${p.agotado ? "Agotado" : "Todavía no disponible"}</span>` : `<button class="btn solid big" id="sheetAdd">Agregar · <span class="num">${money((priceOf(p, sz) + lechePrecio(leche)) * qty)}</span></button>`}</div>
       </div>`;
   }
   function closeSheet() { $("#sheet").classList.remove("on"); if (!$("#drawer").classList.contains("on")) $("#scrim").classList.remove("on"); renderBadge(); }
@@ -278,7 +295,7 @@
   try { lastOrder = JSON.parse(sessionStorage.getItem("setto-last-order") || "null"); } catch (_) {}
 
   function buildMessage(o) {
-    const lines = o.items.map((c) => `• ${c.qty}× ${c.nombre}${c.size ? ` (${c.size})` : ""} — ${money(c.subtotal)}`);
+    const lines = o.items.map((c) => `• ${c.qty}× ${c.nombre}${c.size ? ` (${c.size})` : ""} — ${money(c.subtotal)}` + (c.detalle ? `\n   ↳ ${c.detalle}` : ""));
     const envio = o.modo === "envio";
     const entrega = envio ? `Envío: ${o.retiro}\nDirección: ${o.direccion}` + (Number(o.costo_envio) > 0 ? "" : "\n(Costo de envío a coordinar)") : `Retiro: ${o.retiro}`;
     const premio = o.premio ? `\n\n🎁 Con este pedido completo mi tarjeta del Setto Club: ${o.premio_txt || "premio"}` : "";
@@ -301,7 +318,7 @@
     if (view === "cart") {
       $("#dTitle").textContent = "Tu pedido";
       if (!cart.length) { body.innerHTML = `<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><a class="btn" href="#sets" data-closedrawer>Ver sets</a></div>`; foot.innerHTML = ""; return; }
-      body.innerHTML = cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b><small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
+      body.innerHTML = cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
         <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("");
       foot.innerHTML = `${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
@@ -324,7 +341,7 @@
         <label class="f" for="fHora">${isEnv ? "Horario de entrega" : "Horario de retiro"}<select id="fHora"><option value="">Elegí un horario</option>${slots().map((o) => `<option ${o === form.hora ? "selected" : ""}>${esc(o)}</option>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>
         <div class="f"><span>Forma de pago</span><div class="chips">${(S.pagos || []).map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">El pago se coordina por WhatsApp.</span></div>
         ${premioPicker()}
-        <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: leche de almendras">${esc(form.nota)}</textarea></label>
+        <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>
         <div id="fErr" class="err" hidden></div>`;
       foot.innerHTML = `${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(total() + envioCosto() - (completes() ? premioOff() : 0))}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
       [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; }); });
@@ -355,7 +372,7 @@
     sending = true; drawFootOnly();
     try {
       const isEnv = form.modo === "envio";
-      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null });
+      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [] })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null });
       const full = { ...o, nombre: form.nombre.trim(), retiro: form.hora, pago: form.pago, nota: form.nota.trim() };
       lastOrder = { code: o.code, message: buildMessage(full), modo: o.modo || "retiro", premio: !!o.premio, premio_txt: o.premio_txt };
       cardCache = null;
@@ -400,7 +417,9 @@
     if (b.dataset.close !== undefined) closeSheet();
     if (b.dataset.sz) { sheetState.sz = b.dataset.sz; drawSheet(); }
     if (b.dataset.sq) { sheetState.qty = Math.max(1, sheetState.qty + +b.dataset.sq); drawSheet(); }
-    if (b.id === "sheetAdd") { addItem(sheetState.p, sheetState.sz, sheetState.qty); closeSheet(); }
+    if (b.id === "sheetAdd") { addItem(sheetState.p, sheetState.sz, sheetState.qty, sheetState.leche, sheetState.sin); closeSheet(); }
+    if (b.dataset.leche !== undefined && sheetState) { sheetState.leche = b.dataset.leche; drawSheet(); }
+    if (b.dataset.sin !== undefined && sheetState) { const x = b.dataset.sin, s = sheetState.sin; sheetState.sin = s.includes(x) ? s.filter((y) => y !== x) : [...s, x]; drawSheet(); }
     if (b.id === "tab-dirty" || b.id === "tab-mochi") { tab = b.id.slice(4); renderCarta(); }
     if (b.dataset.goto) { tab = b.dataset.goto; renderCarta(); $(".switch").scrollIntoView({ behavior: "smooth", block: "center" }); }
     if (b.dataset.q !== undefined) { const c = cart[+b.dataset.q]; c.qty += +b.dataset.d; if (c.qty <= 0) cart.splice(+b.dataset.q, 1); save(); renderBadge(); drawDrawer(); }

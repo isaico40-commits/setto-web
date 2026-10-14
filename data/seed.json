@@ -64,6 +64,36 @@
       "activo": true,
       "costo": 0,
       "aviso": "Envíos en Mar del Plata. El costo del envío se coordina por WhatsApp según la zona."
+    },
+    "personalizacion": {
+      "activo": true,
+      "leches": [
+        {
+          "nombre": "Leche entera",
+          "precio": 0
+        },
+        {
+          "nombre": "Leche de avena",
+          "precio": 400
+        },
+        {
+          "nombre": "Leche de quinoa",
+          "precio": 600
+        },
+        {
+          "nombre": "Leche de almendra",
+          "precio": 700
+        },
+        {
+          "nombre": "Leche de coco",
+          "precio": 1000
+        }
+      ],
+      "sin": [
+        "Sin cold foam",
+        "Sin endulzante",
+        "Sin hielo"
+      ]
     }
   },
   "products": [
