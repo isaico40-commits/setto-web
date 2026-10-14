@@ -101,6 +101,13 @@ En **Ajustes → Apps de delivery** podés subir el logo oficial de cada app (cu
 Después de enviar, el cliente ve arriba de la web el estado de su pedido (se actualiza cada 30 segundos y al volver a la pestaña): **Recibido → En preparación → Listo para retirar / En camino → Entregado**. Si cancelás, le aparece cancelado.
 En el panel, cada pedido pendiente tiene **Estado que ve el cliente**: Recibido / En preparación / Listo (o En camino). Al tocar **Entregado ✓** pasa a Entregado.
 
+### Reseñas
+Cuando un pedido pasa a **Entregado**, el cliente ve en su seguimiento **Ver mis sellos** y **Dejar reseña** (estrellas + texto opcional). Solo puede dejar reseña quien recibió el pedido: una por pedido, dentro de los 14 días.
+En el panel, pestaña **Reseñas**: **Publicar** u **Ocultar**. En la web, en "Lo que dicen", solo se ven las publicadas que tienen texto, con nombre e inicial (nunca el teléfono). El promedio aparece desde 3 reseñas.
+
+### Avisar por WhatsApp
+Cada pedido pendiente tiene **Avisar por WhatsApp**: abre el chat del cliente con el mensaje del estado actual (recibido, en preparación, listo o en camino). Lo mandás vos con un toque, sin costo.
+
 ### Edición especial (sabores de tortas)
 En **Carta → Edición especial**:
 - **Estado:** *Próximamente* (se muestra pero no se puede pedir) o *Disponible ahora* (se puede pedir).

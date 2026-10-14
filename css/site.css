@@ -391,3 +391,20 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .trk-steps li.done i,.trk-steps li.now i{background:var(--turquesa)}
 .trk-steps li.now span{color:var(--ink);font-weight:700}
 .trk p{font-size:.9rem;margin:0}
+
+/* Seguimiento: acciones y reseña */
+.trk-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.trk-acts .btn{padding:8px 14px;font-size:.84rem}
+.rv-form{display:grid;gap:8px;margin-top:10px}
+.stars{display:flex;gap:4px}
+.stars button{border:0;background:none;font-size:1.6rem;line-height:1;color:color-mix(in srgb,var(--turquesa) 25%,transparent);cursor:pointer;padding:2px}
+.stars button[aria-pressed="true"]{color:var(--coral,#f8a29a)}
+.rv-form textarea{width:100%;min-height:70px;border:1.5px solid color-mix(in srgb,var(--turquesa) 40%,transparent);border-radius:12px;padding:10px;font:inherit;background:var(--card)}
+.rv-err{font-size:.82rem;color:#b85b52}
+.dtrk{display:grid;gap:8px;margin-bottom:14px}
+.dtrk .trk{padding:12px}
+/* Reseñas públicas */
+.rv{background:var(--card);border-radius:var(--r);padding:20px;border:1.5px solid color-mix(in srgb,var(--turquesa) 25%,transparent);display:flex;flex-direction:column;gap:10px}
+.rv .st{color:var(--coral,#f8a29a);letter-spacing:2px}
+.rv p{margin:0;line-height:1.5}
+.rv b{font-size:.9rem}

@@ -43,6 +43,7 @@
       return;
     }
     await loadBase(); drawShell(); go(P.view);
+    API.listReviews().then((l) => { P.reviews = l; contarResenas(); }).catch(() => {});
     API.onOrders(() => { refreshOrders(true); });
     setInterval(() => refreshOrders(false), 30000);
   }
@@ -53,7 +54,7 @@
     app.innerHTML = `<header class="pbar"><div class="wrap">
         <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.png" alt="Setto"></a><span class="tag">Panel</span>
         <nav class="ptabs" role="tablist">
-          ${[["pedidos", "Pedidos"], ["club", "Club"], ["carta", "Carta"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : ""}</button>`).join("")}
+          ${[["pedidos", "Pedidos"], ["club", "Club"], ["carta", "Carta"], ["resenas", "Reseñas"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : k === "resenas" ? ' <span class="n" id="resN" hidden>0</span>' : ""}</button>`).join("")}
           <a class="ptab" href="caja.html">Caja</a>
         </nav>
         <span class="who">${esc(P.user && P.user.email || "")}<button id="logout">Salir</button></span>
@@ -63,10 +64,35 @@
   function go(v) {
     P.view = v;
     document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === v)));
-    ({ pedidos: viewPedidos, club: viewClub, carta: viewCarta, ajustes: viewAjustes })[v]();
+    ({ pedidos: viewPedidos, club: viewClub, carta: viewCarta, resenas: viewResenas, ajustes: viewAjustes })[v]();
   }
 
   /* =================== PEDIDOS =================== */
+  function avisoTxt(o) {
+    const env = o.modo === "envio", e = o.etapa || "recibido", n = (o.nombre || "").split(" ")[0];
+    if (e === "listo") return env ? `¡Hola ${n}! Tu pedido ${o.code} de Setto ya salió y va en camino 🛵` : `¡Hola ${n}! Tu pedido ${o.code} de Setto está listo. Ya podés pasar a buscarlo 🙌`;
+    if (e === "preparando") return `¡Hola ${n}! Ya estamos preparando tu pedido ${o.code} de Setto.`;
+    return `¡Hola ${n}! Recibimos tu pedido ${o.code} de Setto. Te avisamos cuando esté listo.`;
+  }
+
+  /* =================== RESEÑAS =================== */
+  async function viewResenas() {
+    $("#view").innerHTML = `<h1 class="ph1">Reseñas</h1><p class="muted">Solo las aprobadas se ven en la web (las que tienen texto). Las deja quien recibió su pedido.</p><div id="rvList" class="pgrid" style="margin-top:18px"><p class="muted">Cargando…</p></div>`;
+    try {
+      const l = await API.listReviews(); P.reviews = l; contarResenas();
+      $("#rvList").innerHTML = l.length ? l.map((r) => `<article class="pcard rvc ${r.estado}" data-rid="${r.id}">
+          <div class="ohead"><span style="color:#f8a29a;letter-spacing:2px">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</span><span class="ago">${ago(r.created_at)}</span><span class="st ${r.estado === "aprobada" ? "entregado" : r.estado === "oculta" ? "cancelado" : "pendiente"}">${r.estado}</span></div>
+          <p style="margin:6px 0">${r.texto ? esc(r.texto) : '<i class="muted">Sin texto (solo puntaje)</i>'}</p>
+          <div class="who2"><b>${esc(r.nombre)}</b><span class="num">${esc(pretty(r.phone))}</span></div>
+          <div class="acts">${r.estado !== "aprobada" ? '<button class="btn solid" data-rv="aprobada">Publicar</button>' : ""}${r.estado !== "oculta" ? '<button class="linkbtn warn" data-rv="oculta">Ocultar</button>' : ""}</div></article>`).join("") : '<p class="muted">Todavía no hay reseñas.</p>';
+    } catch (e) { $("#rvList").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+  }
+  function contarResenas() { const n = (P.reviews || []).filter((r) => r.estado === "pendiente").length, el = $("#resN"); if (el) { el.textContent = n; el.hidden = !n; } }
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-rv]"); if (!b) return;
+    const id = b.closest("[data-rid]").dataset.rid; b.disabled = true;
+    try { await API.setReviewEstado(id, b.dataset.rv); toast(b.dataset.rv === "aprobada" ? "Publicada en la web" : "Oculta"); viewResenas(); } catch (err) { toast(err.message); b.disabled = false; }
+  });
   async function refreshOrders(notify) {
     try {
       const pend = await API.listOrders("pendiente");
@@ -110,6 +136,7 @@
             <label>Número del chat de WhatsApp<input class="inp" data-cphone value="${esc(c.phone)}" inputmode="tel"></label>
             <div class="acts"><span style="font-size:.85rem;font-weight:600">Sellos a sumar</span><span class="stepper"><button data-cn="-1" aria-label="Menos">−</button><span>${c.n}</span><button data-cn="1" aria-label="Más">+</button></span></div>
             <div class="acts etapas"><span style="font-size:.85rem;font-weight:600">Estado que ve el cliente</span>${[["recibido", "Recibido"], ["preparando", "En preparación"], ["listo", env ? "En camino" : "Listo para retirar"]].map(([k, l]) => `<button class="chipb" data-etapa="${k}" aria-pressed="${(o.etapa || "recibido") === k}">${l}</button>`).join("")}</div>
+            <a class="linkbtn" target="_blank" rel="noopener" href="https://wa.me/${esc(o.phone)}?text=${encodeURIComponent(avisoTxt(o))}">Avisar por WhatsApp: “${esc(avisoTxt(o).slice(0, 48))}…”</a>
             <div class="acts"><button class="btn solid" data-deliver>Entregado ✓</button><button class="linkbtn warn" data-cancel>${P.cancelArm === o.id ? "¿Seguro? Tocá de nuevo para cancelar" : "Cancelar pedido"}</button></div>
           </div>` : o.status === "entregado" ? `<p class="hintp">Entregado ${o.closed_at ? ago(o.closed_at) : ""} · ${o.sellos || 0} sello(s) sumado(s) a ${esc(pretty(o.phone))}</p>` : ""}
       </article>`;

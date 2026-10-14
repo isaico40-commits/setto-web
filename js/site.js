@@ -355,8 +355,8 @@
     $("#dBack").hidden = view !== "checkout";
     if (view === "cart") {
       $("#dTitle").textContent = "Tu pedido";
-      if (!cart.length) { body.innerHTML = `<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><a class="btn" href="#sets" data-closedrawer>Ver sets</a></div>`; foot.innerHTML = ""; return; }
-      body.innerHTML = cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
+      if (!cart.length) { body.innerHTML = `${trackHtml()}<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><a class="btn" href="#sets" data-closedrawer>Ver sets</a></div>`; foot.innerHTML = ""; return; }
+      body.innerHTML = trackHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
         <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("");
       foot.innerHTML = `${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
@@ -451,8 +451,8 @@
       const falta = Math.max(0, c.meta - c.sellos);
       msg.textContent = !c.existe ? "Todavía no tenés sellos con este número. Se suman cuando retirás un pedido hecho desde la web."
         : falta === 0 ? `¡Completaste la tarjeta! Avisanos en tu próximo pedido para canjear: ${c.premio || "tu premio"}.`
-        : falta <= (S.club && S.club.sellos_por_pedido || 1) ? `Tenés ${c.sellos} de ${c.meta} sellos. ¡Tu próximo pedido viene con ${c.premio || "premio"}!`
-        : `Tenés ${c.sellos} de ${c.meta} sellos. Te ${falta === 1 ? "falta 1" : "faltan " + falta} para ${c.premio || "el premio"}.`;
+        : falta <= (S.club && S.club.sellos_por_pedido || 1) ? `Tenés ${c.sellos} de ${c.meta} sellos. ¡Tu próximo pedido viene con ${premioTxt()}!`
+        : `Tenés ${c.sellos} de ${c.meta} sellos. Te ${falta === 1 ? "falta 1" : "faltan " + falta} para ${premioTxt()}.`;
       try { localStorage.setItem("setto-form", JSON.stringify({ nombre: form.nombre, tel })); } catch (_) {}
     } catch (err) { msg.textContent = err.message || "No pudimos consultar la tarjeta."; }
   });
@@ -505,16 +505,23 @@
   const SKEY = "setto-mis-pedidos";
   const misPedidos = () => { try { return JSON.parse(localStorage.getItem(SKEY) || "[]").filter((x) => Date.now() - x.at < 3 * 864e5); } catch (_) { return []; } };
   function guardarSeguimiento(o) { try { const l = misPedidos().filter((x) => x.code !== o.code); l.unshift(o); localStorage.setItem(SKEY, JSON.stringify(l.slice(0, 5))); } catch (_) {} verSeguimiento(); }
-  let trackT = null;
+  let trackT = null, trackVivos = [];
+  const telDe = (code) => (misPedidos().find((x) => x.code === code) || {}).phone || "";
+  const ocultosTrk = () => { try { return JSON.parse(localStorage.getItem("setto-trk-ocultos") || "[]"); } catch (_) { return []; } };
+  const trackHtml = () => (trackVivos.length ? `<div class="dtrk">${trackVivos.map(trackCard).join("")}</div>` : "");
   async function verSeguimiento() {
     clearTimeout(trackT);
     const l = misPedidos(), box = $("#seguimiento"); if (!l.length) { box.hidden = true; return; }
     const byPhone = {}; l.forEach((x) => (byPhone[x.phone] = byPhone[x.phone] || []).push(x.code));
     let data = [];
     try { data = (await Promise.all(Object.entries(byPhone).map(([ph, codes]) => API.orderStatus(codes, ph)))).flat(); } catch (_) { return; }
-    // los entregados o cancelados se muestran hasta 3 horas
-    const vivos = data.filter((o) => o.status === "pendiente" || Date.now() - new Date(o.created_at) < 3 * 36e5).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    // pendientes; entregados sin reseña (3 días); el resto hasta 3 horas
+    const ocultos = ocultosTrk();
+    const vivos = data.filter((o) => !ocultos.includes(o.code) && (o.status === "pendiente" || (o.status === "entregado" && !o.resena) || Date.now() - new Date(o.created_at) < 3 * 36e5)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    trackVivos = vivos;
+    if (view === "cart" && $("#drawer").classList.contains("on")) drawDrawer();
     if (!vivos.length) { box.hidden = true; return; }
+    if (box.querySelector(".rv-form")) return; // no pisar una reseña a medio escribir
     box.hidden = false; box.innerHTML = `<div class="wrap">${vivos.map(trackCard).join("")}</div>`;
     if (vivos.some((o) => o.status === "pendiente")) trackT = setTimeout(verSeguimiento, 30000);
   }
@@ -523,15 +530,51 @@
     const pasos = ["Recibido", "En preparación", env ? "En camino" : "Listo para retirar", "Entregado"];
     const idx = o.status === "entregado" ? 3 : o.etapa === "listo" ? 2 : o.etapa === "preparando" ? 1 : 0;
     const txt = o.status === "cancelado" ? "Este pedido se canceló. Si tenés dudas, escribinos por WhatsApp."
-      : o.status === "entregado" ? "¡Entregado! Que lo disfrutes."
+      : o.status === "entregado" ? `¡Entregado! Que lo disfrutes.${o.sellos > 0 ? ` Sumaste ${sellosTxt(o.sellos)} al Setto Club.` : ""}`
       : idx === 2 ? (env ? "Tu pedido salió y va en camino." : "¡Está listo! Ya podés pasar a buscarlo.")
       : idx === 1 ? "Lo estamos preparando."
       : "Lo recibimos. Si todavía no mandaste el WhatsApp, mandalo así lo confirmamos.";
     return `<div class="trk ${o.status}"><div class="trk-h"><span class="eyebrow">Tu pedido</span><b class="num">${esc(o.code)}</b><span class="trk-r">${esc(o.retiro || "")}</span>${o.status !== "pendiente" ? `<button class="trk-x" data-trackx="${esc(o.code)}" aria-label="Ocultar">✕</button>` : ""}</div>
       ${o.status === "cancelado" ? "" : `<ol class="trk-steps">${pasos.map((p, i) => `<li class="${i < idx ? "done" : i === idx ? "now" : ""}"><i></i><span>${p}</span></li>`).join("")}</ol>`}
-      <p>${txt}</p></div>`;
+      <p>${txt}</p>
+      ${o.status === "entregado" ? `<div class="trk-acts">${clubOn() ? `<button class="btn" data-vercard="${esc(o.code)}">Ver mis sellos</button>` : ""}${o.resena ? `<span class="muted" style="font-size:.84rem;align-self:center">¡Gracias por tu reseña!</span>` : `<button class="btn solid" data-resena="${esc(o.code)}">Dejar reseña</button>`}</div>` : ""}</div>`;
   }
-  document.addEventListener("click", (e) => { const x = e.target.closest("[data-trackx]"); if (!x) return; try { localStorage.setItem(SKEY, JSON.stringify(misPedidos().filter((o) => o.code !== x.dataset.trackx))); } catch (_) {} verSeguimiento(); });
+  function rvForm(code) {
+    return `<div class="rv-form" data-rvcode="${esc(code)}"><b style="font-size:.9rem">¿Qué tal estuvo?</b>
+      <div class="stars" role="radiogroup" aria-label="Puntaje">${[1, 2, 3, 4, 5].map((n) => `<button type="button" data-star="${n}" aria-pressed="false" aria-label="${n} estrella${n > 1 ? "s" : ""}">★</button>`).join("")}</div>
+      <textarea maxlength="400" placeholder="Contanos qué pediste y qué te pareció (opcional)"></textarea>
+      <span class="rv-err" hidden></span>
+      <div class="trk-acts" style="margin:0"><button class="btn solid" data-rvsend>Enviar reseña</button><button class="back" data-rvcancel>Ahora no</button></div></div>`;
+  }
+  document.addEventListener("click", async (e) => {
+    const t = e.target.closest("[data-resena],[data-star],[data-rvsend],[data-rvcancel],[data-vercard]"); if (!t) return;
+    if (t.dataset.vercard) {
+      const tel = telDe(t.dataset.vercard); closeDrawer(); $("#cardPhone").value = API.prettyPhone ? API.prettyPhone(tel) : tel;
+      $("#club").scrollIntoView({ behavior: "smooth" }); $("#cardForm").requestSubmit(); return;
+    }
+    if (t.dataset.resena) { const card = t.closest(".trk"); const acts = t.closest(".trk-acts"); if (!card.querySelector(".rv-form")) acts.insertAdjacentHTML("afterend", rvForm(t.dataset.resena)); acts.hidden = true; return; }
+    const f = t.closest(".rv-form"); if (!f) return;
+    if (t.dataset.star) { const n = +t.dataset.star; f.dataset.rating = n; f.querySelectorAll("[data-star]").forEach((s) => s.setAttribute("aria-pressed", String(+s.dataset.star <= n))); return; }
+    if (t.dataset.rvcancel !== undefined) { const acts = f.previousElementSibling; f.remove(); if (acts) acts.hidden = false; return; }
+    if (t.dataset.rvsend !== undefined) {
+      const err = f.querySelector(".rv-err"), r = +f.dataset.rating || 0;
+      if (!r) { err.hidden = false; err.textContent = "Tocá las estrellas para puntuar."; return; }
+      t.disabled = true; t.textContent = "Enviando…";
+      try { await API.createReview(f.dataset.rvcode, telDe(f.dataset.rvcode), r, f.querySelector("textarea").value);
+        f.outerHTML = `<p style="margin-top:10px"><b>¡Gracias!</b> La publicamos cuando la revisemos.</p>`; setTimeout(verSeguimiento, 4000);
+      } catch (ex) { err.hidden = false; err.textContent = ex.message; t.disabled = false; t.textContent = "Enviar reseña"; }
+    }
+  });
+  async function renderResenas() {
+    try {
+      const d = await API.publicReviews(); const sec = $("#resenas");
+      if (!d || !d.items || !d.items.length) { sec.hidden = true; return; }
+      sec.hidden = false;
+      $("#resProm").textContent = d.cantidad >= 3 ? `★ ${String(d.promedio).replace(".", ",")} · ${d.cantidad} reseñas` : "Reseñas reales";
+      $("#resGrid").innerHTML = d.items.map((r) => `<article class="rv"><span class="st" aria-label="${r.rating} de 5">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</span><p>${esc(r.texto)}</p><b>${esc(r.nombre)}</b></article>`).join("");
+    } catch (_) {}
+  }
+  document.addEventListener("click", (e) => { const x = e.target.closest("[data-trackx]"); if (!x) return; try { localStorage.setItem("setto-trk-ocultos", JSON.stringify([...ocultosTrk(), x.dataset.trackx].slice(-20))); } catch (_) {} verSeguimiento(); });
 
   /* ---------- arranque ---------- */
   function loading() {
@@ -544,7 +587,7 @@
       const stockP = API.getStock ? API.getStock().catch(() => null) : Promise.resolve(null);
       const { settings, products } = await API.loadAll();
       STOCK = await stockP;
-      verSeguimiento();
+      verSeguimiento(); renderResenas();
       S = settings; adapt(products); syncCart();
       renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;

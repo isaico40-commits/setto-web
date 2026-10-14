@@ -151,8 +151,24 @@
     async orderStatus(codes, phone) {
       const db = dbLoad(), ph = normPhone(phone), since = Date.now() - 3 * 864e5;
       return db.orders.filter((o) => o.phone === ph && codes.includes(o.code) && new Date(o.created_at) > since)
-        .map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at }));
+        .map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, resena: (db.reviews || []).some((r) => r.order_id === o.id) }));
     },
+    async createReview(code, phone, rating, texto) {
+      const db = dbLoad(), ph = normPhone(phone); db.reviews = db.reviews || [];
+      if (!(rating >= 1 && rating <= 5)) throw new Error("Elegí de 1 a 5 estrellas");
+      const o = db.orders.find((x) => x.code === code && x.phone === ph && x.status === "entregado");
+      if (!o) throw new Error("Solo podés dejar reseña de un pedido que ya recibiste");
+      if (db.reviews.some((r) => r.order_id === o.id)) throw new Error("Ya dejaste una reseña de este pedido. ¡Gracias!");
+      db.reviews.unshift({ id: uid(), order_id: o.id, phone: ph, nombre: o.nombre, rating, texto: String(texto || "").trim() || null, estado: "pendiente", created_at: new Date().toISOString() }); dbSave(db);
+    },
+    async publicReviews() {
+      const ok = (dbLoad().reviews || []).filter((r) => r.estado === "aprobada");
+      const nom = (n) => { const [a, b] = String(n).trim().split(/\s+/); return a.charAt(0).toUpperCase() + a.slice(1) + (b ? " " + b[0].toUpperCase() + "." : ""); };
+      return { cantidad: ok.length, promedio: ok.length ? Math.round((ok.reduce((s, r) => s + r.rating, 0) / ok.length) * 10) / 10 : null,
+        items: ok.filter((r) => r.texto).slice(0, 12).map((r) => ({ nombre: nom(r.nombre), rating: r.rating, texto: r.texto, fecha: r.created_at })) };
+    },
+    async listReviews() { return (dbLoad().reviews || []).slice(0, 100); },
+    async setReviewEstado(id, estado) { const db = dbLoad(), r = (db.reviews || []).find((x) => x.id === id); if (r) { r.estado = estado; dbSave(db); } },
     async addStamps(phone, nombre, delta, motivo) {
       const db = dbLoad(), ph = normPhone(phone);
       if (!ph) throw new Error("Número de celular inválido");
@@ -234,6 +250,10 @@
     async cancelOrder(id) { const { error } = await sb.rpc("cancel_order", { p_id: id }); fail(error); },
     async setEtapa(id, etapa) { const { error } = await sb.rpc("set_order_etapa", { p_id: id, p_etapa: etapa }); fail(error); },
     async orderStatus(codes, phone) { const { data, error } = await sb.rpc("get_order_status", { p_codes: codes, p_phone: phone }); fail(error); return data || []; },
+    async createReview(code, phone, rating, texto) { const { error } = await sb.rpc("create_review", { p_code: code, p_phone: phone, p_rating: rating, p_texto: texto || null }); fail(error); },
+    async publicReviews() { const { data, error } = await sb.rpc("public_reviews"); fail(error); return data; },
+    async listReviews() { const { data, error } = await sb.from("reviews").select("*").order("created_at", { ascending: false }).limit(100); fail(error); return data; },
+    async setReviewEstado(id, estado) { const { error } = await sb.from("reviews").update({ estado }).eq("id", id); fail(error); },
     async addStamps(phone, nombre, delta, motivo) { const { data, error } = await sb.rpc("add_stamps", { p_phone: phone, p_nombre: nombre || null, p_delta: delta, p_motivo: motivo || null }); fail(error); return data; },
     async redeem(phone) { const { data, error } = await sb.rpc("redeem_reward", { p_phone: phone }); fail(error); return data; },
     async findCustomer(phone) {
