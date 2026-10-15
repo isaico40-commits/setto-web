@@ -1,8 +1,42 @@
 {
   "cleanUrls": true,
   "headers": [
-    { "source": "/panel", "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }] },
-    { "source": "/caja", "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }] },
-    { "source": "/img/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }] }
+    {
+      "source": "/panel",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
+      "source": "/caja",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
+      "source": "/img/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/gift-cards",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/armar",
+      "destination": "/index.html"
+    }
   ]
 }

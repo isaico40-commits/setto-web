@@ -4,6 +4,10 @@
   const $ = (s) => document.querySelector(s);
   const money = (n) => (Number(n) < 0 ? "−$" : "$") + Math.abs(Number(n || 0)).toLocaleString("es-AR");
   const lcFirst = (t) => (t ? t.charAt(0).toLowerCase() + t.slice(1) : t);
+  const PAGE = (() => { const q = new URLSearchParams(location.search).get("p"); const p = (q || location.pathname.replace(/\/+$/, "").split("/").pop() || "").replace(/\.html$/, ""); return ["gift-cards", "armar"].includes(p) ? p : "home"; })();
+  document.body.dataset.page = PAGE;
+  if (PAGE === "gift-cards") document.title = "Gift cards · Setto"; if (PAGE === "armar") document.title = "Cómo armar tu bebida · Setto";
+  const irA = (hash) => { if (PAGE === "home") location.hash = hash; else location.href = "/" + hash; };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   let S = {}; // ajustes
@@ -257,8 +261,14 @@
     halloween: { nombre: "Halloween", tit: "Boo!", bg: "#2b2035", fg: "#ffb27a", img: "img/mochito-lie.png", pat: "radial-gradient(circle,rgba(232,116,42,.35) 1.5px,transparent 2.5px)", psz: "24px", bats: true },
   };
   const gcfg = () => S.giftcards || {};
-  const gdis = () => (gcfg().disenos || Object.keys(GD)).filter((k) => GD[k]);
+  // diseños: los de base (dibujados) + los que suban con imagen desde el panel
+  const gitems = () => (gcfg().items && gcfg().items.length ? gcfg().items : (gcfg().disenos || Object.keys(GD)).map((id) => ({ id, nombre: (GD[id] || {}).nombre, activo: true })));
+  const gitem = (k) => gitems().find((x) => x.id === k) || { id: k, nombre: (GD[k] || {}).nombre || "Gift card" };
+  const gdis = () => gitems().filter((x) => x.activo !== false && (x.img || GD[x.id])).map((x) => x.id);
+  const gnombre = (k) => gitem(k).nombre || (GD[k] || {}).nombre || "Gift card";
   function gcardHtml(k, monto, tag = "div", attrs = "") {
+    const it = gitem(k);
+    if (it.img) return `<${tag} class="gcard gimg" ${attrs}><img class="g-img" src="${esc(it.img)}" alt="Gift card ${esc(gnombre(k))}"><span class="g-bot"><span class="g-amt num">${monto ? money(monto) : esc(gnombre(k))}</span></span></${tag}>`;
     const d = GD[k] || GD.porquesi;
     return `<${tag} class="gcard" style="--gbg:${d.bg};--gfg:${d.fg};--gpat:${d.pat};--gpsz:${d.psz}" ${attrs}>
       <span class="g-logo"><img src="img/logo.png" alt="Setto"></span>
@@ -270,8 +280,7 @@
   function renderGift() {
     const sec = $("#regalo"); if (!sec) return;
     sec.hidden = gcfg().activo === false; if (sec.hidden) return;
-    $("#gcGrid").innerHTML = gdis().map((k) => gcardHtml(k, 0, "button", `data-gcpick="${k}" aria-label="Gift card ${esc(GD[k].nombre)}"`)).join("");
-    dots("gcGrid");
+    $("#gcGrid").innerHTML = gdis().map((k) => gcardHtml(k, 0, "button", `data-gcpick="${k}" aria-label="Gift card ${esc(gnombre(k))}"`)).join("");
   }
   const GB = { dis: "cumple", monto: 0, otro: "", de: "", para: "", msg: "", tel: "", sending: false, done: null };
   function abrirGift(k) {
@@ -291,7 +300,7 @@
     const montos = gcfg().montos || [10000, 15000, 20000, 30000];
     b.innerHTML = `<div class="gb-wrap"><div class="gb-prev">${gcardHtml(GB.dis, gbMonto())}<div class="gb-msg">${GB.para ? `<b>Para ${esc(GB.para)}</b>${GB.de ? ` · de ${esc(GB.de)}` : ""}<br>` : ""}<span class="muted">${esc(GB.msg) || "Tu mensaje aparece acá."}</span></div></div>
       <div class="gb-form">
-        <div class="f"><span>Diseño</span><div class="gb-dis">${gdis().map((k) => `<button data-gbdis="${k}" aria-pressed="${k === GB.dis}" aria-label="${esc(GD[k].nombre)}"><span class="mini" style="--gbg:${GD[k].bg};--gfg:${GD[k].fg}">${esc(GD[k].nombre)}</span></button>`).join("")}</div></div>
+        <div class="f"><span>Diseño</span><div class="gb-dis">${gdis().map((k) => `<button data-gbdis="${k}" aria-pressed="${k === GB.dis}" aria-label="${esc(gnombre(k))}">${gitem(k).img ? `<span class="mini" style="background:url('${esc(gitem(k).img)}') center/cover"></span>` : `<span class="mini" style="--gbg:${GD[k].bg};--gfg:${GD[k].fg}">${esc(gnombre(k))}</span>`}</button>`).join("")}</div></div>
         <div class="f"><span>Monto</span><div class="chips">${montos.map((m) => `<button data-gbm="${m}" aria-pressed="${GB.monto === m}">${money(m)}</button>`).join("")}<button data-gbm="otro" aria-pressed="${GB.monto === "otro"}">Otro</button></div>
           ${GB.monto === "otro" ? `<input id="gbOtro" inputmode="numeric" placeholder="Desde ${money(gcfg().minimo || 5000)}" value="${esc(GB.otro)}" style="margin-top:8px">` : ""}</div>
         <label class="f">Para<input id="gbPara" maxlength="40" value="${esc(GB.para)}" placeholder="Nombre de quien la recibe"></label>
@@ -312,7 +321,7 @@
     GB.sending = true; $("#gbSend").textContent = "Reservando…";
     try {
       const r = await API.createGiftcard({ diseno: GB.dis, monto: m, de: GB.de.trim(), para: GB.para.trim(), mensaje: GB.msg.trim(), phone: GB.tel });
-      const msg = window.SettoMSG.render("gift_compra", { codigo: r.code, diseno: GD[GB.dis].nombre, monto: money(m), para: GB.para.trim(), de: GB.de.trim() }, S);
+      const msg = window.SettoMSG.render("gift_compra", { codigo: r.code, diseno: gnombre(GB.dis), monto: money(m), para: GB.para.trim(), de: GB.de.trim() }, S);
       GB.done = { code: r.code, monto: m, msg }; GB.sending = false; dibujarGift();
       const link = waLink(msg); if (matchMedia("(pointer:coarse)").matches) location.href = link; else window.open(link, "_blank", "noopener");
     } catch (e) { GB.sending = false; $("#gbSend").textContent = `Comprar · ${money(m)}`; fallo(e.message); }
@@ -326,7 +335,7 @@
     if (t.dataset.gbclose !== undefined) return cerrarGift();
     if (t.dataset.gvclose !== undefined) return cerrarRegalo();
     if (t.dataset.gvcopy) { try { navigator.clipboard.writeText(t.dataset.gvcopy); toast("Código copiado"); } catch (_) {} return; }
-    if (t.dataset.gvuse) { usarGift(t.dataset.gvuse, +t.dataset.saldo); cerrarRegalo(); location.hash = "#sets"; toast("Gift card guardada: se aplica al pedir"); }
+    if (t.dataset.gvuse) { usarGift(t.dataset.gvuse, +t.dataset.saldo); cerrarRegalo(); irA("#sets"); toast("Gift card guardada: se aplica al pedir"); }
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (!$("#gcBuy").hidden) cerrarGift(); if (!$("#gcView").hidden) cerrarRegalo(); } });
 
@@ -402,6 +411,22 @@
     try { VOTO.res = await API.castVote(vcfg().id, VOTO.sel, tel); const l = JSON.parse(localStorage.getItem("setto-voto") || "{}"); l[vcfg().id] = VOTO.sel; localStorage.setItem("setto-voto", JSON.stringify(l)); VOTO.sel = null; await renderVotar(); toast("¡Gracias por votar!"); }
     catch (ex) { msg.textContent = ex.message; } finally { e.target.disabled = false; }
   });
+
+  /* ---------- Preguntas frecuentes (Panel → Ajustes) ---------- */
+  const FAQ_DEF = [
+    { p: "¿Qué es un mochi?", r: "Un bocado de origen japonés: masa suave y elástica de harina de arroz glutinoso y leche, rellena de crema y un corazón de sabor (frutilla, chocolate, oreo y más)." },
+    { p: "¿Cómo llega mi bebida?", r: "Llega por partes: el vaso con la bebida, el cold foam aparte y el hielo aparte. [Mirá cómo armarla](/armar)." },
+    { p: "¿Cómo hago un pedido?", r: "Armalo acá en la web y se envía por WhatsApp con un código. Por ahí te confirmamos horario y pago." },
+    { p: "¿Hacen envíos?", r: "Sí, en Mar del Plata. Con envío el pago es solo por transferencia y el costo te lo pasamos por WhatsApp." },
+    { p: "¿Cómo funciona el Setto Club?", r: "Cada pedido desde la web suma un sello. Al completar la tarjeta elegís tu premio." },
+    { p: "¿Cómo uso una gift card?", r: "Abrí el link que te mandaron y tocá “Usarla en un pedido”. Se descuenta del total y, si sobra, te queda para otro pedido. [Ver gift cards](/gift-cards)." },
+  ];
+  const mdLinks = (t) => esc(t).replace(/\[([^\]]+)\]\(((?:https?:\/\/|\/)[^)\s]*)\)/g, (_, a, u) => `<a href="${u}"${/^https?:/.test(u) ? ' target="_blank" rel="noopener"' : ""}>${a}</a>`).replace(/\n/g, "<br>");
+  function renderFaq() {
+    const items = ((S.faq || {}).items || FAQ_DEF).filter((x) => x && x.p && x.r);
+    $("#faq").hidden = !items.length;
+    $("#faqList").innerHTML = items.map((x) => `<details><summary>${esc(x.p)}</summary><div class="faq-a">${mdLinks(x.r)}</div></details>`).join("");
+  }
 
   function renderBand() {
     const words = ["Probá un set distinto cada día", "Dirty lattes fríos", "Mochis rellenos", "Take away en Mar del Plata", "Elegí tu leche"];
@@ -749,7 +774,7 @@
       const fallback = () => { const r = document.createRange(); r.selectNodeContents($("#msgText")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast("Seleccionado: copialo con tu teclado"); };
       try { navigator.clipboard.writeText(txt).then(() => toast("Mensaje copiado"), fallback); } catch (_) { fallback(); }
     }
-    if (b.id === "newOrder") { refrescarStock(); lastOrder = null; try { sessionStorage.removeItem("setto-last-order"); } catch (_) {} view = "cart"; closeDrawer(); location.hash = "#sets"; }
+    if (b.id === "newOrder") { refrescarStock(); lastOrder = null; try { sessionStorage.removeItem("setto-last-order"); } catch (_) {} view = "cart"; closeDrawer(); irA("#sets"); }
   });
   /* ---------- menú mobile ---------- */
   function closeMenu() { const m = $("#mnav"); if (!m || m.hidden) return; m.hidden = true; $("#burger").setAttribute("aria-expanded", "false"); $("#burger").setAttribute("aria-label", "Abrir menú"); }
@@ -921,7 +946,7 @@
       verSeguimiento(); renderResenas();
       API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
       S = settings; adapt(products); syncCart();
-      renderTema(); renderHero(); renderQueEs(); renderAbierto(); renderGift(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
+      renderTema(); renderHero(); renderFaq(); renderAbierto(); renderGift(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
     } catch (e) {

@@ -83,7 +83,17 @@
 
   /* =================== GIFT CARDS =================== */
   const GDN = { cumple: "Cumpleaños", gracias: "Gracias", tequiero: "Te quiero", felicitaciones: "Felicitaciones", porquesi: "Porque sí", halloween: "Halloween" };
-  const linkRegalo = (g) => `${location.origin}/?regalo=${g.token}`;
+  const gItems = () => { const g = P.settings.giftcards || {}; return g.items && g.items.length ? g.items : (g.disenos || Object.keys(GDN)).map((id) => ({ id, nombre: GDN[id], activo: true })).concat(Object.keys(GDN).filter((id) => !(g.disenos || Object.keys(GDN)).includes(id)).map((id) => ({ id, nombre: GDN[id], activo: false }))); };
+  const gName = (id) => (gItems().find((x) => x.id === id) || {}).nombre || GDN[id] || id;
+  const FAQ_DEF = [
+    { p: "¿Qué es un mochi?", r: "Un bocado de origen japonés: masa suave y elástica de harina de arroz glutinoso y leche, rellena de crema y un corazón de sabor (frutilla, chocolate, oreo y más)." },
+    { p: "¿Cómo llega mi bebida?", r: "Llega por partes: el vaso con la bebida, el cold foam aparte y el hielo aparte. [Mirá cómo armarla](/armar)." },
+    { p: "¿Cómo hago un pedido?", r: "Armalo acá en la web y se envía por WhatsApp con un código. Por ahí te confirmamos horario y pago." },
+    { p: "¿Hacen envíos?", r: "Sí, en Mar del Plata. Con envío el pago es solo por transferencia y el costo te lo pasamos por WhatsApp." },
+    { p: "¿Cómo funciona el Setto Club?", r: "Cada pedido desde la web suma un sello. Al completar la tarjeta elegís tu premio." },
+    { p: "¿Cómo uso una gift card?", r: "Abrí el link que te mandaron y tocá “Usarla en un pedido”. Se descuenta del total y, si sobra, te queda para otro pedido. [Ver gift cards](/gift-cards)." },
+  ];
+  const linkRegalo = (g) => `${location.origin}/gift-cards?regalo=${g.token}`;
   const regaloTxt = (g) => M.render("gift_activa", { para: g.para, monto: money(g.monto), link: linkRegalo(g) }, P.settings);
   P.gsub = "pendiente";
   async function viewGift() {
@@ -95,7 +105,7 @@
       const l = all.filter((g) => g.estado === P.gsub);
       $("#gcList").innerHTML = l.length ? l.map((g) => `<article class="pcard" data-gid="${g.id}">
           <div class="ohead"><span class="ocode num">${esc(g.code)}</span><span class="ago">${ago(g.created_at)}</span><span class="st ${g.estado === "activa" ? "entregado" : g.estado === "anulada" ? "cancelado" : "pendiente"}">${g.estado}</span></div>
-          <div class="meta"><span>Monto: <b>${money(g.monto)}</b></span>${g.estado !== "pendiente" ? `<span>Saldo: <b>${money(g.saldo)}</b></span>` : ""}<span>Diseño: <b>${esc(GDN[g.diseno] || g.diseno)}</b></span></div>
+          <div class="meta"><span>Monto: <b>${money(g.monto)}</b></span>${g.estado !== "pendiente" ? `<span>Saldo: <b>${money(g.saldo)}</b></span>` : ""}<span>Diseño: <b>${esc(gName(g.diseno))}</b></span></div>
           <div class="meta"><span>Para: <b>${esc(g.para || "")}</b></span>${g.de ? `<span>De: <b>${esc(g.de)}</b></span>` : ""}</div>
           ${g.mensaje ? `<p class="hintp">“${esc(g.mensaje)}”</p>` : ""}
           <div class="who2"><span class="num">${esc(pretty(g.phone))}</span><a class="chat" href="https://wa.me/${esc(g.phone)}" target="_blank" rel="noopener">Abrir chat</a></div>
@@ -382,8 +392,12 @@
           <div class="checks"><label><input type="checkbox" name="activo" ${(S.giftcards || {}).activo !== false ? "checked" : ""}> Vender gift cards en la web</label></div>
           <label>Montos sugeridos (separados por coma)<input class="inp" name="montos" value="${esc(((S.giftcards || {}).montos || [10000, 15000, 20000, 30000]).join(", "))}"></label>
           <div class="row2"><label>Mínimo (otro monto)<input class="inp" name="minimo" type="number" step="500" value="${(S.giftcards || {}).minimo || 5000}"></label><label>Máximo<input class="inp" name="maximo" type="number" step="1000" value="${(S.giftcards || {}).maximo || 100000}"></label></div>
-          <div class="checks">${Object.entries(GDN).map(([k, l]) => `<label><input type="checkbox" name="d_${k}" ${((S.giftcards || {}).disenos || Object.keys(GDN)).includes(k) ? "checked" : ""}> ${l}</label>`).join("")}</div>
-          <span class="hintp">Diseños que se ofrecen. Halloween conviene apagarlo pasada la fecha.</span>
+          <b style="margin-top:6px">Diseños</b>
+          <span class="hintp">Subí una imagen horizontal (proporción 1,6:1, ej. 1600×1000) para usar tu propio diseño. Sin imagen, se usa el diseño dibujado. Los vacíos de abajo sirven para sumar diseños nuevos.</span>
+          ${(() => { const its = gItems(); while (its.length < 10) its.push({ id: "", nombre: "", activo: true }); return its.slice(0, 10).map((x, i) => `<div class="slrow"><span class="upprev">${x.img ? `<img src="${esc(x.img)}" alt="">` : GDN[x.id] ? `${esc(GDN[x.id])}<br>(dibujado)` : "Nuevo"}</span>
+            <div class="slf"><input type="hidden" name="gi${i}" value="${esc(x.img || "")}"><input type="hidden" name="gid${i}" value="${esc(x.id || "")}">
+              <div class="row2"><label>Nombre<input class="inp" name="gn${i}" maxlength="30" value="${esc(x.nombre || "")}" placeholder="${GDN[x.id] ? "" : "Ej: Día de la madre"}"></label><label class="checks" style="align-self:end"><span><input type="checkbox" name="ga${i}" ${x.activo !== false ? "checked" : ""}> Visible</span></label></div>
+              <div class="acts"><label class="btn">Subir imagen<input type="file" accept="image/*" data-upimg="gi${i}" data-upmax="1600" hidden></label>${x.img ? `<button type="button" class="linkbtn warn" data-gix="${i}">Quitar imagen</button>` : ""}</div></div></div>`).join(""); })()}
           <button class="btn solid">Guardar</button></form>
         <form class="pcard wide" data-set="votacion"><b>Votación</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${(S.votacion || {}).activo ? "checked" : ""}> Mostrar la votación en la web</label><label><input type="checkbox" name="solo" ${(S.votacion || {}).solo_clientes ? "checked" : ""}> Solo clientes (votan números con un pedido entregado)</label></div>
@@ -399,15 +413,10 @@
           <label>Aviso arriba de la web (opcional)<input class="inp" name="aviso" maxlength="70" value="${esc((S.tema || {}).aviso || "")}" placeholder="Ej: Edición Halloween · del 29/10 al 2/11"></label>
           <span class="hintp">Cambia colores y suma detalles de la temporada. Se saca eligiendo "Ninguno".</span>
           <button class="btn solid">Guardar</button></form>
-        <form class="pcard" data-set="mochi_info"><b>¿Qué es un mochi?</b>
-          <div class="checks"><label><input type="checkbox" name="activo" ${(S.mochi_info || {}).activo !== false ? "checked" : ""}> Mostrar la sección</label></div>
-          <label>Título<input class="inp" name="titulo" value="${esc((S.mochi_info || {}).titulo || "¿Qué es un mochi?")}"></label>
-          <label>Texto (1 o 2 líneas)<textarea class="inp" name="texto" rows="2">${esc((S.mochi_info || {}).texto ?? "Un bocado de origen japonés: masa suave y elástica por fuera, relleno cremoso por dentro.")}</textarea></label>
-          <label>Puntos: uno por línea, título | detalle<textarea class="inp" name="puntos" rows="4">${esc(((S.mochi_info || {}).puntos || ["La masa | harina de arroz glutinoso y leche.", "El relleno | crema y un corazón de sabor: frutilla, chocolate, oreo y más.", "La textura | suave y elástica por fuera, cremosa por dentro."]).join("\n"))}</textarea></label>
-          <div class="acts"><span class="upprev">${(S.mochi_info || {}).img ? `<img src="${esc(S.mochi_info.img)}" alt="">` : "Foto"}</span><input type="hidden" name="img" value="${esc((S.mochi_info || {}).img || "")}">
-            <select class="inp" name="ajuste" style="width:auto"><option value="recorte" ${(S.mochi_info || {}).ajuste !== "foto" ? "selected" : ""}>Recorte</option><option value="foto" ${(S.mochi_info || {}).ajuste === "foto" ? "selected" : ""}>Foto</option></select>
-            <label class="btn">Subir foto<input type="file" accept="image/*" data-upimg="img" data-upmax="1400" hidden></label></div>
-          <button class="btn solid">Guardar</button></form>
+        <form class="pcard wide" data-set="faq"><b>Preguntas frecuentes</b>
+          <span class="hintp">Aparecen al final de la web. Para un link escribí [texto](/armar) o [texto](https://…). Dejá vacía una pregunta para sacarla.</span>
+          ${Array.from({ length: 10 }, (_, i) => { const x = (((S.faq || {}).items) || FAQ_DEF)[i] || {}; return `<div class="row2" style="align-items:start"><label>Pregunta ${i + 1}<input class="inp" name="fp${i}" maxlength="90" value="${esc(x.p || "")}"></label><label>Respuesta<textarea class="inp" name="fr${i}" rows="2" maxlength="500">${esc(x.r || "")}</textarea></label></div>`; }).join("")}
+          <button class="btn solid">Guardar preguntas</button></form>
         <form class="pcard" data-set="ventajas"><b>Pedir acá te conviene</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${(S.ventajas || {}).activo !== false ? "checked" : ""}> Mostrar en "Cómo pedir"</label></div>
           <label>Título<input class="inp" name="titulo" value="${esc((S.ventajas || {}).titulo || "Pedir acá te conviene")}"></label>
@@ -470,7 +479,10 @@
       }
       if (k === "mensajes") { const out = {}; Object.keys(M.MSG).forEach((key) => { const v = (f["m_" + key] || "").replace(/\r/g, "").trim(); if (v && v !== M.MSG[key].texto) out[key] = v; }); await API.saveSetting("mensajes", out); }
       if (k === "giftcards") await API.saveSetting("giftcards", { activo: !!f.activo, montos: (f.montos || "").split(",").map((x) => Math.round(+x.replace(/[^\d]/g, ""))).filter((x) => x > 0).slice(0, 6),
-        minimo: Math.max(1000, +f.minimo || 5000), maximo: Math.max(+f.minimo || 5000, +f.maximo || 100000), disenos: Object.keys(GDN).filter((k2) => f["d_" + k2]) });
+        minimo: Math.max(1000, +f.minimo || 5000), maximo: Math.max(+f.minimo || 5000, +f.maximo || 100000),
+        items: Array.from({ length: 10 }, (_, i) => ({ id: (f["gid" + i] || "").trim() || ((f["gn" + i] || "").trim() || f["gi" + i] ? "d" + Date.now().toString(36) + i : ""), nombre: (f["gn" + i] || "").trim(), img: (f["gi" + i] || "").trim(), activo: !!f["ga" + i] }))
+          .filter((x) => x.id && (x.img || GDN[x.id]) && (x.nombre || GDN[x.id])).map((x) => ({ ...x, nombre: x.nombre || GDN[x.id] })),
+        disenos: Object.keys(GDN) });
       if (k === "votacion") {
         const ops = [0, 1, 2, 3, 4, 5].map((i) => ({ id: (f["oid" + i] || "").trim() || "o" + Date.now().toString(36) + i, nombre: (f["on" + i] || "").trim(), img: (f["oi" + i] || "").trim() })).filter((o) => o.nombre);
         if (f.activo && ops.length < 2) throw new Error("Cargá al menos 2 opciones");
@@ -478,7 +490,8 @@
         await API.saveSetting("votacion", { activo: !!f.activo, id: form.dataset.newid || prev.id || "v1", pregunta: (f.pregunta || "").trim(), opciones: ops, solo_clientes: !!f.solo, cierre: f.cierre ? new Date(f.cierre).toISOString() : "" });
       }
       if (k === "tema") await API.saveSetting("tema", { nombre: f.nombre || "", aviso: (f.aviso || "").trim() });
-      if (k === "mochi_info") await API.saveSetting("mochi_info", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "¿Qué es un mochi?", texto: (f.texto || "").trim(),
+      if (k === "faq") await API.saveSetting("faq", { items: Array.from({ length: 10 }, (_, i) => ({ p: (f["fp" + i] || "").trim(), r: (f["fr" + i] || "").trim() })).filter((x) => x.p && x.r) });
+      if (false) await API.saveSetting("mochi_info", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "¿Qué es un mochi?", texto: (f.texto || "").trim(),
         puntos: (f.puntos || "").split("\n").map((s) => s.trim()).filter(Boolean), img: (f.img || "").trim(), ajuste: f.ajuste === "foto" ? "foto" : "recorte" });
       if (k === "ventajas") await API.saveSetting("ventajas", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "Pedir acá te conviene",
         items: (f.items || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const [t, ...d] = s.split("|"); return { titulo: t.trim(), detalle: d.join("|").trim() }; }) });
@@ -602,6 +615,7 @@
   document.addEventListener("click", (e) => { if (e.target.closest("[data-justx],[data-justgo]")) { setTimeout(() => { P.justDelivered = null; drawJust(); }, 300); } });
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-votnew]"); if (!b) return; if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = "¿Seguro? Tocá de nuevo y después Guardar"; return; } const f = b.closest("form"); f.dataset.newid = "v" + Date.now().toString(36); [0, 1, 2, 3, 4, 5].forEach((i) => (f.querySelector(`[name=oid${i}]`).value = "")); b.textContent = "Lista: tocá Guardar"; });
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-msgreset]"); if (!b) return; const ta = b.closest("form").querySelector(`[name=m_${b.dataset.msgreset}]`); ta.value = window.SettoMSG.MSG[b.dataset.msgreset].texto; toast("Restaurado · tocá Guardar mensajes"); });
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-gix]"); if (!b) return; const r = b.closest(".slrow"); r.querySelector(`[name=gi${b.dataset.gix}]`).value = ""; r.querySelector(".upprev").textContent = "Sin imagen · tocá Guardar"; b.remove(); });
   document.addEventListener("submit", (e) => { if (e.target.matches("form[data-set]")) { e.preventDefault(); saveAjuste(e.target); } });
 
   /* =================== ARRANQUE =================== */

@@ -595,3 +595,45 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .vt .vt-yo{position:absolute;top:10px;left:10px;background:var(--turquesa);color:#fff;font-size:.7rem;font-weight:800;border-radius:99px;padding:3px 9px}
 .vt-tel{display:flex;gap:10px;align-items:flex-end;justify-content:center;margin-top:16px;flex-wrap:wrap}
 .vt-msg{text-align:center;margin-top:12px;font-size:.9rem;color:var(--ink-2);min-height:1.2em}
+
+/* ---------- Páginas: inicio / gift cards / armar ---------- */
+.volver{display:none;margin-bottom:10px}
+body:not([data-page="home"]) .volver{display:inline-flex}
+body[data-page="home"] #regalo,body[data-page="home"] #armar{display:none!important}
+body[data-page="gift-cards"] main > :not(#regalo):not(#seguimiento),body[data-page="armar"] main > :not(#armar):not(#seguimiento){display:none!important}
+body[data-page="gift-cards"] #regalo{display:block!important}
+body:not([data-page="home"]) .tema-aviso{display:none!important}
+.gc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px}
+.gc-how{text-align:center;margin-top:18px;font-size:.9rem}
+/* gift con imagen propia */
+.gcard.gimg{padding:0;background:#f1e4ca}
+.gcard.gimg::before{display:none}
+.gcard.gimg .g-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1}
+.gcard.gimg .g-bot{position:absolute;left:14px;bottom:14px}
+/* ---------- Cómo armar tu bebida ---------- */
+.ar-sub{text-align:center;font-size:1.3rem;margin:26px 0 14px;color:var(--turquesa)}
+.ar-inc{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.ar-item{background:#f1e4ca;border-radius:24px;padding:16px;display:grid;justify-items:center;text-align:center;gap:6px}
+.ar-item img{height:170px;width:auto;object-fit:contain}
+.ar-item b{font-size:1.1rem;color:var(--turquesa)}
+.ar-item span{font-size:.88rem;color:var(--ink-2)}
+.ar-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.ar-steps li{background:#f1e4ca;border-radius:24px;padding:16px;display:grid;justify-items:center;gap:10px;text-align:center}
+.ar-steps img{height:200px;width:auto;object-fit:contain}
+.ar-steps img.ar-mito{height:150px;margin-block:25px}
+.ar-steps span{font-weight:700;display:grid;justify-items:center;gap:6px}
+.ar-steps i{font-style:normal;width:34px;height:34px;border-radius:50%;background:var(--coral);display:grid;place-items:center;font-weight:800}
+.ar-fin{display:grid;justify-items:center;text-align:center;gap:12px;margin-top:28px}
+.ar-fin img{width:110px}
+.ar-fin .ctas{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+@media (max-width:760px){.ar-inc{grid-template-columns:1fr 1fr 1fr;gap:8px}.ar-item{padding:10px;border-radius:18px}.ar-item img{height:90px}.ar-item span{font-size:.76rem}
+  .ar-steps{grid-template-columns:1fr 1fr;gap:10px}.ar-steps img{height:140px}.ar-steps img.ar-mito{height:100px;margin-block:20px}}
+/* ---------- Preguntas frecuentes ---------- */
+.faq-list{max-width:760px;margin:0 auto;display:grid;gap:10px}
+.faq-list details{background:var(--card);border-radius:18px;padding:0;border:1.5px solid color-mix(in srgb,var(--turquesa) 22%,transparent)}
+.faq-list summary{cursor:pointer;list-style:none;padding:16px 18px;font-weight:700;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.faq-list summary::-webkit-details-marker{display:none}
+.faq-list summary::after{content:"+";font-size:1.3rem;color:var(--turquesa);transition:transform .2s}
+.faq-list details[open] summary::after{transform:rotate(45deg)}
+.faq-list .faq-a{padding:0 18px 16px;color:var(--ink-2);line-height:1.5}
+.faq-list .faq-a a{color:var(--turquesa);font-weight:700}

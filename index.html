@@ -21,26 +21,26 @@
 
 <header class="top">
   <div class="wrap">
-    <a class="logo" href="#inicio" aria-label="Setto, inicio"><img src="img/logo.png" alt="Setto"></a>
+    <a class="logo" href="/" aria-label="Setto, inicio"><img src="img/logo.png" alt="Setto"></a>
     <nav aria-label="Principal">
-      <a href="#especial">Edición especial</a>
-      <a href="#sets">Sets</a>
-      <a href="#carta">Carta</a>
-      <a href="#pedir">Cómo pedir</a>
-      <a href="#club">Setto Club</a>
-      <a href="#regalo">Gift cards</a>
+      <a href="/#especial">Edición especial</a>
+      <a href="/#sets">Sets</a>
+      <a href="/#carta">Carta</a>
+      <a href="/#pedir">Cómo pedir</a>
+      <a href="/#club">Setto Club</a>
+      <a href="/gift-cards">Gift cards</a>
     </nav>
     <a class="btn wacta" id="navWa" href="#" target="_blank" rel="noopener" aria-label="Escribinos por WhatsApp"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12z"/></svg><span>WhatsApp</span></a>
     <button class="btn cartbtn" id="openCart" aria-label="Abrir tu pedido">Tu pedido <span class="count num" id="cartCount">0</span></button>
     <button class="burger" id="burger" aria-label="Abrir menú" aria-expanded="false" aria-controls="mnav"><span></span><span></span><span></span></button>
   </div>
   <nav class="mnav" id="mnav" aria-label="Menú" hidden>
-    <a href="#especial">Edición especial</a>
-    <a href="#sets">Sets</a>
-    <a href="#carta">Carta</a>
-    <a href="#pedir">Cómo pedir</a>
-    <a href="#club">Setto Club <small id="mnavClub">Sumá sellos</small></a>
-    <a href="#regalo">Gift cards</a>
+    <a href="/#especial">Edición especial</a>
+    <a href="/#sets">Sets</a>
+    <a href="/#carta">Carta</a>
+    <a href="/#pedir">Cómo pedir</a>
+    <a href="/#club">Setto Club <small id="mnavClub">Sumá sellos</small></a>
+    <a href="/gift-cards">Gift cards</a>
     <div class="mnav-foot"><span>WhatsApp <b id="mnavWa"></b></span><span>Instagram <b>@setto.project</b></span></div>
   </nav>
 </header>
@@ -98,19 +98,6 @@
       <div class="vt-grid" id="vtGrid"></div>
       <div class="vt-tel" id="vtTel" hidden><label class="f">Tu celular para votar<input id="vtPhone" type="tel" inputmode="tel" placeholder="223 347-1277"></label><button class="btn solid" id="vtSend">Votar</button></div>
       <p class="vt-msg" id="vtMsg"></p>
-    </div>
-  </section>
-
-  <section class="blk mochiq" id="quees" aria-labelledby="t-quees" hidden>
-    <div class="wrap mq">
-      <div class="mq-img"><img id="mqImg" src="img/mochi-sakura.webp" alt="Mochi cortado al medio: masa por fuera, crema y relleno por dentro" loading="lazy"></div>
-      <div class="mq-txt">
-        <span class="eyebrow">Para los que recién llegan</span>
-        <h2 id="t-quees">¿Qué es un mochi?</h2>
-        <p id="mqText"></p>
-        <ul class="mq-list" id="mqList"></ul>
-        <a class="btn solid" href="#carta" data-gomochi>Ver los mochis</a>
-      </div>
     </div>
   </section>
 
@@ -174,9 +161,10 @@
 
   <section class="blk giftsec" id="regalo" aria-labelledby="t-gift" hidden>
     <div class="wrap">
+      <a class="back volver" href="/">← Volver al inicio</a>
       <div class="head"><span class="eyebrow">Gift cards</span><h2 id="t-gift">Regalá Setto</h2><p>Digital, al instante y para cualquier ocasión.</p></div>
-      <div class="rail" id="gcGrid" style="--cols:3;--w:78%"></div>
-      <div class="hint"><span class="dots" data-for="gcGrid"></span><span>Deslizá</span></div>
+      <div class="gc-grid" id="gcGrid"></div>
+      <p class="muted gc-how">Elegí un diseño → monto y mensaje → la pagás por transferencia → te mandamos el link para regalarla.</p>
     </div>
   </section>
 
@@ -201,6 +189,37 @@
         <div class="stamps" id="stamps"></div>
         <p class="muted" id="cardMsg" style="font-size:.84rem;margin-top:14px">Con el celular de tus pedidos.</p>
       </div>
+    </div>
+  </section>
+  <section class="blk armar" id="armar" aria-labelledby="t-armar">
+    <div class="wrap">
+      <a class="back volver" href="/">← Volver al inicio</a>
+      <div class="head"><span class="eyebrow">Guía</span><h2 id="t-armar">¿Cómo armo mi bebida?</h2><p>Tu bebida llega por partes. Armarla lleva un minuto.</p></div>
+      <h3 class="ar-sub">¿Qué incluye tu pedido?</h3>
+      <div class="ar-inc">
+        <div class="ar-item"><img src="img/armar/vaso.webp" alt="Vaso con la bebida y tapa"><b>Vaso</b><span>Con tu bebida lista para armar</span></div>
+        <div class="ar-item"><img src="img/armar/foam.webp" alt="Pote con cold foam"><b>Cold foam</b><span>Cremoso, para tirar al final</span></div>
+        <div class="ar-item"><img src="img/armar/hielo.webp" alt="Bolsa con hielo"><b>Hielo</b><span>Para que quede perfecta</span></div>
+      </div>
+      <h3 class="ar-sub">Paso a paso</h3>
+      <ol class="ar-steps">
+        <li><img src="img/armar/paso1.webp" alt="Vaso con la tapa abierta"><span><i>1</i>Abrí la tapa de tu vaso.</span></li>
+        <li><img src="img/armar/paso2.webp" alt="Vaso con el hielo agregado"><span><i>2</i>Agregá todo el hielo.</span></li>
+        <li><img src="img/armar/paso3.webp" alt="Cold foam cayendo sobre la bebida"><span><i>3</i>Sumá el cold foam por encima.</span></li>
+        <li><img src="img/mochito-cup.png" alt="" class="ar-mito"><span><i>4</i>¡Disfrutá tu bebida!</span></li>
+      </ol>
+      <div class="ar-fin">
+        <img src="img/mochito-run.png" alt="">
+        <p><b>¿Te gustó?</b> Subí una historia y etiquetanos en <a href="https://instagram.com/setto.project" target="_blank" rel="noopener">@setto.project</a>.</p>
+        <div class="ctas"><a class="btn solid" href="/#sets">Hacer un pedido</a><a class="btn" href="img/armar/guia-setto.pdf" download>Descargar la guía (PDF)</a></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk faq" id="faq" aria-labelledby="t-faq">
+    <div class="wrap">
+      <div class="head"><span class="eyebrow">Dudas</span><h2 id="t-faq">Preguntas frecuentes</h2></div>
+      <div class="faq-list" id="faqList"></div>
     </div>
   </section>
 </main>
@@ -230,6 +249,7 @@
     <div class="box"><img class="logo" src="img/logo.png" alt="Setto"><p>Asian inspired home cafe en Mar del Plata.</p></div>
     <div class="box"><b>Retiro y envíos</b><p>Dirección de retiro y costo de envío, por WhatsApp.</p><p style="margin-top:6px" id="footHours"></p></div>
     <div class="box"><b>Contacto</b><p>WhatsApp <b style="display:inline;color:var(--ink);user-select:all" id="waNum"></b></p><p style="margin-top:6px">Instagram <b style="display:inline;color:var(--ink)">@setto.project</b></p><p style="margin-top:6px"><a href="https://setto-project.carrd.co/" target="_blank" rel="noopener" style="color:var(--turquesa);font-weight:600">Todos nuestros links ↗</a></p></div>
+    <p class="fine" style="display:flex;gap:14px;flex-wrap:wrap"><a href="/armar" style="color:inherit">Cómo armar tu bebida</a><a href="/#faq" style="color:inherit">Preguntas frecuentes</a><a href="/gift-cards" style="color:inherit">Gift cards</a></p>
     <p class="fine"><a href="panel.html" style="color:inherit;text-decoration:none">·</a> Precios en pesos. Sabores sujetos a disponibilidad.</p>
   </div>
 </footer>
