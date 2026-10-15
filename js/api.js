@@ -226,6 +226,12 @@
         items: ok.slice(offset, offset + 50).map((r) => { const o = db.orders.find((x) => x.id === r.order_id) || { items: [] };
           return { nombre: nom(r.nombre), rating: r.rating, texto: r.texto, foto: r.foto, instagram: r.instagram, fecha: r.created_at, pedido: [...new Set(o.items.filter((i) => !["envio", "premio"].includes(i.id)).map((i) => i.nombre))] }; }) };
     },
+    async productReviews(id) {
+      const db = dbLoad(), ok = (db.reviews || []).filter((r) => r.estado === "aprobada" && (db.orders.find((x) => x.id === r.order_id) || { items: [] }).items.some((i) => i.id === id)), por = {};
+      ok.forEach((r) => (por[r.rating] = (por[r.rating] || 0) + 1));
+      const all = await this.publicReviewsAll(0), keep = new Set(ok.map((r) => r.created_at));
+      return { cantidad: ok.length, promedio: ok.length ? Math.round((ok.reduce((s, r) => s + r.rating, 0) / ok.length) * 10) / 10 : null, por_estrella: por, items: all.items.filter((x) => keep.has(x.fecha)).slice(0, 30) };
+    },
     async setReviewEstado(id, estado) { const db = dbLoad(), r = (db.reviews || []).find((x) => x.id === id); if (r) { r.estado = estado; dbSave(db); } },
     async addStamps(phone, nombre, delta, motivo) {
       const db = dbLoad(), ph = normPhone(phone);
@@ -319,6 +325,7 @@
     },
     async productRatings() { const { data, error } = await sb.rpc("product_ratings"); if (error) return {}; return data || {}; },
     async publicReviews() { const { data, error } = await sb.rpc("public_reviews"); fail(error); return data; },
+    async productReviews(id) { const { data, error } = await sb.rpc("product_reviews", { p_id: id }); fail(error); return data; },
     async publicReviewsAll(offset = 0) { const { data, error } = await sb.rpc("public_reviews_all", { p_offset: offset }); fail(error); return data; },
     async createGiftcard({ diseno, monto, de, para, mensaje, phone }) { const { data, error } = await sb.rpc("create_giftcard", { p_diseno: diseno, p_monto: monto, p_de: de || null, p_para: para, p_mensaje: mensaje || null, p_phone: phone }); fail(error); return data; },
     async giftcardByToken(token) { const { data, error } = await sb.rpc("giftcard_by_token", { p_token: token }); fail(error); return data; },

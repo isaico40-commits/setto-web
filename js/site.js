@@ -555,7 +555,7 @@
   let sheetState = null;
   function openSheet(id) {
     const p = find(id); if (!p) return;
-    sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1, leche: persOn(p) ? (leches()[0] || {}).nombre || "" : "", sin: [] };
+    sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1, leche: persOn(p) ? (leches()[0] || {}).nombre || "" : "", sin: [], rvOpen: false };
     drawSheet();
     $("#sheet").classList.add("on"); $("#scrim").classList.add("on"); renderBadge();
     setTimeout(() => $("#sheet .x").focus(), 60);
@@ -574,16 +574,44 @@
     $("#sheet").innerHTML = `<div class="sph"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
       <div class="sb">
         ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
-        <h3 id="sTitle">${esc(nameOf(p))}</h3>${rateTag(p)}
+        <h3 id="sTitle">${esc(nameOf(p))}</h3>
+        <div class="s-row">${sheetRate(p)}<div class="qty" style="margin:0"><button data-sq="-1" aria-label="Restar uno">−</button><span class="num" style="min-width:18px;text-align:center">${qty}</span><button data-sq="1" aria-label="Sumar uno">+</button></div></div>
+        <div class="s-rv" id="sRv" ${sheetState.rvOpen ? "" : "hidden"}>${sheetState.rvOpen ? sheetRvHtml(p) : ""}</div>
         <p class="muted">${esc(descOf(p))}</p>
         ${k === "premium" && !espOpen() ? "" : stockLine(p)}
         ${opts}
         ${custom}
         ${clubOn() && !blocked ? `<span class="clubtag">Tu pedido suma ${sellosTxt(spp())} del Setto Club</span>` : ""}
-        <div class="act"><div class="qty" style="margin:0"><button data-sq="-1" aria-label="Restar uno">−</button><span class="num" style="min-width:18px;text-align:center">${qty}</span><button data-sq="1" aria-label="Sumar uno">+</button></div>
+        <div class="act">
         ${blocked ? `<span class="btn big" style="flex:1;opacity:.7;box-shadow:none;background:var(--bg-2);color:var(--ink);cursor:default">${p.agotado ? "Agotado" : sinSt ? "Sin stock hoy" : "Todavía no disponible"}</span>` : `<button class="btn solid big" id="sheetAdd">Agregar · <span class="num">${money((priceOf(p, sz) + lechePrecio(leche)) * qty)}</span></button>`}</div>
       </div>`;
   }
+  /* reseñas dentro de la ficha: promedio con estrellas + desplegable */
+  const PRV = {};
+  const estrellas = (v) => `<span class="stars5" aria-hidden="true"><span>★★★★★</span><span style="width:${Math.max(0, Math.min(100, (v / 5) * 100))}%">★★★★★</span></span>`;
+  function sheetRate(p) {
+    const r = RATINGS[p.id];
+    if (!r || !r.cantidad) return `<span class="s-rate none">${estrellas(0)}<small>Todavía sin reseñas</small></span>`;
+    return `<span class="s-rate">${estrellas(r.promedio)}<b class="num">${String(r.promedio).replace(".", ",")}</b><button class="s-rvbtn" data-rvtoggle aria-expanded="${sheetState.rvOpen}" aria-controls="sRv">${r.cantidad} reseña${r.cantidad > 1 ? "s" : ""} <i>${sheetState.rvOpen ? "▴" : "▾"}</i></button></span>`;
+  }
+  function sheetRvHtml(p) {
+    const d = PRV[p.id];
+    if (!d) return '<p class="loading">Cargando reseñas…</p>';
+    if (d.error) return `<p class="muted">${esc(d.error)}</p>`;
+    if (!d.items || !d.items.length) return '<p class="muted">Todavía no hay reseñas publicadas de este producto.</p>';
+    const n = d.cantidad || d.items.length, bars = [5, 4, 3, 2, 1].map((k) => { const c = (d.por_estrella || {})[k] || 0; return `<div class="sb-bar"><span>${k}★</span><i><b style="width:${n ? (c / n) * 100 : 0}%"></b></i><small>${c}</small></div>`; }).join("");
+    return `<div class="s-rvsum"><div class="s-rvbig"><b class="num">${String(d.promedio).replace(".", ",")}</b>${estrellas(d.promedio)}<small>${n} reseña${n > 1 ? "s" : ""}</small></div><div class="s-bars">${bars}</div></div>
+      <div class="s-rvlist">${d.items.map(rvCard).join("")}</div>`;
+  }
+  async function cargarRvProducto(p) {
+    if (!PRV[p.id]) { try { PRV[p.id] = API.productReviews ? await API.productReviews(p.id) : { items: [] }; } catch (e) { PRV[p.id] = { error: e.message || "No pudimos cargar las reseñas" }; } }
+    if (sheetState && sheetState.p.id === p.id && sheetState.rvOpen) { const el = $("#sRv"); if (el) el.innerHTML = sheetRvHtml(p); }
+  }
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-rvtoggle]") || !sheetState) return;
+    sheetState.rvOpen = !sheetState.rvOpen; drawSheet();
+    if (sheetState.rvOpen) { cargarRvProducto(sheetState.p); const el = $("#sRv"); if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+  });
   function closeSheet() { $("#sheet").classList.remove("on"); if (!$("#drawer").classList.contains("on")) $("#scrim").classList.remove("on"); renderBadge(); }
 
   /* ---------- pedido ---------- */
