@@ -133,6 +133,18 @@ En **Ajustes → ¿Qué es un mochi?** editás título, texto, puntos (`título 
 En **Ajustes → Decoración de temporada** elegís *Halloween 🎃* y, si querés, un aviso arriba de la web (ej. "Edición Halloween · del 29/10 al 2/11"). Cambia colores de la cinta y de la Edición especial, y suma murciélagos, telaraña y calabaza en la portada. Se saca eligiendo *Ninguno*.
 Los sabores de la edición se cargan en **Carta → Edición especial** (título de la sección, estado, etiqueta y sabores). Para que no se mezclen, desmarcá *Visible en la web* en los sabores de tortas hasta que salgan.
 
+### Gift cards
+En la web, sección **Regalá Setto**: el cliente elige diseño, monto, para quién, de quién y un mensaje, y la reserva por WhatsApp (pago por transferencia).
+En el panel, pestaña **Gift cards** → **Por cobrar**: cuando te pagan, tocá **Pago recibido** (MP o efectivo). Se activa, entra como ingreso en la caja y aparece **Mandar link al comprador** con el link de regalo.
+Quien la recibe abre el link, ve la tarjeta, el saldo y el código, y toca **Usarla en un pedido**. En el checkout se descuenta del total (envío incluido); si sobra, el saldo queda para otro pedido. Si cancelás ese pedido, el saldo vuelve.
+Se puede anular mientras no se haya usado. En **Ajustes → Gift cards** elegís montos, mínimo, máximo y diseños.
+
+### Votación
+En **Ajustes → Votación**: pregunta, hasta 6 opciones con foto, "solo clientes" (votan números con un pedido entregado) y fecha de cierre opcional. Los resultados aparecen ahí mismo. "Empezar una votación nueva" arranca de cero.
+
+### Abierto / cerrado
+Arriba de la portada se ve "Abierto ahora · retirás desde las …" o "Cerrado · abrimos …", calculado con los horarios de retiro.
+
 ### Edición especial (sabores de tortas)
 En **Carta → Edición especial**:
 - **Estado:** *Próximamente* (se muestra pero no se puede pedir) o *Disponible ahora* (se puede pedir).

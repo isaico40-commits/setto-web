@@ -233,6 +233,176 @@
     const esp = $("#especial .head"); if (esp) esp.insertAdjacentHTML("afterbegin", `<span class="deco deco-pk2">${PUMPKIN}</span>`);
   }
 
+
+  /* ---------- Abierto / cerrado ahora (sale de los horarios de retiro) ---------- */
+  function renderAbierto() {
+    const el = $("#abierto"); if (!el) return;
+    const r = S.retiro || {}, now = new Date(), toMin = (s) => { const [h, m] = s.split(":").map(Number); return h * 60 + m; };
+    const mins = now.getHours() * 60 + now.getMinutes();
+    const abierto = (r.dias || []).includes(now.getDay()) && (r.rangos || []).some(([a, b]) => mins >= toMin(a) && mins < toMin(b));
+    const prox = slots()[0];
+    el.classList.toggle("open", abierto); el.classList.toggle("closed", !abierto);
+    el.innerHTML = abierto ? `<i></i>Abierto ahora${prox && prox.startsWith("Hoy") ? ` · retirás desde las ${esc(prox.split("· ")[1].replace(" hs", ""))}` : ""}`
+      : `<i></i>Cerrado${prox ? ` · abrimos ${esc(prox.split(" · ")[0].toLowerCase())} ${esc(prox.split("· ")[1].replace(" hs", ""))}` : ""}`;
+  }
+  setInterval(() => { try { renderAbierto(); } catch (_) {} }, 60000);
+
+  /* ---------- Gift cards ---------- */
+  const GD = {
+    cumple: { nombre: "Cumpleaños", tit: "¡Feliz cumple!", bg: "#f8a29a", fg: "#1f1c18", img: "img/mochito-cup.png", pat: "radial-gradient(circle,#fffdf8 2px,transparent 3px)", psz: "26px" },
+    gracias: { nombre: "Gracias", tit: "Gracias", bg: "#296A67", fg: "#fffdf8", img: "img/mochito-run.png", pat: "radial-gradient(circle,rgba(255,253,248,.35) 1.5px,transparent 2.5px)", psz: "22px" },
+    tequiero: { nombre: "Te quiero", tit: "Te quiero", bg: "#f6c9d0", fg: "#1f1c18", img: "img/mochito-lie.png", pat: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 16s-6-3.6-6-7.4C4 6.6 5.4 5.5 7 5.5c1.3 0 2.3.8 3 1.8.7-1 1.7-1.8 3-1.8 1.6 0 3 1.1 3 3.1C16 12.4 10 16 10 16z' fill='%23fffdf8'/%3E%3C/svg%3E\")", psz: "30px" },
+    felicitaciones: { nombre: "Felicitaciones", tit: "¡Felicitaciones!", bg: "#f1e4ca", fg: "#296A67", img: "img/mochito-run.png", pat: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 3l1.8 4.6L16.5 8l-3.6 3 1.1 4.8L10 13.3 6 15.8 7.1 11 3.5 8l4.7-.4z' fill='%23f8a29a'/%3E%3C/svg%3E\")", psz: "34px" },
+    porquesi: { nombre: "Porque sí", tit: "Porque sí", bg: "#fffdf8", fg: "#1f1c18", img: "img/mochito-cup.png", pat: "radial-gradient(circle,#f8a29a 2px,transparent 3px)", psz: "30px" },
+    halloween: { nombre: "Halloween", tit: "Boo!", bg: "#2b2035", fg: "#ffb27a", img: "img/mochito-lie.png", pat: "radial-gradient(circle,rgba(232,116,42,.35) 1.5px,transparent 2.5px)", psz: "24px", bats: true },
+  };
+  const gcfg = () => S.giftcards || {};
+  const gdis = () => (gcfg().disenos || Object.keys(GD)).filter((k) => GD[k]);
+  function gcardHtml(k, monto, tag = "div", attrs = "") {
+    const d = GD[k] || GD.porquesi;
+    return `<${tag} class="gcard" style="--gbg:${d.bg};--gfg:${d.fg};--gpat:${d.pat};--gpsz:${d.psz}" ${attrs}>
+      <span class="g-logo"><img src="img/logo.png" alt="Setto"></span>
+      ${d.bats ? `<span class="g-bat" style="top:16px;right:22px">${BAT}</span><span class="g-bat" style="top:44px;right:64px;width:20px">${BAT}</span>` : ""}
+      <span class="g-tit">${esc(d.tit)}</span>
+      <span class="g-bot"><span class="g-amt num">${monto ? money(monto) : "Gift card"}</span></span>
+      <img class="g-mito" src="${d.img}" alt=""></${tag}>`;
+  }
+  function renderGift() {
+    const sec = $("#regalo"); if (!sec) return;
+    sec.hidden = gcfg().activo === false; if (sec.hidden) return;
+    $("#gcGrid").innerHTML = gdis().map((k) => gcardHtml(k, 0, "button", `data-gcpick="${k}" aria-label="Gift card ${esc(GD[k].nombre)}"`)).join("");
+    dots("gcGrid");
+  }
+  const GB = { dis: "cumple", monto: 0, otro: "", de: "", para: "", msg: "", tel: "", sending: false, done: null };
+  function abrirGift(k) {
+    Object.assign(GB, { dis: k || gdis()[0], monto: (gcfg().montos || [15000])[1] || (gcfg().montos || [15000])[0], otro: "", done: null, tel: GB.tel || form.tel || "" });
+    $("#gcBuy").hidden = false; document.body.style.overflow = "hidden"; dibujarGift();
+  }
+  function cerrarGift() { $("#gcBuy").hidden = true; document.body.style.overflow = ""; }
+  const gbMonto = () => (GB.monto === "otro" ? Math.round(Number(String(GB.otro).replace(/\D/g, "")) || 0) : GB.monto);
+  function dibujarGift() {
+    const b = $("#gbBody");
+    if (GB.done) {
+      b.innerHTML = `<div class="gb-ok">${gcardHtml(GB.dis, GB.done.monto)}<b style="font-size:1.2rem">¡Listo! Tu gift card quedó reservada</b>
+        <p class="muted" style="max-width:36ch">Pagala por transferencia en el WhatsApp. Cuando lo confirmemos te mandamos el link para regalarla.</p>
+        <a class="btn wa big" target="_blank" rel="noopener" href="${waLink(GB.done.msg)}">Abrir WhatsApp</a></div>`;
+      return;
+    }
+    const montos = gcfg().montos || [10000, 15000, 20000, 30000];
+    b.innerHTML = `<div class="gb-wrap"><div class="gb-prev">${gcardHtml(GB.dis, gbMonto())}<div class="gb-msg">${GB.para ? `<b>Para ${esc(GB.para)}</b>${GB.de ? ` · de ${esc(GB.de)}` : ""}<br>` : ""}<span class="muted">${esc(GB.msg) || "Tu mensaje aparece acá."}</span></div></div>
+      <div class="gb-form">
+        <div class="f"><span>Diseño</span><div class="gb-dis">${gdis().map((k) => `<button data-gbdis="${k}" aria-pressed="${k === GB.dis}" aria-label="${esc(GD[k].nombre)}"><span class="mini" style="--gbg:${GD[k].bg};--gfg:${GD[k].fg}">${esc(GD[k].nombre)}</span></button>`).join("")}</div></div>
+        <div class="f"><span>Monto</span><div class="chips">${montos.map((m) => `<button data-gbm="${m}" aria-pressed="${GB.monto === m}">${money(m)}</button>`).join("")}<button data-gbm="otro" aria-pressed="${GB.monto === "otro"}">Otro</button></div>
+          ${GB.monto === "otro" ? `<input id="gbOtro" inputmode="numeric" placeholder="Desde ${money(gcfg().minimo || 5000)}" value="${esc(GB.otro)}" style="margin-top:8px">` : ""}</div>
+        <label class="f">Para<input id="gbPara" maxlength="40" value="${esc(GB.para)}" placeholder="Nombre de quien la recibe"></label>
+        <label class="f">De (opcional)<input id="gbDe" maxlength="40" value="${esc(GB.de)}" placeholder="Tu nombre"></label>
+        <label class="f">Mensaje (opcional)<textarea id="gbMsg" maxlength="160" placeholder="Ej: ¡Feliz cumple! Que lo disfrutes">${esc(GB.msg)}</textarea></label>
+        <label class="f">Tu celular (WhatsApp)<input id="gbTel" type="tel" inputmode="tel" value="${esc(GB.tel)}" placeholder="223 347-1277"><span class="hintf">Pago por transferencia. Te mandamos el link para regalarla.</span></label>
+        <div id="gbErr" class="err" hidden></div>
+        <button class="btn wa big" id="gbSend">${GB.sending ? "Reservando…" : `Comprar · ${money(gbMonto())}`}</button>
+      </div></div>`;
+    [["gbPara", "para"], ["gbDe", "de"], ["gbMsg", "msg"], ["gbTel", "tel"], ["gbOtro", "otro"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { GB[k] = e.target.value; const pv = $(".gb-prev"); if (pv && k !== "tel") pv.innerHTML = `${gcardHtml(GB.dis, gbMonto())}<div class="gb-msg">${GB.para ? `<b>Para ${esc(GB.para)}</b>${GB.de ? ` · de ${esc(GB.de)}` : ""}<br>` : ""}<span class="muted">${esc(GB.msg) || "Tu mensaje aparece acá."}</span></div>`; if (k === "otro") $("#gbSend").textContent = `Comprar · ${money(gbMonto())}`; }); });
+  }
+  async function comprarGift() {
+    const err = $("#gbErr"), m = gbMonto(), mn = gcfg().minimo || 5000, mx = gcfg().maximo || 100000;
+    const fallo = (t) => { err.hidden = false; err.textContent = t; };
+    if (!(m >= mn && m <= mx)) return fallo(`El monto va de ${money(mn)} a ${money(mx)}.`);
+    if (!GB.para.trim()) return fallo("Falta para quién es.");
+    if (!API.normPhone(GB.tel)) return fallo("Revisá tu celular.");
+    GB.sending = true; $("#gbSend").textContent = "Reservando…";
+    try {
+      const r = await API.createGiftcard({ diseno: GB.dis, monto: m, de: GB.de.trim(), para: GB.para.trim(), mensaje: GB.msg.trim(), phone: GB.tel });
+      const msg = `¡Hola Setto! Quiero comprar una gift card 🎁\n\nCódigo: ${r.code}\nDiseño: ${GD[GB.dis].nombre}\nMonto: ${money(m)}\nPara: ${GB.para.trim()}${GB.de.trim() ? `\nDe: ${GB.de.trim()}` : ""}\n\nLa pago por transferencia.`;
+      GB.done = { code: r.code, monto: m, msg }; GB.sending = false; dibujarGift();
+      const link = waLink(msg); if (matchMedia("(pointer:coarse)").matches) location.href = link; else window.open(link, "_blank", "noopener");
+    } catch (e) { GB.sending = false; $("#gbSend").textContent = `Comprar · ${money(m)}`; fallo(e.message); }
+  }
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-gcpick],[data-gbdis],[data-gbm],#gbSend,[data-gbclose],[data-gvclose],[data-gvuse],[data-gvcopy]"); if (!t) { if (e.target.id === "gcBuy") cerrarGift(); if (e.target.id === "gcView") cerrarRegalo(); return; }
+    if (t.dataset.gcpick) return abrirGift(t.dataset.gcpick);
+    if (t.dataset.gbdis) { GB.dis = t.dataset.gbdis; return dibujarGift(); }
+    if (t.dataset.gbm) { GB.monto = t.dataset.gbm === "otro" ? "otro" : +t.dataset.gbm; dibujarGift(); if (GB.monto === "otro") $("#gbOtro").focus(); return; }
+    if (t.id === "gbSend") return comprarGift();
+    if (t.dataset.gbclose !== undefined) return cerrarGift();
+    if (t.dataset.gvclose !== undefined) return cerrarRegalo();
+    if (t.dataset.gvcopy) { try { navigator.clipboard.writeText(t.dataset.gvcopy); toast("Código copiado"); } catch (_) {} return; }
+    if (t.dataset.gvuse) { usarGift(t.dataset.gvuse, +t.dataset.saldo); cerrarRegalo(); location.hash = "#sets"; toast("Gift card guardada: se aplica al pedir"); }
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (!$("#gcBuy").hidden) cerrarGift(); if (!$("#gcView").hidden) cerrarRegalo(); } });
+
+  /* link de regalo: ?regalo=TOKEN */
+  function cerrarRegalo() { $("#gcView").hidden = true; document.body.style.overflow = ""; }
+  async function abrirRegalo(token) {
+    let g = null; try { g = await API.giftcardByToken(token); } catch (_) {}
+    const b = $("#gvBody"); $("#gcView").hidden = false; document.body.style.overflow = "hidden";
+    if (!g) { b.innerHTML = '<p class="muted" style="padding:20px 0">No encontramos esta gift card.</p>'; return; }
+    const activa = g.estado === "activa" || g.estado === "usada";
+    b.innerHTML = `<div class="gv">${gcardHtml(g.diseno, g.monto)}
+      <div class="gb-msg"><b>Para ${esc(g.para || "vos")}</b>${g.de ? ` · de ${esc(g.de)}` : ""}${g.mensaje ? `<br>${esc(g.mensaje)}` : ""}</div>
+      ${activa ? `<div class="gv-code"><span class="num">${esc(g.code)}</span><button class="back" data-gvcopy="${esc(g.code)}">Copiar</button></div>
+        <p style="margin:0;text-align:center"><b>Saldo: ${money(g.saldo)}</b>${g.saldo < g.monto ? ` de ${money(g.monto)}` : ""}</p>
+        ${g.saldo > 0 ? `<button class="btn solid big" data-gvuse="${esc(g.code)}" data-saldo="${g.saldo}">Usarla en un pedido</button><p class="muted" style="font-size:.82rem;text-align:center;margin:0">Se descuenta del total. Si sobra, te queda para otro pedido.</p>` : '<p class="muted" style="text-align:center">Esta gift card ya se usó completa.</p>'}`
+        : g.estado === "anulada" ? '<p class="muted" style="text-align:center">Esta gift card fue anulada.</p>' : '<p class="muted" style="text-align:center">Se activa cuando confirmemos el pago. Volvé a abrir este link en un rato.</p>'}</div>`;
+  }
+  (function regaloDesdeLink() {
+    const t = new URLSearchParams(location.search).get("regalo"); if (!t || !/^[A-Za-z0-9-]{16,64}$/.test(t)) return;
+    try { history.replaceState(null, "", location.pathname + location.hash); } catch (_) {}
+    window.__regalo = t;
+  })();
+
+  /* gift card en el checkout */
+  let GIFT = null; try { GIFT = JSON.parse(localStorage.getItem("setto-gift") || "null"); } catch (_) {}
+  function usarGift(code, saldo) { GIFT = { code, saldo }; try { localStorage.setItem("setto-gift", JSON.stringify(GIFT)); } catch (_) {} }
+  function quitarGift() { GIFT = null; try { localStorage.removeItem("setto-gift"); } catch (_) {} }
+  const antesGift = () => total() + envioCosto() - (completes() ? premioOff() : 0);
+  const giftOff = () => (GIFT ? Math.min(GIFT.saldo, Math.max(antesGift(), 0)) : 0);
+  function giftBox() {
+    return `<div class="f gcbox">${GIFT ? `<div class="gcon"><span>🎁 Gift card <b>${esc(GIFT.code)}</b> · saldo ${money(GIFT.saldo)}</span><button class="back" data-gcx>Quitar</button></div>`
+      : `<details><summary>¿Tenés una gift card?</summary><div class="gcin"><input id="gcCode" placeholder="GIFT-XXXX-XXXX" autocapitalize="characters"><button class="btn" data-gcok>Aplicar</button></div><span class="hintf" id="gcMsg"></span></details>`}</div>`;
+  }
+  document.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-gcx]")) { quitarGift(); drawDrawer(); return; }
+    if (!e.target.closest("[data-gcok]")) return;
+    const code = ($("#gcCode").value || "").trim().toUpperCase(), msg = $("#gcMsg"); if (!code) return;
+    msg.textContent = "Revisando…";
+    try { const g = await API.giftcardCheck(code);
+      if (!g) msg.textContent = "No encontramos ese código.";
+      else if (g.estado === "pendiente") msg.textContent = "Esa gift card todavía no está activa.";
+      else if (!(g.saldo > 0)) msg.textContent = "Esa gift card ya no tiene saldo.";
+      else { usarGift(g.code, g.saldo); drawDrawer(); }
+    } catch (ex) { msg.textContent = ex.message; }
+  });
+
+  /* ---------- Votación ---------- */
+  const vcfg = () => S.votacion || {};
+  const miVoto = () => { try { return JSON.parse(localStorage.getItem("setto-voto") || "{}")[vcfg().id] || null; } catch (_) { return null; } };
+  let VOTO = { sel: null, res: null };
+  async function renderVotar() {
+    const v = vcfg(), sec = $("#votar"), ops = (v.opciones || []).filter((o) => o && o.nombre);
+    const cerrada = v.cierre && new Date(v.cierre) < new Date();
+    sec.hidden = !v.activo || ops.length < 2; if (sec.hidden) return;
+    $("#t-vot").textContent = v.pregunta || "¿Qué sabor querés?";
+    $("#votSub").textContent = cerrada ? "La votación cerró. Gracias por votar." : v.solo_clientes ? "Votan quienes ya pidieron por la web. Un voto por celular." : "Un voto por celular. Podés cambiarlo.";
+    const yo = miVoto();
+    if (yo || cerrada) { try { VOTO.res = await API.pollResults(v.id); } catch (_) {} }
+    const tot = (VOTO.res && VOTO.res.total) || 0;
+    $("#vtGrid").innerHTML = ops.map((o) => { const n = (VOTO.res && VOTO.res.conteo && VOTO.res.conteo[o.id]) || 0, pct = tot ? Math.round((n / tot) * 100) : 0, ver = !!VOTO.res;
+      return `<button class="vt" data-vt="${esc(o.id)}" aria-pressed="${(VOTO.sel || yo) === o.id}" ${cerrada ? "disabled" : ""}>${yo === o.id ? '<span class="vt-yo">Tu voto</span>' : ""}<span class="vt-img">${o.img ? `<img src="${esc(o.img)}" alt="" loading="lazy">` : "<span>🍡</span>"}</span><b>${esc(o.nombre)}</b>
+        ${ver ? `<span class="vt-bar"><i style="width:${pct}%"></i></span><span class="vt-pct">${pct}%</span>` : ""}</button>`; }).join("");
+    $("#vtTel").hidden = !VOTO.sel || cerrada; if (VOTO.sel && !$("#vtPhone").value) $("#vtPhone").value = form.tel || "";
+    $("#vtMsg").textContent = VOTO.res && tot ? `${tot} voto${tot > 1 ? "s" : ""} hasta ahora` : "";
+  }
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-vt]");
+    if (b) { VOTO.sel = b.dataset.vt; document.querySelectorAll("[data-vt]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); $("#vtTel").hidden = false; if (!$("#vtPhone").value) $("#vtPhone").value = form.tel || ""; $("#vtPhone").focus(); return; }
+    if (e.target.id !== "vtSend") return;
+    const tel = $("#vtPhone").value, msg = $("#vtMsg");
+    if (!API.normPhone(tel)) { msg.textContent = "Revisá tu celular."; return; }
+    e.target.disabled = true; msg.textContent = "Votando…";
+    try { VOTO.res = await API.castVote(vcfg().id, VOTO.sel, tel); const l = JSON.parse(localStorage.getItem("setto-voto") || "{}"); l[vcfg().id] = VOTO.sel; localStorage.setItem("setto-voto", JSON.stringify(l)); VOTO.sel = null; await renderVotar(); toast("¡Gracias por votar!"); }
+    catch (ex) { msg.textContent = ex.message; } finally { e.target.disabled = false; }
+  });
+
   function renderBand() {
     const words = ["Probá un set distinto cada día", "Dirty lattes fríos", "Mochis rellenos", "Take away en Mar del Plata", "Elegí tu leche"];
     if (S.club && clubOn()) words.splice(1, 0, "Cada pedido suma sellos del Setto Club");
@@ -466,9 +636,10 @@
         <label class="f" for="fHora">${isEnv ? "Horario de entrega" : "Horario de retiro"}<select id="fHora"><option value="">Elegí un horario</option>${slots().map((o) => `<option ${o === form.hora ? "selected" : ""}>${esc(o)}</option>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>
         <div class="f"><span>Forma de pago</span><div class="chips">${pagosVer.map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">${form.modo === "envio" ? "Con envío, solo transferencia." : "El pago se coordina por WhatsApp."}</span></div>
         ${premioPicker()}
+        ${giftBox()}
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>
         <div id="fErr" class="err" hidden></div>`;
-      foot.innerHTML = `${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(total() + envioCosto() - (completes() ? premioOff() : 0))}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
+      foot.innerHTML = `${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
       [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; }); });
       $("#fTel").addEventListener("change", async () => {
         if (!(await loadCard()) || view !== "checkout") return;
@@ -503,7 +674,7 @@
     sending = true; drawFootOnly();
     try {
       const isEnv = form.modo === "envio";
-      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [] })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null });
+      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [] })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null, gift: GIFT ? GIFT.code : null });
       const ph = o.phone || API.normPhone(form.tel);
       let track = o.track || null;
       if (!track) { try { const st = await API.orderStatus([o.code], ph); track = (st.find((x) => x.code === o.code) || {}).track || null; } catch (_) {} }
@@ -514,6 +685,7 @@
       guardarSeguimiento({ code: o.code, phone: ph, track, at: Date.now() });
       refrescarStock();
       try { sessionStorage.setItem("setto-last-order", JSON.stringify(lastOrder)); localStorage.setItem("setto-form", JSON.stringify({ nombre: form.nombre, tel: form.tel, dir: form.dir, dirExtra: form.dirExtra })); } catch (_) {}
+      if (GIFT && o.gift) { const rest = GIFT.saldo - o.gift; if (rest > 0) usarGift(GIFT.code, rest); else quitarGift(); }
       cart = []; save(); form.hora = ""; form.nota = ""; form.premio = ""; renderBadge();
       view = "sent"; sending = false; drawDrawer();
       const link = waLink(lastOrder.message);
@@ -522,6 +694,7 @@
     } catch (e) {
       sending = false;
       if (/premio/i.test(e.message || "")) { await loadCard(true); drawDrawer(); }
+      if (/gift card/i.test(e.message || "")) { quitarGift(); drawDrawer(); }
       if (/nos qued/i.test(e.message || "") && API.getStock) { try { STOCK = await API.getStock(); renderEspecial(); renderSets(); renderCarta(); } catch (_) {} }
       drawFootOnly();
       const el2 = $("#fErr"); if (el2) { el2.hidden = false; el2.textContent = e.message || "No pudimos registrar el pedido. Probá de nuevo."; }
@@ -746,7 +919,7 @@
       verSeguimiento(); renderResenas();
       API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
       S = settings; adapt(products); syncCart();
-      renderTema(); renderHero(); renderQueEs(); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
+      renderTema(); renderHero(); renderQueEs(); renderAbierto(); renderGift(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
     } catch (e) {

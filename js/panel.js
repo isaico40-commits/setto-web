@@ -44,6 +44,7 @@
     }
     await loadBase(); drawShell(); go(P.view);
     API.listReviews().then((l) => { P.reviews = l; contarResenas(); }).catch(() => {});
+    API.listGiftcards().then((l) => { P.gifts = l; contarGift(); }).catch(() => {});
     API.onOrders(() => { refreshOrders(true); });
     setInterval(() => refreshOrders(false), 30000);
   }
@@ -54,7 +55,7 @@
     app.innerHTML = `<header class="pbar"><div class="wrap">
         <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.png" alt="Setto"></a><span class="tag">Panel</span>
         <nav class="ptabs" role="tablist">
-          ${[["pedidos", "Pedidos"], ["club", "Club"], ["carta", "Carta"], ["resenas", "Reseñas"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : k === "resenas" ? ' <span class="n" id="resN" hidden>0</span>' : ""}</button>`).join("")}
+          ${[["pedidos", "Pedidos"], ["club", "Club"], ["carta", "Carta"], ["resenas", "Reseñas"], ["gift", "Gift cards"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : k === "resenas" ? ' <span class="n" id="resN" hidden>0</span>' : k === "gift" ? ' <span class="n" id="gcN" hidden>0</span>' : ""}</button>`).join("")}
           <a class="ptab" href="caja.html">Caja</a>
         </nav>
         <span class="who">${esc(P.user && P.user.email || "")}<button id="logout">Salir</button></span>
@@ -64,7 +65,7 @@
   function go(v) {
     P.view = v;
     document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === v)));
-    ({ pedidos: viewPedidos, club: viewClub, carta: viewCarta, resenas: viewResenas, ajustes: viewAjustes })[v]();
+    ({ pedidos: viewPedidos, club: viewClub, carta: viewCarta, resenas: viewResenas, gift: viewGift, ajustes: viewAjustes })[v]();
   }
 
   /* =================== PEDIDOS =================== */
@@ -80,6 +81,43 @@
     if (e === "preparando") return `¡Hola ${n}! Ya estamos preparando tu pedido ${o.code} de Setto.`;
     return `¡Hola ${n}! Recibimos tu pedido ${o.code} de Setto. Te avisamos cuando esté listo.`;
   }
+
+  /* =================== GIFT CARDS =================== */
+  const GDN = { cumple: "Cumpleaños", gracias: "Gracias", tequiero: "Te quiero", felicitaciones: "Felicitaciones", porquesi: "Porque sí", halloween: "Halloween" };
+  const linkRegalo = (g) => `${location.origin}/?regalo=${g.token}`;
+  const regaloTxt = (g) => `¡Listo! 🎁 Tu gift card de Setto para ${g.para} ya está activa (${money(g.monto)}).\n\nMandale este link para que la vea y la use:\n${linkRegalo(g)}`;
+  P.gsub = "pendiente";
+  async function viewGift() {
+    $("#view").innerHTML = `<h1 class="ph1">Gift cards</h1><p class="muted">Cuando te paguen, tocá <b>Pago recibido</b>: se activa, entra a la caja y te da el link para mandarle al comprador.</p>
+      <div class="sub">${[["pendiente", "Por cobrar"], ["activa", "Activas"], ["usada", "Usadas"], ["anulada", "Anuladas"]].map(([k, l]) => `<button class="ptab" data-gsub="${k}" aria-selected="${P.gsub === k}">${l}</button>`).join("")}</div>
+      <div class="pgrid" id="gcList" style="margin-top:14px"><p class="muted">Cargando…</p></div>`;
+    try {
+      const all = await API.listGiftcards(); P.gifts = all; contarGift();
+      const l = all.filter((g) => g.estado === P.gsub);
+      $("#gcList").innerHTML = l.length ? l.map((g) => `<article class="pcard" data-gid="${g.id}">
+          <div class="ohead"><span class="ocode num">${esc(g.code)}</span><span class="ago">${ago(g.created_at)}</span><span class="st ${g.estado === "activa" ? "entregado" : g.estado === "anulada" ? "cancelado" : "pendiente"}">${g.estado}</span></div>
+          <div class="meta"><span>Monto: <b>${money(g.monto)}</b></span>${g.estado !== "pendiente" ? `<span>Saldo: <b>${money(g.saldo)}</b></span>` : ""}<span>Diseño: <b>${esc(GDN[g.diseno] || g.diseno)}</b></span></div>
+          <div class="meta"><span>Para: <b>${esc(g.para || "")}</b></span>${g.de ? `<span>De: <b>${esc(g.de)}</b></span>` : ""}</div>
+          ${g.mensaje ? `<p class="hintp">“${esc(g.mensaje)}”</p>` : ""}
+          <div class="who2"><span class="num">${esc(pretty(g.phone))}</span><a class="chat" href="https://wa.me/${esc(g.phone)}" target="_blank" rel="noopener">Abrir chat</a></div>
+          ${g.estado === "pendiente" ? `<div class="acts"><select class="inp" data-gcta style="width:auto"><option value="mp">Transferencia / MP</option><option value="efectivo">Efectivo</option></select><button class="btn solid" data-gact>Pago recibido</button><button class="linkbtn warn" data-gann>Anular</button></div>`
+            : g.estado === "activa" ? `<div class="acts"><a class="btn solid" target="_blank" rel="noopener" href="https://wa.me/${esc(g.phone)}?text=${encodeURIComponent(regaloTxt(g))}">Mandar link al comprador</a><button class="linkbtn" data-gcopy="${esc(linkRegalo(g))}">Copiar link</button>${g.saldo === g.monto ? '<button class="linkbtn warn" data-gann>Anular</button>' : ""}</div>` : ""}
+        </article>`).join("") : '<p class="muted">Nada por acá.</p>';
+    } catch (e) { $("#gcList").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+  }
+  function contarGift() { const n = (P.gifts || []).filter((g) => g.estado === "pendiente").length, el = $("#gcN"); if (el) { el.textContent = n; el.hidden = !n; } }
+  document.addEventListener("click", async (e) => {
+    const s = e.target.closest("[data-gsub]"); if (s) { P.gsub = s.dataset.gsub; return viewGift(); }
+    const c = e.target.closest("[data-gcopy]"); if (c) { try { await navigator.clipboard.writeText(c.dataset.gcopy); toast("Link copiado"); } catch (_) { toast(c.dataset.gcopy); } return; }
+    const b = e.target.closest("[data-gact],[data-gann]"); if (!b) return;
+    const card = b.closest("[data-gid]"), id = card.dataset.gid; b.disabled = true;
+    try {
+      if (b.dataset.gact !== undefined) { await API.activateGiftcard(id, card.querySelector("[data-gcta]").value); toast("Activada · cargada en la caja"); P.gsub = "activa"; }
+      else { if (!confirmar(b)) { b.disabled = false; return; } await API.annulGiftcard(id); toast("Anulada"); }
+      viewGift();
+    } catch (err) { toast(err.message); b.disabled = false; }
+  });
+  function confirmar(b) { if (b.dataset.armed) return true; b.dataset.armed = "1"; b.disabled = false; b.textContent = "¿Seguro? Tocá de nuevo"; return false; }
 
   /* =================== RESEÑAS =================== */
   async function viewResenas() {
@@ -289,6 +327,7 @@
 
   /* =================== AJUSTES =================== */
   function viewAjustes() {
+    setTimeout(votResultados, 0);
     const S = P.settings, r = S.retiro || { dias: [], rangos: [] }, club = S.club || {};
     const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
     $("#view").innerHTML = `<h1 class="ph1">Ajustes</h1>
@@ -333,6 +372,22 @@
                 <label class="btn">Subir foto<input type="file" accept="image/*" data-upimg="si${i}" data-upmax="1600" hidden></label>${x.img || x.titulo ? `<button type="button" class="linkbtn warn" data-slx="${i}">Quitar</button>` : ""}</div></div></div>`; }).join("")}
           <label>Cambia cada (segundos)<input class="inp" name="intervalo" type="number" min="3" max="15" value="${(S.hero || {}).intervalo || 5}" style="width:120px"></label>
           <button class="btn solid">Guardar portada</button></form>
+        <form class="pcard" data-set="giftcards"><b>Gift cards</b>
+          <div class="checks"><label><input type="checkbox" name="activo" ${(S.giftcards || {}).activo !== false ? "checked" : ""}> Vender gift cards en la web</label></div>
+          <label>Montos sugeridos (separados por coma)<input class="inp" name="montos" value="${esc(((S.giftcards || {}).montos || [10000, 15000, 20000, 30000]).join(", "))}"></label>
+          <div class="row2"><label>Mínimo (otro monto)<input class="inp" name="minimo" type="number" step="500" value="${(S.giftcards || {}).minimo || 5000}"></label><label>Máximo<input class="inp" name="maximo" type="number" step="1000" value="${(S.giftcards || {}).maximo || 100000}"></label></div>
+          <div class="checks">${Object.entries(GDN).map(([k, l]) => `<label><input type="checkbox" name="d_${k}" ${((S.giftcards || {}).disenos || Object.keys(GDN)).includes(k) ? "checked" : ""}> ${l}</label>`).join("")}</div>
+          <span class="hintp">Diseños que se ofrecen. Halloween conviene apagarlo pasada la fecha.</span>
+          <button class="btn solid">Guardar</button></form>
+        <form class="pcard wide" data-set="votacion"><b>Votación</b>
+          <div class="checks"><label><input type="checkbox" name="activo" ${(S.votacion || {}).activo ? "checked" : ""}> Mostrar la votación en la web</label><label><input type="checkbox" name="solo" ${(S.votacion || {}).solo_clientes ? "checked" : ""}> Solo clientes (votan números con un pedido entregado)</label></div>
+          <label>Pregunta<input class="inp" name="pregunta" maxlength="70" value="${esc((S.votacion || {}).pregunta || "¿Qué sabor querés en la próxima edición?")}"></label>
+          ${[0, 1, 2, 3, 4, 5].map((i) => { const o = ((S.votacion || {}).opciones || [])[i] || {}; return `<div class="slrow"><span class="upprev">${o.img ? `<img src="${esc(o.img)}" alt="">` : `Opción ${i + 1}`}</span><div class="slf"><input type="hidden" name="oi${i}" value="${esc(o.img || "")}"><input type="hidden" name="oid${i}" value="${esc(o.id || "")}">
+            <label>Nombre<input class="inp" name="on${i}" maxlength="40" value="${esc(o.nombre || "")}" placeholder="${i < 2 ? "Ej: Mochi de calabaza" : "(opcional)"}"></label>
+            <div class="acts"><label class="btn">Subir foto<input type="file" accept="image/*" data-upimg="oi${i}" data-upmax="900" hidden></label></div></div></div>`; }).join("")}
+          <label>Cierra el (opcional)<input class="inp" name="cierre" type="datetime-local" value="${esc(((S.votacion || {}).cierre || "").slice(0, 16))}" style="width:auto"></label>
+          <div id="votRes" class="hintp"></div>
+          <div class="acts"><button class="btn solid">Guardar</button><button type="button" class="linkbtn warn" data-votnew>Empezar una votación nueva (borra los resultados de la web)</button></div></form>
         <form class="pcard" data-set="tema"><b>Decoración de temporada</b>
           <label>Tema<select class="inp" name="nombre"><option value="">Ninguno</option><option value="halloween" ${(S.tema || {}).nombre === "halloween" ? "selected" : ""}>Halloween 🎃</option></select></label>
           <label>Aviso arriba de la web (opcional)<input class="inp" name="aviso" maxlength="70" value="${esc((S.tema || {}).aviso || "")}" placeholder="Ej: Edición Halloween · del 29/10 al 2/11"></label>
@@ -376,6 +431,12 @@
         ${API.DEMO ? `<div class="pcard"><b>Modo demo</b><p class="hintp">Borra pedidos, clientes y cambios de prueba de este navegador.</p><button class="btn" id="resetDemo">Reiniciar demo</button></div>` : ""}
       </div>`;
   }
+  async function votResultados() {
+    const v = P.settings.votacion || {}, el = $("#votRes"); if (!el || !v.id) return;
+    try { const r = await API.pollResults(v.id), ops = v.opciones || [];
+      el.innerHTML = r.total ? `<b>Resultados (${r.total} votos):</b> ` + ops.map((o) => `${esc(o.nombre)} ${Math.round(((r.conteo[o.id] || 0) / r.total) * 100)}% (${r.conteo[o.id] || 0})`).join(" · ") : "Todavía no hay votos.";
+    } catch (_) {}
+  }
   async function saveAjuste(form) {
     const f = Object.fromEntries(new FormData(form).entries()), k = form.dataset.set;
     try {
@@ -400,6 +461,14 @@
         const slides = [0, 1, 2, 3, 4].map((i) => ({ img: (f["si" + i] || "").trim(), titulo: (f["st" + i] || "").trim(), texto: (f["sx" + i] || "").trim(), ajuste: f["sa" + i] === "foto" ? "foto" : "recorte" })).filter((x) => x.img || x.titulo);
         if (!slides.length) throw new Error("Dejá al menos un slide con foto o título");
         await API.saveSetting("hero", { slides, intervalo: Math.max(3, Math.min(15, +f.intervalo || 5)) });
+      }
+      if (k === "giftcards") await API.saveSetting("giftcards", { activo: !!f.activo, montos: (f.montos || "").split(",").map((x) => Math.round(+x.replace(/[^\d]/g, ""))).filter((x) => x > 0).slice(0, 6),
+        minimo: Math.max(1000, +f.minimo || 5000), maximo: Math.max(+f.minimo || 5000, +f.maximo || 100000), disenos: Object.keys(GDN).filter((k2) => f["d_" + k2]) });
+      if (k === "votacion") {
+        const ops = [0, 1, 2, 3, 4, 5].map((i) => ({ id: (f["oid" + i] || "").trim() || "o" + Date.now().toString(36) + i, nombre: (f["on" + i] || "").trim(), img: (f["oi" + i] || "").trim() })).filter((o) => o.nombre);
+        if (f.activo && ops.length < 2) throw new Error("Cargá al menos 2 opciones");
+        const prev = P.settings.votacion || {};
+        await API.saveSetting("votacion", { activo: !!f.activo, id: form.dataset.newid || prev.id || "v1", pregunta: (f.pregunta || "").trim(), opciones: ops, solo_clientes: !!f.solo, cierre: f.cierre ? new Date(f.cierre).toISOString() : "" });
       }
       if (k === "tema") await API.saveSetting("tema", { nombre: f.nombre || "", aviso: (f.aviso || "").trim() });
       if (k === "mochi_info") await API.saveSetting("mochi_info", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "¿Qué es un mochi?", texto: (f.texto || "").trim(),
@@ -524,6 +593,7 @@
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-slx]"); if (!x) return; const r = x.closest(".slrow"), i = x.dataset.slx; ["si", "st", "sx"].forEach((p) => (r.querySelector(`[name=${p}${i}]`).value = "")); r.querySelector(".upprev").textContent = "Vacío · tocá Guardar"; x.remove(); });
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-applogo-x]"); if (!x) return; const row = x.closest(".applogo"); row.querySelector(`[name=al${x.dataset.applogoX}]`).value = ""; row.querySelector(".lprev").textContent = "Sin logo"; x.remove(); });
   document.addEventListener("click", (e) => { if (e.target.closest("[data-justx],[data-justgo]")) { setTimeout(() => { P.justDelivered = null; drawJust(); }, 300); } });
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-votnew]"); if (!b) return; if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = "¿Seguro? Tocá de nuevo y después Guardar"; return; } const f = b.closest("form"); f.dataset.newid = "v" + Date.now().toString(36); [0, 1, 2, 3, 4, 5].forEach((i) => (f.querySelector(`[name=oid${i}]`).value = "")); b.textContent = "Lista: tocá Guardar"; });
   document.addEventListener("submit", (e) => { if (e.target.matches("form[data-set]")) { e.preventDefault(); saveAjuste(e.target); } });
 
   /* =================== ARRANQUE =================== */

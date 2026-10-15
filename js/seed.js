@@ -118,6 +118,33 @@ window.SETTO_SEED = {
      "detalle": "Tu pedido llega a nuestro WhatsApp."
     }
    ]
+  },
+  "giftcards": {
+   "activo": true,
+   "montos": [
+    10000,
+    15000,
+    20000,
+    30000
+   ],
+   "minimo": 5000,
+   "maximo": 100000,
+   "disenos": [
+    "cumple",
+    "gracias",
+    "tequiero",
+    "felicitaciones",
+    "porquesi",
+    "halloween"
+   ]
+  },
+  "votacion": {
+   "activo": false,
+   "id": "v1",
+   "pregunta": "¿Qué sabor querés en la próxima edición?",
+   "opciones": [],
+   "solo_clientes": false,
+   "cierre": ""
   }
  },
  "products": [

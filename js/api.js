@@ -52,7 +52,7 @@
 
   const demo = {
     async loadAll() { const db = dbLoad(); return { settings: db.settings, products: db.products }; },
-    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio: elegido }) {
+    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio: elegido, gift }) {
       const db = dbLoad(), ph = normPhone(phone), esp = db.settings.especial || {}, envio = db.settings.envio || {}, club = db.settings.club || {}, pers = db.settings.personalizacion || {};
       modo = modo === "envio" ? "envio" : "retiro";
       if (modo === "envio" && !envio.activo) throw new Error("Por ahora no hacemos envíos desde la web");
@@ -102,12 +102,22 @@
           ptxt = ps.nombre + " (12 oz) de regalo"; lines.push({ id: "premio", nombre: "Premio Setto Club: " + ptxt, size: "12 oz", qty: 1, precio: 0, subtotal: 0 });
         } else throw new Error("Elegí tu premio del Setto Club");
       }
+      let giftOff = 0, gc = null;
+      if (gift && String(gift).trim()) {
+        gc = (db.giftcards || []).find((g) => g.code === String(gift).trim().toUpperCase());
+        if (!gc) throw new Error("No encontramos esa gift card. Revisá el código.");
+        if (gc.estado === "pendiente") throw new Error("Esa gift card todavía no está activa");
+        if (gc.estado !== "activa" || gc.saldo <= 0) throw new Error("Esa gift card ya no tiene saldo");
+        giftOff = Math.min(gc.saldo, Math.max(total, 0));
+        if (giftOff > 0) { lines.push({ id: "gift", nombre: "Gift card " + gc.code, size: null, qty: 1, precio: -giftOff, subtotal: -giftOff }); total -= giftOff; gc.saldo -= giftOff; if (gc.saldo <= 0) gc.estado = "usada"; }
+      }
       let code; do { code = "STT-" + String(Math.floor(Math.random() * 10000)).padStart(4, "0"); }
       while (db.orders.some((o) => o.code === code && o.status === "pendiente"));
       const o = { id: uid(), code, nombre: String(nombre).trim(), phone: ph, items: lines, total, retiro, pago, nota: nota || null, status: "pendiente", sellos: 0, created_at: new Date().toISOString(),
         modo, direccion: modo === "envio" ? String(direccion).trim() : null, premio, premio_txt: ptxt };
+      if (giftOff > 0) o.gift = { code: gc.code, monto: giftOff };
       o.etapa = "recibido"; o.track = uid().replace(/-/g, ""); db.orders.unshift(o); dbSave(db);
-      return { id: o.id, code, total, items: lines, phone: ph, modo, direccion: o.direccion, costo_envio: costo, premio, premio_txt: ptxt, descuento: off, meta };
+      return { id: o.id, code, total, items: lines, phone: ph, modo, direccion: o.direccion, costo_envio: costo, premio, premio_txt: ptxt, descuento: off, gift: giftOff, meta };
     },
     async getStock() { return null; },
     async getCard(phone) {
@@ -145,7 +155,8 @@
     async cancelOrder(id) {
       const db = dbLoad(), o = db.orders.find((x) => x.id === id);
       if (!o || o.status !== "pendiente") throw new Error("El pedido no está pendiente");
-      o.status = "cancelado"; o.closed_at = new Date().toISOString(); dbSave(db);
+      o.status = "cancelado"; o.closed_at = new Date().toISOString();
+      if (o.gift && !o.gift.devuelto) { const g = (db.giftcards || []).find((x) => x.code === o.gift.code); if (g) { g.saldo += o.gift.monto; g.estado = "activa"; } o.gift.devuelto = true; } dbSave(db);
     },
     async setEtapa(id, etapa) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o || o.status !== "pendiente") throw new Error("El pedido no está pendiente"); o.etapa = etapa; dbSave(db); },
     async orderStatus(codes, phone) {
@@ -183,6 +194,30 @@
           return { nombre: nom(r.nombre), rating: r.rating, texto: r.texto, foto: r.foto, instagram: r.instagram, fecha: r.created_at, pedido: [...new Set(o.items.filter((i) => !["envio", "premio"].includes(i.id)).map((i) => i.nombre))] }; }) };
     },
     async listReviews() { return (dbLoad().reviews || []).slice(0, 100); },
+    async createGiftcard({ diseno, monto, de, para, mensaje, phone }) {
+      const db = dbLoad(), ph = normPhone(phone), cfg = db.settings.giftcards || {}; db.giftcards = db.giftcards || [];
+      if (!ph) throw new Error("Revisá tu celular");
+      if (!(monto >= (cfg.minimo || 5000) && monto <= (cfg.maximo || 100000))) throw new Error(`El monto tiene que ser entre ${cfg.minimo || 5000} y ${cfg.maximo || 100000}`);
+      if (!String(para || "").trim()) throw new Error("Falta para quién es");
+      const hex = () => Math.random().toString(16).slice(2, 6).toUpperCase().padEnd(4, "0");
+      const g = { id: uid(), code: `GIFT-${hex()}-${hex()}`, token: uid().replace(/-/g, ""), diseno, monto, saldo: 0, de: de || null, para, mensaje: mensaje || null, phone: ph, estado: "pendiente", created_at: new Date().toISOString() };
+      db.giftcards.unshift(g); dbSave(db); return { code: g.code, token: g.token, monto };
+    },
+    async giftcardByToken(token) { const g = (dbLoad().giftcards || []).find((x) => x.token === token); if (!g) return null; return { ...g, code: ["activa", "usada"].includes(g.estado) ? g.code : null }; },
+    async giftcardCheck(code) { const g = (dbLoad().giftcards || []).find((x) => x.code === String(code).trim().toUpperCase() && x.estado !== "anulada"); return g ? { code: g.code, saldo: g.saldo, estado: g.estado, diseno: g.diseno } : null; },
+    async listGiftcards() { return (dbLoad().giftcards || []).slice(0, 200); },
+    async activateGiftcard(id, cuenta) { const db = dbLoad(), g = (db.giftcards || []).find((x) => x.id === id); if (!g || g.estado !== "pendiente") throw new Error("La gift card no está pendiente"); g.estado = "activa"; g.saldo = g.monto; g.pago = cuenta; g.activada_at = new Date().toISOString(); dbSave(db); return { token: g.token, code: g.code }; },
+    async annulGiftcard(id) { const db = dbLoad(), g = (db.giftcards || []).find((x) => x.id === id); if (!g) return; if (g.estado === "usada" || (g.estado === "activa" && g.saldo < g.monto)) throw new Error("Ya se usó: no se puede anular"); g.estado = "anulada"; g.saldo = 0; dbSave(db); },
+    async pollResults(poll) { const v = (dbLoad().votes || []).filter((x) => x.poll === poll), conteo = {}; v.forEach((x) => (conteo[x.opcion] = (conteo[x.opcion] || 0) + 1)); return { total: v.length, conteo }; },
+    async castVote(poll, opcion, phone) {
+      const db = dbLoad(), cfg = db.settings.votacion || {}, ph = normPhone(phone); db.votes = db.votes || [];
+      if (!cfg.activo || cfg.id !== poll) throw new Error("Esta votación ya cerró");
+      if (!(cfg.opciones || []).some((o) => o.id === opcion)) throw new Error("Esa opción no existe");
+      if (!ph) throw new Error("Revisá tu celular");
+      if (cfg.solo_clientes && !db.orders.some((o) => o.phone === ph && o.status === "entregado")) throw new Error("Votan quienes ya hicieron un pedido por la web. ¡Te esperamos!");
+      const ex = db.votes.find((x) => x.poll === poll && x.phone === ph); if (ex) ex.opcion = opcion; else db.votes.push({ poll, opcion, phone: ph, created_at: new Date().toISOString() });
+      dbSave(db); return this.pollResults(poll);
+    },
     async publicReviewsAll(offset = 0) {
       const db = dbLoad(), ok = (db.reviews || []).filter((r) => r.estado === "aprobada"), por = {};
       ok.forEach((r) => (por[r.rating] = (por[r.rating] || 0) + 1));
@@ -246,10 +281,10 @@
       const settings = {}; s.data.forEach((r) => (settings[r.key] = r.value));
       return { settings, products: p.data };
     },
-    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio }) {
-      const { data, error } = await sb.rpc("create_order_v4", {
+    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift }) {
+      const { data, error } = await sb.rpc("create_order_v5", {
         p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty, leche: i.leche || null, sin: i.sin || [] })),
-        p_retiro: retiro, p_pago: pago, p_nota: nota || null, p_modo: modo || "retiro", p_direccion: direccion || null, p_premio: premio || null,
+        p_retiro: retiro, p_pago: pago, p_nota: nota || null, p_modo: modo || "retiro", p_direccion: direccion || null, p_premio: premio || null, p_gift: gift || null,
       });
       fail(error); return data;
     },
@@ -285,6 +320,14 @@
     async productRatings() { const { data, error } = await sb.rpc("product_ratings"); if (error) return {}; return data || {}; },
     async publicReviews() { const { data, error } = await sb.rpc("public_reviews"); fail(error); return data; },
     async publicReviewsAll(offset = 0) { const { data, error } = await sb.rpc("public_reviews_all", { p_offset: offset }); fail(error); return data; },
+    async createGiftcard({ diseno, monto, de, para, mensaje, phone }) { const { data, error } = await sb.rpc("create_giftcard", { p_diseno: diseno, p_monto: monto, p_de: de || null, p_para: para, p_mensaje: mensaje || null, p_phone: phone }); fail(error); return data; },
+    async giftcardByToken(token) { const { data, error } = await sb.rpc("giftcard_by_token", { p_token: token }); fail(error); return data; },
+    async giftcardCheck(code) { const { data, error } = await sb.rpc("giftcard_check", { p_code: code }); fail(error); return data; },
+    async listGiftcards() { const { data, error } = await sb.from("giftcards").select("*").order("created_at", { ascending: false }).limit(200); fail(error); return data; },
+    async activateGiftcard(id, cuenta) { const { data, error } = await sb.rpc("activate_giftcard", { p_id: id, p_cuenta: cuenta || "mp" }); fail(error); return data; },
+    async annulGiftcard(id) { const { error } = await sb.rpc("annul_giftcard", { p_id: id }); fail(error); },
+    async pollResults(poll) { const { data, error } = await sb.rpc("poll_results", { p_poll: poll }); fail(error); return data; },
+    async castVote(poll, opcion, phone) { const { data, error } = await sb.rpc("cast_vote", { p_poll: poll, p_opcion: opcion, p_phone: phone }); fail(error); return data; },
     async listReviews() { const { data, error } = await sb.from("reviews").select("*").order("created_at", { ascending: false }).limit(100); fail(error); return data; },
     async setReviewEstado(id, estado) { const { error } = await sb.from("reviews").update({ estado }).eq("id", id); fail(error); },
     async addStamps(phone, nombre, delta, motivo) { const { data, error } = await sb.rpc("add_stamps", { p_phone: phone, p_nombre: nombre || null, p_delta: delta, p_motivo: motivo || null }); fail(error); return data; },
