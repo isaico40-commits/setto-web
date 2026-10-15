@@ -70,22 +70,21 @@
 
   /* =================== PEDIDOS =================== */
   const linkSeguir = (o) => (o.track ? `${location.origin}/?seguir=${o.track}` : `${location.origin}/`);
+  const M = window.SettoMSG, primerNombre = (o) => (o.nombre || "").split(" ")[0];
   function resenaTxt(o) {
-    const n = (o.nombre || "").split(" ")[0], s = Number(o.sellos) || 0;
-    return `¡Gracias por tu pedido, ${n}! 🙌${s > 0 ? ` Sumaste ${s === 1 ? "1 sello" : s + " sellos"} al Setto Club.` : ""}\n\nSi te gustó, nos ayuda un montón que dejes tu reseña (con foto si querés) y ahí mismo ves tus sellos:\n${linkSeguir(o)}`;
+    const s = Number(o.sellos) || 0;
+    return M.render("pedir_resena", { nombre: primerNombre(o), codigo: o.code, link: linkSeguir(o), sellos: s > 0 ? `Sumaste ${s === 1 ? "1 sello" : s + " sellos"} al Setto Club.` : "" }, P.settings);
   }
-  function avisoTxt(o) { return avisoBase(o) + `\n\nSeguí tu pedido acá: ${linkSeguir(o)}`; }
-  function avisoBase(o) {
-    const env = o.modo === "envio", e = o.etapa || "recibido", n = (o.nombre || "").split(" ")[0];
-    if (e === "listo") return env ? `¡Hola ${n}! Tu pedido ${o.code} de Setto ya salió y va en camino 🛵` : `¡Hola ${n}! Tu pedido ${o.code} de Setto está listo. Ya podés pasar a buscarlo 🙌`;
-    if (e === "preparando") return `¡Hola ${n}! Ya estamos preparando tu pedido ${o.code} de Setto.`;
-    return `¡Hola ${n}! Recibimos tu pedido ${o.code} de Setto. Te avisamos cuando esté listo.`;
+  function avisoTxt(o) {
+    const e = o.etapa || "recibido", key = e === "listo" ? (o.modo === "envio" ? "aviso_camino" : "aviso_listo") : e === "preparando" ? "aviso_preparando" : "aviso_recibido";
+    return M.render(key, { nombre: primerNombre(o), codigo: o.code, link: linkSeguir(o) }, P.settings);
   }
+  const avisoBase = (o) => avisoTxt(o).split("\n")[0];
 
   /* =================== GIFT CARDS =================== */
   const GDN = { cumple: "Cumpleaños", gracias: "Gracias", tequiero: "Te quiero", felicitaciones: "Felicitaciones", porquesi: "Porque sí", halloween: "Halloween" };
   const linkRegalo = (g) => `${location.origin}/?regalo=${g.token}`;
-  const regaloTxt = (g) => `¡Listo! 🎁 Tu gift card de Setto para ${g.para} ya está activa (${money(g.monto)}).\n\nMandale este link para que la vea y la use:\n${linkRegalo(g)}`;
+  const regaloTxt = (g) => M.render("gift_activa", { para: g.para, monto: money(g.monto), link: linkRegalo(g) }, P.settings);
   P.gsub = "pendiente";
   async function viewGift() {
     $("#view").innerHTML = `<h1 class="ph1">Gift cards</h1><p class="muted">Cuando te paguen, tocá <b>Pago recibido</b>: se activa, entra a la caja y te da el link para mandarle al comprador.</p>
@@ -372,6 +371,13 @@
                 <label class="btn">Subir foto<input type="file" accept="image/*" data-upimg="si${i}" data-upmax="1600" hidden></label>${x.img || x.titulo ? `<button type="button" class="linkbtn warn" data-slx="${i}">Quitar</button>` : ""}</div></div></div>`; }).join("")}
           <label>Cambia cada (segundos)<input class="inp" name="intervalo" type="number" min="3" max="15" value="${(S.hero || {}).intervalo || 5}" style="width:120px"></label>
           <button class="btn solid">Guardar portada</button></form>
+        <form class="pcard wide" data-set="mensajes"><b>Mensajes de WhatsApp</b>
+          <span class="hintp">Lo que va entre llaves se completa solo. Si borrás un mensaje entero, vuelve al original.</span>
+          ${["Lo que manda el cliente", "Lo que mandan ustedes"].map((gr) => `<h3 class="msg-gr">${gr}</h3>` + Object.entries(M.MSG).filter(([, d]) => d.grupo === gr).map(([k, d]) => `<label class="msg-row">${esc(d.titulo)}
+            <textarea class="inp" name="m_${k}" rows="${Math.min(7, d.texto.split("\n").length + 1)}">${esc(M.texto(k, S))}</textarea>
+            <span class="msg-vars">${d.vars.map((v) => `<code title="${esc(M.VARS[v] || "")}">{${v}}</code>`).join(" ")}${d.vars.length ? "" : "Sin variables"} <button type="button" class="linkbtn" data-msgreset="${k}">Volver al original</button></span></label>`).join("")).join("")}
+          <details class="hintp"><summary>¿Qué es cada variable?</summary>${Object.entries(M.VARS).map(([v, t]) => `<div><code>{${v}}</code> ${esc(t)}</div>`).join("")}</details>
+          <button class="btn solid">Guardar mensajes</button></form>
         <form class="pcard" data-set="giftcards"><b>Gift cards</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${(S.giftcards || {}).activo !== false ? "checked" : ""}> Vender gift cards en la web</label></div>
           <label>Montos sugeridos (separados por coma)<input class="inp" name="montos" value="${esc(((S.giftcards || {}).montos || [10000, 15000, 20000, 30000]).join(", "))}"></label>
@@ -462,6 +468,7 @@
         if (!slides.length) throw new Error("Dejá al menos un slide con foto o título");
         await API.saveSetting("hero", { slides, intervalo: Math.max(3, Math.min(15, +f.intervalo || 5)) });
       }
+      if (k === "mensajes") { const out = {}; Object.keys(M.MSG).forEach((key) => { const v = (f["m_" + key] || "").replace(/\r/g, "").trim(); if (v && v !== M.MSG[key].texto) out[key] = v; }); await API.saveSetting("mensajes", out); }
       if (k === "giftcards") await API.saveSetting("giftcards", { activo: !!f.activo, montos: (f.montos || "").split(",").map((x) => Math.round(+x.replace(/[^\d]/g, ""))).filter((x) => x > 0).slice(0, 6),
         minimo: Math.max(1000, +f.minimo || 5000), maximo: Math.max(+f.minimo || 5000, +f.maximo || 100000), disenos: Object.keys(GDN).filter((k2) => f["d_" + k2]) });
       if (k === "votacion") {
@@ -594,6 +601,7 @@
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-applogo-x]"); if (!x) return; const row = x.closest(".applogo"); row.querySelector(`[name=al${x.dataset.applogoX}]`).value = ""; row.querySelector(".lprev").textContent = "Sin logo"; x.remove(); });
   document.addEventListener("click", (e) => { if (e.target.closest("[data-justx],[data-justgo]")) { setTimeout(() => { P.justDelivered = null; drawJust(); }, 300); } });
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-votnew]"); if (!b) return; if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = "¿Seguro? Tocá de nuevo y después Guardar"; return; } const f = b.closest("form"); f.dataset.newid = "v" + Date.now().toString(36); [0, 1, 2, 3, 4, 5].forEach((i) => (f.querySelector(`[name=oid${i}]`).value = "")); b.textContent = "Lista: tocá Guardar"; });
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-msgreset]"); if (!b) return; const ta = b.closest("form").querySelector(`[name=m_${b.dataset.msgreset}]`); ta.value = window.SettoMSG.MSG[b.dataset.msgreset].texto; toast("Restaurado · tocá Guardar mensajes"); });
   document.addEventListener("submit", (e) => { if (e.target.matches("form[data-set]")) { e.preventDefault(); saveAjuste(e.target); } });
 
   /* =================== ARRANQUE =================== */

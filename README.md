@@ -145,6 +145,9 @@ En **Ajustes → Votación**: pregunta, hasta 6 opciones con foto, "solo cliente
 ### Abierto / cerrado
 Arriba de la portada se ve "Abierto ahora · retirás desde las …" o "Cerrado · abrimos …", calculado con los horarios de retiro.
 
+### Mensajes de WhatsApp
+En **Ajustes → Mensajes de WhatsApp** editás todos los textos precargados: el inicio y cierre del pedido, el botón de consulta, la compra de gift card, los avisos de estado, el pedido de reseña y la gift card activada. Lo que va entre llaves (`{nombre}`, `{codigo}`, `{link}`…) se completa solo. "Volver al original" restaura el texto.
+
 ### Edición especial (sabores de tortas)
 En **Carta → Edición especial**:
 - **Estado:** *Próximamente* (se muestra pero no se puede pedir) o *Disponible ahora* (se puede pedir).

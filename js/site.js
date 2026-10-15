@@ -312,7 +312,7 @@
     GB.sending = true; $("#gbSend").textContent = "Reservando…";
     try {
       const r = await API.createGiftcard({ diseno: GB.dis, monto: m, de: GB.de.trim(), para: GB.para.trim(), mensaje: GB.msg.trim(), phone: GB.tel });
-      const msg = `¡Hola Setto! Quiero comprar una gift card 🎁\n\nCódigo: ${r.code}\nDiseño: ${GD[GB.dis].nombre}\nMonto: ${money(m)}\nPara: ${GB.para.trim()}${GB.de.trim() ? `\nDe: ${GB.de.trim()}` : ""}\n\nLa pago por transferencia.`;
+      const msg = window.SettoMSG.render("gift_compra", { codigo: r.code, diseno: GD[GB.dis].nombre, monto: money(m), para: GB.para.trim(), de: GB.de.trim() }, S);
       GB.done = { code: r.code, monto: m, msg }; GB.sending = false; dibujarGift();
       const link = waLink(msg); if (matchMedia("(pointer:coarse)").matches) location.href = link; else window.open(link, "_blank", "noopener");
     } catch (e) { GB.sending = false; $("#gbSend").textContent = `Comprar · ${money(m)}`; fallo(e.message); }
@@ -505,7 +505,7 @@
     $("#footHours").textContent = "Retiro: " + HORARIO.charAt(0).toLowerCase() + HORARIO.slice(1);
     $("#waNum").textContent = S.whatsapp_visible || API.prettyPhone(S.whatsapp);
     $("#mnavWa").textContent = S.whatsapp_visible || API.prettyPhone(S.whatsapp);
-    $("#navWa").href = `https://wa.me/${S.whatsapp}?text=${encodeURIComponent("¡Hola Setto! Tengo una consulta.")}`;
+    $("#navWa").href = `https://wa.me/${S.whatsapp}?text=${encodeURIComponent(window.SettoMSG.render("consulta", {}, S))}`;
   }
   function renderBadge() {
     try { refreshStockUI(); } catch (_) {}
@@ -590,8 +590,10 @@
     const envio = o.modo === "envio";
     const entrega = envio ? `Envío: ${o.retiro}\nDirección: ${o.direccion}` + (Number(o.costo_envio) > 0 ? "" : "\n(Costo de envío a coordinar)") : `Retiro: ${o.retiro}`;
     const premio = o.premio ? `\n\n🎁 Con este pedido completo mi tarjeta del Setto Club: ${o.premio_txt || "premio"}` : "";
-    return `¡Hola Setto! Te paso mi pedido ${o.code} ${envio ? "con envío a domicilio" : "para retirar"}:\n\n${lines.join("\n")}\n\nTotal: ${money(o.total)}${premio}\n\nNombre: ${o.nombre}\n${entrega}\nPago: ${o.pago}` + (o.nota ? `\nNota: ${o.nota}` : "")
-      + (o.track ? `\n\n📍 Sigo mi pedido acá: ${linkSeguir(o.track)}` : "");
+    const M = window.SettoMSG, ini = M.render("pedido_inicio", { codigo: o.code, entrega: envio ? "con envío a domicilio" : "para retirar" }, S);
+    const cierre = o.track ? M.render("pedido_cierre", { link: linkSeguir(o.track) }, S) : "";
+    return `${ini}\n\n${lines.join("\n")}\n\nTotal: ${money(o.total)}${premio}\n\nNombre: ${o.nombre}\n${entrega}\nPago: ${o.pago}` + (o.nota ? `\nNota: ${o.nota}` : "")
+      + (cierre ? `\n\n${cierre}` : "");
   }
   const envioOn = () => !!(S.envio && S.envio.activo);
   const envioCosto = () => (envioOn() && form.modo === "envio" ? Math.max(0, Number(S.envio.costo) || 0) : 0);
