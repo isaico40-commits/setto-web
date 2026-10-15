@@ -238,4 +238,4 @@ python3 -m http.server 8000
 - Reconoce el pedido solo si se pidió desde ese celular o se abrió el link del WhatsApp; si no, se busca con código (STT-1234) + celular.
 - La reseña se puede dejar cuando el pedido está **listo** o **entregado** (migración 018).
 - El mensaje "Pedir reseña" del panel ahora manda a `/listo?seguir=…`.
-- Archivos del sticker: `img/qr/QR-setto-listo.pdf` (vector, 5,5 × 6,9 cm) y `.png`.
+- Archivos del sticker: `img/qr/QR-setto-listo.pdf` (vector, 5,5 × 6,9 cm) y `.png`, apuntan a https://setto.com.ar/listo.
