@@ -28,15 +28,5 @@
         }
       ]
     }
-  ],
-  "rewrites": [
-    {
-      "source": "/gift-cards",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/armar",
-      "destination": "/index.html"
-    }
   ]
 }

@@ -355,7 +355,7 @@
   }
   (function regaloDesdeLink() {
     const t = new URLSearchParams(location.search).get("regalo"); if (!t || !/^[A-Za-z0-9-]{16,64}$/.test(t)) return;
-    try { history.replaceState(null, "", location.pathname + location.hash); } catch (_) {}
+    try { history.replaceState(null, "", location.pathname + (PAGE !== "home" ? "?p=" + PAGE : "") + location.hash); } catch (_) {}
     window.__regalo = t;
   })();
 
@@ -799,7 +799,7 @@
   (function desdeLink() {
     const t = new URLSearchParams(location.search).get("seguir"); if (!t || !/^[A-Za-z0-9-]{16,64}$/.test(t)) return;
     try { const l = misPedidos().filter((x) => x.track !== t); l.unshift({ code: "", phone: "", track: t, at: Date.now() }); localStorage.setItem(SKEY, JSON.stringify(l.slice(0, 8))); } catch (_) {}
-    try { history.replaceState(null, "", location.pathname + location.hash); } catch (_) {}
+    try { history.replaceState(null, "", location.pathname + (PAGE !== "home" ? "?p=" + PAGE : "") + location.hash); } catch (_) {}
     window.scrollTo(0, 0);
   })();
   let trackT = null, trackVivos = [];
