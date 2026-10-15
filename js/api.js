@@ -181,8 +181,8 @@
       const ig = String(instagram || "").trim().replace(/^@+/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//, "").replace(/\/$/, "");
       if (ig && !/^[A-Za-z0-9._]{1,30}$/.test(ig)) throw new Error("Revisá tu usuario de Instagram");
       if (!(rating >= 1 && rating <= 5)) throw new Error("Elegí de 1 a 5 estrellas");
-      const o = db.orders.find((x) => x.code === code && x.phone === ph && x.status === "entregado");
-      if (!o) throw new Error("Solo podés dejar reseña de un pedido que ya recibiste");
+      const o = db.orders.find((x) => x.code === code && x.phone === ph && (x.status === "entregado" || (x.status === "pendiente" && x.etapa === "listo")));
+      if (!o) throw new Error("Vas a poder dejar tu reseña cuando tu pedido esté listo");
       if (db.reviews.some((r) => r.order_id === o.id)) throw new Error("Ya dejaste una reseña de este pedido. ¡Gracias!");
       db.reviews.unshift({ id: uid(), order_id: o.id, phone: ph, nombre: o.nombre, rating, texto: String(texto || "").trim() || null, foto: foto || null, instagram: ig.toLowerCase() || null, estado: "pendiente", created_at: new Date().toISOString() }); dbSave(db);
     },

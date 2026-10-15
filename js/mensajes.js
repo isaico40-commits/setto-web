@@ -19,7 +19,7 @@
     aviso_camino: { grupo: "Lo que mandan ustedes", titulo: "Aviso · En camino (envío)", vars: ["nombre", "codigo", "link"],
       texto: "¡Hola {nombre}! Tu pedido {codigo} de Setto ya salió y va en camino 🛵\n\nSeguí tu pedido acá: {link}" },
     pedir_resena: { grupo: "Lo que mandan ustedes", titulo: "Pedir reseña (al entregar)", vars: ["nombre", "codigo", "sellos", "link"],
-      texto: "¡Gracias por tu pedido, {nombre}! 🙌 {sellos}\n\nSi te gustó, nos ayuda un montón que dejes tu reseña (con foto si querés) y ahí mismo ves tus sellos:\n{link}" },
+      texto: "¡Gracias por tu pedido, {nombre}! 🙌 {sellos}\n\nAcá ves cómo armar tu bebida, tus sellos y, si te gustó, podés dejar tu reseña (con foto si querés):\n{link}" },
     gift_activa: { grupo: "Lo que mandan ustedes", titulo: "Gift card activada (al comprador)", vars: ["para", "monto", "link"],
       texto: "¡Listo! 🎁 Tu gift card de Setto para {para} ya está activa ({monto}).\n\nMandale este link para que la vea y la use:\n{link}" },
   };

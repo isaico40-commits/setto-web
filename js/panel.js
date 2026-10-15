@@ -71,9 +71,10 @@
   /* =================== PEDIDOS =================== */
   const linkSeguir = (o) => (o.track ? `${location.origin}/?seguir=${o.track}` : `${location.origin}/`);
   const M = window.SettoMSG, primerNombre = (o) => (o.nombre || "").split(" ")[0];
+  const linkListo = (o) => (o.track ? `${location.origin}/listo?seguir=${o.track}` : `${location.origin}/listo`);
   function resenaTxt(o) {
     const s = Number(o.sellos) || 0;
-    return M.render("pedir_resena", { nombre: primerNombre(o), codigo: o.code, link: linkSeguir(o), sellos: s > 0 ? `Sumaste ${s === 1 ? "1 sello" : s + " sellos"} al Setto Club.` : "" }, P.settings);
+    return M.render("pedir_resena", { nombre: primerNombre(o), codigo: o.code, link: linkListo(o), sellos: s > 0 ? `Sumaste ${s === 1 ? "1 sello" : s + " sellos"} al Setto Club.` : "" }, P.settings);
   }
   function avisoTxt(o) {
     const e = o.etapa || "recibido", key = e === "listo" ? (o.modo === "envio" ? "aviso_camino" : "aviso_listo") : e === "preparando" ? "aviso_preparando" : "aviso_recibido";

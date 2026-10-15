@@ -232,3 +232,10 @@ cd setto-web
 python3 -m http.server 8000
 # abrí http://localhost:8000 y http://localhost:8000/panel.html
 ```
+
+## Página /listo (QR del sticker)
+- `/listo` es a donde lleva el QR de la bolsa: arriba "¡Llegó tu Setto!", después cómo armar la bebida, la reseña del pedido y los sellos.
+- Reconoce el pedido solo si se pidió desde ese celular o se abrió el link del WhatsApp; si no, se busca con código (STT-1234) + celular.
+- La reseña se puede dejar cuando el pedido está **listo** o **entregado** (migración 018).
+- El mensaje "Pedir reseña" del panel ahora manda a `/listo?seguir=…`.
+- Archivos del sticker: `img/qr/QR-setto-listo.pdf` (vector, 5,5 × 6,9 cm) y `.png`.

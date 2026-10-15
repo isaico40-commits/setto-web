@@ -4,9 +4,9 @@
   const $ = (s) => document.querySelector(s);
   const money = (n) => (Number(n) < 0 ? "−$" : "$") + Math.abs(Number(n || 0)).toLocaleString("es-AR");
   const lcFirst = (t) => (t ? t.charAt(0).toLowerCase() + t.slice(1) : t);
-  const PAGE = (() => { const q = new URLSearchParams(location.search).get("p"); const p = (q || location.pathname.replace(/\/+$/, "").split("/").pop() || "").replace(/\.html$/, ""); return ["gift-cards", "armar"].includes(p) ? p : "home"; })();
+  const PAGE = (() => { const q = new URLSearchParams(location.search).get("p"); const p = (q || location.pathname.replace(/\/+$/, "").split("/").pop() || "").replace(/\.html$/, ""); return ["gift-cards", "armar", "listo"].includes(p) ? p : "home"; })();
   document.body.dataset.page = PAGE;
-  if (PAGE === "gift-cards") document.title = "Gift cards · Setto"; if (PAGE === "armar") document.title = "Cómo armar tu bebida · Setto";
+  if (PAGE === "gift-cards") document.title = "Gift cards · Setto"; if (PAGE === "armar") document.title = "Cómo armar tu bebida · Setto"; if (PAGE === "listo") document.title = "¡Llegó tu Setto! · Setto";
   const irA = (hash) => { if (PAGE === "home") location.hash = hash; else location.href = "/" + hash; };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -802,21 +802,25 @@
     try { history.replaceState(null, "", location.pathname + (PAGE !== "home" ? "?p=" + PAGE : "") + location.hash); } catch (_) {}
     window.scrollTo(0, 0);
   })();
-  let trackT = null, trackVivos = [];
-  const telDe = (code) => (trackVivos.find((x) => x.code === code) || {}).phone || (misPedidos().find((x) => x.code === code) || {}).phone || "";
-  const trackDe = (code) => (trackVivos.find((x) => x.code === code) || {}).track || (misPedidos().find((x) => x.code === code) || {}).track || "";
+  let trackT = null, trackVivos = [], MIOS = [];
+  const telDe = (code) => (trackVivos.find((x) => x.code === code) || MIOS.find((x) => x.code === code) || {}).phone || (misPedidos().find((x) => x.code === code) || {}).phone || "";
+  const trackDe = (code) => (trackVivos.find((x) => x.code === code) || MIOS.find((x) => x.code === code) || {}).track || (misPedidos().find((x) => x.code === code) || {}).track || "";
   const ocultosTrk = () => { try { return JSON.parse(localStorage.getItem("setto-trk-ocultos") || "[]"); } catch (_) { return []; } };
   const trackHtml = () => (trackVivos.length ? `<div class="dtrk">${trackVivos.map(trackCard).join("")}</div>` : "");
-  async function verSeguimiento() {
-    clearTimeout(trackT);
-    const l = misPedidos(), box = $("#seguimiento"); if (!l.length) { box.hidden = true; return; }
+  async function traerMios() {
+    const l = misPedidos(); if (!l.length) return [];
     const byPhone = {}; l.filter((x) => !x.track && x.phone).forEach((x) => (byPhone[x.phone] = byPhone[x.phone] || []).push(x.code));
     const tracks = l.filter((x) => x.track).map((x) => x.track);
+    const parts = await Promise.all([tracks.length && API.trackStatus ? API.trackStatus(tracks) : [], ...Object.entries(byPhone).map(([ph, codes]) => API.orderStatus(codes, ph).then((r) => r.map((o) => ({ ...o, phone: o.phone || ph }))))]);
+    const seen = new Set(); MIOS = parts.flat().filter((o) => o && !seen.has(o.code) && seen.add(o.code)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    return MIOS;
+  }
+  async function verSeguimiento() {
+    clearTimeout(trackT);
+    const l = misPedidos(), box = $("#seguimiento"); if (!l.length) { box.hidden = true; if (PAGE === "listo") renderListo(); return; }
     let data = [];
-    try {
-      const parts = await Promise.all([tracks.length && API.trackStatus ? API.trackStatus(tracks) : [], ...Object.entries(byPhone).map(([ph, codes]) => API.orderStatus(codes, ph))]);
-      const seen = new Set(); data = parts.flat().filter((o) => o && !seen.has(o.code) && seen.add(o.code));
-    } catch (_) { return; }
+    try { data = await traerMios(); } catch (_) { return; }
+    if (PAGE === "listo") renderListo();
     // pendientes; entregados sin reseña (3 días); el resto hasta 3 horas
     const ocultos = ocultosTrk();
     const vivos = data.filter((o) => !ocultos.includes(o.code) && (o.status === "pendiente" || (o.status === "entregado" && !o.resena) || Date.now() - new Date(o.created_at) < 3 * 36e5)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
@@ -839,7 +843,8 @@
     return `<div class="trk ${o.status}"><div class="trk-h"><span class="eyebrow">Tu pedido</span><b class="num">${esc(o.code)}</b><span class="trk-r">${esc(o.retiro || "")}</span>${o.status !== "pendiente" ? `<button class="trk-x" data-trackx="${esc(o.code)}" aria-label="Ocultar">✕</button>` : ""}</div>
       ${o.status === "cancelado" ? "" : `<ol class="trk-steps">${pasos.map((p, i) => `<li class="${i < idx ? "done" : i === idx ? "now" : ""}"><i></i><span>${p}</span></li>`).join("")}</ol>`}
       <p>${txt}</p>
-      ${o.status === "entregado" ? `<div class="trk-acts">${clubOn() ? `<button class="btn" data-vercard="${esc(o.code)}">Ver mis sellos</button>` : ""}${o.resena ? `<span class="muted" style="font-size:.84rem;align-self:center">¡Gracias por tu reseña!</span>` : `<button class="btn solid" data-resena="${esc(o.code)}">Dejar reseña</button>`}</div>` : ""}</div>`;
+      ${o.status === "entregado" ? `<div class="trk-acts">${clubOn() ? `<button class="btn" data-vercard="${esc(o.code)}">Ver mis sellos</button>` : ""}${o.resena ? `<span class="muted" style="font-size:.84rem;align-self:center">¡Gracias por tu reseña!</span>` : `<button class="btn solid" data-resena="${esc(o.code)}">Dejar reseña</button>`}<a class="btn" href="/listo">Cómo armar tu bebida</a></div>`
+        : o.status === "pendiente" && idx === 2 ? `<div class="trk-acts"><a class="btn" href="/listo">Cómo armar tu bebida</a></div>` : ""}</div>`;
   }
   function rvForm(code) {
     return `<div class="rv-form" data-rvcode="${esc(code)}"><b style="font-size:.9rem">¿Qué tal estuvo?</b>
@@ -893,6 +898,47 @@
         ${r.texto ? `<p>${esc(r.texto)}</p>` : ""}
         <div class="rv-who"><span class="rv-av">${esc((r.nombre || "?")[0])}</span><span><b>${esc(r.nombre)}</b>${r.instagram ? `<a href="https://instagram.com/${encodeURIComponent(r.instagram)}" target="_blank" rel="noopener nofollow">@${esc(r.instagram)}</a>` : ""}</span></div>
         <span class="rv-ver">✓ Compra verificada${r.pedido && r.pedido.length ? ` · pidió ${esc(r.pedido.slice(0, 3).join(", "))}` : ""}</span></article>`;
+  /* ---------- /listo: la página del QR del sticker (armar + reseña + sellos) ---------- */
+  const puedeResenar = (o) => !o.resena && (o.status === "entregado" || (o.status === "pendiente" && o.etapa === "listo"));
+  const buscarHtml = (abierto) => `<details class="ls-buscar"${abierto ? " open" : ""}><summary>${abierto ? "Buscá tu pedido" : "¿Es otro pedido? Buscalo acá"}</summary>
+      <form class="ls-form" id="lsBuscar" novalidate>
+        <label class="f">Código del pedido<input name="code" placeholder="STT-1234" autocapitalize="characters" autocomplete="off" maxlength="12"></label>
+        <label class="f">Tu celular<input name="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 347-1277"></label>
+        <button class="btn solid" type="submit">Buscar</button>
+      </form><small class="muted">El código está en el mensaje de WhatsApp de tu pedido (empieza con STT).</small><span class="rv-err" id="lsErr" hidden></span></details>`;
+  let lsTel = false;
+  function renderListo() {
+    const box = $("#lsResBody"); if (!box || box.querySelector(".rv-form")) return;
+    const mios = MIOS.filter((o) => o.status !== "cancelado");
+    const tel = (mios.find((o) => o.phone) || {}).phone;
+    if (tel && !lsTel && clubOn()) { lsTel = true; $("#cardPhone").value = API.prettyPhone ? API.prettyPhone(tel) : tel; $("#cardForm").requestSubmit(); }
+    if (!mios.length) {
+      box.innerHTML = `<div class="trk ls-trk"><p style="margin:0 0 6px"><b>Las reseñas son de pedidos hechos desde la web.</b> Si pediste por acá, buscalo con tu código y tu celular.</p>${buscarHtml(true)}</div>
+        <p class="muted ls-alt">¿Pediste por WhatsApp o por una app? Contanos qué tal en <a href="https://instagram.com/setto.project" target="_blank" rel="noopener">@setto.project</a>. La próxima, pedí desde la web y sumás sellos.</p>`;
+      return;
+    }
+    const o = mios.find(puedeResenar) || mios[0];
+    let body;
+    if (puedeResenar(o)) body = `<div class="trk-acts" hidden><button class="btn solid" data-resena="${esc(o.code)}">Dejar reseña</button></div>${rvForm(o.code)}`;
+    else if (o.resena) body = `<p style="margin:6px 0 0"><b>¡Gracias por tu reseña!</b> La publicamos cuando la revisemos.</p><div class="trk-acts"><button class="btn" data-verresenas>Ver reseñas</button></div>`;
+    else body = `<p style="margin:6px 0 0">Tu pedido todavía está ${o.etapa === "preparando" ? "en preparación" : "en camino a estar listo"}. Cuando esté listo vas a poder dejar tu reseña acá.</p>`;
+    box.innerHTML = `<div class="trk ls-trk"><div class="trk-h"><span class="eyebrow">Tu pedido</span><b class="num">${esc(o.code)}</b><span class="trk-r">${esc(o.retiro || "")}</span></div>${body}</div>${buscarHtml(false)}`;
+  }
+  document.addEventListener("submit", async (e) => {
+    if (e.target.id !== "lsBuscar") return; e.preventDefault();
+    const f = e.target, err = $("#lsErr"), code = f.code.value.trim().toUpperCase().replace(/^STT-?/, "STT-"), tel = f.tel.value;
+    err.hidden = true;
+    if (!/^STT-\d{4}$/.test(code)) { err.hidden = false; err.textContent = "El código es STT seguido de 4 números."; return; }
+    if (!API.normPhone(tel)) { err.hidden = false; err.textContent = "Revisá el celular: código de área + número."; return; }
+    const btn = f.querySelector("button"); btn.disabled = true; btn.textContent = "Buscando…";
+    try {
+      const r = await API.orderStatus([code], tel);
+      if (!r.length) throw new Error("No encontramos ese pedido. Revisá el código y el celular (vale para pedidos de los últimos 3 días).");
+      guardarSeguimiento({ code, phone: API.normPhone(tel), at: Date.now() }); lsTel = false;
+    } catch (ex) { err.hidden = false; err.textContent = ex.message; btn.disabled = false; btn.textContent = "Buscar"; }
+  });
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-verresenas]")) abrirResenas(); });
+
   /* ---------- todas las reseñas ---------- */
   const AR = { items: [], off: 0, fil: "todas", data: null };
   async function abrirResenas() {
@@ -948,6 +994,7 @@
       S = settings; adapt(products); syncCart();
       renderTema(); renderHero(); renderFaq(); renderAbierto(); renderGift(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
+      if (PAGE === "listo" && form.tel && clubOn()) setTimeout(() => { if (!lsTel) { lsTel = true; $("#cardForm").requestSubmit(); } }, 1500);
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
     } catch (e) {
       const bar = $("#errBar"); bar.hidden = false; bar.textContent = "No pudimos cargar la carta. Escribinos por WhatsApp.";

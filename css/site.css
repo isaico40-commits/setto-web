@@ -599,7 +599,30 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 /* ---------- Páginas: inicio / gift cards / armar ---------- */
 .volver{display:none;margin-bottom:10px}
 body:not([data-page="home"]) .volver{display:inline-flex}
-body[data-page="home"] #regalo,body[data-page="home"] #armar{display:none!important}
+body[data-page="home"] #regalo,body[data-page="home"] #armar,body:not([data-page="listo"]) #listo,body:not([data-page="listo"]) #lsRes{display:none!important}
+body[data-page="listo"] main{display:flex;flex-direction:column}
+body[data-page="listo"] main > :not(#listo):not(#armar):not(#lsRes):not(#club){display:none!important}
+body[data-page="listo"] #listo{order:1}body[data-page="listo"] #armar{order:2}body[data-page="listo"] #lsRes{order:3}body[data-page="listo"] #club{order:4}
+body[data-page="listo"] #armar .volver,body[data-page="listo"] #armar .ar-fin .ctas .btn:not(.solid){display:none}
+body[data-page="listo"] #armar,body[data-page="listo"] #lsRes,body[data-page="listo"] #club{scroll-margin-top:80px}
+.listo{padding-bottom:8px}
+.ls-hero{text-align:center;max-width:560px;margin:0 auto}
+.ls-hero h1{font-size:clamp(2.4rem,7vw,3.6rem);margin:6px 0 8px;color:var(--turquesa)}
+.ls-hero p{color:var(--ink-2);margin:0}
+.ls-mito{width:84px;height:auto;display:block;margin:0 auto 6px}
+.ls-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:620px;margin:22px auto 0}
+.ls-tiles a{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;background:var(--card);border:1.5px solid var(--turquesa);border-radius:18px;padding:14px 8px;text-decoration:none;color:var(--ink);box-shadow:var(--sombra-chica);transition:transform .15s}
+.ls-tiles a:active{transform:translate(2px,2px);box-shadow:none}
+.ls-tiles i{font-style:normal;font-family:var(--display);width:30px;height:30px;border-radius:99px;background:var(--turquesa);color:#fff;display:grid;place-items:center;margin-bottom:4px}
+.ls-tiles b{font-size:.9rem;line-height:1.15}
+.ls-tiles span{font-size:.74rem;color:var(--ink-2)}
+.lsres .wrap{max-width:620px}
+.ls-trk .rv-form{margin-top:10px}
+.ls-buscar{margin-top:12px;font-size:.9rem}
+.ls-buscar summary{cursor:pointer;color:var(--turquesa);font-weight:600}
+.ls-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:end;margin:10px 0 6px}
+.ls-alt{font-size:.86rem;margin-top:12px;text-align:center}
+@media (max-width:560px){.ls-form{grid-template-columns:minmax(0,1fr)}.ls-tiles{gap:8px}.ls-tiles a{padding:12px 4px}.ls-tiles span{display:none}}
 body[data-page="gift-cards"] main > :not(#regalo):not(#seguimiento),body[data-page="armar"] main > :not(#armar):not(#seguimiento){display:none!important}
 body[data-page="gift-cards"] #regalo{display:block!important}
 body:not([data-page="home"]) .tema-aviso{display:none!important}
