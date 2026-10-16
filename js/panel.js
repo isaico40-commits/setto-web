@@ -315,7 +315,7 @@
     const chk = (f, label) => `<label><input type="checkbox" data-f="${f}" ${p[f] ? "checked" : ""}> ${label}</label>`;
     const money3 = 'min="0" step="100" inputmode="numeric"';
     const opts = (cat, sel) => P.products.filter((x) => x.categoria === cat).map((x) => `<option value="${esc(x.id)}" ${x.id === sel ? "selected" : ""}>${esc(x.nombre)}</option>`).join("");
-    return `<article class="pcard ${dirty ? "dirty" : ""} ${p.activo === false ? "off" : ""}" data-pid="${esc(p.id)}">
+    return `<article class="pcard ${dirty ? "dirty" : ""} ${p.activo === false ? "oculto" : ""}" data-pid="${esc(p.id)}">
       <div class="ptop"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><div><b>${esc(p.nombre)}</b><br>
         <label class="up">${p.img ? "Cambiar foto" : "Subir foto"}<input type="file" accept="image/*" data-photo></label>
         ${p.img && c === "especial" ? `<button class="linkbtn" data-nophoto>Quitar foto</button>` : ""}</div></div>
@@ -618,7 +618,7 @@
     pc.classList.add("dirty");
     if (!pc.querySelector("[data-undo]")) { const sp = pc.querySelector("[data-savep]").parentElement; sp.insertAdjacentHTML("afterbegin", '<button class="linkbtn" data-undo>Descartar</button> '); }
     if (d.categoria === "set") { const c = pc.querySelector("[data-calc]"); if (c) c.outerHTML = setCalc(d); }
-    if (t.dataset.f === "activo") pc.classList.toggle("off", !t.checked);
+    if (t.dataset.f === "activo") pc.classList.toggle("oculto", !t.checked);
   });
   document.addEventListener("change", async (e) => {
     const t = e.target;
