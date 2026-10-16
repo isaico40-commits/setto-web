@@ -27,13 +27,13 @@
   if (off) return;
 
   /* ---------- 2) Mochito ---------- */
-  // Mochito animado por partes (piernas, cuerpo y ojos recortados del dibujo original mochito-run.png)
+  // Mochito animado por partes, recortado de los dibujos originales: quieto = mochito-run.png (parpadea); scrolleando = mochito-cup.png con el latte (corre)
   const el = document.createElement("div");
   el.className = "mito"; el.setAttribute("aria-live", "polite");
   el.innerHTML = `<div class="mito-bubble" hidden><p></p><div class="mito-acts"></div><button class="mito-x" aria-label="Ocultar a Mochito">✕</button></div>
     <button class="mito-btn" aria-label="Mochito: te llevo a pedir">
       <svg class="mito-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46"/><circle class="p" cx="50" cy="50" r="46" pathLength="100"/></svg>
-      <span class="mito-body"><span class="rig"><i class="lg l"></i><i class="lg r"></i><i class="bd"></i><i class="ey"></i></span></span>
+      <span class="mito-body"><span class="rig quieto"><i class="lg l"></i><i class="lg r"></i><i class="bd"></i><i class="ey"></i></span><span class="rig latte"><i class="lg l"></i><i class="lg r"></i><i class="bd"></i><i class="tz"></i></span></span>
       <span class="mito-shadow"></span>
     </button>`;
   document.body.appendChild(el);
@@ -118,6 +118,7 @@
       }
     }, 260);
   }
+  body.addEventListener("animationend", (e) => { if (e.animationName === "mitohop") body.classList.remove("hop"); });
   function hop() { if (RM) return; body.classList.remove("hop"); void body.offsetWidth; body.classList.add("hop"); }
 
   // No molesta cuando hay un panel abierto

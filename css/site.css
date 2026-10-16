@@ -707,22 +707,32 @@ body:not([data-page="home"]) .tema-aviso{display:none!important}
 .mito-ring .p{fill:none;stroke:var(--coral,#f8a29a);stroke-linecap:round;stroke-dasharray:0 100;transition:stroke-dasharray .15s linear}
 .mito-body{position:absolute;inset:11px 8px 12px;display:block;will-change:transform}
 .mito-body{display:flex;align-items:center}
-.rig{position:relative;width:100%;aspect-ratio:700/647}
+.mito-body{position:absolute}
+.rig{position:absolute;left:0;right:0;top:50%;translate:0 -50%}
 .rig i{position:absolute;inset:0;background:center/contain no-repeat}
-.rig .bd{background-image:url(../img/mochito-anim/body.webp)}
-.rig .ey{background-image:url(../img/mochito-anim/ojos.webp);transform-origin:50% 33%;animation:mitoblink 4.2s infinite}
-.rig .lg.l{background-image:url(../img/mochito-anim/pierna-izq.webp);transform-origin:32.9% 66.5%;animation:mitolegl 1.6s ease-in-out infinite}
-.rig .lg.r{background-image:url(../img/mochito-anim/pierna-der.webp);transform-origin:54.3% 74.2%;animation:mitolegr 1.6s ease-in-out infinite}
-.mito.run .rig .lg.l{animation-duration:.32s;--amp:1}
-.mito.run .rig .lg.r{animation-duration:.32s;--amp:1}
-.rig .lg{--amp:.35}
-@keyframes mitolegl{0%,100%{rotate:calc(10deg * var(--amp))}50%{rotate:calc(-10deg * var(--amp))}}
-@keyframes mitolegr{0%,100%{rotate:calc(-8deg * var(--amp))}50%{rotate:calc(8deg * var(--amp))}}
+.rig.quieto{aspect-ratio:700/647}
+.rig.quieto .bd{background-image:url(../img/mochito-anim/body.webp)}
+.rig.quieto .lg.l{background-image:url(../img/mochito-anim/pierna-izq.webp)}
+.rig.quieto .lg.r{background-image:url(../img/mochito-anim/pierna-der.webp)}
+.rig.quieto .ey{background-image:url(../img/mochito-anim/ojos.webp);transform-origin:50% 33%;animation:mitoblink 4.2s infinite}
+.rig.latte{aspect-ratio:700/532;opacity:0;left:2%;right:2%}
+.rig.latte .bd{background-image:url(../img/mochito-anim/cup-body.webp)}
+.rig.latte .tz{background-image:url(../img/mochito-anim/cup-taza.webp);transform-origin:13% 53%}
+.rig.latte .lg.l{background-image:url(../img/mochito-anim/cup-pierna-izq.webp);transform-origin:45.7% 79%}
+.rig.latte .lg.r{background-image:url(../img/mochito-anim/cup-pierna-der.webp);transform-origin:67.1% 82.7%}
+.mito.run .rig.quieto{opacity:0}
+.mito.run .rig.latte{opacity:1}
+.mito.run .rig.latte .lg.l{animation:mitolegl .3s ease-in-out infinite}
+.mito.run .rig.latte .lg.r{animation:mitolegr .3s ease-in-out infinite}
+.mito.run .rig.latte .tz{animation:mitotaza .6s ease-in-out infinite}
+@keyframes mitolegl{0%,100%{rotate:10deg}50%{rotate:-10deg}}
+@keyframes mitolegr{0%,100%{rotate:-9deg}50%{rotate:9deg}}
+@keyframes mitotaza{0%,100%{rotate:-4deg}50%{rotate:4deg}}
 @keyframes mitoblink{0%,90%,96%,100%{scale:1 1}93%{scale:1 .12}}
 .mito-shadow{position:absolute;left:50%;bottom:6px;width:30px;height:5px;margin-left:-15px;border-radius:50%;background:rgba(41,106,103,.16);transform:scaleX(var(--sh,1))}
 .mito-body.hop{animation:mitohop .55s cubic-bezier(.3,1.6,.5,1)}
 @keyframes mitohop{0%{translate:0 0}35%{translate:0 -16px;scale:1.06 .94}60%{translate:0 0;scale:.95 1.05}100%{translate:0 0;scale:1 1}}
-.mito-body.hop .rig .lg{animation-duration:.18s;--amp:1.6}
+.mito-body.hop .rig.latte{opacity:1}.mito-body.hop .rig.quieto{opacity:0}.mito-body.hop .rig.latte .lg.l{animation:mitolegl .18s infinite}.mito-body.hop .rig.latte .lg.r{animation:mitolegr .18s infinite}
 .mito-bubble{pointer-events:auto;position:relative;max-width:min(260px,calc(100vw - 40px));background:var(--card,#fffaf0);color:var(--ink);border:1.5px solid var(--turquesa);border-radius:18px 18px 6px 18px;
   padding:10px 30px 10px 13px;box-shadow:var(--sombra-chica);font-size:.86rem;line-height:1.35;opacity:0;transform:translateY(8px) scale(.96);transform-origin:100% 100%;transition:opacity .2s,transform .25s cubic-bezier(.3,1.4,.5,1)}
 .mito-bubble.on{opacity:1;transform:none}
