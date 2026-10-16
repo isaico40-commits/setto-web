@@ -53,7 +53,7 @@
       <div class="htrack" id="heroSlides" tabindex="-1"></div>
     </div>
     <div class="wrap hctl">
-      <div class="h2dots" id="heroDots" role="tablist" aria-label="Elegir slide"></div>
+      <div class="hleft"><span class="tagline" id="abierto"><i></i>Home cafe · Mar del Plata</span><div class="h2dots" id="heroDots" role="tablist" aria-label="Elegir slide"></div></div>
       <div class="harr">
         <button class="hbtn" id="heroPause" aria-label="Pausar" aria-pressed="false"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path class="pz" d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor"/><path class="pl" d="M8 5l11 7-11 7z" fill="currentColor"/></svg></button>
         <button class="hbtn" id="heroPrev" aria-label="Anterior"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -231,6 +231,18 @@
     <div class="wrap">
       <div class="head"><span class="eyebrow">Reseña</span><h2 id="t-lsres">¿Qué tal estuvo?</h2><p>Tu reseña ayuda a que más gente de Mar del Plata nos conozca.</p></div>
       <div id="lsResBody"><p class="loading">Buscando tu pedido…</p></div>
+    </div>
+  </section>
+
+  <section class="blk" id="ubicacion" aria-labelledby="t-ubi" hidden>
+    <div class="wrap ubi">
+      <div class="ubi-txt">
+        <span class="eyebrow">Retiro</span>
+        <h2 id="t-ubi">Dónde estamos</h2>
+        <p id="ubiTexto"></p>
+        <a class="btn" id="ubiLink" target="_blank" rel="noopener">Abrir en Google Maps</a>
+      </div>
+      <div class="ubi-map"><iframe id="ubiMap" title="Mapa de Setto" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
   </section>
 
