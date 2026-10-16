@@ -58,7 +58,7 @@
   }
 
   /* el stock frena: no se puede pedir más de lo que hay (la base también lo controla) */
-  const mochiDe = (p) => (!p ? null : p.categoria === "set" ? p.set_mochi : ["mochi", "especial"].includes(p.categoria) ? p.id : null);
+  const mochiDe = (p) => (!p ? null : fmt(p) === "set" ? p.set_mochi : fmt(p) === "mochi" ? p.id : null);
   const sinStock = (p) => { const n = stockDe(p); return n !== null && n <= 0; };
   const enCarrito = (mid) => cart.reduce((a, c) => a + (mochiDe(find(c.id)) === mid ? c.qty : 0), 0);
   function frenoStock(p, extra) {
@@ -70,7 +70,9 @@
 
   const find = (id) => [...SETS, ...DIRTY, ...MOCHIS, ...ESP].find((x) => x.id === id);
   const kind = (p) => p.categoria === "especial" ? "premium" : p.categoria;
-  const unit = (p) => kind(p) === "mochi" || kind(p) === "premium";
+  const fmt = (p) => (p.categoria === "especial" ? p.formato || "mochi" : p.categoria);   // especial puede ser mochi, dirty o set
+  const bebida = (p) => ["set", "dirty"].includes(fmt(p));
+  const unit = (p) => !bebida(p);
   const priceOf = (p, sz) => (unit(p) ? p.precio : p.precios[sz]);
   const nameOf = (p) => (unit(p) ? "Mochi " + p.nombre : p.nombre);
   const espOpen = () => (S.especial || {}).estado === "disponible";
@@ -142,7 +144,7 @@
   const pers = () => S.personalizacion || {};
   const leches = () => (pers().activo === false ? [] : pers().leches || []);
   const sinOpts = () => (pers().activo === false ? [] : pers().sin || []);
-  const persOn = (p) => ["set", "dirty"].includes(kind(p)) && (leches().length > 0 || sinOpts().length > 0);
+  const persOn = (p) => bebida(p) && (leches().length > 0 || sinOpts().length > 0);
   const lechePrecio = (n) => { const l = leches().find((x) => x.nombre === n); return l ? Number(l.precio) || 0 : 0; };
   const detalleOf = (leche, sin) => [leche && (lechePrecio(leche) > 0 || leche !== (leches()[0] || {}).nombre) ? leche : "", ...(sin || [])].filter(Boolean).join(" · ");
   function syncCart() { // si cambió la carta, actualiza precios y saca lo que ya no existe
@@ -453,14 +455,15 @@
     document.querySelectorAll('a[href="#especial"]').forEach((a) => (a.textContent = E.titulo || "Edición especial"));
     $("#espIntro").textContent = E.intro || "";
     $("#espGrid").innerHTML = items.map((p) => {
-      const foto = !!p.img, canBuy = open && !p.agotado && !sinStock(p) && Number(p.precio) > 0;
-      const pic = foto ? `<img src="${esc(p.img)}" alt="Mochi ${esc(p.nombre)}" loading="lazy">` : `<span class="pend"><img src="img/mochito-lie.png" alt="">Foto en camino</span>`;
+      const beb = bebida(p), base = beb ? Number(p.precios["12 oz"]) : Number(p.precio);
+      const foto = !!p.img, canBuy = open && !p.agotado && !sinStock(p) && base > 0;
+      const pic = foto ? `<img src="${esc(p.img)}" alt="${esc(nameOf(p))}" loading="lazy">` : `<span class="pend"><img src="img/mochito-lie.png" alt="">Foto en camino</span>`;
       const tag = p.agotado ? '<span class="badge">Agotado</span>' : !open ? '<span class="badge">Próximamente</span>' : stockBadge(p);
       return `<article class="prem ${p.agotado ? "agotado" : ""}">
         <button class="ph ${foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${tag}${pic}</button>
         <h3>${esc(p.nombre)}</h3><p class="desc">${esc(p.desc)}</p>${open ? stockLine(p) : ""}
-        <div class="row">${Number(p.precio) > 0 ? `<span class="price num">${money(p.precio)}</span>` : `<span class="muted" style="font-size:.85rem">Precio a confirmar</span>`}
-        ${canBuy ? `<button class="add" data-quick="${p.id}" aria-label="Sumar ${esc(nameOf(p))}">+</button>` : ""}</div>
+        <div class="row">${base > 0 ? `<span class="price num">${beb ? "Desde " : ""}${money(base)}</span>` : `<span class="muted" style="font-size:.85rem">Precio a confirmar</span>`}
+        ${canBuy ? `<button class="add" ${beb ? `data-open="${p.id}"` : `data-quick="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>` : ""}</div>
       </article>`;
     }).join("");
     $("#espSoon").innerHTML = open ? "" : `<div class="prem-soon"><img src="img/mochito-run.png" alt=""><div><b>Todavía no salió</b><p>Avisamos en Instagram <strong>@${esc(S.instagram || "setto.project")}</strong>.</p></div></div>`;
@@ -562,7 +565,7 @@
   }
   function drawSheet() {
     const { p, sz, qty, leche, sin } = sheetState, k = kind(p);
-    const custom = persOn(p) ? `${leches().length ? `<div><span class="eyebrow">Leche${k === "set" ? " de la bebida" : ""}</span><div class="chips lechas" style="margin-top:8px">${leches().map((l) => `<button data-leche="${esc(l.nombre)}" aria-pressed="${l.nombre === leche}">${esc(l.nombre)}${Number(l.precio) > 0 ? ` <span class="num">+${money(l.precio)}</span>` : ""}</button>`).join("")}</div></div>` : ""}
+    const custom = persOn(p) ? `${leches().length ? `<div><span class="eyebrow">Leche${fmt(p) === "set" ? " de la bebida" : ""}</span><div class="chips lechas" style="margin-top:8px">${leches().map((l) => `<button data-leche="${esc(l.nombre)}" aria-pressed="${l.nombre === leche}">${esc(l.nombre)}${Number(l.precio) > 0 ? ` <span class="num">+${money(l.precio)}</span>` : ""}</button>`).join("")}</div></div>` : ""}
       ${sinOpts().length ? `<div><span class="eyebrow">¿Algo para sacar?</span><div class="chips" style="margin-top:8px">${sinOpts().map((x) => `<button data-sin="${esc(x)}" aria-pressed="${sin.includes(x)}">${esc(x)}</button>`).join("")}</div></div>` : ""}` : "";
     const opts = unit(p) ? "" : `<div><span class="eyebrow">Tamaño</span><div class="opts" style="margin-top:8px">${["12 oz", "16 oz"].map((oz) => {
       const sv = k === "set" ? suelto(p, oz) : 0, pv = p.precios[oz];
@@ -570,7 +573,7 @@
       return `<button class="opt" data-sz="${oz}" aria-pressed="${oz === sz}"><span class="rd"></span><b>${oz.toUpperCase()}</b><span class="pp num">${pr}</span></button>`;
     }).join("")}</div></div>`;
     const sinSt = sinStock(p) && !(k === "premium" && !espOpen());
-    const blocked = p.agotado || sinSt || (k === "premium" && (!espOpen() || !(Number(p.precio) > 0)));
+    const blocked = p.agotado || sinSt || (k === "premium" && (!espOpen() || !(Number(bebida(p) ? p.precios[sz || "12 oz"] : p.precio) > 0)));
     $("#sheet").innerHTML = `<div class="sph"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
       <div class="sb">
         ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}

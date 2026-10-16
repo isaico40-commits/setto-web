@@ -310,7 +310,7 @@
     return `<div class="calc ${rows.some((r) => r.bad) ? "bad" : ""}" data-calc>${rows.map((r) => r.txt).join("<br>")}</div>`;
   }
   function cardP(p0) {
-    const p = draftOf(p0), c = p.categoria, dirty = !!P.drafts[p.id] || p._new;
+    const p = draftOf(p0), c = p.categoria, dirty = !!P.drafts[p.id] || p._new, F = c === "especial" ? p.formato || "mochi" : c;
     const inp = (f, label, type = "text", extra = "") => `<label>${label}<input data-f="${f}" type="${type}" value="${esc(p[f] ?? "")}" ${extra}></label>`;
     const chk = (f, label) => `<label><input type="checkbox" data-f="${f}" ${p[f] ? "checked" : ""}> ${label}</label>`;
     const money3 = 'min="0" step="100" inputmode="numeric"';
@@ -320,10 +320,12 @@
         <label class="up">${p.img ? "Cambiar foto" : "Subir foto"}<input type="file" accept="image/*" data-photo></label>
         ${p.img && c === "especial" ? `<button class="linkbtn" data-nophoto>Quitar foto</button>` : ""}</div></div>
       ${inp("nombre", "Nombre")}
+      ${c === "especial" ? `<label>Tipo<select data-f="formato">${[["mochi", "Mochi (precio por unidad)"], ["dirty", "Dirty / latte (12 y 16 oz, leche y extras)"], ["set", "Set (bebida + mochi, 12 y 16 oz)"]].map(([v, l]) => `<option value="${v}" ${F === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
+      ${c === "especial" && F === "set" ? `<label>Mochi que incluye (para el stock)<select data-f="set_mochi"><option value="">—</option>${opts("mochi", p.set_mochi)}${P.products.filter((x) => x.categoria === "especial" && (x.formato || "mochi") === "mochi").map((x) => `<option value="${esc(x.id)}" ${x.id === p.set_mochi ? "selected" : ""}>${esc(x.nombre)} (especial)</option>`).join("")}</select></label>` : ""}
       ${c === "set" ? `<div class="row2">${inp("codigo", "Código (ej: Set 04)")}${inp("tema", "Tema (ej: Matcha & cereza)")}</div>
         <div class="row2"><label>Bebida<select data-f="set_bebida">${opts("dirty", p.set_bebida)}</select></label><label>Mochi<select data-f="set_mochi">${opts("mochi", p.set_mochi)}</select></label></div>`
         : `<label>Descripción<textarea data-f="descripcion">${esc(p.descripcion || "")}</textarea></label>`}
-      ${c === "set" || c === "dirty" ? `<div class="row3">${inp("precio_12", "Precio 12 oz", "number", money3)}${inp("precio_16", "Precio 16 oz", "number", money3)}${inp("orden", "Orden", "number")}</div>`
+      ${c === "set" || c === "dirty" || (c === "especial" && F !== "mochi") ? `<div class="row3">${inp("precio_12", "Precio 12 oz", "number", money3)}${inp("precio_16", "Precio 16 oz", "number", money3)}${inp("orden", "Orden", "number")}</div>`
         : `<div class="row2">${inp("precio", c === "especial" ? "Precio (0 = a confirmar)" : "Precio por unidad", "number", money3)}${inp("orden", "Orden", "number")}</div>`}
       ${c === "set" ? setCalc(p) : ""}
       <div class="checks">${chk("activo", "Visible en la web")}${chk("agotado", "Agotado")}${c === "mochi" ? chk("rotativo", "Rotativo") : ""}</div>
@@ -588,6 +590,7 @@
       if (b.dataset.savep !== undefined) {
         const d = { ...(P.drafts[id] || base) }; delete d._new;
         if (!String(d.nombre || "").trim()) return toast("Falta el nombre");
+        if (d.set_mochi === "") d.set_mochi = null;
         ["precio", "precio_12", "precio_16", "orden"].forEach((k) => { if (d[k] !== null && d[k] !== undefined && d[k] !== "") d[k] = parseInt(d[k], 10) || 0; });
         b.disabled = true;
         try { await API.saveProduct(d); delete P.drafts[id]; await loadBase(); toast("Guardado"); redrawCard(id); }
@@ -619,6 +622,7 @@
     if (!pc.querySelector("[data-undo]")) { const sp = pc.querySelector("[data-savep]").parentElement; sp.insertAdjacentHTML("afterbegin", '<button class="linkbtn" data-undo>Descartar</button> '); }
     if (d.categoria === "set") { const c = pc.querySelector("[data-calc]"); if (c) c.outerHTML = setCalc(d); }
     if (t.dataset.f === "activo") pc.classList.toggle("oculto", !t.checked);
+    if (t.dataset.f === "formato") redrawCard(id);
   });
   document.addEventListener("change", async (e) => {
     const t = e.target;
