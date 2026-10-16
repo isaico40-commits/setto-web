@@ -49,19 +49,15 @@
 <main id="inicio">
   <section class="seguimiento" id="seguimiento" aria-live="polite" hidden></section>
   <section class="hero2" aria-roledescription="carrusel" aria-label="Destacados">
-    <div class="wrap">
-      <div class="h2box" id="heroBox">
-        <div class="h2slides" id="heroSlides"></div>
-        <div class="h2txt">
-          <span class="tagline" id="abierto"><i></i>Home cafe · Mar del Plata</span>
-          <h1 id="heroTitle">Asian Inspired Home Cafe</h1>
-          <p class="lead" id="heroText">Dirty lattes y mochis en Mar del Plata.</p>
-          <div class="ctas">
-            <a class="btn glow big" href="#sets">Armar mi pedido</a>
-            <a class="btn big ghost" href="#apps">Pedir por apps</a>
-          </div>
-          <div class="h2dots" id="heroDots" role="tablist" aria-label="Elegir slide"></div>
-        </div>
+    <div class="hcar" id="heroBox">
+      <div class="htrack" id="heroSlides" tabindex="-1"></div>
+    </div>
+    <div class="wrap hctl">
+      <div class="h2dots" id="heroDots" role="tablist" aria-label="Elegir slide"></div>
+      <div class="harr">
+        <button class="hbtn" id="heroPause" aria-label="Pausar" aria-pressed="false"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path class="pz" d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor"/><path class="pl" d="M8 5l11 7-11 7z" fill="currentColor"/></svg></button>
+        <button class="hbtn" id="heroPrev" aria-label="Anterior"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="hbtn" id="heroNext" aria-label="Siguiente"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
     </div>
   </section>

@@ -389,7 +389,7 @@
           <span class="hintp">El recargo se suma al precio de la bebida o del set.</span>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard wide" data-set="hero"><b>Portada (slides del inicio)</b>
-          <span class="hintp">Hasta 5 slides. Cada uno: foto, título corto y una línea. "Recorte" = producto sin fondo (sobre el círculo); "Foto" = foto completa que llena el espacio.</span>
+          <span class="hintp">Hasta 5 slides. Cada uno: foto, título corto y una línea. <b>Recorte</b> = producto sin fondo, al lado del texto (sobre el círculo). <b>Foto de fondo</b> = la foto llena toda la tarjeta y el texto va encima (ideal para fotos reales, mejor horizontales y de buena calidad). Con "Encuadre" elegís qué parte de la foto se prioriza.</span>
           ${[0, 1, 2, 3, 4].map((i) => { const x = ((S.hero || {}).slides || [])[i] || (i < 3 && !((S.hero || {}).slides || []).length ? [
               { img: "img/set-sakura.webp", titulo: "Asian Inspired Home Cafe", texto: "Dirty lattes y mochis en Mar del Plata.", ajuste: "recorte" },
               { img: "img/set-yoru.webp", titulo: "Un set distinto cada día", texto: "Una bebida y un mochi que van juntos.", ajuste: "recorte" },
@@ -398,7 +398,8 @@
               <div class="slf"><input type="hidden" name="si${i}" value="${esc(x.img || "")}">
                 <label>Título<input class="inp" name="st${i}" maxlength="40" value="${esc(x.titulo || "")}" placeholder="Ej: Asian Inspired Home Cafe"></label>
                 <label>Línea corta (opcional)<input class="inp" name="sx${i}" maxlength="70" value="${esc(x.texto || "")}"></label>
-                <div class="acts"><select class="inp" name="sa${i}" style="width:auto"><option value="recorte" ${x.ajuste !== "foto" ? "selected" : ""}>Recorte</option><option value="foto" ${x.ajuste === "foto" ? "selected" : ""}>Foto</option></select>
+                <div class="acts"><select class="inp" name="sa${i}" style="width:auto"><option value="recorte" ${x.ajuste !== "foto" ? "selected" : ""}>Recorte</option><option value="foto" ${x.ajuste === "foto" ? "selected" : ""}>Foto de fondo</option></select>
+                <select class="inp" name="sp${i}" style="width:auto" title="Encuadre de la foto">${[["centro", "Encuadre: centro"], ["arriba", "Encuadre: arriba"], ["abajo", "Encuadre: abajo"]].map(([v, l]) => `<option value="${v}" ${(x.pos || "centro") === v ? "selected" : ""}>${l}</option>`).join("")}</select>
                 <label class="btn">Subir foto<input type="file" accept="image/*" data-upimg="si${i}" data-upmax="1600" hidden></label>${x.img || x.titulo ? `<button type="button" class="linkbtn warn" data-slx="${i}">Quitar</button>` : ""}</div></div></div>`; }).join("")}
           <label>Cambia cada (segundos)<input class="inp" name="intervalo" type="number" min="3" max="15" value="${(S.hero || {}).intervalo || 5}" style="width:120px"></label>
           <button class="btn solid">Guardar portada</button></form>
@@ -494,7 +495,7 @@
         await API.saveSetting("personalizacion", { activo: !!f.activo, leches, sin: (f.sin || "").split("\n").map((s) => s.trim()).filter(Boolean) });
       }
       if (k === "hero") {
-        const slides = [0, 1, 2, 3, 4].map((i) => ({ img: (f["si" + i] || "").trim(), titulo: (f["st" + i] || "").trim(), texto: (f["sx" + i] || "").trim(), ajuste: f["sa" + i] === "foto" ? "foto" : "recorte" })).filter((x) => x.img || x.titulo);
+        const slides = [0, 1, 2, 3, 4].map((i) => ({ img: (f["si" + i] || "").trim(), titulo: (f["st" + i] || "").trim(), texto: (f["sx" + i] || "").trim(), ajuste: f["sa" + i] === "foto" ? "foto" : "recorte", pos: ["arriba", "abajo"].includes(f["sp" + i]) ? f["sp" + i] : "centro" })).filter((x) => x.img || x.titulo);
         if (!slides.length) throw new Error("Dejá al menos un slide con foto o título");
         await API.saveSetting("hero", { slides, intervalo: Math.max(3, Math.min(15, +f.intervalo || 5)) });
       }

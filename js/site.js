@@ -176,33 +176,56 @@
     { img: "img/set-yoru.webp", titulo: "Un set distinto cada día", texto: "Una bebida y un mochi que van juntos.", ajuste: "recorte" },
     { img: "img/mochi-sakura.webp", titulo: "Mochis rellenos", texto: "Masa suave por fuera, crema por dentro.", ajuste: "recorte" },
   ];
-  let heroI = 0, heroT = null, HS = [];
+  let heroI = 0, heroT = null, HS = [], heroPausa = false, heroHold = 0;
+  const RMH = matchMedia("(prefers-reduced-motion: reduce)").matches;
   function renderHero() {
     const h = S.hero || {}; HS = (h.slides || []).filter((x) => x && (x.img || x.titulo)); if (!HS.length) HS = HERO_DEF;
-    $("#heroSlides").innerHTML = HS.map((x, i) => `<div class="h2s ${x.ajuste === "foto" ? "foto" : "recorte"} ${i === 0 ? "on" : ""}" aria-hidden="${i !== 0}"><img src="${esc(x.img || "img/mochito-lie.png")}" alt="${esc(x.alt || x.titulo || "Setto")}" ${i ? 'loading="lazy"' : ""}></div>`).join("");
+    $("#heroSlides").innerHTML = HS.map((x, i) => {
+      const foto = x.ajuste === "foto", T = i === 0 ? "h1" : "h2";
+      return `<article class="hcard ${foto ? "foto" : "recorte"}" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">
+        <div class="hmedia"><img src="${esc(x.img || "img/mochito-lie.png")}" alt="${esc(x.alt || x.titulo || "Setto")}" ${i ? 'loading="lazy"' : 'fetchpriority="high"'} style="object-position:center ${esc({ arriba: "top", abajo: "bottom" }[x.pos] || "center")}"></div>
+        <div class="h2txt">
+          ${i === 0 ? '<span class="tagline" id="abierto"><i></i>Home cafe · Mar del Plata</span>' : ""}
+          <${T} class="ht">${esc(x.titulo || "Asian Inspired Home Cafe")}</${T}>
+          ${x.texto ? `<p class="lead">${esc(x.texto)}</p>` : ""}
+          <div class="ctas"><a class="btn glow big" href="#sets">Armar mi pedido</a><a class="btn big ghost" href="#apps">Pedir por apps</a></div>
+        </div></article>`;
+    }).join("");
     $("#heroDots").innerHTML = HS.length > 1 ? HS.map((_, i) => `<button role="tab" aria-selected="${i === 0}" aria-label="Slide ${i + 1}" data-hero="${i}"></button>`).join("") : "";
-    heroI = 0; heroTexto(0, true); heroAuto();
+    document.querySelector(".hctl").hidden = HS.length < 2;
+    heroI = 0; $("#heroSlides").scrollLeft = 0; heroMarcar(); heroAuto();
   }
-  function heroTexto(i, sinFade) {
-    const x = HS[i] || {}, t = $(".h2txt");
-    const put = () => { $("#heroTitle").textContent = x.titulo || "Asian Inspired Home Cafe"; $("#heroText").textContent = x.texto || ""; $("#heroText").hidden = !x.texto; t.classList.remove("fade"); };
-    if (sinFade) return put(); t.classList.add("fade"); setTimeout(put, 300);
+  const heroCards = () => Array.from(document.querySelectorAll("#heroSlides .hcard"));
+  function heroIr(i, smooth = true) {
+    const cs = heroCards(); if (!cs.length) return;
+    heroI = (i + cs.length) % cs.length;
+    const tr = $("#heroSlides"), pad = parseFloat(getComputedStyle(tr).scrollPaddingLeft) || 0;
+    tr.scrollTo({ left: cs[heroI].offsetLeft - pad, behavior: smooth && !RMH ? "smooth" : "auto" });
+    heroMarcar();
   }
-  function heroIr(i) {
-    if (!HS.length) return; heroI = (i + HS.length) % HS.length;
-    document.querySelectorAll(".h2s").forEach((el, k) => { el.classList.toggle("on", k === heroI); el.setAttribute("aria-hidden", String(k !== heroI)); });
-    document.querySelectorAll("[data-hero]").forEach((d, k) => d.setAttribute("aria-selected", String(k === heroI)));
-    heroTexto(heroI);
-  }
+  function heroMarcar() { document.querySelectorAll("[data-hero]").forEach((d, k) => d.setAttribute("aria-selected", String(k === heroI))); heroCards().forEach((c, k) => c.classList.toggle("on", k === heroI)); }
   function heroAuto() {
-    clearInterval(heroT); if (HS.length < 2 || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    heroT = setInterval(() => { if (!document.hidden) heroIr(heroI + 1); }, Math.max(3, Number((S.hero || {}).intervalo) || 5) * 1000);
+    clearInterval(heroT); if (HS.length < 2 || RMH || heroPausa) return;
+    heroT = setInterval(() => { if (!document.hidden && Date.now() > heroHold) heroIr(heroI + 1); }, Math.max(3, Number((S.hero || {}).intervalo) || 5) * 1000);
   }
-  document.addEventListener("click", (e) => { const d = e.target.closest("[data-hero]"); if (d) { heroIr(+d.dataset.hero); heroAuto(); } });
-  (function swipeHero() {
-    let x0 = null; const box = document.getElementById("heroBox"); if (!box) return;
-    box.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
-    box.addEventListener("touchend", (e) => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) { heroIr(heroI + (dx < 0 ? 1 : -1)); heroAuto(); } x0 = null; });
+  const heroEspera = () => { heroHold = Date.now() + 8000; };  // si la persona toca, esperamos antes de seguir solos
+  document.addEventListener("click", (e) => {
+    const d = e.target.closest("[data-hero]"); if (d) { heroEspera(); heroIr(+d.dataset.hero); return; }
+    if (e.target.closest("#heroPrev")) { heroEspera(); heroIr(heroI - 1); }
+    if (e.target.closest("#heroNext")) { heroEspera(); heroIr(heroI + 1); }
+    const pz = e.target.closest("#heroPause");
+    if (pz) { heroPausa = !heroPausa; pz.setAttribute("aria-pressed", String(heroPausa)); pz.setAttribute("aria-label", heroPausa ? "Reproducir" : "Pausar"); heroAuto(); }
+  });
+  (function heroScroll() {
+    const tr = document.getElementById("heroSlides"); if (!tr) return; let t = null;
+    tr.addEventListener("scroll", () => {
+      clearTimeout(t); t = setTimeout(() => {
+        const cs = heroCards(), pad = parseFloat(getComputedStyle(tr).scrollPaddingLeft) || 0;
+        let best = 0, bd = 1e9; cs.forEach((c, k) => { const dd = Math.abs(c.offsetLeft - pad - tr.scrollLeft); if (dd < bd) { bd = dd; best = k; } });
+        if (best !== heroI) { heroI = best; heroMarcar(); }
+      }, 80);
+    }, { passive: true });
+    ["pointerdown", "wheel", "touchstart", "focusin"].forEach((ev) => tr.addEventListener(ev, heroEspera, { passive: true }));
   })();
 
   /* ---------- ¿Qué es un mochi? (se edita en Panel → Ajustes) ---------- */
