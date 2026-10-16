@@ -306,6 +306,7 @@
     async uploadPhoto(blob) {
       return await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
     },
+    async uploadMedia(file) { return this.uploadPhoto(file); },
     onOrders(cb) { window.addEventListener("storage", (e) => { if (e.key === KEY) cb(); }); },
     resetDemo() { localStorage.removeItem(KEY); },
   };
@@ -394,6 +395,13 @@
     },
     async deleteProduct(id) { const { error } = await sb.from("products").delete().eq("id", id); fail(error); },
     async saveSetting(key, value) { const { error } = await sb.from("settings").upsert({ key, value, updated_at: new Date().toISOString() }); fail(error); },
+    async uploadMedia(file, id) {
+      const ext = ((file.name || "").split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "") || (file.type.includes("webm") ? "webm" : "mp4");
+      const path = `${id}-${Date.now()}.${ext}`;
+      const { error } = await sb.storage.from("productos").upload(path, file, { contentType: file.type || "video/mp4", upsert: true });
+      fail(error);
+      return sb.storage.from("productos").getPublicUrl(path).data.publicUrl;
+    },
     async uploadPhoto(blob, id) {
       const ext = (blob.type || "").includes("webp") ? "webp" : "jpg";
       const path = `${id}-${Date.now()}.${ext}`;

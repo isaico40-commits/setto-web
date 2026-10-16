@@ -178,34 +178,84 @@
     { img: "img/set-yoru.webp", titulo: "Un set distinto cada día", texto: "Una bebida y un mochi que van juntos.", ajuste: "recorte" },
     { img: "img/mochi-sakura.webp", titulo: "Mochis rellenos", texto: "Masa suave por fuera, crema por dentro.", ajuste: "recorte" },
   ];
-  let heroI = 0, heroT = null, HS = [];
+  let heroI = 0, heroT = null, HS = [], heroPausa = false, heroHold = 0;
+  const RMH = matchMedia("(prefers-reduced-motion: reduce)").matches;
   function renderHero() {
     const h = S.hero || {}; HS = (h.slides || []).filter((x) => x && (x.img || x.titulo)); if (!HS.length) HS = HERO_DEF;
-    $("#heroSlides").innerHTML = HS.map((x, i) => `<div class="h2s ${x.ajuste === "foto" ? "foto" : "recorte"} ${i === 0 ? "on" : ""}" aria-hidden="${i !== 0}"><img src="${esc(x.img || "img/mochito-lie.png")}" alt="${esc(x.alt || x.titulo || "Setto")}" ${i ? 'loading="lazy"' : ""}></div>`).join("");
+    const MOB = matchMedia("(max-width: 820px)").matches, todoMedia = HS.every((x) => x.tipo === "media");
+    $("#heroSlides").classList.toggle("all-media", todoMedia);
+    $("#heroSlides").innerHTML = HS.map((x, i) => {
+      if (x.tipo === "media") {
+        const vid = MOB ? x.video_m || x.video : x.video || x.video_m, poster = MOB ? x.img_m || x.img : x.img || x.img_m, alt = esc(x.alt || "Setto");
+        const media = vid ? `<video muted loop playsinline preload="${i ? "none" : "metadata"}" ${poster ? `poster="${esc(poster)}"` : ""} data-src="${esc(vid)}" aria-label="${alt}"></video>`
+          : `<picture>${x.img_m ? `<source media="(max-width: 820px)" srcset="${esc(x.img_m)}">` : ""}<img src="${esc(x.img || x.img_m || "img/mochito-lie.png")}" alt="${alt}" ${i ? 'loading="lazy"' : 'fetchpriority="high"'}></picture>`;
+        const cta = x.boton ? `<a class="btn solid hcta" href="${esc(x.link || "#sets")}">${esc(x.boton)}</a>` : "";
+        return `<article class="hcard media" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">${i === 0 ? `<h1 class="sr-only">${esc(x.alt || "Setto · Asian Inspired Home Cafe en Mar del Plata")}</h1>` : ""}<div class="hmedia">${media}</div>${cta}</article>`;
+      }
+      const foto = x.ajuste === "foto", T = i === 0 ? "h1" : "h2";
+      return `<article class="hcard ${foto ? "foto" : "recorte"}" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">
+        <div class="hmedia"><img src="${esc(x.img || "img/mochito-lie.png")}" alt="${esc(x.alt || x.titulo || "Setto")}" ${i ? 'loading="lazy"' : 'fetchpriority="high"'} style="object-position:center ${esc({ arriba: "top", abajo: "bottom" }[x.pos] || "center")}"></div>
+        <div class="h2txt">
+          <${T} class="ht">${esc(x.titulo || "Asian Inspired Home Cafe")}</${T}>
+          ${x.texto ? `<p class="lead">${esc(x.texto)}</p>` : ""}
+          <div class="ctas"><a class="btn glow big" href="#sets">Armar mi pedido</a><a class="btn big ghost" href="#apps">Pedir por apps</a></div>
+        </div></article>`;
+    }).join("");
     $("#heroDots").innerHTML = HS.length > 1 ? HS.map((_, i) => `<button role="tab" aria-selected="${i === 0}" aria-label="Slide ${i + 1}" data-hero="${i}"></button>`).join("") : "";
-    heroI = 0; heroTexto(0, true); heroAuto();
+    document.querySelector(".harr").hidden = HS.length < 2;
+    heroI = 0; $("#heroSlides").scrollLeft = 0; heroMarcar(); heroAuto();
   }
-  function heroTexto(i, sinFade) {
-    const x = HS[i] || {}, t = $(".h2txt");
-    const put = () => { $("#heroTitle").textContent = x.titulo || "Asian Inspired Home Cafe"; $("#heroText").textContent = x.texto || ""; $("#heroText").hidden = !x.texto; t.classList.remove("fade"); };
-    if (sinFade) return put(); t.classList.add("fade"); setTimeout(put, 300);
+  const heroCards = () => Array.from(document.querySelectorAll("#heroSlides .hcard"));
+  function heroIr(i, smooth = true) {
+    const cs = heroCards(); if (!cs.length) return;
+    heroI = (i + cs.length) % cs.length;
+    const tr = $("#heroSlides"), pad = parseFloat(getComputedStyle(tr).scrollPaddingLeft) || 0;
+    tr.scrollTo({ left: cs[heroI].offsetLeft - pad, behavior: smooth && !RMH ? "smooth" : "auto" });
+    heroMarcar();
   }
-  function heroIr(i) {
-    if (!HS.length) return; heroI = (i + HS.length) % HS.length;
-    document.querySelectorAll(".h2s").forEach((el, k) => { el.classList.toggle("on", k === heroI); el.setAttribute("aria-hidden", String(k !== heroI)); });
+  function heroMarcar() {
     document.querySelectorAll("[data-hero]").forEach((d, k) => d.setAttribute("aria-selected", String(k === heroI)));
-    heroTexto(heroI);
+    heroCards().forEach((c, k) => {
+      c.classList.toggle("on", k === heroI);
+      const v = c.querySelector("video"); if (!v) return;
+      if (k === heroI && !heroPausa && !RMH) { if (!v.src) v.src = v.dataset.src; const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); }
+      else v.pause();
+    });
   }
   function heroAuto() {
-    clearInterval(heroT); if (HS.length < 2 || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    heroT = setInterval(() => { if (!document.hidden) heroIr(heroI + 1); }, Math.max(3, Number((S.hero || {}).intervalo) || 5) * 1000);
+    clearInterval(heroT); if (HS.length < 2 || RMH || heroPausa) return;
+    heroT = setInterval(() => { if (!document.hidden && Date.now() > heroHold) heroIr(heroI + 1); }, Math.max(3, Number((S.hero || {}).intervalo) || 5) * 1000);
   }
-  document.addEventListener("click", (e) => { const d = e.target.closest("[data-hero]"); if (d) { heroIr(+d.dataset.hero); heroAuto(); } });
-  (function swipeHero() {
-    let x0 = null; const box = document.getElementById("heroBox"); if (!box) return;
-    box.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
-    box.addEventListener("touchend", (e) => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) { heroIr(heroI + (dx < 0 ? 1 : -1)); heroAuto(); } x0 = null; });
+  const heroEspera = () => { heroHold = Date.now() + 8000; };  // si la persona toca, esperamos antes de seguir solos
+  document.addEventListener("click", (e) => {
+    const d = e.target.closest("[data-hero]"); if (d) { heroEspera(); heroIr(+d.dataset.hero); return; }
+    if (e.target.closest("#heroPrev")) { heroEspera(); heroIr(heroI - 1); }
+    if (e.target.closest("#heroNext")) { heroEspera(); heroIr(heroI + 1); }
+    const pz = e.target.closest("#heroPause");
+    if (pz) { heroPausa = !heroPausa; pz.setAttribute("aria-pressed", String(heroPausa)); pz.setAttribute("aria-label", heroPausa ? "Reproducir" : "Pausar"); heroMarcar(); heroAuto(); }
+  });
+  (function heroScroll() {
+    const tr = document.getElementById("heroSlides"); if (!tr) return; let t = null;
+    tr.addEventListener("scroll", () => {
+      clearTimeout(t); t = setTimeout(() => {
+        const cs = heroCards(), pad = parseFloat(getComputedStyle(tr).scrollPaddingLeft) || 0;
+        let best = 0, bd = 1e9; cs.forEach((c, k) => { const dd = Math.abs(c.offsetLeft - pad - tr.scrollLeft); if (dd < bd) { bd = dd; best = k; } });
+        if (best !== heroI) { heroI = best; heroMarcar(); }
+      }, 80);
+    }, { passive: true });
+    ["pointerdown", "wheel", "touchstart", "focusin"].forEach((ev) => tr.addEventListener(ev, heroEspera, { passive: true }));
   })();
+
+  /* ---------- Ubicación (Panel → Ajustes → Ubicación) ---------- */
+  function renderUbicacion() {
+    const u = S.ubicacion || {}, sec = $("#ubicacion"); if (!sec) return;
+    const q = (u.mapa || "").trim(); sec.hidden = !(u.activo && q); if (sec.hidden) return;
+    $("#t-ubi").textContent = u.titulo || "Dónde estamos";
+    $("#ubiTexto").textContent = u.texto || ""; $("#ubiTexto").hidden = !u.texto;
+    const map = $("#ubiMap"), src = `https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=${Math.max(12, Math.min(18, +u.zoom || 15))}&output=embed`;
+    if (map.getAttribute("src") !== src) map.setAttribute("src", src);
+    $("#ubiLink").href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+  }
 
   /* ---------- ¿Qué es un mochi? (se edita en Panel → Ajustes) ---------- */
   const MQ_DEF = {
@@ -459,7 +509,7 @@
       const foto = !!p.img, canBuy = open && !p.agotado && !sinStock(p) && base > 0;
       const pic = foto ? `<img src="${esc(p.img)}" alt="${esc(nameOf(p))}" loading="lazy">` : `<span class="pend"><img src="img/mochito-lie.png" alt="">Foto en camino</span>`;
       const tag = p.agotado ? '<span class="badge">Agotado</span>' : !open ? '<span class="badge">Próximamente</span>' : stockBadge(p);
-      return `<article class="prem ${p.agotado ? "agotado" : ""}">
+      return `<article class="prem ${p.agotado ? "agotado" : ""} ${p.esmerilado ? "soon" : ""}">
         <button class="ph ${foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${tag}${pic}</button>
         <h3>${esc(p.nombre)}</h3><p class="desc">${esc(p.desc)}</p>${open ? stockLine(p) : ""}
         <div class="row">${base > 0 ? `<span class="price num">${beb ? "Desde " : ""}${money(base)}</span>` : `<span class="muted" style="font-size:.85rem">Precio a confirmar</span>`}
@@ -574,7 +624,7 @@
     }).join("")}</div></div>`;
     const sinSt = sinStock(p) && !(k === "premium" && !espOpen());
     const blocked = p.agotado || sinSt || (k === "premium" && (!espOpen() || !(Number(bebida(p) ? p.precios[sz || "12 oz"] : p.precio) > 0)));
-    $("#sheet").innerHTML = `<div class="sph"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
+    $("#sheet").innerHTML = `<div class="sph ${p.esmerilado ? "frost" : ""}"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
       <div class="sb">
         ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
         <h3 id="sTitle">${esc(nameOf(p))}</h3>
@@ -1075,7 +1125,7 @@
       verSeguimiento(); renderResenas();
       API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
       S = settings; adapt(products); syncCart();
-      renderTema(); renderHero(); renderFaq(); renderAbierto(); renderGift(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
+      renderTema(); renderHero(); renderUbicacion(); renderFaq(); renderAbierto(); renderGift(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
       if (PAGE === "listo" && form.tel && clubOn()) setTimeout(() => { if (!lsTel) { lsTel = true; $("#cardForm").requestSubmit(); } }, 1500);
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }

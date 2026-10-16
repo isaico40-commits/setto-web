@@ -109,3 +109,13 @@ a.ptab{text-decoration:none}
 .cambiobox.ok{background:#e3f2ea;border:1.5px solid #3f8f63}
 .cambiobox.bad{background:var(--coral-2,#fde3df);border:1.5px solid #d9776b}
 .cambiobox span{display:block}
+
+.slrow2{border-top:1px dashed #0002;padding-top:10px;display:grid;gap:8px}
+.sln{font-size:.85rem}
+.upgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.upbox{display:grid;gap:4px;justify-items:start}
+.upbox small{font-size:.72rem;color:#0009;font-weight:600}
+.upbox .upprev{width:100%;height:64px}
+.upprev video{width:100%;height:100%;object-fit:cover}
+.slf2{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
+@media (max-width:700px){.upgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.slf2{grid-template-columns:1fr}}

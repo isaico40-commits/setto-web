@@ -328,7 +328,7 @@
       ${c === "set" || c === "dirty" || (c === "especial" && F !== "mochi") ? `<div class="row3">${inp("precio_12", "Precio 12 oz", "number", money3)}${inp("precio_16", "Precio 16 oz", "number", money3)}${inp("orden", "Orden", "number")}</div>`
         : `<div class="row2">${inp("precio", c === "especial" ? "Precio (0 = a confirmar)" : "Precio por unidad", "number", money3)}${inp("orden", "Orden", "number")}</div>`}
       ${c === "set" ? setCalc(p) : ""}
-      <div class="checks">${chk("activo", "Visible en la web")}${chk("agotado", "Agotado")}${c === "mochi" ? chk("rotativo", "Rotativo") : ""}</div>
+      <div class="checks">${chk("activo", "Visible en la web")}${chk("agotado", "Agotado")}${c === "mochi" ? chk("rotativo", "Rotativo") : ""}${c === "especial" ? chk("esmerilado", "Esmerilado (tapa la foto)") : ""}</div>
       <div class="savebar"><button class="linkbtn warn" data-delp>${P.cancelArm === "del-" + p.id ? "¿Seguro? Tocá de nuevo" : "Eliminar"}</button>
         <span>${dirty ? `<button class="linkbtn" data-undo>Descartar</button> ` : ""}<button class="btn solid" data-savep>Guardar</button></span></div>
     </article>`;
@@ -391,19 +391,26 @@
           <span class="hintp">El recargo se suma al precio de la bebida o del set.</span>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard wide" data-set="hero"><b>Portada (slides del inicio)</b>
-          <span class="hintp">Hasta 5 slides. Cada uno: foto, título corto y una línea. "Recorte" = producto sin fondo (sobre el círculo); "Foto" = foto completa que llena el espacio.</span>
-          ${[0, 1, 2, 3, 4].map((i) => { const x = ((S.hero || {}).slides || [])[i] || (i < 3 && !((S.hero || {}).slides || []).length ? [
-              { img: "img/set-sakura.webp", titulo: "Asian Inspired Home Cafe", texto: "Dirty lattes y mochis en Mar del Plata.", ajuste: "recorte" },
-              { img: "img/set-yoru.webp", titulo: "Un set distinto cada día", texto: "Una bebida y un mochi que van juntos.", ajuste: "recorte" },
-              { img: "img/mochi-sakura.webp", titulo: "Mochis rellenos", texto: "Masa suave por fuera, crema por dentro.", ajuste: "recorte" }][i] : {});
-            return `<div class="slrow"><span class="upprev">${x.img ? `<img src="${esc(x.img)}" alt="">` : `Slide ${i + 1}`}</span>
-              <div class="slf"><input type="hidden" name="si${i}" value="${esc(x.img || "")}">
-                <label>Título<input class="inp" name="st${i}" maxlength="40" value="${esc(x.titulo || "")}" placeholder="Ej: Asian Inspired Home Cafe"></label>
-                <label>Línea corta (opcional)<input class="inp" name="sx${i}" maxlength="70" value="${esc(x.texto || "")}"></label>
-                <div class="acts"><select class="inp" name="sa${i}" style="width:auto"><option value="recorte" ${x.ajuste !== "foto" ? "selected" : ""}>Recorte</option><option value="foto" ${x.ajuste === "foto" ? "selected" : ""}>Foto</option></select>
-                <label class="btn">Subir foto<input type="file" accept="image/*" data-upimg="si${i}" data-upmax="1600" hidden></label>${x.img || x.titulo ? `<button type="button" class="linkbtn warn" data-slx="${i}">Quitar</button>` : ""}</div></div></div>`; }).join("")}
+          <span class="hintp">Cada slide es una imagen o un video con el texto ya diseñado adentro. Medidas: <b>compu 2000 × 1000</b> (horizontal 2:1) y <b>celular 1080 × 1350</b> (vertical 4:5). Si no subís la de celular, se usa la de compu recortada. Video: corto (5–15 s), sin sonido, MP4, hasta 25 MB; la imagen de esa medida se usa como portada mientras carga.</span>
+          ${[0, 1, 2, 3, 4, 5].map((i) => { const x = ((S.hero || {}).slides || [])[i] || {};
+            const prev = (n, v, vid) => `<span class="upprev ${vid ? "vid" : ""}" data-prevfor="${n}${i}">${v ? (vid ? `<video src="${esc(v)}" muted playsinline></video>` : `<img src="${esc(v)}" alt="">`) : "—"}</span>`;
+            const up = (n, label, vid, max) => `<div class="upbox"><small>${label}</small>${prev(n, x[{ si: "img", sm: "img_m", sv: "video", sw: "video_m" }[n]], vid)}<input type="hidden" name="${n}${i}" value="${esc(x[{ si: "img", sm: "img_m", sv: "video", sw: "video_m" }[n]] || "")}">
+              <span class="acts" style="gap:4px"><label class="linkbtn">${vid ? "Subir video" : "Subir"}<input type="file" accept="${vid ? "video/mp4,video/webm,video/quicktime" : "image/*"}" ${vid ? `data-upvid="${n}${i}"` : `data-upimg="${n}${i}" data-upmax="${max}"`} hidden></label><button type="button" class="linkbtn warn" data-upx="${n}${i}">✕</button></span></div>`;
+            return `<div class="slrow2"><b class="sln">Slide ${i + 1}</b>
+              <div class="upgrid">${up("si", "Imagen compu", false, 2000)}${up("sm", "Imagen celu", false, 1350)}${up("sv", "Video compu", true)}${up("sw", "Video celu", true)}</div>
+              <div class="slf2"><label>Descripción (no se muestra, ayuda a Google)<input class="inp" name="st${i}" maxlength="80" value="${esc(x.alt || x.titulo || "")}" placeholder="Ej: Set Sakura: strawberry matcha + mochi sakura"></label>
+                <label>Botón (opcional)<input class="inp" name="sb${i}" maxlength="22" value="${esc(x.boton || "")}" placeholder="Ej: Pedir ahora"></label>
+                <label>Lleva a<select class="inp" name="sl${i}">${[["#sets", "Sets"], ["#carta", "Carta"], ["#especial", "Edición especial"], ["#club", "Setto Club"], ["/gift-cards", "Gift cards"], ["#apps", "Pedir por apps"]].map(([v, l]) => `<option value="${v}" ${(x.link || "#sets") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label></div></div>`; }).join("")}
           <label>Cambia cada (segundos)<input class="inp" name="intervalo" type="number" min="3" max="15" value="${(S.hero || {}).intervalo || 5}" style="width:120px"></label>
           <button class="btn solid">Guardar portada</button></form>
+        <form class="pcard" data-set="ubicacion"><b>Ubicación (mapa en la web)</b>
+          <span class="hintp">El mapa es público. Si retiran en tu casa, poné solo una esquina o la zona (ej: “Güemes y Alberti, Mar del Plata”) y pasá la dirección exacta por WhatsApp.</span>
+          <label class="chk"><input type="checkbox" name="activo" ${(S.ubicacion || {}).activo ? "checked" : ""}> Mostrar el mapa</label>
+          <label>Qué buscar en el mapa<input class="inp" name="mapa" maxlength="140" value="${esc((S.ubicacion || {}).mapa || "")}" placeholder="Ej: Güemes y Alberti, Mar del Plata"></label>
+          <label>Título<input class="inp" name="titulo" maxlength="40" value="${esc((S.ubicacion || {}).titulo || "Dónde estamos")}"></label>
+          <label>Texto (opcional)<input class="inp" name="texto" maxlength="160" value="${esc((S.ubicacion || {}).texto || "")}" placeholder="Ej: Retirás por la zona de Güemes. Te pasamos la dirección exacta por WhatsApp."></label>
+          <label>Zoom<select class="inp" name="zoom" style="width:auto">${[[13, "Barrio"], [15, "Cuadras"], [17, "Calle"]].map(([v, l]) => `<option value="${v}" ${(+(S.ubicacion || {}).zoom || 15) === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+          <button class="btn solid">Guardar ubicación</button></form>
         <form class="pcard wide" data-set="mensajes"><b>Mensajes de WhatsApp</b>
           <span class="hintp">Lo que va entre llaves se completa solo. Si borrás un mensaje entero, vuelve al original.</span>
           ${["Lo que manda el cliente", "Lo que mandan ustedes"].map((gr) => `<h3 class="msg-gr">${gr}</h3>` + Object.entries(M.MSG).filter(([, d]) => d.grupo === gr).map(([k, d]) => `<label class="msg-row">${esc(d.titulo)}
@@ -496,8 +503,9 @@
         await API.saveSetting("personalizacion", { activo: !!f.activo, leches, sin: (f.sin || "").split("\n").map((s) => s.trim()).filter(Boolean) });
       }
       if (k === "hero") {
-        const slides = [0, 1, 2, 3, 4].map((i) => ({ img: (f["si" + i] || "").trim(), titulo: (f["st" + i] || "").trim(), texto: (f["sx" + i] || "").trim(), ajuste: f["sa" + i] === "foto" ? "foto" : "recorte" })).filter((x) => x.img || x.titulo);
-        if (!slides.length) throw new Error("Dejá al menos un slide con foto o título");
+        const slides = [0, 1, 2, 3, 4, 5].map((i) => ({ tipo: "media", img: (f["si" + i] || "").trim(), img_m: (f["sm" + i] || "").trim(), video: (f["sv" + i] || "").trim(), video_m: (f["sw" + i] || "").trim(),
+          alt: (f["st" + i] || "").trim(), boton: (f["sb" + i] || "").trim(), link: f["sl" + i] || "#sets" })).filter((x) => x.img || x.img_m || x.video || x.video_m);
+        if (!slides.length) throw new Error("Subí al menos una imagen o video");
         await API.saveSetting("hero", { slides, intervalo: Math.max(3, Math.min(15, +f.intervalo || 5)) });
       }
       if (k === "mensajes") { const out = {}; Object.keys(M.MSG).forEach((key) => { const v = (f["m_" + key] || "").replace(/\r/g, "").trim(); if (v && v !== M.MSG[key].texto) out[key] = v; }); await API.saveSetting("mensajes", out); }
@@ -512,6 +520,7 @@
         const prev = P.settings.votacion || {};
         await API.saveSetting("votacion", { activo: !!f.activo, id: form.dataset.newid || prev.id || "v1", pregunta: (f.pregunta || "").trim(), opciones: ops, solo_clientes: !!f.solo, cierre: f.cierre ? new Date(f.cierre).toISOString() : "" });
       }
+      if (k === "ubicacion") await API.saveSetting("ubicacion", { activo: !!f.activo, mapa: (f.mapa || "").trim(), titulo: (f.titulo || "").trim() || "Dónde estamos", texto: (f.texto || "").trim(), zoom: +f.zoom || 15 });
       if (k === "tema") await API.saveSetting("tema", { nombre: f.nombre || "", aviso: (f.aviso || "").trim() });
       if (k === "faq") await API.saveSetting("faq", { items: Array.from({ length: 10 }, (_, i) => ({ p: (f["fp" + i] || "").trim(), r: (f["fr" + i] || "").trim() })).filter((x) => x.p && x.r) });
       if (false) await API.saveSetting("mochi_info", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "¿Qué es un mochi?", texto: (f.texto || "").trim(),
@@ -631,8 +640,17 @@
     if (t.matches("[data-upimg]") && t.files && t.files[0]) {
       const form = t.closest("form"), name = t.dataset.upimg, max = +t.dataset.upmax || 1600; toast("Subiendo foto…");
       try { const blob = await fitBlob(t.files[0], max); const url = await API.uploadPhoto(blob, "web-" + name); form.querySelector(`[name="${name}"]`).value = url;
-        const prev = t.closest(".slrow, .acts").querySelector(".upprev") || t.closest(".slrow").querySelector(".upprev"); if (prev) prev.innerHTML = `<img src="${url}" alt="">`; toast("Foto lista · tocá Guardar"); }
+        const prev = form.querySelector(`[data-prevfor="${name}"]`) || (t.closest(".slrow, .acts") || t.parentElement).querySelector(".upprev") || (t.closest(".slrow") || form).querySelector(".upprev"); if (prev) prev.innerHTML = `<img src="${url}" alt="">`; toast("Foto lista · tocá Guardar"); }
       catch (err) { toast(err.message || "No se pudo subir la foto"); }
+      return;
+    }
+    if (t.matches("[data-upvid]") && t.files && t.files[0]) {
+      const form = t.closest("form"), name = t.dataset.upvid, file = t.files[0];
+      if (!/^video\//.test(file.type)) { toast("Elegí un video (MP4)"); return; }
+      if (file.size > 25 * 1024 * 1024) { toast("El video pesa más de 25 MB. Acortalo o comprimilo."); return; }
+      toast("Subiendo video… (puede tardar)");
+      try { const url = await API.uploadMedia(file, "web-" + name); form.querySelector(`[name="${name}"]`).value = url; const pv = form.querySelector(`[data-prevfor="${name}"]`); if (pv) pv.innerHTML = `<video src="${url}" muted playsinline></video>`; toast("Video listo · tocá Guardar"); }
+      catch (err) { toast(err.message || "No se pudo subir el video"); }
       return;
     }
     if (t.matches("[data-applogo]") && t.files && t.files[0]) {
@@ -648,6 +666,7 @@
       catch (err) { toast(err.message || "No se pudo subir la foto"); }
     }
   });
+  document.addEventListener("click", (e) => { const x = e.target.closest("[data-upx]"); if (!x) return; const n = x.dataset.upx, form = x.closest("form"); form.querySelector(`[name="${n}"]`).value = ""; const pv = form.querySelector(`[data-prevfor="${n}"]`); if (pv) pv.textContent = "—"; });
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-slx]"); if (!x) return; const r = x.closest(".slrow"), i = x.dataset.slx; ["si", "st", "sx"].forEach((p) => (r.querySelector(`[name=${p}${i}]`).value = "")); r.querySelector(".upprev").textContent = "Vacío · tocá Guardar"; x.remove(); });
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-applogo-x]"); if (!x) return; const row = x.closest(".applogo"); row.querySelector(`[name=al${x.dataset.applogoX}]`).value = ""; row.querySelector(".lprev").textContent = "Sin logo"; x.remove(); });
   document.addEventListener("click", (e) => { if (e.target.closest("[data-justx],[data-justgo]")) { setTimeout(() => { P.justDelivered = null; drawJust(); }, 300); } });
