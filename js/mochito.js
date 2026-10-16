@@ -27,18 +27,17 @@
   if (off) return;
 
   /* ---------- 2) Mochito ---------- */
-  const IMG = { run: "img/mochito-run.png", cup: "img/mochito-cup.png", hola: "img/mochito-lie.png" };
-  Object.values(IMG).forEach((src) => { const i = new Image(); i.src = src; });
+  // Mochito animado por partes (piernas, cuerpo y ojos recortados del dibujo original mochito-run.png)
   const el = document.createElement("div");
   el.className = "mito"; el.setAttribute("aria-live", "polite");
   el.innerHTML = `<div class="mito-bubble" hidden><p></p><div class="mito-acts"></div><button class="mito-x" aria-label="Ocultar a Mochito">✕</button></div>
     <button class="mito-btn" aria-label="Mochito: te llevo a pedir">
       <svg class="mito-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46"/><circle class="p" cx="50" cy="50" r="46" pathLength="100"/></svg>
-      <span class="mito-body"><img src="${IMG.hola}" alt=""></span>
+      <span class="mito-body"><span class="rig"><i class="lg l"></i><i class="lg r"></i><i class="bd"></i><i class="ey"></i></span></span>
       <span class="mito-shadow"></span>
     </button>`;
   document.body.appendChild(el);
-  const btn = el.querySelector(".mito-btn"), body = el.querySelector(".mito-body"), img = body.querySelector("img"),
+  const btn = el.querySelector(".mito-btn"), body = el.querySelector(".mito-body"),
         bub = el.querySelector(".mito-bubble"), bubP = bub.querySelector("p"), bubA = bub.querySelector(".mito-acts"), ring = el.querySelector(".mito-ring .p");
 
   const items = () => { try { return JSON.parse(localStorage.getItem("setto-cart") || "[]").reduce((a, c) => a + (c.qty || 1), 0); } catch (_) { return 0; } };
@@ -90,7 +89,7 @@
 
   // Física: mientras scrolleás corre (y se inclina con la velocidad); al frenar, pose según la sección
   let lastY = scrollY, vel = 0, moving = false, stopT = null, raf = null, t0 = performance.now();
-  function pose(name) { const src = IMG[name]; if (!img.src.endsWith(src)) img.src = src; }
+  function pose(name) { el.classList.toggle("run", name === "run"); }
   function tick(now) {
     vel *= 0.9;
     const tilt = Math.max(-14, Math.min(14, vel * 0.6));
@@ -111,7 +110,7 @@
     stopT = setTimeout(() => {
       moving = false;
       const s = seccion();
-      pose(s === "top" || s === "faq" ? "hola" : "cup");
+      pose("idle");
       if (s !== cur) {
         cur = s;
         if (!seen[s]) { seen[s] = 1; say(s === "pedir" || s === "club" ? (cartTip() || TIPS[s]) : TIPS[s]); }
