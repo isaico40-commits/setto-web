@@ -20,12 +20,14 @@
       texto: "¡Hola {nombre}! Tu pedido {codigo} de Setto ya salió y va en camino 🛵\n\nSeguí tu pedido acá: {link}" },
     pedir_resena: { grupo: "Lo que mandan ustedes", titulo: "Pedir reseña (al entregar)", vars: ["nombre", "codigo", "sellos", "link"],
       texto: "¡Gracias por tu pedido, {nombre}! 🙌 {sellos}\n\nAcá ves cómo armar tu bebida, tus sellos y, si te gustó, podés dejar tu reseña (con foto si querés):\n{link}" },
+    pedir_cambio: { grupo: "Lo que mandan ustedes", titulo: "Falta algo del pedido (pedir cambio)", vars: ["nombre", "codigo", "faltan", "link"],
+      texto: "¡Hola {nombre}! Perdón, nos quedamos sin {faltan} para tu pedido {codigo} 😕\n\nElegí acá con qué lo reemplazamos o si preferís sacarlo (el total se ajusta solo):\n{link}" },
     gift_activa: { grupo: "Lo que mandan ustedes", titulo: "Gift card activada (al comprador)", vars: ["para", "monto", "link"],
       texto: "¡Listo! 🎁 Tu gift card de Setto para {para} ya está activa ({monto}).\n\nMandale este link para que la vea y la use:\n{link}" },
   };
   const VARS = {
     nombre: "nombre del cliente", codigo: "código (STT-1234 o GIFT-…)", link: "link de seguimiento o de la gift card",
-    entrega: "“para retirar” o “con envío a domicilio”", sellos: "“Sumaste 1 sello al Setto Club.” (vacío si no sumó)",
+    entrega: "“para retirar” o “con envío a domicilio”", sellos: "“Sumaste 1 sello al Setto Club.” (vacío si no sumó)", faltan: "lo que falta (ej: 2 Mochi Oreo)",
     diseno: "diseño de la gift card", monto: "monto", para: "para quién", de: "de quién (si no hay, se borra la línea)",
   };
   function texto(key, settings) { const m = (settings && settings.mensajes) || {}; return (m[key] && String(m[key]).trim()) || (MSG[key] ? MSG[key].texto : ""); }

@@ -679,3 +679,16 @@ body:not([data-page="home"]) .tema-aviso{display:none!important}
 .faq-list details[open] summary::after{transform:rotate(45deg)}
 .faq-list .faq-a{padding:0 18px 16px;color:var(--ink-2);line-height:1.5}
 .faq-list .faq-a a{color:var(--turquesa);font-weight:700}
+/* cambio de pedido (cliente) */
+.cmb{margin-top:10px;border:1.5px solid #e8b84a;background:#fff8e6;border-radius:14px;padding:12px}
+.cmb-f{display:grid;gap:4px;padding:8px 0;border-top:1px dashed color-mix(in srgb,var(--turquesa) 30%,transparent)}
+.cmb-f small{font-size:.8rem;color:var(--ink-2)}
+.cmb-opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.cmb-opts button{display:flex;align-items:center;gap:6px;font:inherit;font-size:.82rem;font-weight:600;text-align:left;background:var(--card);border:1.5px solid color-mix(in srgb,var(--turquesa) 45%,transparent);border-radius:12px;padding:6px 10px;cursor:pointer;color:var(--ink)}
+.cmb-opts button img{width:30px;height:30px;object-fit:contain}
+.cmb-opts button small{display:block;font-size:.72rem;font-weight:500;color:var(--ink-2)}
+.cmb-opts button[aria-pressed="true"]{background:var(--turquesa);border-color:var(--turquesa);color:#fff}
+.cmb-opts button[aria-pressed="true"] small{color:#e6f1f0}
+.cmb-quitar{border-style:dashed!important}
+.cmb-tot{display:flex;justify-content:space-between;align-items:center;border-top:1.5px solid color-mix(in srgb,var(--turquesa) 30%,transparent);padding-top:8px;margin-top:4px;font-size:.95rem}
+.cmb-ok{margin-top:8px;font-size:.88rem;color:#2f7a50}

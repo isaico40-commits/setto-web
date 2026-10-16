@@ -856,6 +856,7 @@
     if ((view === "cart" || view === "sent") && $("#drawer").classList.contains("on")) drawDrawer();
     if (!vivos.length) { box.hidden = true; return; }
     if (box.querySelector(".rv-form")) return; // no pisar una reseña a medio escribir
+    if (box.querySelector(".cmb-busy")) return; // ni un cambio que se está enviando
     box.hidden = false; box.innerHTML = `<div class="wrap">${vivos.map(trackCard).join("")}</div>`;
     if (vivos.some((o) => o.status === "pendiente")) trackT = setTimeout(verSeguimiento, 30000);
   }
@@ -871,9 +872,60 @@
     return `<div class="trk ${o.status}"><div class="trk-h"><span class="eyebrow">Tu pedido</span><b class="num">${esc(o.code)}</b><span class="trk-r">${esc(o.retiro || "")}</span>${o.status !== "pendiente" ? `<button class="trk-x" data-trackx="${esc(o.code)}" aria-label="Ocultar">✕</button>` : ""}</div>
       ${o.status === "cancelado" ? "" : `<ol class="trk-steps">${pasos.map((p, i) => `<li class="${i < idx ? "done" : i === idx ? "now" : ""}"><i></i><span>${p}</span></li>`).join("")}</ol>`}
       <p>${txt}</p>
+      ${cambioHtml(o)}
       ${o.status === "entregado" ? `<div class="trk-acts">${clubOn() ? `<button class="btn" data-vercard="${esc(o.code)}">Ver mis sellos</button>` : ""}${o.resena ? `<span class="muted" style="font-size:.84rem;align-self:center">¡Gracias por tu reseña!</span>` : `<button class="btn solid" data-resena="${esc(o.code)}">Dejar reseña</button>`}<a class="btn" href="/listo">Cómo armar tu bebida</a></div>`
         : o.status === "pendiente" && idx === 2 ? `<div class="trk-acts"><a class="btn" href="/listo">Cómo armar tu bebida</a></div>` : ""}</div>`;
   }
+  /* ---------- cambio de pedido: el cliente elige reemplazo, sacarlo o cancelar ---------- */
+  const CMB = {};
+  function cambioHtml(o) {
+    const c = o.cambio; if (!c) return "";
+    if (c.resolucion === "cambiado") return `<p class="cmb-ok">✓ Actualizamos tu pedido con el cambio que elegiste. Total: <b class="num">${money(o.total)}</b></p>`;
+    if (c.estado !== "esperando" || o.status !== "pendiente" || !o.track) return "";
+    const st = CMB[o.track] || (CMB[o.track] = { data: null, sel: {}, err: "", cancelArm: false });
+    if (!st.data && !st.loading) { st.loading = true; API.cambioOpciones(o.track).then((d) => { st.data = d; st.loading = false; redibujarCambio(o.track); }).catch((e) => { st.err = e.message; st.loading = false; redibujarCambio(o.track); }); }
+    return `<div class="cmb" data-cmb="${esc(o.track)}">${cambioInner(o.track)}</div>`;
+  }
+  function cambioInner(tr) {
+    const st = CMB[tr], d = st.data;
+    if (st.err && !d) return `<p class="rv-err">${esc(st.err)}</p>`;
+    if (!d) return '<b>Nos quedamos sin algo de tu pedido 😕</b><p class="loading">Cargando opciones…</p>';
+    if (d.estado !== "esperando") return "";
+    let total = Number(d.total) || 0, listo = true;
+    const filas = d.faltan.map((f) => {
+      const e = st.sel[f.idx];
+      if (!e) listo = false;
+      else if (e === "quitar") total -= f.precio * f.qty;
+      else { const a = f.alternativas.find((x) => x.id === e); if (a) total += (a.precio - f.precio) * f.qty; }
+      const dif = (p) => { const x = (p - f.precio) * f.qty; return x === 0 ? "mismo precio" : (x > 0 ? "+" : "−") + money(Math.abs(x)).replace("−", ""); };
+      return `<div class="cmb-f"><b>${f.qty}× ${esc(f.nombre)}${f.size ? ` (${esc(f.size)})` : ""}</b><small>${f.qty < f.de ? `Nos quedaron ${f.de - f.qty} de ${f.de}. ¿Qué hacemos con ${f.qty === 1 ? "el que falta" : `los ${f.qty} que faltan`}?` : "¿Con qué lo reemplazamos?"}</small>
+        <div class="cmb-opts">${f.alternativas.map((a) => `<button type="button" data-cmbsel="${f.idx}:${esc(a.id)}" aria-pressed="${e === a.id}">${a.img ? `<img src="${esc(a.img)}" alt="">` : ""}<span>${esc(a.nombre)}<small>${dif(a.precio)}</small></span></button>`).join("")}
+          <button type="button" class="cmb-quitar" data-cmbsel="${f.idx}:quitar" aria-pressed="${e === "quitar"}"><span>Sacarlo<small>−${money(f.precio * f.qty)}</small></span></button></div>
+        ${f.alternativas.length ? "" : '<small class="muted">No tenemos otro igual disponible ahora.</small>'}</div>`;
+    }).join("");
+    return `<b>Nos quedamos sin algo de tu pedido 😕</b><p class="muted" style="margin:2px 0 8px;font-size:.88rem">Elegí qué hacemos y confirmá. El total se ajusta solo.${d.nota ? ` <i>“${esc(d.nota)}”</i>` : ""}</p>
+      ${filas}
+      <div class="cmb-tot"><span>Nuevo total</span><b class="num">${listo ? money(Math.max(0, total)) : "—"}</b></div>
+      ${st.err ? `<p class="rv-err">${esc(st.err)}</p>` : ""}
+      <div class="trk-acts" style="margin-top:8px"><button class="btn solid" data-cmbok ${listo ? "" : "disabled"}>Confirmar cambio</button>
+        <button class="back" data-cmbcancel>${st.cancelArm ? "¿Seguro? Tocá de nuevo para cancelar el pedido" : "Prefiero cancelar el pedido"}</button></div>`;
+  }
+  function redibujarCambio(tr) { document.querySelectorAll(`[data-cmb="${CSS.escape(tr)}"]`).forEach((el) => (el.innerHTML = cambioInner(tr))); }
+  document.addEventListener("click", async (e) => {
+    const t = e.target.closest("[data-cmbsel],[data-cmbok],[data-cmbcancel]"); if (!t) return;
+    const box = t.closest("[data-cmb]"), tr = box.dataset.cmb, st = CMB[tr]; if (!st) return;
+    if (t.dataset.cmbsel) { const [ix, v] = t.dataset.cmbsel.split(":"); st.sel[+ix] = v; st.err = ""; st.cancelArm = false; redibujarCambio(tr); return; }
+    const cancelar = t.dataset.cmbcancel !== undefined;
+    if (cancelar && !st.cancelArm) { st.cancelArm = true; redibujarCambio(tr); return; }
+    box.classList.add("cmb-busy"); t.disabled = true; t.textContent = "Enviando…";
+    try {
+      const r = await API.resolverCambio(tr, Object.entries(st.sel).map(([idx, v]) => (v === "quitar" ? { idx: +idx, accion: "quitar" } : { idx: +idx, accion: "cambiar", id: v })), cancelar);
+      delete CMB[tr]; box.classList.remove("cmb-busy");
+      toast(r.estado === "cancelado" ? "Pedido cancelado. ¡Perdón por la molestia!" : `¡Listo! Tu pedido quedó en ${money(r.total)}`);
+      refrescarStock(); verSeguimiento();
+    } catch (ex) { box.classList.remove("cmb-busy"); st.err = ex.message; st.data = null; st.cancelArm = false; redibujarCambio(tr); cambioHtmlReload(tr); }
+  });
+  function cambioHtmlReload(tr) { const st = CMB[tr]; if (!st || st.loading) return; st.loading = true; API.cambioOpciones(tr).then((d) => { st.data = d; st.loading = false; redibujarCambio(tr); }).catch(() => { st.loading = false; }); }
   function rvForm(code) {
     return `<div class="rv-form" data-rvcode="${esc(code)}"><b style="font-size:.9rem">¿Qué tal estuvo?</b>
       <div class="stars" role="radiogroup" aria-label="Puntaje">${[1, 2, 3, 4, 5].map((n) => `<button type="button" data-star="${n}" aria-pressed="false" aria-label="${n} estrella${n > 1 ? "s" : ""}">★</button>`).join("")}</div>

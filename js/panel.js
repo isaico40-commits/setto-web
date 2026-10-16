@@ -16,7 +16,7 @@
     return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" }) + " · " + hh;
   };
 
-  const P = { user: null, view: "pedidos", sub: "pendiente", q: "", settings: {}, products: [], orders: [], pendCount: 0, drafts: {}, confirm: {}, client: null, cancelArm: null };
+  const P = { falta: {}, user: null, view: "pedidos", sub: "pendiente", q: "", settings: {}, products: [], orders: [], pendCount: 0, drafts: {}, confirm: {}, client: null, cancelArm: null };
 
   /* =================== LOGIN =================== */
   function drawLogin(msg) {
@@ -72,6 +72,25 @@
   const linkSeguir = (o) => (o.track ? `${location.origin}/?seguir=${o.track}` : `${location.origin}/`);
   const M = window.SettoMSG, primerNombre = (o) => (o.nombre || "").split(" ")[0];
   const linkListo = (o) => (o.track ? `${location.origin}/listo?seguir=${o.track}` : `${location.origin}/listo`);
+  const faltanTxt = (c) => (c.faltan || []).map((f) => `${f.qty} ${String(f.nombre).replace(/^Mochi /, "mochi ")}${f.size ? ` (${f.size})` : ""}`).join(" y ");
+  const cambioTxt = (o) => M.render("pedir_cambio", { nombre: primerNombre(o), codigo: o.code, faltan: faltanTxt(o.cambio || {}), link: linkSeguir(o) }, P.settings);
+  function cambioBox(o) {
+    const c = o.cambio, F = P.falta[o.id];
+    if (o.status === "pendiente" && F) {
+      const prods = (o.items || []).map((i, idx) => ({ i, idx })).filter(({ i }) => !["envio", "premio", "gift"].includes(i.id));
+      return `<div class="faltabox"><b>¿Qué falta?</b><span class="hintp">Marcá lo que no tenés. Si te queda algo, bajá la cantidad que falta.</span>
+        ${prods.map(({ i, idx }) => { const q = F.sel[idx]; return `<div class="frow"><label><input type="checkbox" data-fsel="${idx}" ${q ? "checked" : ""}> ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""} <small>×${i.qty}</small></label>
+          ${q && i.qty > 1 ? `<span class="stepper sm"><button data-fq="${idx}:-1" aria-label="Menos">−</button><span>faltan ${q}</span><button data-fq="${idx}:1" aria-label="Más">+</button></span>` : ""}</div>`; }).join("")}
+        <input class="inp" data-fnota placeholder="Nota para el cliente (opcional)" maxlength="140" value="${esc(F.nota || "")}">
+        <div class="acts"><button class="btn solid" data-fsend ${Object.keys(F.sel).length ? "" : "disabled"}>Pedir cambio al cliente</button><button class="linkbtn" data-fx>Cancelar</button></div></div>`;
+    }
+    if (!c) return o.status === "pendiente" ? `<button class="linkbtn" data-falta>¿Falta algo? Pedile un cambio al cliente</button>` : "";
+    if (c.estado === "esperando") return `<div class="cambiobox wait"><b>⏳ Esperando que el cliente elija</b><span>Falta: ${esc(faltanTxt(c))}${c.nota ? ` · “${esc(c.nota)}”` : ""}</span>
+        <div class="acts"><a class="btn solid" target="_blank" rel="noopener" href="https://wa.me/${esc(o.phone)}?text=${encodeURIComponent(cambioTxt(o))}">Mandar el aviso por WhatsApp</a><button class="linkbtn" data-fquitar>Quitar aviso (lo arreglamos por chat)</button></div></div>`;
+    if (c.resolucion === "cancelado") return `<div class="cambiobox bad"><b>El cliente canceló el pedido</b><span>Faltaba: ${esc(faltanTxt(c))}</span></div>`;
+    return `<div class="cambiobox ok"><b>✓ El cliente eligió el cambio</b>${(c.cambios || []).map((x) => `<span>${x.qty}× ${esc(x.de)} → ${x.a ? `<b>${esc(x.a)}</b>` : "<b>lo sacó</b>"}</span>`).join("")}
+        ${c.total_antes != null && c.total_antes !== o.total ? `<span>Total: <s>${money(c.total_antes)}</s> → <b>${money(o.total)}</b>${o.total > c.total_antes ? " (paga la diferencia)" : " (cobrás menos)"}</span>` : ""}</div>`;
+  }
   function resenaTxt(o) {
     const s = Number(o.sellos) || 0;
     return M.render("pedir_resena", { nombre: primerNombre(o), codigo: o.code, link: linkListo(o), sellos: s > 0 ? `Sumaste ${s === 1 ? "1 sello" : s + " sellos"} al Setto Club.` : "" }, P.settings);
@@ -196,6 +215,7 @@
         <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>Pago: <b>${esc(o.pago || "—")}</b></span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}</div>
         <div class="olines">${(o.items || []).map((i) => `<div><span>${i.qty}× ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""}${i.detalle ? `<small class="det">${esc(i.detalle)}</small>` : ""}</span><span class="num">${money(i.subtotal)}</span></div>`).join("")}</div>
         <div class="otot"><span>Total</span><span class="num">${money(o.total)}</span></div>
+        ${cambioBox(o)}
         ${o.status === "pendiente" ? `<div class="confirm">
             <label>Número del chat de WhatsApp<input class="inp" data-cphone value="${esc(c.phone)}" inputmode="tel"></label>
             <div class="acts"><span style="font-size:.85rem;font-weight:600">Sellos a sumar</span><span class="stepper"><button data-cn="-1" aria-label="Menos">−</button><span>${c.n}</span><button data-cn="1" aria-label="Más">+</button></span></div>
@@ -521,6 +541,16 @@
         try { await API.setEtapa(id, b.dataset.etapa); if (o) o.etapa = b.dataset.etapa; drawOrders(); toast("Estado actualizado · el cliente lo ve en la web"); }
         catch (err) { toast(err.message); b.disabled = false; }
       }
+      if (b.dataset.falta !== undefined) { P.falta[id] = { sel: {}, nota: "" }; drawOrders(); return; }
+      if (b.dataset.fx !== undefined) { delete P.falta[id]; drawOrders(); return; }
+      if (b.dataset.fq) { const [ix, d] = b.dataset.fq.split(":").map(Number), o = P.orders.find((x) => x.id === id), F = P.falta[id]; F.sel[ix] = Math.max(1, Math.min(o.items[ix].qty, (F.sel[ix] || 1) + d)); drawOrders(); return; }
+      if (b.dataset.fsend !== undefined) {
+        const F = P.falta[id]; b.disabled = true;
+        try { const cam = await API.pedirCambio(id, Object.entries(F.sel).map(([idx, qty]) => ({ idx: +idx, qty })), F.nota); const o = P.orders.find((x) => x.id === id); if (o) o.cambio = cam; delete P.falta[id]; drawOrders(); toast("Listo · mandale el aviso por WhatsApp"); }
+        catch (err) { toast(err.message); b.disabled = false; }
+        return;
+      }
+      if (b.dataset.fquitar !== undefined) { try { await API.quitarCambio(id); const o = P.orders.find((x) => x.id === id); if (o) o.cambio = null; drawOrders(); toast("Aviso quitado"); } catch (err) { toast(err.message); } return; }
       if (b.dataset.cn) { c.n = Math.max(0, Math.min(10, c.n + +b.dataset.cn)); drawOrders(); }
       if (b.dataset.deliver !== undefined) {
         b.disabled = true;
@@ -580,6 +610,7 @@
     const t = e.target;
     if (t.id === "oq") { P.q = t.value; drawOrders(); return; }
     if (t.matches("[data-cphone]")) { P.confirm[t.closest("[data-oid]").dataset.oid].phone = t.value; return; }
+    if (t.matches("[data-fnota]")) { const F = P.falta[t.closest("[data-oid]").dataset.oid]; if (F) F.nota = t.value; return; }
     const pc = t.closest("[data-pid]"); if (!pc || !t.dataset.f) return;
     const id = pc.dataset.pid, base = P.products.find((x) => x.id === id);
     const d = P.drafts[id] || (P.drafts[id] = { ...base });
@@ -591,6 +622,8 @@
   });
   document.addEventListener("change", async (e) => {
     const t = e.target;
+    if (t.matches("[data-fsel]")) { const id = t.closest("[data-oid]").dataset.oid, F = P.falta[id], ix = +t.dataset.fsel, o = P.orders.find((x) => x.id === id);
+      if (t.checked) F.sel[ix] = o.items[ix].qty; else delete F.sel[ix]; drawOrders(); return; }
     if (t.matches("[data-upimg]") && t.files && t.files[0]) {
       const form = t.closest("form"), name = t.dataset.upimg, max = +t.dataset.upmax || 1600; toast("Subiendo foto…");
       try { const blob = await fitBlob(t.files[0], max); const url = await API.uploadPhoto(blob, "web-" + name); form.querySelector(`[name="${name}"]`).value = url;

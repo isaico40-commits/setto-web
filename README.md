@@ -239,3 +239,9 @@ python3 -m http.server 8000
 - La reseña se puede dejar cuando el pedido está **listo** o **entregado** (migración 018).
 - El mensaje "Pedir reseña" del panel ahora manda a `/listo?seguir=…`.
 - Archivos del sticker: `img/qr/QR-setto-listo.pdf` (vector, 5,5 × 6,9 cm) y `.png`, apuntan a https://setto.com.ar/listo.
+
+## Cambio de pedido cuando falta algo
+- Panel → pedido pendiente → **¿Falta algo?**: marcás qué falta (y cuántos), nota opcional → **Pedir cambio al cliente** → botón para mandar el aviso por WhatsApp (texto editable en Ajustes → Mensajes, "Falta algo del pedido").
+- El cliente abre su link de seguimiento y elige para cada faltante un reemplazo de la misma categoría con stock, o sacarlo, o cancelar el pedido. Ve el nuevo total antes de confirmar.
+- La base recalcula el total, valida stock, devuelve saldo de gift card si baja y actualiza la reserva de stock. El panel muestra lo que eligió (en vivo).
+- Migración 020 (`pedir_cambio`, `quitar_cambio`, `cambio_opciones`, `resolver_cambio`).

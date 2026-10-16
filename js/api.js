@@ -158,15 +158,49 @@
       o.status = "cancelado"; o.closed_at = new Date().toISOString();
       if (o.gift && !o.gift.devuelto) { const g = (db.giftcards || []).find((x) => x.code === o.gift.code); if (g) { g.saldo += o.gift.monto; g.estado = "activa"; } o.gift.devuelto = true; } dbSave(db);
     },
+    async pedirCambio(id, faltan, nota) {
+      const db = dbLoad(), o = db.orders.find((x) => x.id === id);
+      if (!o || o.status !== "pendiente") throw new Error("El pedido no está pendiente");
+      if (!faltan || !faltan.length) throw new Error("Marcá qué falta");
+      o.cambio = { estado: "esperando", nota: (nota || "").trim() || null, at: new Date().toISOString(), faltan: faltan.map((f) => { const it = o.items[f.idx]; const q = Math.max(1, Math.min(f.qty || it.qty, it.qty)); return { idx: f.idx, id: it.id, nombre: it.nombre, size: it.size, qty: q, de: it.qty }; }) };
+      dbSave(db); return o.cambio;
+    },
+    async quitarCambio(id) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (o) { o.cambio = null; dbSave(db); } },
+    async cambioOpciones(track) {
+      const db = dbLoad(), o = db.orders.find((x) => x.track === track); if (!o) throw new Error("No encontramos ese pedido");
+      if (!o.cambio || o.cambio.estado !== "esperando" || o.status !== "pendiente") return { estado: (o.cambio && o.cambio.estado) || "sin_cambio", code: o.code, status: o.status };
+      const leche = (n) => (((db.settings.personalizacion || {}).leches || []).find((l) => l.nombre === n) || {}).precio || 0;
+      const precio = (a, size, l) => (["set", "dirty"].includes(a.categoria) ? (size === "16 oz" ? a.precio_16 : a.precio_12) + leche(l) : a.precio);
+      return { estado: "esperando", code: o.code, status: o.status, nota: o.cambio.nota, total: o.total, items: o.items,
+        faltan: o.cambio.faltan.map((f) => { const it = o.items[f.idx], pr = db.products.find((p) => p.id === it.id) || {};
+          const alts = db.products.filter((a) => a.activo !== false && !a.agotado && a.id !== pr.id && (a.categoria === pr.categoria || (["mochi", "especial"].includes(pr.categoria) && a.categoria === "mochi")) && precio(a, it.size, it.leche) > 0)
+            .map((a) => ({ id: a.id, nombre: ["mochi", "especial"].includes(a.categoria) ? "Mochi " + a.nombre : a.nombre, img: a.img, precio: precio(a, it.size, it.leche) }));
+          return { idx: f.idx, nombre: it.nombre, size: it.size, detalle: it.detalle, qty: f.qty, de: it.qty, precio: it.precio, alternativas: alts }; }) };
+    },
+    async resolverCambio(track, elecciones, cancelar) {
+      const db = dbLoad(), o = db.orders.find((x) => x.track === track); if (!o) throw new Error("No encontramos ese pedido");
+      if (o.status !== "pendiente" || !o.cambio || o.cambio.estado !== "esperando") throw new Error("Este pedido no tiene cambios pendientes");
+      if (cancelar) { o.status = "cancelado"; o.closed_at = new Date().toISOString(); Object.assign(o.cambio, { estado: "resuelto", resolucion: "cancelado" }); dbSave(db); return { estado: "cancelado", code: o.code }; }
+      const op = await this.cambioOpciones(track), items = o.items.map((x) => ({ ...x })), add = [], res = [];
+      op.faltan.forEach((f) => { const e = (elecciones || []).find((x) => x.idx === f.idx); if (!e) throw new Error("Elegí qué hacer con " + f.nombre);
+        const it = items[f.idx]; it.qty -= f.qty;
+        if (e.accion === "cambiar") { const a = f.alternativas.find((x) => x.id === e.id); if (!a) throw new Error("Ese reemplazo ya no está disponible, elegí otro"); add.push({ ...it, id: a.id, nombre: a.nombre, qty: f.qty, precio: a.precio, subtotal: a.precio * f.qty }); res.push({ de: f.nombre, qty: f.qty, a: a.nombre }); }
+        else res.push({ de: f.nombre, qty: f.qty, a: null }); });
+      const nuevo = [...items.filter((i) => i.id !== "gift" && (["envio", "premio"].includes(i.id) || i.qty > 0)).map((i) => (["envio", "premio"].includes(i.id) ? i : { ...i, subtotal: i.precio * i.qty })), ...add];
+      if (!nuevo.some((i) => !["envio", "premio"].includes(i.id))) throw new Error("El pedido quedaría vacío. Elegí un reemplazo o cancelalo.");
+      const antes = o.total; o.items = nuevo; o.total = Math.max(0, nuevo.reduce((s, i) => s + i.subtotal, 0));
+      Object.assign(o.cambio, { estado: "resuelto", resolucion: "cambiado", cambios: res, total_antes: antes }); dbSave(db);
+      return { estado: "resuelto", code: o.code, total: o.total, total_antes: antes, items: nuevo, cambios: res };
+    },
     async setEtapa(id, etapa) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o || o.status !== "pendiente") throw new Error("El pedido no está pendiente"); o.etapa = etapa; dbSave(db); },
     async orderStatus(codes, phone) {
       const db = dbLoad(), ph = normPhone(phone), since = Date.now() - 3 * 864e5;
       return db.orders.filter((o) => o.phone === ph && codes.includes(o.code) && new Date(o.created_at) > since)
-        .map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, track: o.track, resena: (db.reviews || []).some((r) => r.order_id === o.id) }));
+        .map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, track: o.track, cambio: o.cambio ? { estado: o.cambio.estado, resolucion: o.cambio.resolucion } : null, resena: (db.reviews || []).some((r) => r.order_id === o.id) }));
     },
     async trackStatus(tracks) {
       const db = dbLoad();
-      return db.orders.filter((o) => o.track && tracks.includes(o.track)).map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, track: o.track, phone: o.phone, resena: (db.reviews || []).some((r) => r.order_id === o.id) }));
+      return db.orders.filter((o) => o.track && tracks.includes(o.track)).map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, track: o.track, phone: o.phone, cambio: o.cambio ? { estado: o.cambio.estado, resolucion: o.cambio.resolucion } : null, resena: (db.reviews || []).some((r) => r.order_id === o.id) }));
     },
     async createReviewTrack(track, rating, texto, foto, instagram) { const o = dbLoad().orders.find((x) => x.track === track); if (!o) throw new Error("No encontramos ese pedido"); return this.createReview(o.code, o.phone, rating, texto, foto, instagram); },
     async uploadReviewPhoto(blob) { return await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); }); },
@@ -312,6 +346,10 @@
     },
     async confirmOrder(id, phone, n) { const { data, error } = await sb.rpc("confirm_order", { p_id: id, p_phone: phone, p_sellos: n }); fail(error); return data; },
     async cancelOrder(id) { const { error } = await sb.rpc("cancel_order", { p_id: id }); fail(error); },
+    async pedirCambio(id, faltan, nota) { const { data, error } = await sb.rpc("pedir_cambio", { p_id: id, p_faltan: faltan, p_nota: nota || null }); fail(error); return data; },
+    async quitarCambio(id) { const { error } = await sb.rpc("quitar_cambio", { p_id: id }); fail(error); },
+    async cambioOpciones(track) { const { data, error } = await sb.rpc("cambio_opciones", { p_track: track }); fail(error); return data; },
+    async resolverCambio(track, elecciones, cancelar) { const { data, error } = await sb.rpc("resolver_cambio", { p_track: track, p_elecciones: elecciones || [], p_cancelar: !!cancelar }); fail(error); return data; },
     async setEtapa(id, etapa) { const { error } = await sb.rpc("set_order_etapa", { p_id: id, p_etapa: etapa }); fail(error); },
     async orderStatus(codes, phone) { const { data, error } = await sb.rpc("get_order_status", { p_codes: codes, p_phone: phone }); fail(error); return data || []; },
     async trackStatus(tracks) { const { data, error } = await sb.rpc("track_status", { p_tracks: tracks }); fail(error); return data || []; },

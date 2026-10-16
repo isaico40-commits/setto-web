@@ -96,3 +96,16 @@ a.ptab{text-decoration:none}
 .justdel{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:#e6f0ef;border:1.5px solid #296A67;border-radius:18px;padding:14px 16px;margin:14px 0}.justdel>div{display:grid;flex:1 1 220px}.justdel span{font-size:.85rem;color:#4a4a4a}
 .pcard.wide{grid-column:1/-1}.slrow{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:start;border-top:1px dashed #0002;padding-top:10px}.slf{display:grid;gap:6px}.upprev{width:96px;height:72px;border-radius:12px;background:#f1e4ca;display:grid;place-items:center;overflow:hidden;font-size:.72rem;color:#0008;text-align:center}.upprev img{width:100%;height:100%;object-fit:cover}.acts .upprev{width:64px;height:64px}
 .msg-gr{font-size:.95rem;margin:10px 0 0;color:#296A67}.msg-row{display:grid;gap:4px}.msg-vars{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:.78rem}.msg-vars code,.pcard details code{background:#f1e4ca;border-radius:6px;padding:1px 6px}.msg-vars .linkbtn{margin-left:auto}
+
+/* cambio de pedido */
+.faltabox,.cambiobox{border-radius:12px;padding:10px 12px;font-size:.88rem;display:grid;gap:6px;margin-top:4px}
+.faltabox{border:1.5px dashed var(--turquesa,#296A67);background:color-mix(in srgb,var(--turquesa,#296A67) 6%,transparent)}
+.faltabox .frow{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.faltabox label{display:flex;align-items:center;gap:8px;font-weight:600}
+.faltabox small{color:var(--ink-2);font-weight:500}
+.stepper.sm button{width:26px;height:26px}
+.stepper.sm span{font-size:.8rem;min-width:56px;text-align:center}
+.cambiobox.wait{background:#fff4d6;border:1.5px solid #e8b84a}
+.cambiobox.ok{background:#e3f2ea;border:1.5px solid #3f8f63}
+.cambiobox.bad{background:var(--coral-2,#fde3df);border:1.5px solid #d9776b}
+.cambiobox span{display:block}
