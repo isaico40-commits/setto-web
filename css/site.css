@@ -692,3 +692,31 @@ body:not([data-page="home"]) .tema-aviso{display:none!important}
 .cmb-quitar{border-style:dashed!important}
 .cmb-tot{display:flex;justify-content:space-between;align-items:center;border-top:1.5px solid color-mix(in srgb,var(--turquesa) 30%,transparent);padding-top:8px;margin-top:4px;font-size:.95rem}
 .cmb-ok{margin-top:8px;font-size:.88rem;color:#2f7a50}
+
+/* ---------- Mochito guía + aparición al scrollear ---------- */
+.rv-on .rv-up{opacity:0;transform:translateY(22px);transition:opacity .55s ease var(--rv-d,0ms),transform .55s cubic-bezier(.2,.8,.2,1) var(--rv-d,0ms)}
+.rv-on .rv-up.rv-in{opacity:1;transform:none}
+.mito{position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:34;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none;
+  opacity:0;transform:translateY(30px) scale(.8);transition:opacity .35s,transform .45s cubic-bezier(.3,1.5,.5,1),bottom .25s ease}
+.mito.in{opacity:1;transform:none}
+.mito.lift{bottom:calc(82px + env(safe-area-inset-bottom,0px))}
+.mito.hide,.mito.bye{opacity:0;transform:translateY(30px) scale(.7)}
+.mito-btn{pointer-events:auto;position:relative;width:66px;height:66px;border:0;background:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mito-ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.mito-ring circle{fill:var(--card,#fffaf0);stroke:color-mix(in srgb,var(--turquesa) 16%,transparent);stroke-width:4}
+.mito-ring .p{fill:none;stroke:var(--coral,#f8a29a);stroke-linecap:round;stroke-dasharray:0 100;transition:stroke-dasharray .15s linear}
+.mito-body{position:absolute;inset:11px 8px 12px;display:block;will-change:transform}
+.mito-body img{width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 2px 0 rgba(41,106,103,.12))}
+.mito-shadow{position:absolute;left:50%;bottom:6px;width:30px;height:5px;margin-left:-15px;border-radius:50%;background:rgba(41,106,103,.16);transform:scaleX(var(--sh,1))}
+.mito-body.hop{animation:mitohop .55s cubic-bezier(.3,1.6,.5,1)}
+@keyframes mitohop{0%{translate:0 0}35%{translate:0 -16px;scale:1.06 .94}60%{translate:0 0;scale:.95 1.05}100%{translate:0 0;scale:1 1}}
+.mito-bubble{pointer-events:auto;position:relative;max-width:min(260px,calc(100vw - 40px));background:var(--card,#fffaf0);color:var(--ink);border:1.5px solid var(--turquesa);border-radius:18px 18px 6px 18px;
+  padding:10px 30px 10px 13px;box-shadow:var(--sombra-chica);font-size:.86rem;line-height:1.35;opacity:0;transform:translateY(8px) scale(.96);transform-origin:100% 100%;transition:opacity .2s,transform .25s cubic-bezier(.3,1.4,.5,1)}
+.mito-bubble.on{opacity:1;transform:none}
+.mito-bubble p{margin:0}
+.mito-acts{display:flex;gap:6px;flex-wrap:wrap}
+.mito-acts:not(:empty){margin-top:8px}
+.mito-a{font:inherit;font-size:.8rem;font-weight:700;background:var(--turquesa);color:#fff;border:0;border-radius:99px;padding:6px 12px;cursor:pointer}
+.mito-x{position:absolute;top:4px;right:4px;width:24px;height:24px;border:0;background:none;color:var(--ink-2);font-size:.8rem;cursor:pointer;border-radius:50%}
+@media (min-width:761px){.mito{right:22px;bottom:22px}.mito-btn{width:88px;height:88px}}
+@media (prefers-reduced-motion:reduce){.rv-on .rv-up{opacity:1;transform:none}}
