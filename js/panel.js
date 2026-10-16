@@ -328,7 +328,7 @@
       ${c === "set" || c === "dirty" || (c === "especial" && F !== "mochi") ? `<div class="row3">${inp("precio_12", "Precio 12 oz", "number", money3)}${inp("precio_16", "Precio 16 oz", "number", money3)}${inp("orden", "Orden", "number")}</div>`
         : `<div class="row2">${inp("precio", c === "especial" ? "Precio (0 = a confirmar)" : "Precio por unidad", "number", money3)}${inp("orden", "Orden", "number")}</div>`}
       ${c === "set" ? setCalc(p) : ""}
-      <div class="checks">${chk("activo", "Visible en la web")}${chk("agotado", "Agotado")}${c === "mochi" ? chk("rotativo", "Rotativo") : ""}</div>
+      <div class="checks">${chk("activo", "Visible en la web")}${chk("agotado", "Agotado")}${c === "mochi" ? chk("rotativo", "Rotativo") : ""}${c === "especial" ? chk("esmerilado", "Esmerilado (tapa la foto)") : ""}</div>
       <div class="savebar"><button class="linkbtn warn" data-delp>${P.cancelArm === "del-" + p.id ? "¿Seguro? Tocá de nuevo" : "Eliminar"}</button>
         <span>${dirty ? `<button class="linkbtn" data-undo>Descartar</button> ` : ""}<button class="btn solid" data-savep>Guardar</button></span></div>
     </article>`;

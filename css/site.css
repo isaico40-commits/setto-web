@@ -795,3 +795,6 @@ body:not([data-page="home"]) .tema-aviso{display:none!important}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){#especial .prem.soon .ph img{filter:blur(14px)}}
 .t-halloween #especial .prem{background:#fde3df;color:var(--ink)}
 .t-halloween #especial .prem h3{color:var(--ink)}
+.sph.frost{position:relative}
+.sph.frost::after{content:"";position:absolute;inset:0;border-radius:inherit;z-index:1;background:rgba(253,227,223,.32);-webkit-backdrop-filter:blur(16px) saturate(1.25);backdrop-filter:blur(16px) saturate(1.25)}
+.sph.frost .x{z-index:2}

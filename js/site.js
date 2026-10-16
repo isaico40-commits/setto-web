@@ -509,7 +509,7 @@
       const foto = !!p.img, canBuy = open && !p.agotado && !sinStock(p) && base > 0;
       const pic = foto ? `<img src="${esc(p.img)}" alt="${esc(nameOf(p))}" loading="lazy">` : `<span class="pend"><img src="img/mochito-lie.png" alt="">Foto en camino</span>`;
       const tag = p.agotado ? '<span class="badge">Agotado</span>' : !open ? '<span class="badge">Próximamente</span>' : stockBadge(p);
-      return `<article class="prem ${p.agotado ? "agotado" : ""} ${open ? "" : "soon"}">
+      return `<article class="prem ${p.agotado ? "agotado" : ""} ${p.esmerilado ? "soon" : ""}">
         <button class="ph ${foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${tag}${pic}</button>
         <h3>${esc(p.nombre)}</h3><p class="desc">${esc(p.desc)}</p>${open ? stockLine(p) : ""}
         <div class="row">${base > 0 ? `<span class="price num">${beb ? "Desde " : ""}${money(base)}</span>` : `<span class="muted" style="font-size:.85rem">Precio a confirmar</span>`}
@@ -624,7 +624,7 @@
     }).join("")}</div></div>`;
     const sinSt = sinStock(p) && !(k === "premium" && !espOpen());
     const blocked = p.agotado || sinSt || (k === "premium" && (!espOpen() || !(Number(bebida(p) ? p.precios[sz || "12 oz"] : p.precio) > 0)));
-    $("#sheet").innerHTML = `<div class="sph"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
+    $("#sheet").innerHTML = `<div class="sph ${p.esmerilado ? "frost" : ""}"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
       <div class="sb">
         ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
         <h3 id="sTitle">${esc(nameOf(p))}</h3>
