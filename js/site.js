@@ -183,7 +183,7 @@
   const heroBotones = (x) => Array.isArray(x.botones) ? x.botones.filter((b) => b && b.texto)
     : x.tipo === "media" ? (x.boton ? [{ texto: x.boton, link: x.link || "#sets", estilo: "principal" }] : [])
     : [{ texto: "Armar mi pedido", link: "#sets", estilo: "principal" }, { texto: "Pedir por apps", link: "#apps", estilo: "secundario" }];
-  let heroI = 0, heroT = null, HS = [], heroPausa = false, heroHold = 0;
+  let heroI = 0, heroT = null, HS = [], heroPausa = false;
   const RMH = matchMedia("(prefers-reduced-motion: reduce)").matches;
   function renderHero() {
     const h = S.hero || {}; HS = (h.slides || []).filter((x) => x && (x.img || x.img_m || x.video || x.titulo)); if (!HS.length) HS = HERO_DEF;
@@ -230,31 +230,41 @@
       else v.pause();
     });
   }
-  function heroAuto() {
-    clearInterval(heroT); if (HS.length < 2 || RMH || heroPausa) return;
-    heroT = setInterval(() => { if (!document.hidden && Date.now() > heroHold) heroIr(heroI + 1); }, Math.max(3, Number((S.hero || {}).intervalo) || 5) * 1000);
+  // Auto avance: un temporizador por slide que arranca de cero cada vez que cambia la slide (sola o a mano).
+  // Si la persona interactúa, la próxima espera es más larga; con el mouse sobre la barra o el foco de teclado adentro, se frena.
+  const heroMs = () => Math.max(3, Number((S.hero || {}).intervalo) || 5) * 1000;
+  let heroQuieto = 0; // 1 = mouse sobre la barra, 2 = foco de teclado adentro
+  function heroAuto(ms = heroMs()) {
+    clearTimeout(heroT); if (HS.length < 2 || RMH || heroPausa || heroQuieto || document.hidden) return;
+    heroT = setTimeout(() => { heroIr(heroI + 1); heroAuto(); }, ms);
   }
-  const heroEspera = () => { heroHold = Date.now() + 8000; };  // si la persona toca, esperamos antes de seguir solos
+  const heroEspera = () => heroAuto(Math.max(heroMs() * 2, 7000));  // después de tocar, le damos más tiempo
+  document.addEventListener("visibilitychange", () => heroAuto());
   document.addEventListener("click", (e) => {
-    const d = e.target.closest("[data-hero]"); if (d) { heroEspera(); heroIr(+d.dataset.hero); return; }
-    if (e.target.closest("#heroPrev")) { heroEspera(); heroIr(heroI - 1); }
-    if (e.target.closest("#heroNext")) { heroEspera(); heroIr(heroI + 1); }
+    const d = e.target.closest("[data-hero]"); if (d) { heroIr(+d.dataset.hero); heroEspera(); return; }
+    if (e.target.closest("#heroPrev")) { heroIr(heroI - 1); heroEspera(); }
+    if (e.target.closest("#heroNext")) { heroIr(heroI + 1); heroEspera(); }
     const pz = e.target.closest("#heroPause");
     if (pz) { heroPausa = !heroPausa; pz.setAttribute("aria-pressed", String(heroPausa)); pz.setAttribute("aria-label", heroPausa ? "Reproducir" : "Pausar"); heroMarcar(); heroAuto(); }
   });
   (function heroScroll() {
-    const tr = document.getElementById("heroSlides"); if (!tr) return; let t = null;
+    const tr = document.getElementById("heroSlides"), sec = document.querySelector(".hero2"); if (!tr || !sec) return; let t = null;
     tr.addEventListener("scroll", () => {
       clearTimeout(t); t = setTimeout(() => {
         const cs = heroCards(), pad = parseFloat(getComputedStyle(tr).scrollPaddingLeft) || 0;
         let best = 0, bd = 1e9; cs.forEach((c, k) => { const dd = Math.abs(c.offsetLeft - pad - tr.scrollLeft); if (dd < bd) { bd = dd; best = k; } });
-        if (best !== heroI) { heroI = best; heroMarcar(); }
+        if (tr.scrollLeft >= tr.scrollWidth - tr.clientWidth - 2) best = cs.length - 1; // la última no llega a pegarse a la izquierda
+        if (best !== heroI) { heroI = best; heroMarcar(); heroEspera(); } // la cambió con el dedo
       }, 80);
     }, { passive: true });
-    ["pointerdown", "wheel", "touchstart", "focusin"].forEach((ev) => tr.addEventListener(ev, heroEspera, { passive: true }));
-    // si la persona va a tocar un botón, que la slide no cambie justo debajo del dedo
-    const ct = document.getElementById("heroCtas");
-    if (ct) ["pointerenter", "pointerdown", "touchstart", "focusin"].forEach((ev) => ct.addEventListener(ev, heroEspera, { passive: true }));
+    // tocar la portada (o los botones) reinicia la espera, así no cambia debajo del dedo
+    sec.addEventListener("pointerdown", heroEspera, { passive: true });
+    // con el mouse sobre los botones o los controles se frena (sobre las fotos sigue, si no parecería trabado)
+    const ctl = sec.querySelector(".hctl");
+    if (ctl) { ctl.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") { heroQuieto |= 1; heroAuto(); } });
+      ctl.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") { heroQuieto &= ~1; heroAuto(); } }); }
+    sec.addEventListener("focusin", (e) => { if (e.target.matches(":focus-visible")) { heroQuieto |= 2; heroAuto(); } });
+    sec.addEventListener("focusout", (e) => { if (!sec.contains(e.relatedTarget)) { heroQuieto &= ~2; heroAuto(); } });
   })();
 
   /* ---------- Ubicación (Panel → Ajustes → Ubicación) ---------- */
