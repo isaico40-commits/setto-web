@@ -42,17 +42,15 @@
   };
   // lo que ve el cliente = stock − lo que ya tiene en su carrito (contador en vivo)
   const libreDe = (p) => { const n = stockDe(p); if (n === null) return null; const mid = p.categoria === "set" ? p.set_mochi : p.id; return n - enCarrito(mid); };
-  const badgeInner = (p) => { const n = stockDe(p), l = libreDe(p); if (n === null || p.agotado) return ""; return n <= 0 ? "" : l <= 0 ? '<span class="badge low">En tu pedido</span>' : l <= umbral() ? '<span class="badge low">¡Últimos!</span>' : ""; };
+  const badgeInner = (p) => { const n = stockDe(p), l = libreDe(p); if (n === null || p.agotado) return ""; return n <= 0 ? '<span class="badge">Sin stock hoy</span>' : l <= 0 ? '<span class="badge low">En tu pedido</span>' : l <= umbral() ? '<span class="badge low">¡Últimos!</span>' : ""; };
   const lineInner = (p) => {
     const n = stockDe(p), l = libreDe(p); if (n === null || p.agotado) return "";
-    if (n <= 0) return "";
+    if (n <= 0) return '<p class="stk out">No hay stock disponible</p>';
     if (l <= 0) return `<p class="stk low">Ya tenés ${n === 1 ? "el último" : `los ${n} que quedan`} en tu pedido</p>`;
     const num = `<b class="num stkn">${l}</b>`;
     if (p.categoria === "set") return `<p class="stk ${l <= umbral() ? "low" : ""}">${l === 1 ? "Queda" : "Quedan"} ${num} para este set</p>`;
     return l <= umbral() ? `<p class="stk low">${l === 1 ? "Queda" : "Quedan"} ${num} · ¡últimos!</p>` : `<p class="stk">${num} disponibles hoy</p>`;
   };
-  // va en el lugar del botón + cuando no se puede pedir
-  const noAdd = (t) => `<span class="noadd">${t}</span>`;
   const stockBadge = (p) => `<span class="stkw" data-stkb="${esc(p.id)}">${badgeInner(p)}</span>`;
   const stockLine = (p) => `<div class="stkw" data-stkl="${esc(p.id)}">${lineInner(p)}</div>`;
   function refreshStockUI() {
@@ -555,12 +553,12 @@
       const beb = bebida(p), base = beb ? Number(p.precios["12 oz"]) : Number(p.precio);
       const foto = !!p.img, canBuy = open && !p.agotado && !sinStock(p) && base > 0;
       const pic = foto ? `<img src="${esc(p.img)}" alt="${esc(nameOf(p))}" loading="lazy">` : `<span class="pend"><img src="img/mochito-lie.png" alt="">Foto en camino</span>`;
-      const tag = p.agotado ? (open ? "" : '<span class="badge">Agotado</span>') : !open ? '<span class="badge">Próximamente</span>' : stockBadge(p);
+      const tag = p.agotado ? '<span class="badge">Agotado</span>' : !open ? '<span class="badge">Próximamente</span>' : stockBadge(p);
       return `<article class="prem ${p.agotado ? "agotado" : ""} ${p.esmerilado ? "soon" : ""}">
         <button class="ph ${foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${tag}${pic}</button>
         <h3>${esc(p.nombre)}</h3><p class="desc">${esc(p.desc)}</p>${open ? stockLine(p) : ""}
         <div class="row">${base > 0 ? `<span class="price num">${beb ? "Desde " : ""}${money(base)}</span>` : `<span class="muted" style="font-size:.85rem">Precio a confirmar</span>`}
-        ${canBuy ? `<button class="add" ${beb ? `data-open="${p.id}"` : `data-quick="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>` : open && (p.agotado || sinStock(p)) ? noAdd(p.agotado ? "Agotado" : "Sin stock") : ""}</div>
+        ${canBuy ? `<button class="add" ${beb ? `data-open="${p.id}"` : `data-quick="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>` : ""}</div>
       </article>`;
     }).join("");
     $("#espSoon").innerHTML = open ? "" : `<div class="prem-soon"><img src="img/mochito-run.png" alt=""><div><b>Todavía no salió</b><p>Avisamos en Instagram <strong>@${esc(S.instagram || "setto.project")}</strong>.</p></div></div>`;
@@ -577,7 +575,7 @@
         <p class="code">${esc(s.codigo || "")}${s.tema ? " ✦ " + esc(s.tema) : ""}</p>
         <p class="combo">${esc(descOf(s))}</p>${stockLine(s)}
         <div class="foot"><span class="from num">Desde<b>${money(ahora)}${ahorro > 0 ? `<s>${money(antes)}</s>` : ""}</b>${rateTag(s)}</span>
-        ${sinStock(s) ? noAdd("Sin stock") : `<button class="add" data-open="${s.id}" aria-label="Elegir tamaño de ${esc(s.nombre)}">+</button>`}</div>
+        ${sinStock(s) ? "" : `<button class="add" data-open="${s.id}" aria-label="Elegir tamaño de ${esc(s.nombre)}">+</button>`}</div>
       </article>`;
     }).join("");
     $("#sets").hidden = on(SETS).length === 0;
@@ -593,11 +591,11 @@
       const agot = p.agotado;
       const precio = tab === "dirty" ? `<span class="from num">Desde<b>${money(p.precios["12 oz"])}</b>${rateTag(p)}</span>` : `<span class="from num">Unidad<b>${money(p.precio)}</b>${rateTag(p)}</span>`;
       const sb = tab === "mochi" ? stockBadge(p) : "";
-      const badge = agot ? "" : sb ? sb : p.rotativo ? '<span class="badge">Rotativo</span>' : "";
+      const badge = agot ? '<span class="badge">Agotado</span>' : sb ? sb : p.rotativo ? '<span class="badge">Rotativo</span>' : "";
       return `<article class="item">
         <button class="ph ${p.foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(nameOf(p))}">${badge}<img src="${esc(p.img || "img/mochito-lie.png")}" alt="${esc(tab === "dirty" ? p.nombre + " en vaso transparente" : "Mochi de " + p.nombre + " entero y cortado")}" loading="lazy"></button>
         <h3>${esc(p.nombre)}</h3><p class="desc">${esc(p.desc)}</p>${tab === "mochi" ? stockLine(p) : ""}
-        <div class="row">${precio}${agot || (tab === "mochi" && sinStock(p)) ? noAdd(agot ? "Agotado" : "Sin stock") : `<button class="add" style="margin-left:auto" ${tab === "dirty" ? `data-open="${p.id}"` : `data-quick="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>`}</div>
+        <div class="row">${precio}${agot || (tab === "mochi" && sinStock(p)) ? "" : `<button class="add" style="margin-left:auto" ${tab === "dirty" ? `data-open="${p.id}"` : `data-quick="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>`}</div>
       </article>`;
     }).join("") + (tab === "dirty"
       ? `<button class="next-cat" data-goto="mochi"><span class="nc-th"><img src="img/mochi-sakura.webp" alt=""></span><b>¿Y para acompañar?</b><span class="cta">Ver los ${on(MOCHIS).length} mochis →</span></button>`

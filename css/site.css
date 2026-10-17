@@ -127,6 +127,9 @@ section.blk{padding-block:72px}
 .set .ph:hover img{transform:scale(1.04) rotate(-2deg)}
 .off{position:absolute;top:28px;right:28px;z-index:1;background:var(--turquesa);color:#FFFDF8;border-radius:var(--pill);font-size:.76rem;font-weight:700;padding:5px 11px;letter-spacing:.02em;box-shadow:0 0 0 2px var(--card),0 0 14px 2px color-mix(in srgb,var(--turquesa) 55%,transparent);animation:offglow 2.6s ease-in-out infinite}
 @keyframes offglow{50%{box-shadow:0 0 0 2px var(--card),0 0 22px 5px color-mix(in srgb,var(--turquesa) 45%,transparent)}}
+/* en los sets, "Sin stock hoy" va a la misma altura que el cartel de off */
+.set .stkw .badge{top:28px;left:28px;padding:5px 11px}
+.stk.out{color:var(--tachado)}
 /* hover en cualquier parte de la tarjeta: cambia el fondo de la foto */
 .set .ph{transition:background .2s}
 .set:hover .ph{background:#E8D3AC}
@@ -434,8 +437,6 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .rate .stars5{font-size:.95rem;color:color-mix(in srgb,var(--coral) 35%,transparent)}
 .rate .stars5 span:last-child{color:var(--coral)}
 .rate b,.from .rate b{display:inline;font-size:.8rem;font-weight:700;color:var(--ink);line-height:1}
-/* lo que va en el lugar del + cuando no se puede pedir */
-.noadd{flex:none;margin-left:auto;border-radius:var(--pill);background:var(--bg-2);color:var(--ink-2);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:9px 12px;line-height:1;white-space:nowrap}
 /* carta y edición especial: el hover en la tarjeta cambia el fondo de la foto */
 .item .ph,.prem .ph{transition:background .2s}
 @media (hover:hover){.item:hover .ph,.prem:hover .ph{background:#E8D3AC}}
