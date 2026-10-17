@@ -125,7 +125,15 @@ section.blk{padding-block:72px}
 .set .ph::before{content:"";position:absolute;width:62%;aspect-ratio:1;border-radius:50%;background:var(--coral)}
 .set .ph img{position:relative;max-height:210px;width:auto;transition:transform .25s}
 .set .ph:hover img{transform:scale(1.04) rotate(-2deg)}
-.off{position:absolute;top:28px;right:28px;background:var(--ink);color:var(--bg);border-radius:var(--pill);font-size:.74rem;font-weight:700;padding:4px 10px;letter-spacing:.02em}
+.off{position:absolute;top:28px;right:28px;z-index:1;background:var(--turquesa);color:#FFFDF8;border-radius:var(--pill);font-size:.76rem;font-weight:700;padding:5px 11px;letter-spacing:.02em;box-shadow:0 0 0 2px var(--card),0 0 14px 2px color-mix(in srgb,var(--turquesa) 55%,transparent);animation:offglow 2.6s ease-in-out infinite}
+@keyframes offglow{50%{box-shadow:0 0 0 2px var(--card),0 0 22px 5px color-mix(in srgb,var(--turquesa) 45%,transparent)}}
+/* en los sets, "Sin stock hoy" va a la misma altura que el cartel de off */
+.set .stkw .badge{top:28px;left:28px;padding:5px 11px}
+.stk.out{color:var(--tachado)}
+/* hover en cualquier parte de la tarjeta: la sombra verde sólida se aclara */
+.set{transition:box-shadow .2s}
+.set:hover{box-shadow:5px 5px 0 color-mix(in srgb,var(--turquesa) 55%,#fff)}
+.set:hover .off{box-shadow:0 0 0 2px var(--card),0 0 22px 5px color-mix(in srgb,var(--turquesa) 45%,transparent)}
 .setsnote{margin:22px auto 0;font-size:.9rem;color:var(--ink-2);max-width:60ch;text-align:center}
 /* edición especial */
 .prem{display:flex;flex-direction:column;gap:10px;min-width:0;text-align:center}
@@ -140,7 +148,7 @@ section.blk{padding-block:72px}
 .prem h3{font-size:1.3rem}
 .prem .desc{font-size:.85rem;color:var(--ink-2)}
 .prem .row{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:auto}
-.prem .price{font-weight:700}
+.prem .price{font-weight:700;font-size:1.25rem}
 .prem .badge{left:auto;right:12px}
 .prem.agotado .ph img{filter:grayscale(.6) opacity(.7)}
 .prem-soon{margin:26px auto 0;max-width:560px;border-radius:22px;background:var(--bg-2);padding:18px 22px;display:flex;gap:16px;align-items:center;text-align:left}
@@ -152,7 +160,8 @@ section.blk{padding-block:72px}
 .set .combo{font-size:.92rem;color:var(--ink-2);margin-top:2px}
 .set .foot{display:flex;align-items:center;gap:10px;margin-top:16px;padding-top:14px;border-top:1.5px solid color-mix(in srgb,var(--turquesa) 40%,transparent)}
 .from{font-size:.78rem;color:var(--ink-2);line-height:1.2}
-.from b{display:block;font-size:1.15rem;color:var(--ink)}
+.from b{display:block;font-size:1.4rem;color:var(--ink);line-height:1.15}
+.from s{font-size:1rem}
 .from s{color:var(--tachado);margin-left:4px}
 .set .foot .add{margin-left:auto}
 
@@ -424,7 +433,10 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 
 /* estrellas en productos */
 .rate{display:flex;align-items:center;gap:3px;font-size:.78rem;font-weight:700;color:var(--ink);margin-top:3px;font-family:inherit;letter-spacing:0}
-.rate i{font-style:normal;color:var(--coral,#f8a29a);font-size:.9rem}
+.rate{gap:5px;margin-top:5px}
+.rate .stars5{font-size:.95rem;color:color-mix(in srgb,var(--coral) 35%,transparent)}
+.rate .stars5 span:last-child{color:var(--coral)}
+.rate b,.from .rate b{display:inline;font-size:.8rem;font-weight:700;color:var(--ink);line-height:1}
 .rate small{font-weight:500;color:var(--ink-2)}
 #sTitle + .rate{margin:-4px 0 4px}
 .s-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:-2px 0 2px}

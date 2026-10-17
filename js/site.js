@@ -29,7 +29,8 @@
 
   /* ---------- estrellas por producto (reseñas publicadas) ---------- */
   let RATINGS = {};
-  const rateTag = (p) => { const r = RATINGS[p.id]; if (!r || !r.cantidad) return ""; return `<span class="rate" aria-label="${r.promedio} de 5, ${r.cantidad} reseña${r.cantidad > 1 ? "s" : ""}"><i>★</i>${String(r.promedio).replace(".", ",")} <small>(${r.cantidad})</small></span>`; };
+  // 5 estrellas rellenas según el promedio (4,5 → cuatro y media), como en Crumbl
+  const rateTag = (p) => { const r = RATINGS[p.id]; if (!r || !r.cantidad) return ""; const w = Math.max(0, Math.min(100, (r.promedio / 5) * 100)); return `<span class="rate" role="img" aria-label="${r.promedio} de 5, ${r.cantidad} reseña${r.cantidad > 1 ? "s" : ""}"><span class="stars5" aria-hidden="true"><span>★★★★★</span><span style="width:${w}%">★★★★★</span></span><b>${String(r.promedio).replace(".", ",")}</b><small>(${r.cantidad})</small></span>`; };
 
   /* ---------- stock visible (sale de la caja del equipo) ---------- */
   let STOCK = null;
@@ -44,7 +45,7 @@
   const badgeInner = (p) => { const n = stockDe(p), l = libreDe(p); if (n === null || p.agotado) return ""; return n <= 0 ? '<span class="badge">Sin stock hoy</span>' : l <= 0 ? '<span class="badge low">En tu pedido</span>' : l <= umbral() ? '<span class="badge low">¡Últimos!</span>' : ""; };
   const lineInner = (p) => {
     const n = stockDe(p), l = libreDe(p); if (n === null || p.agotado) return "";
-    if (n <= 0) return '<p class="stk out">Sin stock por ahora</p>';
+    if (n <= 0) return '<p class="stk out">No hay stock disponible</p>';
     if (l <= 0) return `<p class="stk low">Ya tenés ${n === 1 ? "el último" : `los ${n} que quedan`} en tu pedido</p>`;
     const num = `<b class="num stkn">${l}</b>`;
     if (p.categoria === "set") return `<p class="stk ${l <= umbral() ? "low" : ""}">${l === 1 ? "Queda" : "Quedan"} ${num} para este set</p>`;
