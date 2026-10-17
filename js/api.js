@@ -198,6 +198,11 @@
       return db.orders.filter((o) => o.phone === ph && codes.includes(o.code) && new Date(o.created_at) > since)
         .map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, track: o.track, cambio: o.cambio ? { estado: o.cambio.estado, resolucion: o.cambio.resolucion } : null, resena: (db.reviews || []).some((r) => r.order_id === o.id) }));
     },
+    async buscarPedido(phone, code) {
+      const db = dbLoad(), ph = normPhone(phone), since = Date.now() - 2 * 864e5;
+      return db.orders.filter((o) => o.status === "pendiente" && new Date(o.created_at) > since && (code ? o.code === code : ph && o.phone === ph)).slice(-3).reverse()
+        .map((o) => ({ code: code ? o.code : "STT-••" + o.code.slice(-2), etapa: o.etapa || "recibido", modo: o.modo, created_at: o.created_at }));
+    },
     async trackStatus(tracks) {
       const db = dbLoad();
       return db.orders.filter((o) => o.track && tracks.includes(o.track)).map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, track: o.track, phone: o.phone, cambio: o.cambio ? { estado: o.cambio.estado, resolucion: o.cambio.resolucion } : null, resena: (db.reviews || []).some((r) => r.order_id === o.id) }));
@@ -353,6 +358,7 @@
     async resolverCambio(track, elecciones, cancelar) { const { data, error } = await sb.rpc("resolver_cambio", { p_track: track, p_elecciones: elecciones || [], p_cancelar: !!cancelar }); fail(error); return data; },
     async setEtapa(id, etapa) { const { error } = await sb.rpc("set_order_etapa", { p_id: id, p_etapa: etapa }); fail(error); },
     async orderStatus(codes, phone) { const { data, error } = await sb.rpc("get_order_status", { p_codes: codes, p_phone: phone }); fail(error); return data || []; },
+    async buscarPedido(phone, code) { const { data, error } = await sb.rpc("buscar_pedido", { p_phone: phone || null, p_code: code || null }); fail(error); return data || []; },
     async trackStatus(tracks) { const { data, error } = await sb.rpc("track_status", { p_tracks: tracks }); fail(error); return data || []; },
     async createReviewTrack(track, rating, texto, foto, instagram) { const { error } = await sb.rpc("create_review_track", { p_track: track, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); },
     async createReview(code, phone, rating, texto, foto, instagram) { const { error } = await sb.rpc("create_review_v2", { p_code: code, p_phone: phone, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); },
