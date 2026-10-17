@@ -21,7 +21,7 @@
   /* =================== LOGIN =================== */
   function drawLogin(msg) {
     app.innerHTML = `<div class="loginwrap"><form class="loginbox" id="login">
-      <img class="l" src="img/logo.png" alt="Setto">
+      <img class="l" src="img/logo.svg" alt="Setto">
       <h1 class="ph1">Panel del equipo</h1>
       ${API.DEMO ? `<p class="note-demo">Modo demo: todavía no cargaste las claves de Supabase en <b>js/config.js</b>. Entrás sin usuario y los datos quedan en este navegador.</p>`
         : `<label class="f" for="lEmail">Email<input id="lEmail" type="email" autocomplete="username" required></label>
@@ -53,7 +53,7 @@
   /* =================== ESTRUCTURA =================== */
   function drawShell() {
     app.innerHTML = `<header class="pbar"><div class="wrap">
-        <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.png" alt="Setto"></a><span class="tag">Panel</span>
+        <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.svg" alt="Setto"></a><span class="tag">Panel</span>
         <nav class="ptabs" role="tablist">
           ${[["pedidos", "Pedidos"], ["club", "Club"], ["carta", "Carta"], ["resenas", "Reseñas"], ["gift", "Gift cards"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : k === "resenas" ? ' <span class="n" id="resN" hidden>0</span>' : k === "gift" ? ' <span class="n" id="gcN" hidden>0</span>' : ""}</button>`).join("")}
           <a class="ptab" href="caja.html">Caja</a>
