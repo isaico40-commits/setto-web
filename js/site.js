@@ -516,7 +516,21 @@
   function renderConviene() {
     const v = S.ventajas || {}, items = (v.items || []).filter((x) => x && x.titulo);
     const el = $("#conviene"); el.hidden = !items.length || v.activo === false; if (el.hidden) return;
-    el.innerHTML = `<h3>${esc(v.titulo || "Pedir acá te conviene")}</h3><div class="cv-grid">${items.map((x, i) => `<div class="cv"><i>${i + 1}</i><b>${esc(x.titulo)}</b>${x.detalle ? `<span>${esc(x.detalle)}</span>` : ""}</div>`).join("")}</div>`;
+    el.innerHTML = `<h3>${esc(v.titulo || "Pedir acá te conviene")}</h3><div class="cv-grid">${items.map((x) => `<div class="cv"><span class="ic" aria-hidden="true">${cvIcon(x)}</span><b>${esc(x.titulo)}</b>${x.detalle ? `<span>${esc(x.detalle)}</span>` : ""}</div>`).join("")}</div>`;
+  }
+  // Ícono según el título (o el detalle) de cada motivo; los motivos se editan desde el panel.
+  const CV_ICONS = [
+    [/barat|precio|ahorr|descuent|%|menos/, '<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>'],
+    [/sello|club|premio|punto|tarjeta/, '<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"/>'],
+    [/gusto|eleg|tama|leche|extra|personaliz/, '<path d="M4 6h10M4 12h4M12 12h8M4 18h12"/><circle cx="17" cy="6" r="2.2"/><circle cx="10" cy="12" r="2.2"/><circle cx="18.5" cy="18" r="2.2"/>'],
+    [/directo|whatsapp|chat|mensaje/, '<path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12z"/>'],
+    [/env[ií]o|domicilio|delivery|retir/, '<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>'],
+  ];
+  function cvIcon(x) {
+    const t = (x.titulo || "").toLowerCase(), d = (x.detalle || "").toLowerCase();
+    const hit = CV_ICONS.find(([re]) => re.test(t)) || CV_ICONS.find(([re]) => re.test(d));
+    const path = hit ? hit[1] : '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>';
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
   }
   function renderEspecial() {
     const E = S.especial || {}, items = on(ESP), open = espOpen();

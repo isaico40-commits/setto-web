@@ -360,15 +360,16 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .btn.ghost:hover{background:var(--card)}
 @media (max-width:560px){.hero .ctas .btn{flex:1 1 auto}}
 /* Pedir acá te conviene */
-.conviene{background:var(--turquesa);color:#FFFDF8;border-radius:var(--r);padding:26px;margin-bottom:22px}
-.conviene h3{font-size:clamp(1.6rem,3.4vw,2.2rem);color:#FFFDF8;text-align:center}
-.conviene .cv-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px}
-.conviene .cv{background:rgba(255,253,248,.1);border:1.5px solid rgba(255,253,248,.28);border-radius:18px;padding:16px}
-.conviene .cv b{display:block;font-size:1.05rem}
-.conviene .cv span{display:block;font-size:.88rem;opacity:.9;margin-top:6px;line-height:1.4}
-.conviene .cv i{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--coral,#f8a29a);color:var(--ink);font-style:normal;font-weight:800;font-size:.85rem;margin-bottom:10px}
+.conviene{background:var(--bg);color:var(--ink);border-radius:var(--r);padding:28px 26px;margin-bottom:22px}
+.conviene h3{font-size:clamp(1.6rem,3.4vw,2.2rem);color:var(--turquesa);text-align:center}
+.conviene .cv-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:20px}
+.conviene .cv{background:var(--card);border:1.5px solid color-mix(in srgb,var(--turquesa) 22%,transparent);border-radius:20px;padding:20px 16px;text-align:center;display:flex;flex-direction:column;align-items:center}
+.conviene .cv .ic{display:grid;place-items:center;width:52px;height:52px;border-radius:50%;background:var(--bg-2);color:var(--turquesa);margin-bottom:12px}
+.conviene .cv .ic svg{width:26px;height:26px}
+.conviene .cv b{display:block;font-size:1.08rem;color:var(--turquesa)}
+.conviene .cv span{display:block;font-size:.9rem;color:var(--ink-2);margin-top:6px;line-height:1.4;max-width:24ch}
 @media (max-width:900px){.conviene .cv-grid{grid-template-columns:1fr 1fr}}
-@media (max-width:520px){.conviene{padding:20px 16px}.conviene .cv-grid{grid-template-columns:1fr}}
+@media (max-width:520px){.conviene{padding:22px 16px}.conviene .cv-grid{gap:10px}.conviene .cv{padding:16px 10px}.conviene .cv .ic{width:44px;height:44px}.conviene .cv .ic svg{width:22px;height:22px}}
 /* logos de apps */
 .app .ico img{width:100%;height:100%;object-fit:contain;border-radius:12px}
 .app .ico.logo{background:#fff;overflow:hidden}
@@ -575,12 +576,6 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .mq-list li::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--coral);transform:translateY(-1px)}
 .mq-list b{font-weight:700}
 @media (max-width:820px){.mq{grid-template-columns:1fr}.mq-img{aspect-ratio:4/3}}
-/* ---------- Pedir acá te conviene: más contraste ---------- */
-.conviene .cv{background:var(--bg);border:0;color:var(--ink)}
-.conviene .cv b{color:var(--turquesa);font-size:1.08rem}
-.conviene .cv span{color:var(--ink-2);opacity:1;font-size:.9rem}
-.conviene .cv:nth-child(even){background:#fbe3df}
-
 /* ---------- Tema Halloween (se activa desde el panel) ---------- */
 .tema-aviso{display:flex;align-items:center;justify-content:center;gap:10px;background:#2b2035;color:#ffe9d6;font-weight:700;font-size:.88rem;padding:8px 16px;text-align:center}
 .tema-aviso svg{width:22px;height:22px;flex:none}
