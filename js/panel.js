@@ -403,6 +403,13 @@
                 <label>Lleva a<select class="inp" name="sl${i}">${[["#sets", "Sets"], ["#carta", "Carta"], ["#especial", "Edición especial"], ["#club", "Setto Club"], ["/gift-cards", "Gift cards"], ["#apps", "Pedir por apps"]].map(([v, l]) => `<option value="${v}" ${(x.link || "#sets") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label></div></div>`; }).join("")}
           <label>Cambia cada (segundos)<input class="inp" name="intervalo" type="number" min="3" max="15" value="${(S.hero || {}).intervalo || 5}" style="width:120px"></label>
           <button class="btn solid">Guardar portada</button></form>
+        <form class="pcard" data-set="stickers"><b>Stickers de WhatsApp</b>
+          <span class="hintp">Subí el pack a Sticker.ly desde el celu, tocá Compartir y pegá acá el link. Sin link la sección no se muestra.</span>
+          <label class="chk"><input type="checkbox" name="activo" ${(S.stickers || {}).activo ? "checked" : ""}> Mostrar los stickers en la web</label>
+          <label>Link del pack en Sticker.ly<input class="inp" name="link" type="url" maxlength="200" value="${esc((S.stickers || {}).link || "")}" placeholder="https://sticker.ly/s/…"></label>
+          <label>Título<input class="inp" name="titulo" maxlength="40" value="${esc((S.stickers || {}).titulo || "Stickers de Mochito")}"></label>
+          <label>Texto<input class="inp" name="texto" maxlength="140" value="${esc((S.stickers || {}).texto || "Llevate a Mochito a tus chats. Son gratis.")}"></label>
+          <button class="btn solid">Guardar stickers</button></form>
         <form class="pcard" data-set="ubicacion"><b>Ubicación (mapa en la web)</b>
           <span class="hintp">El mapa es público. Si retiran en tu casa, poné solo una esquina o la zona (ej: “Güemes y Alberti, Mar del Plata”) y pasá la dirección exacta por WhatsApp.</span>
           <label class="chk"><input type="checkbox" name="activo" ${(S.ubicacion || {}).activo ? "checked" : ""}> Mostrar el mapa</label>
@@ -519,6 +526,12 @@
         if (f.activo && ops.length < 2) throw new Error("Cargá al menos 2 opciones");
         const prev = P.settings.votacion || {};
         await API.saveSetting("votacion", { activo: !!f.activo, id: form.dataset.newid || prev.id || "v1", pregunta: (f.pregunta || "").trim(), opciones: ops, solo_clientes: !!f.solo, cierre: f.cierre ? new Date(f.cierre).toISOString() : "" });
+      }
+      if (k === "stickers") {
+        const link = (f.link || "").trim();
+        if (link && !/^https:\/\/([a-z0-9-]+\.)*sticker\.ly\//i.test(link)) throw new Error("Pegá el link que te da Sticker.ly (empieza con https://sticker.ly/)");
+        if (f.activo && !link) throw new Error("Para mostrar los stickers falta el link del pack");
+        await API.saveSetting("stickers", { activo: !!f.activo, link, titulo: (f.titulo || "").trim() || "Stickers de Mochito", texto: (f.texto || "").trim() });
       }
       if (k === "ubicacion") await API.saveSetting("ubicacion", { activo: !!f.activo, mapa: (f.mapa || "").trim(), titulo: (f.titulo || "").trim() || "Dónde estamos", texto: (f.texto || "").trim(), zoom: +f.zoom || 15 });
       if (k === "tema") await API.saveSetting("tema", { nombre: f.nombre || "", aviso: (f.aviso || "").trim() });

@@ -652,7 +652,7 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 body:not([data-page="home"]) .volver{display:inline-flex}
 body[data-page="home"] #regalo,body[data-page="home"] #armar,body:not([data-page="listo"]) #listo,body:not([data-page="listo"]) #lsRes{display:none!important}
 body[data-page="listo"] main{display:flex;flex-direction:column}
-body[data-page="listo"] main > :not(#listo):not(#armar):not(#lsRes):not(#club){display:none!important}
+body[data-page="listo"] main > :not(#listo):not(#armar):not(#lsRes):not(#club):not(#stickers){display:none!important}
 body[data-page="listo"] #listo{order:1}body[data-page="listo"] #armar{order:2}body[data-page="listo"] #lsRes{order:3}body[data-page="listo"] #club{order:4}
 body[data-page="listo"] #armar .volver,body[data-page="listo"] #armar .ar-fin .ctas .btn:not(.solid){display:none}
 body[data-page="listo"] #armar,body[data-page="listo"] #lsRes,body[data-page="listo"] #club{scroll-margin-top:80px}
@@ -798,3 +798,17 @@ body:not([data-page="home"]) .tema-aviso{display:none!important}
 .sph.frost{position:relative}
 .sph.frost::after{content:"";position:absolute;inset:0;border-radius:inherit;z-index:1;background:rgba(253,227,223,.32);-webkit-backdrop-filter:blur(16px) saturate(1.25);backdrop-filter:blur(16px) saturate(1.25)}
 .sph.frost .x{z-index:2}
+
+/* ---------- Stickers de WhatsApp ---------- */
+.stk-in{display:grid;grid-template-columns:1fr 1.15fr;gap:clamp(20px,4vw,56px);align-items:center}
+.stk-txt{display:grid;gap:12px;justify-items:start}
+.stk-txt h2{font-size:clamp(2rem,4.4vw,3rem);margin:0}
+.stk-txt p{margin:0;color:var(--ink-2);max-width:40ch}
+.stk-pasos{margin:4px 0 0;padding-left:1.2em;display:grid;gap:4px;color:var(--ink-2);font-size:.92rem}
+.stk-desk{display:none;font-size:.86rem}
+.stk.desk .stk-desk{display:block}
+.stk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(4px,1.2vw,12px);background:var(--bg-2);border-radius:28px;padding:clamp(10px,2vw,22px);border:var(--line)}
+.stk-grid img{width:100%;height:auto;display:block;transition:transform .2s}
+@media (hover:hover){.stk-grid img:hover{transform:scale(1.06) rotate(-3deg)}}
+@media (max-width:820px){.stk-in{grid-template-columns:1fr}.stk-grid{order:-1}}
+body[data-page="listo"] main > #stickers{order:5}
