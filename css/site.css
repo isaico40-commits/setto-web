@@ -689,12 +689,12 @@ body:not([data-page="home"]) .tema-aviso{display:none!important}
 .ar-sub{text-align:center;font-size:1.3rem;margin:26px 0 14px;color:var(--turquesa)}
 .ar-inc{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .ar-item{background:#f1e4ca;border-radius:24px;padding:16px;display:grid;justify-items:center;text-align:center;gap:6px}
-.ar-item img{height:170px;width:auto;object-fit:contain}
+.ar-item img{height:170px;width:auto;max-width:100%;object-fit:contain}
 .ar-item b{font-size:1.1rem;color:var(--turquesa)}
 .ar-item span{font-size:.88rem;color:var(--ink-2)}
 .ar-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
-.ar-steps li{background:#f1e4ca;border-radius:24px;padding:16px;display:grid;justify-items:center;gap:10px;text-align:center}
-.ar-steps img{height:200px;width:auto;object-fit:contain}
+.ar-steps li{background:#f1e4ca;border-radius:24px;padding:16px;display:grid;justify-items:center;align-content:start;gap:10px;text-align:center}
+.ar-steps img{height:200px;width:auto;max-width:100%;object-fit:contain}
 .ar-steps img.ar-mito{height:150px;margin-block:25px}
 .ar-steps span{font-weight:700;display:grid;justify-items:center;gap:6px}
 .ar-steps i{font-style:normal;width:34px;height:34px;border-radius:50%;background:var(--coral);display:grid;place-items:center;font-weight:800}
