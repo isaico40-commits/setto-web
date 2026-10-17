@@ -257,6 +257,20 @@
     $("#ubiLink").href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
   }
 
+  /* ---------- Stickers para WhatsApp (Panel → Ajustes → Stickers). El pack vive en Sticker.ly:
+     WhatsApp no deja instalar packs desde una web, solo desde una app. ---------- */
+  const STK_DEF = ["01_fantasma", "02_calabaza", "03_diablito", "04_bruja", "05_latte", "06_gatito", "07_momia", "08_durmiendo", "09_fantasmita"].map((n) => `img/stickers/halloween/${n}.webp`);
+  function renderStickers() {
+    const k = S.stickers || {}, sec = $("#stickers"); if (!sec) return;
+    const link = (k.link || "").trim(); sec.hidden = !(k.activo && /^https:\/\//.test(link)); if (sec.hidden) return;
+    $("#t-stk").textContent = k.titulo || "Stickers de Mochito";
+    $("#stkTexto").textContent = k.texto || "Llevate a Mochito a tus chats. Son gratis.";
+    $("#stkBtn").href = link;
+    const grid = $("#stkGrid");
+    if (!grid.dataset.ok) { grid.innerHTML = STK_DEF.map((s) => `<img src="${s}" alt="" width="512" height="512" loading="lazy" decoding="async">`).join(""); grid.dataset.ok = "1"; }
+    sec.classList.toggle("desk", !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+  }
+
   /* ---------- ¿Qué es un mochi? (se edita en Panel → Ajustes) ---------- */
   const MQ_DEF = {
     activo: true,
@@ -1125,7 +1139,7 @@
       verSeguimiento(); renderResenas();
       API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
       S = settings; adapt(products); syncCart();
-      renderTema(); renderHero(); renderUbicacion(); renderFaq(); renderAbierto(); renderGift(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
+      renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
       if (PAGE === "listo" && form.tel && clubOn()) setTimeout(() => { if (!lsTel) { lsTel = true; $("#cardForm").requestSubmit(); } }, 1500);
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
