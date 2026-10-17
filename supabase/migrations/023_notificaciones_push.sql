@@ -3,7 +3,8 @@
 --   Cuando el pedido cambia de etapa, se entrega/cancela o el equipo marca que falta algo,
 --   un trigger llama a la Edge Function "push-pedido" (pg_net), que manda la notificación.
 --   Sin suscripciones para ese pedido, el trigger no hace nada. Nunca frena un cambio del pedido.
---   URL y clave de la función van en Vault: push_hook_url y push_hook_secret.
+--   Todo lo secreto va en Vault: push_hook_url, push_hook_secret, vapid_public_key y vapid_private_key
+--   (se cargan aparte con vault.create_secret, nunca en el repo).
 -- No borra nada.
 
 create extension if not exists pg_net with schema extensions;
@@ -44,6 +45,15 @@ language sql security definer set search_path = public as $$
 $$;
 revoke all on function public.push_desuscribir(text, text) from public;
 grant execute on function public.push_desuscribir(text, text) to anon, authenticated;
+
+-- Solo la Edge Function (service_role) lee las claves de Vault
+create or replace function public.push_config() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_object_agg(name, decrypted_secret), '{}'::jsonb) from vault.decrypted_secrets
+   where name in ('push_hook_secret', 'vapid_public_key', 'vapid_private_key');
+$$;
+revoke all on function public.push_config() from public, anon, authenticated;
+grant execute on function public.push_config() to service_role;
 
 -- Qué cambió → qué aviso mandar
 create or replace function public.push_aviso() returns trigger

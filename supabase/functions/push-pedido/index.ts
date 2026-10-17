@@ -1,13 +1,21 @@
 // Edge Function · push-pedido
 // La llama el trigger orders_push (migración 023) cuando un pedido cambia.
 // Busca las suscripciones del pedido y manda la notificación. Sin JWT: se valida con x-setto-hook.
-// Secrets: PUSH_HOOK_SECRET, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY (SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY ya vienen).
+// Las claves (hook y VAPID) se leen de Vault con push_config(); SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY ya vienen.
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const env = (k: string) => Deno.env.get(k) ?? "";
-webpush.setVapidDetails("https://setto.com.ar", env("VAPID_PUBLIC_KEY"), env("VAPID_PRIVATE_KEY"));
 const sb = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false } });
+
+let cfg: Record<string, string> | null = null;
+async function config() {
+  if (cfg) return cfg;
+  const { data, error } = await sb.rpc("push_config");
+  if (error || !data?.push_hook_secret || !data?.vapid_private_key) throw new Error("Falta configurar las claves en Vault");
+  webpush.setVapidDetails("https://setto.com.ar", data.vapid_public_key, data.vapid_private_key);
+  return (cfg = data);
+}
 
 type Order = { id: string; code: string; track: string; modo: string; status: string };
 
@@ -24,7 +32,8 @@ function mensaje(tipo: string, o: Order) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST" || !env("PUSH_HOOK_SECRET") || req.headers.get("x-setto-hook") !== env("PUSH_HOOK_SECRET")) {
+  const c = await config();
+  if (req.method !== "POST" || req.headers.get("x-setto-hook") !== c.push_hook_secret) {
     return new Response("no", { status: 401 });
   }
   const { order_id, tipo } = await req.json().catch(() => ({}));
