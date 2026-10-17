@@ -361,7 +361,7 @@
   const gdesc = (k) => { const it = gitem(k); return it.desc != null && it.desc !== "" ? it.desc : (GD[k] || {}).desc || ""; };
   function gcardHtml(k, monto, tag = "div", attrs = "") {
     const it = gitem(k);
-    if (it.img) return `<${tag} class="gcard gimg" ${attrs}><img class="g-img" src="${esc(it.img)}" alt="Gift card ${esc(gnombre(k))}"><span class="g-bot"><span class="g-amt num">${monto ? money(monto) : esc(gnombre(k))}</span></span></${tag}>`;
+    if (it.img) return `<${tag} class="gcard gimg" ${attrs}><img class="g-img" src="${esc(it.img)}" alt="Gift card ${esc(gnombre(k))}"><span class="g-logo"><img src="img/logo.svg" alt="Setto"></span><span class="g-bot"><span class="g-amt num">${monto ? money(monto) : esc(gnombre(k))}</span></span></${tag}>`;
     const d = GD[k] || GD.porquesi;
     return `<${tag} class="gcard" style="--gbg:${d.bg};--gfg:${d.fg};--gpat:${d.pat};--gpsz:${d.psz}" ${attrs}>
       <span class="g-logo"><img src="img/logo.svg" alt="Setto"></span>
