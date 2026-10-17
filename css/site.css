@@ -710,7 +710,11 @@ body[data-page="listo"] #armar,body[data-page="listo"] #lsRes,body[data-page="li
 body[data-page="gift-cards"] main > :not(#regalo):not(#seguimiento),body[data-page="armar"] main > :not(#armar):not(#seguimiento){display:none!important}
 body[data-page="gift-cards"] #regalo{display:block!important}
 body:not([data-page="home"]) .tema-aviso{display:none!important}
-.gc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px}
+.gc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:28px 24px}
+.gc-item{display:grid;gap:12px;align-content:start}
+.gc-item .gcard{transition:transform .2s,box-shadow .2s}
+.gc-item .gcard:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(31,28,24,.18)}
+.gc-txt{margin:0;padding-inline:4px;font-size:.95rem;color:var(--ink-2);line-height:1.45}
 .gc-how{text-align:center;margin-top:18px;font-size:.9rem}
 /* gift con imagen propia */
 .gcard.gimg{padding:0;background:#f1e4ca}

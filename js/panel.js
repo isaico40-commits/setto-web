@@ -124,6 +124,8 @@
 
   /* =================== GIFT CARDS =================== */
   const GDN = { cumple: "Cumpleaños", gracias: "Gracias", tequiero: "Te quiero", felicitaciones: "Felicitaciones", porquesi: "Porque sí", halloween: "Halloween" };
+  // descripciones por defecto (las mismas que usa site.js si se deja vacío)
+  const GDD = { cumple: "Regalá algo especial y único a esa persona especial y única en su cumple.", gracias: "Para agradecer con algo rico, sin vueltas.", tequiero: "Un mimo dulce para esa persona que te importa.", felicitaciones: "Para festejar sus logros como se merecen.", porquesi: "No hace falta una excusa para darse un gusto.", halloween: "Un susto dulce para regalar en Halloween." };
   const gItems = () => { const g = P.settings.giftcards || {}; return g.items && g.items.length ? g.items : (g.disenos || Object.keys(GDN)).map((id) => ({ id, nombre: GDN[id], activo: true })).concat(Object.keys(GDN).filter((id) => !(g.disenos || Object.keys(GDN)).includes(id)).map((id) => ({ id, nombre: GDN[id], activo: false }))); };
   const gName = (id) => (gItems().find((x) => x.id === id) || {}).nombre || GDN[id] || id;
   const FAQ_DEF = [
@@ -463,6 +465,7 @@
           ${(() => { const its = gItems(); while (its.length < 10) its.push({ id: "", nombre: "", activo: true }); return its.slice(0, 10).map((x, i) => `<div class="slrow"><span class="upprev">${x.img ? `<img src="${esc(x.img)}" alt="">` : GDN[x.id] ? `${esc(GDN[x.id])}<br>(dibujado)` : "Nuevo"}</span>
             <div class="slf"><input type="hidden" name="gi${i}" value="${esc(x.img || "")}"><input type="hidden" name="gid${i}" value="${esc(x.id || "")}">
               <div class="row2"><label>Nombre<input class="inp" name="gn${i}" maxlength="30" value="${esc(x.nombre || "")}" placeholder="${GDN[x.id] ? "" : "Ej: Día de la madre"}"></label><label class="checks" style="align-self:end"><span><input type="checkbox" name="ga${i}" ${x.activo !== false ? "checked" : ""}> Visible</span></label></div>
+              <label>Descripción (debajo de la tarjeta)<input class="inp" name="gdsc${i}" maxlength="120" value="${esc(x.desc || "")}" placeholder="${GDD[x.id] ? esc(GDD[x.id]) : "Ej: Para esa mamá que se merece todo."}"></label>
               <div class="acts"><label class="btn">Subir imagen<input type="file" accept="image/*" data-upimg="gi${i}" data-upmax="1600" hidden></label>${x.img ? `<button type="button" class="linkbtn warn" data-gix="${i}">Quitar imagen</button>` : ""}</div></div></div>`).join(""); })()}
           <button class="btn solid">Guardar</button></form>
         <form class="pcard wide" data-set="votacion"><b>Votación</b>
@@ -554,7 +557,7 @@
       if (k === "mensajes") { const out = {}; Object.keys(M.MSG).forEach((key) => { const v = (f["m_" + key] || "").replace(/\r/g, "").trim(); if (v && v !== M.MSG[key].texto) out[key] = v; }); await API.saveSetting("mensajes", out); }
       if (k === "giftcards") await API.saveSetting("giftcards", { activo: !!f.activo, montos: (f.montos || "").split(",").map((x) => Math.round(+x.replace(/[^\d]/g, ""))).filter((x) => x > 0).slice(0, 6),
         minimo: Math.max(1000, +f.minimo || 5000), maximo: Math.max(+f.minimo || 5000, +f.maximo || 100000),
-        items: Array.from({ length: 10 }, (_, i) => ({ id: (f["gid" + i] || "").trim() || ((f["gn" + i] || "").trim() || f["gi" + i] ? "d" + Date.now().toString(36) + i : ""), nombre: (f["gn" + i] || "").trim(), img: (f["gi" + i] || "").trim(), activo: !!f["ga" + i] }))
+        items: Array.from({ length: 10 }, (_, i) => ({ id: (f["gid" + i] || "").trim() || ((f["gn" + i] || "").trim() || f["gi" + i] ? "d" + Date.now().toString(36) + i : ""), nombre: (f["gn" + i] || "").trim(), desc: (f["gdsc" + i] || "").trim(), img: (f["gi" + i] || "").trim(), activo: !!f["ga" + i] }))
           .filter((x) => x.id && (x.img || GDN[x.id]) && (x.nombre || GDN[x.id])).map((x) => ({ ...x, nombre: x.nombre || GDN[x.id] })),
         disenos: Object.keys(GDN) });
       if (k === "votacion") {
