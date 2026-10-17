@@ -127,10 +127,9 @@ section.blk{padding-block:72px}
 .set .ph:hover img{transform:scale(1.04) rotate(-2deg)}
 .off{position:absolute;top:28px;right:28px;z-index:1;background:var(--turquesa);color:#FFFDF8;border-radius:var(--pill);font-size:.76rem;font-weight:700;padding:5px 11px;letter-spacing:.02em;box-shadow:0 0 0 2px var(--card),0 0 14px 2px color-mix(in srgb,var(--turquesa) 55%,transparent);animation:offglow 2.6s ease-in-out infinite}
 @keyframes offglow{50%{box-shadow:0 0 0 2px var(--card),0 0 22px 5px color-mix(in srgb,var(--turquesa) 45%,transparent)}}
-/* hover en toda la tarjeta: el fondo se oscurece un poco */
-.set{transition:background .2s}
-.set:hover{background:color-mix(in srgb,var(--bg-2) 55%,var(--card))}
-.set:hover .ph{background:var(--card)}
+/* hover en cualquier parte de la tarjeta: cambia el fondo de la foto */
+.set .ph{transition:background .2s}
+.set:hover .ph{background:#E8D3AC}
 .set:hover .off{box-shadow:0 0 0 2px var(--card),0 0 22px 5px color-mix(in srgb,var(--turquesa) 45%,transparent)}
 .setsnote{margin:22px auto 0;font-size:.9rem;color:var(--ink-2);max-width:60ch;text-align:center}
 /* edición especial */
@@ -437,9 +436,9 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .rate b,.from .rate b{display:inline;font-size:.8rem;font-weight:700;color:var(--ink);line-height:1}
 /* lo que va en el lugar del + cuando no se puede pedir */
 .noadd{flex:none;margin-left:auto;border-radius:var(--pill);background:var(--bg-2);color:var(--ink-2);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:9px 12px;line-height:1;white-space:nowrap}
-/* carta y edición especial: el hover tiñe toda la tarjeta */
-.item,.prem{border-radius:26px;transition:background .2s,box-shadow .2s}
-@media (hover:hover){.item:hover,.prem:hover{background:var(--bg-2);box-shadow:0 0 0 10px var(--bg-2)}.item:hover .ph,.prem:hover .ph{background:var(--card)}}
+/* carta y edición especial: el hover en la tarjeta cambia el fondo de la foto */
+.item .ph,.prem .ph{transition:background .2s}
+@media (hover:hover){.item:hover .ph,.prem:hover .ph{background:#E8D3AC}}
 .rate small{font-weight:500;color:var(--ink-2)}
 #sTitle + .rate{margin:-4px 0 4px}
 .s-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:-2px 0 2px}
@@ -845,4 +844,3 @@ body[data-page="listo"] #stickers{scroll-margin-top:80px}
 .ls-more{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:620px;margin:14px auto 0}
 .ls-more .btn{flex:1 1 200px}
 .ls-more .btn[hidden]{display:none}
-.t-halloween #especial .prem:hover{background:rgba(255,233,214,.08);box-shadow:0 0 0 10px rgba(255,233,214,.08)}
