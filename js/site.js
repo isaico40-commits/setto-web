@@ -946,9 +946,53 @@
       ${o.status === "cancelado" ? "" : `<ol class="trk-steps">${pasos.map((p, i) => `<li class="${i < idx ? "done" : i === idx ? "now" : ""}"><i></i><span>${p}</span></li>`).join("")}</ol>`}
       <p>${txt}</p>
       ${cambioHtml(o)}
+      ${pushHtml(o)}
       ${o.status === "entregado" ? `<div class="trk-acts">${clubOn() ? `<button class="btn" data-vercard="${esc(o.code)}">Ver mis sellos</button>` : ""}${o.resena ? `<span class="muted" style="font-size:.84rem;align-self:center">¡Gracias por tu reseña!</span>` : `<button class="btn solid" data-resena="${esc(o.code)}">Dejar reseña</button>`}<a class="btn" href="/listo">Cómo armar tu bebida</a></div>`
         : o.status === "pendiente" && idx === 2 ? `<div class="trk-acts"><a class="btn" href="/listo">Cómo armar tu bebida</a></div>` : ""}</div>`;
   }
+  /* ---------- avisos push: el cliente acepta notificaciones de su pedido ---------- */
+  const PKEY = "setto-push";
+  const pushMios = () => { try { return JSON.parse(localStorage.getItem(PKEY) || "[]"); } catch (_) { return []; } };
+  const esIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const instalada = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const vapid = (window.SETTO_CONFIG || {}).vapidPublicKey;
+  const pushOk = () => !API.DEMO && !!vapid && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  let pushIOS = ""; // pedido con la ayuda de iPhone abierta
+  function pushHtml(o) {
+    if (o.status !== "pendiente" || !o.track) return "";
+    const btn = `<button class="btn push-btn" data-push="${esc(o.track)}">🔔 Avisame cuando cambie</button>`;
+    if (!pushOk()) {
+      if (!esIOS || instalada || API.DEMO) return ""; // navegador sin push: queda el seguimiento de siempre
+      return pushIOS !== o.track ? btn : `<div class="push-ios"><b>En iPhone los avisos llegan solo con Setto en tu inicio</b>
+        <ol><li>Tocá <b>Compartir</b> (el cuadrado con la flecha) abajo en Safari.</li><li>Elegí <b>Agregar a inicio</b>.</li><li>Abrí Setto desde ese ícono y tocá <b>Avisame cuando cambie</b>.</li></ol>
+        <small>Necesitás iOS 16.4 o más nuevo. Si no, te avisamos por WhatsApp como siempre.</small></div>`;
+    }
+    if (Notification.permission === "denied") return `<p class="push-off">Bloqueaste las notificaciones de Setto. Si las querés, activalas en los ajustes del navegador.</p>`;
+    if (Notification.permission === "granted" && pushMios().includes(o.track)) return `<p class="push-on">🔔 Te avisamos con una notificación cuando cambie.</p>`;
+    return btn;
+  }
+  const claveVapid = (k) => { const b = atob((k + "=".repeat((4 - (k.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(b, (c) => c.charCodeAt(0)); };
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-push]"); if (!b) return;
+    const tr = b.dataset.push;
+    if (!pushOk()) { // iPhone sin instalar: mostramos cómo, y dejamos el link del pedido para que el ícono abra este pedido
+      pushIOS = tr; try { history.replaceState(null, "", "/?seguir=" + tr); } catch (_) {}
+      verSeguimiento(); return;
+    }
+    b.disabled = true; b.textContent = "Activando…";
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") throw new Error(perm === "denied" ? "Bloqueaste las notificaciones" : "Sin permiso no podemos avisarte");
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+      const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: claveVapid(vapid) }));
+      await API.pushSuscribir(tr, sub);
+      try { localStorage.setItem(PKEY, JSON.stringify([tr, ...pushMios().filter((x) => x !== tr)].slice(0, 10))); } catch (_) {}
+      toast("Listo, te avisamos cuando cambie");
+    } catch (ex) { toast(ex.message || "No pudimos activar los avisos"); }
+    verSeguimiento();
+  });
+
   /* ---------- cambio de pedido: el cliente elige reemplazo, sacarlo o cancelar ---------- */
   const CMB = {};
   function cambioHtml(o) {
