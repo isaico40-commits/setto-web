@@ -262,12 +262,14 @@
   const STK_DEF = ["01_fantasma", "02_calabaza", "03_diablito", "04_bruja", "05_latte", "06_gatito", "07_momia", "08_durmiendo", "09_fantasmita"].map((n) => `img/stickers/halloween/${n}.webp`);
   function renderStickers() {
     const k = S.stickers || {}, sec = $("#stickers"); if (!sec) return;
+    const listo = document.body.dataset.page === "listo"; // ya compró: se presenta como regalo por la compra
     // ?stickers en la URL = vista previa (se ve aunque falte el link o no esté activado)
     const link = (k.link || "").trim(), ok = k.activo && /^https:\/\//.test(link), prev = new URLSearchParams(location.search).has("stickers");
-    sec.hidden = !(ok || prev); if (sec.hidden) return;
-    if (prev && !sec.dataset.fui) { sec.dataset.fui = "1"; setTimeout(() => sec.scrollIntoView({ block: "start" }), 600); }
-    $("#t-stk").textContent = k.titulo || "Stickers de Mochito";
-    $("#stkTexto").textContent = k.texto || "Llevate a Mochito a tus chats. Son gratis.";
+    sec.hidden = !(ok || prev); const g = $("#lsGift"); if (g) g.hidden = sec.hidden; if (sec.hidden) return;
+    if (prev && !listo && !sec.dataset.fui) { sec.dataset.fui = "1"; setTimeout(() => sec.scrollIntoView({ block: "start" }), 600); }
+    $("#stkEye").textContent = listo ? "Tu regalo" : "Para WhatsApp";
+    $("#t-stk").textContent = listo ? "Un regalo por tu compra" : (k.titulo || "Stickers de Mochito");
+    $("#stkTexto").textContent = listo ? "Gracias por elegirnos. Llevate a Mochito a tus chats: es un pack de stickers para WhatsApp." : (k.texto || "Llevate a Mochito a tus chats. Son gratis.");
     if (link) $("#stkBtn").href = link; else { $("#stkBtn").removeAttribute("href"); $("#stkBtn").textContent = "Falta el link de Sticker.ly"; }
     const grid = $("#stkGrid");
     if (!grid.dataset.ok) { grid.innerHTML = STK_DEF.map((s) => `<img src="${s}" alt="" width="512" height="512" loading="lazy" decoding="async">`).join(""); grid.dataset.ok = "1"; }
