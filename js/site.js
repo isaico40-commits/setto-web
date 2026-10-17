@@ -345,12 +345,12 @@
 
   /* ---------- Gift cards ---------- */
   const GD = {
-    cumple: { nombre: "Cumpleaños", tit: "¡Feliz cumple!", bg: "#f8a29a", fg: "#1f1c18", img: "img/mochito-cup.png", pat: "radial-gradient(circle,#fffdf8 2px,transparent 3px)", psz: "26px" },
-    gracias: { nombre: "Gracias", tit: "Gracias", bg: "#296A67", fg: "#fffdf8", img: "img/mochito-run.png", pat: "radial-gradient(circle,rgba(255,253,248,.35) 1.5px,transparent 2.5px)", psz: "22px" },
-    tequiero: { nombre: "Te quiero", tit: "Te quiero", bg: "#f6c9d0", fg: "#1f1c18", img: "img/mochito-lie.png", pat: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 16s-6-3.6-6-7.4C4 6.6 5.4 5.5 7 5.5c1.3 0 2.3.8 3 1.8.7-1 1.7-1.8 3-1.8 1.6 0 3 1.1 3 3.1C16 12.4 10 16 10 16z' fill='%23fffdf8'/%3E%3C/svg%3E\")", psz: "30px" },
-    felicitaciones: { nombre: "Felicitaciones", tit: "¡Felicitaciones!", bg: "#f1e4ca", fg: "#296A67", img: "img/mochito-run.png", pat: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 3l1.8 4.6L16.5 8l-3.6 3 1.1 4.8L10 13.3 6 15.8 7.1 11 3.5 8l4.7-.4z' fill='%23f8a29a'/%3E%3C/svg%3E\")", psz: "34px" },
-    porquesi: { nombre: "Porque sí", tit: "Porque sí", bg: "#fffdf8", fg: "#1f1c18", img: "img/mochito-cup.png", pat: "radial-gradient(circle,#f8a29a 2px,transparent 3px)", psz: "30px" },
-    halloween: { nombre: "Halloween", tit: "Boo!", bg: "#2b2035", fg: "#ffb27a", img: "img/mochito-lie.png", pat: "radial-gradient(circle,rgba(232,116,42,.35) 1.5px,transparent 2.5px)", psz: "24px", bats: true },
+    cumple: { nombre: "Cumpleaños", desc: "Regalá algo especial y único a esa persona especial y única en su cumple.", tit: "¡Feliz cumple!", bg: "#f8a29a", fg: "#1f1c18", img: "img/mochito-cup.png", pat: "radial-gradient(circle,#fffdf8 2px,transparent 3px)", psz: "26px" },
+    gracias: { nombre: "Gracias", desc: "Para agradecer con algo rico, sin vueltas.", tit: "Gracias", bg: "#296A67", fg: "#fffdf8", img: "img/mochito-run.png", pat: "radial-gradient(circle,rgba(255,253,248,.35) 1.5px,transparent 2.5px)", psz: "22px" },
+    tequiero: { nombre: "Te quiero", desc: "Un mimo dulce para esa persona que te importa.", tit: "Te quiero", bg: "#f6c9d0", fg: "#1f1c18", img: "img/mochito-lie.png", pat: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 16s-6-3.6-6-7.4C4 6.6 5.4 5.5 7 5.5c1.3 0 2.3.8 3 1.8.7-1 1.7-1.8 3-1.8 1.6 0 3 1.1 3 3.1C16 12.4 10 16 10 16z' fill='%23fffdf8'/%3E%3C/svg%3E\")", psz: "30px" },
+    felicitaciones: { nombre: "Felicitaciones", desc: "Para festejar sus logros como se merecen.", tit: "¡Felicitaciones!", bg: "#f1e4ca", fg: "#296A67", img: "img/mochito-run.png", pat: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 3l1.8 4.6L16.5 8l-3.6 3 1.1 4.8L10 13.3 6 15.8 7.1 11 3.5 8l4.7-.4z' fill='%23f8a29a'/%3E%3C/svg%3E\")", psz: "34px" },
+    porquesi: { nombre: "Porque sí", desc: "No hace falta una excusa para darse un gusto.", tit: "Porque sí", bg: "#fffdf8", fg: "#1f1c18", img: "img/mochito-cup.png", pat: "radial-gradient(circle,#f8a29a 2px,transparent 3px)", psz: "30px" },
+    halloween: { nombre: "Halloween", desc: "Un susto dulce para regalar en Halloween.", tit: "Boo!", bg: "#2b2035", fg: "#ffb27a", img: "img/mochito-lie.png", pat: "radial-gradient(circle,rgba(232,116,42,.35) 1.5px,transparent 2.5px)", psz: "24px", bats: true },
   };
   const gcfg = () => S.giftcards || {};
   // diseños: los de base (dibujados) + los que suban con imagen desde el panel
@@ -358,6 +358,7 @@
   const gitem = (k) => gitems().find((x) => x.id === k) || { id: k, nombre: (GD[k] || {}).nombre || "Gift card" };
   const gdis = () => gitems().filter((x) => x.activo !== false && (x.img || GD[x.id])).map((x) => x.id);
   const gnombre = (k) => gitem(k).nombre || (GD[k] || {}).nombre || "Gift card";
+  const gdesc = (k) => { const it = gitem(k); return it.desc != null && it.desc !== "" ? it.desc : (GD[k] || {}).desc || ""; };
   function gcardHtml(k, monto, tag = "div", attrs = "") {
     const it = gitem(k);
     if (it.img) return `<${tag} class="gcard gimg" ${attrs}><img class="g-img" src="${esc(it.img)}" alt="Gift card ${esc(gnombre(k))}"><span class="g-bot"><span class="g-amt num">${monto ? money(monto) : esc(gnombre(k))}</span></span></${tag}>`;
@@ -373,7 +374,8 @@
     const gc = $("#lsGc"); if (gc) gc.hidden = gcfg().activo === false;
     const sec = $("#regalo"); if (!sec) return;
     sec.hidden = gcfg().activo === false; if (sec.hidden) return;
-    $("#gcGrid").innerHTML = gdis().map((k) => gcardHtml(k, 0, "button", `data-gcpick="${k}" aria-label="Gift card ${esc(gnombre(k))}"`)).join("");
+    $("#gcGrid").innerHTML = gdis().map((k) => `<div class="gc-item">${gcardHtml(k, 0, "button", `data-gcpick="${k}" aria-label="Gift card ${esc(gnombre(k))}"`)}
+      ${gdesc(k) ? `<p class="gc-txt">${esc(gdesc(k))}</p>` : ""}</div>`).join("");
   }
   const GB = { dis: "cumple", monto: 0, otro: "", de: "", para: "", msg: "", tel: "", sending: false, done: null };
   function abrirGift(k) {
