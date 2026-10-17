@@ -112,7 +112,7 @@
   /* ---------- login ---------- */
   function drawLogin(msg) {
     app.innerHTML = `<div class="loginwrap"><form class="loginbox" id="login">
-      <img class="l" src="img/logo.png" alt="Setto"><h1 class="ph1">Caja del equipo</h1>
+      <img class="l" src="img/logo.svg" alt="Setto"><h1 class="ph1">Caja del equipo</h1>
       <label class="f">Email<input id="lEmail" type="email" autocomplete="username" required></label>
       <label class="f">Contraseña<input id="lPass" type="password" autocomplete="current-password" required></label>
       ${msg ? `<p class="err">${esc(msg)}</p>` : ""}
@@ -158,7 +158,7 @@
   };
   function drawShell() {
     app.innerHTML = `<header class="cbar"><div class="wrap">
-        <a class="logo" href="panel.html" title="Ir al panel de pedidos"><img src="img/logo.png" alt="Setto"></a><span class="tag">Caja</span>
+        <a class="logo" href="panel.html" title="Ir al panel de pedidos"><img src="img/logo.svg" alt="Setto"></a><span class="tag">Caja</span>
         <span class="sp"></span><a class="toplink" href="panel.html">Pedidos</a>
         <button class="mebtn" data-who><i>${esc((S.me || "?")[0])}</i>${esc(S.me || "¿Quién sos?")}</button>
       </div></header>

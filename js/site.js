@@ -342,7 +342,7 @@
     if (it.img) return `<${tag} class="gcard gimg" ${attrs}><img class="g-img" src="${esc(it.img)}" alt="Gift card ${esc(gnombre(k))}"><span class="g-bot"><span class="g-amt num">${monto ? money(monto) : esc(gnombre(k))}</span></span></${tag}>`;
     const d = GD[k] || GD.porquesi;
     return `<${tag} class="gcard" style="--gbg:${d.bg};--gfg:${d.fg};--gpat:${d.pat};--gpsz:${d.psz}" ${attrs}>
-      <span class="g-logo"><img src="img/logo.png" alt="Setto"></span>
+      <span class="g-logo"><img src="img/logo.svg" alt="Setto"></span>
       ${d.bats ? `<span class="g-bat" style="top:16px;right:22px">${BAT}</span><span class="g-bat" style="top:44px;right:64px;width:20px">${BAT}</span>` : ""}
       <span class="g-tit">${esc(d.tit)}</span>
       <span class="g-bot"><span class="g-amt num">${monto ? money(monto) : "Gift card"}</span></span>
