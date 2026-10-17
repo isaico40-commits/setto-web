@@ -349,6 +349,7 @@
       <img class="g-mito" src="${d.img}" alt=""></${tag}>`;
   }
   function renderGift() {
+    const gc = $("#lsGc"); if (gc) gc.hidden = gcfg().activo === false;
     const sec = $("#regalo"); if (!sec) return;
     sec.hidden = gcfg().activo === false; if (sec.hidden) return;
     $("#gcGrid").innerHTML = gdis().map((k) => gcardHtml(k, 0, "button", `data-gcpick="${k}" aria-label="Gift card ${esc(gnombre(k))}"`)).join("");
@@ -486,7 +487,7 @@
   /* ---------- Preguntas frecuentes (Panel → Ajustes) ---------- */
   const FAQ_DEF = [
     { p: "¿Qué es un mochi?", r: "Un bocado de origen japonés: masa suave y elástica de harina de arroz glutinoso y leche, rellena de crema y un corazón de sabor (frutilla, chocolate, oreo y más)." },
-    { p: "¿Cómo llega mi bebida?", r: "Llega por partes: el vaso con la bebida, el cold foam aparte y el hielo aparte. [Mirá cómo armarla](/armar)." },
+    { p: "¿Cómo llega mi bebida?", r: "Llega por partes: el vaso con la bebida, el cold foam y el hielo aparte, más un revolvedor y un sorbete. [Mirá cómo armarla](/armar)." },
     { p: "¿Cómo hago un pedido?", r: "Armalo acá en la web y se envía por WhatsApp con un código. Por ahí te confirmamos horario y pago." },
     { p: "¿Hacen envíos?", r: "Sí, en Mar del Plata. Con envío el pago es solo por transferencia y el costo te lo pasamos por WhatsApp." },
     { p: "¿Cómo funciona el Setto Club?", r: "Cada pedido desde la web suma un sello. Al completar la tarjeta elegís tu premio." },
