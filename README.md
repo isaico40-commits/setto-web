@@ -101,6 +101,12 @@ En **Ajustes → Apps de delivery** podés subir el logo oficial de cada app (cu
 Después de enviar, el cliente ve arriba de la web el estado de su pedido (se actualiza cada 30 segundos y al volver a la pestaña): **Recibido → En preparación → Listo para retirar / En camino → Entregado**. Si cancelás, le aparece cancelado.
 En el panel, cada pedido pendiente tiene **Estado que ve el cliente**: Recibido / En preparación / Listo (o En camino). Al tocar **Entregado ✓** pasa a Entregado.
 
+### Consultar pedido desde el carrito
+Con el carrito vacío aparece **Consultar mi pedido** al lado de "Ver sets". Sirve si el cliente cerró la pestaña, cambió de navegador o de celular.
+- **Celular + código:** ve el seguimiento completo y el pedido queda guardado en ese navegador.
+- **Solo celular o solo código:** ve si tiene un pedido en curso y en qué etapa. Nada más: ni nombre, ni productos, ni total. Por celular el código aparece tapado (STT-••21).
+- Busca pedidos sin entregar de los últimos 2 días. Función de la base: `buscar_pedido` (`023_consultar_pedido.sql`).
+
 ### Link de seguimiento
 Cada pedido tiene un link propio (`/?seguir=…`). Va al final del WhatsApp que manda el cliente y en los avisos de estado del panel. Al abrirlo, en cualquier celular, ve el estado del pedido arriba de la web, sin escribir nada.
 Después de enviar, la pantalla final muestra el estado en vivo y el botón **Reenviar mensaje por WhatsApp**.

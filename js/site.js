@@ -735,16 +735,17 @@
   function closeDrawer() { $("#drawer").classList.remove("on"); $("#scrim").classList.remove("on"); if (view === "sent") { view = "cart"; } renderBadge(); }
   function drawDrawer() {
     const body = $("#dBody"), foot = $("#dFoot");
-    $("#dBack").hidden = view !== "checkout";
+    $("#dBack").hidden = view !== "checkout" && view !== "buscar";
     if (view === "cart") {
       $("#dTitle").textContent = "Tu pedido";
-      if (!cart.length) { body.innerHTML = `${trackHtml()}<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><a class="btn" href="#sets" data-closedrawer>Ver sets</a></div>`; foot.innerHTML = ""; return; }
+      if (!cart.length) { body.innerHTML = `${trackHtml()}<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><div class="empty-acts"><a class="btn" href="#sets" data-closedrawer>Ver sets</a><button class="btn" id="toBuscar">Consultar mi pedido</button></div></div>`; foot.innerHTML = ""; return; }
       body.innerHTML = trackHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
         <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("");
       foot.innerHTML = `${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
         <p class="muted" style="font-size:.78rem;text-align:center">${envioOn() ? "Retiro o envío: lo elegís después." : "¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats."}</p>`;
     }
+    if (view === "buscar") { $("#dTitle").textContent = "Consultar pedido"; body.innerHTML = buscarDrawerHtml(); foot.innerHTML = ""; return; }
     if (view === "checkout") {
       $("#dTitle").textContent = "Entrega";
       if (!envioOn()) form.modo = "retiro";
@@ -866,6 +867,7 @@
     if (b.id === "dClose" || b.dataset.closedrawer !== undefined) closeDrawer();
     if (b.id === "dBack") { view = "cart"; drawDrawer(); }
     if (b.id === "toCheckout") { view = "checkout"; drawDrawer(); }
+    if (b.id === "toBuscar") { BQ.res = null; BQ.err = ""; BQ.tel = BQ.tel || form.tel; view = "buscar"; drawDrawer(); setTimeout(() => { const i = $("#bqTel"); if (i && !i.value) i.focus(); }, 30); }
     if (b.dataset.pago) { form.pago = b.dataset.pago; document.querySelectorAll("[data-pago]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); }
     if (b.id === "toWA") sendOrder();
     if (b.dataset.premio) { form.premio = b.dataset.premio; drawDrawer(); }
@@ -876,6 +878,52 @@
       try { navigator.clipboard.writeText(txt).then(() => toast("Mensaje copiado"), fallback); } catch (_) { fallback(); }
     }
     if (b.id === "newOrder") { refrescarStock(); lastOrder = null; try { sessionStorage.removeItem("setto-last-order"); } catch (_) {} view = "cart"; closeDrawer(); irA("#sets"); }
+  });
+  /* ---------- consultar pedido desde el carrito (otro navegador, pestaña cerrada) ---------- */
+  // Celular + código: seguimiento completo y queda guardado acá. Un solo dato: solo si hay un pedido en curso y en qué etapa.
+  const BQ = { tel: "", code: "", res: null, por: "", err: "", busy: false };
+  const ETAPA_TXT = { recibido: "Recibido", preparando: "En preparación", listo: "Listo" };
+  const horaTxt = (iso) => new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+  function buscarDrawerHtml() {
+    let res = "";
+    if (BQ.res && !BQ.res.length) res = `<div class="trk bq-res"><p style="margin:0"><b>No encontramos un pedido en curso${BQ.por === "tel" ? " con ese celular" : " con ese código"}.</b></p>
+        <p class="muted" style="margin:6px 0 0;font-size:.88rem">Acá aparecen los pedidos hechos desde la web que todavía no se entregaron (hasta 2 días). ¿Dudas? <a href="${waLink("¡Hola! Quiero consultar por mi pedido.")}" target="_blank" rel="noopener">Escribinos por WhatsApp</a>.</p></div>`;
+    else if (BQ.res) res = BQ.res.map((o) => `<div class="trk bq-res"><div class="trk-h"><span class="eyebrow">Pedido en curso</span><b class="num">${esc(o.code)}</b><span class="trk-r">${o.modo === "envio" ? "Envío" : "Retiro"} · pedido ${haceTxt(o.created_at)} ${horaTxt(o.created_at)} hs</span></div>
+        <p style="margin:6px 0 0">Estado: <b>${o.etapa === "listo" ? (o.modo === "envio" ? "En camino" : "Listo para retirar") : ETAPA_TXT[o.etapa] || "Recibido"}</b></p></div>`).join("")
+        + `<p class="muted" style="font-size:.86rem;margin:4px 0 0">Para seguirlo acá en vivo, completá ${BQ.por === "tel" ? "el código del pedido" : "tu celular"} y tocá Buscar.</p>`;
+    return `<form class="bq-form" id="dBuscar" novalidate>
+        <p class="muted" style="margin:0;font-size:.9rem">Poné tu celular o el código del pedido (está en el WhatsApp que nos mandaste). Con los dos ves el seguimiento completo y queda guardado en este navegador.</p>
+        <label class="f" for="bqTel">Tu celular<input id="bqTel" name="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 347-1277" value="${esc(BQ.tel)}"></label>
+        <label class="f" for="bqCode">Código del pedido<input id="bqCode" name="code" placeholder="STT-1234" autocapitalize="characters" autocomplete="off" maxlength="12" value="${esc(BQ.code)}"></label>
+        <span class="rv-err" ${BQ.err ? "" : "hidden"}>${esc(BQ.err)}</span>
+        <button class="btn solid big" type="submit" ${BQ.busy ? "disabled" : ""}>${BQ.busy ? "Buscando…" : "Buscar"}</button>
+      </form><div class="bq-list">${res}</div>`;
+  }
+  document.addEventListener("submit", async (e) => {
+    if (e.target.id !== "dBuscar") return; e.preventDefault();
+    const f = e.target, raw = f.code.value.trim().toUpperCase();
+    BQ.tel = f.tel.value.trim(); BQ.code = raw; BQ.err = ""; BQ.res = null;
+    const code = /^\d{4}$/.test(raw) ? "STT-" + raw : raw.replace(/^STT\s*-?\s*/, "STT-"), ph = API.normPhone(BQ.tel);
+    if (!raw && !BQ.tel) BQ.err = "Poné tu celular o el código del pedido.";
+    else if (raw && !/^STT-\d{4}$/.test(code)) BQ.err = "El código es STT seguido de 4 números.";
+    else if (BQ.tel && !ph) BQ.err = "Revisá el celular: código de área + número.";
+    if (BQ.err) { drawDrawer(); return; }
+    BQ.busy = true; drawDrawer();
+    try {
+      if (raw && ph) {
+        const r = await API.orderStatus([code], ph);
+        if (!r.length) throw new Error("No encontramos ese pedido. Revisá el código y el celular (vale para pedidos de los últimos 3 días).");
+        try { localStorage.setItem("setto-trk-ocultos", JSON.stringify(ocultosTrk().filter((c) => c !== code))); } catch (_) {}
+        trackVivos = [{ ...r[0], phone: ph }, ...trackVivos.filter((x) => x.code !== code)];
+        guardarSeguimiento({ code, phone: ph, track: r[0].track || null, at: Date.now() });
+        if (!form.tel) form.tel = BQ.tel;
+        BQ.busy = false; BQ.code = ""; view = "cart"; drawDrawer(); toast("¡Lo encontramos!");
+        return;
+      }
+      BQ.por = raw ? "code" : "tel";
+      BQ.res = await API.buscarPedido(raw ? null : ph, raw ? code : null);
+    } catch (ex) { BQ.err = ex.message || "No pudimos buscar ahora. Probá de nuevo."; }
+    BQ.busy = false; if (view === "buscar") drawDrawer();
   });
   /* ---------- menú mobile ---------- */
   function closeMenu() { const m = $("#mnav"); if (!m || m.hidden) return; m.hidden = true; $("#burger").setAttribute("aria-expanded", "false"); $("#burger").setAttribute("aria-label", "Abrir menú"); }
