@@ -43,7 +43,8 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;backgroun
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:var(--line);border-radius:var(--pill);background:var(--card);color:var(--ink);box-shadow:var(--sombra-chica);padding:11px 20px;font-weight:600;font-size:.94rem;text-decoration:none;transition:transform .08s,box-shadow .08s,background .15s;white-space:nowrap}
 .btn:hover{background:var(--bg-2)}
 .btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--turquesa)}
-.btn.solid{background:var(--turquesa);color:#FFFDF8}
+.btn.solid{background:var(--turquesa);color:#FFFDF8;--osc:color-mix(in srgb,var(--turquesa) 62%,#000);border-color:var(--osc);box-shadow:3px 3px 0 var(--osc)}
+.btn.solid:active{box-shadow:0 0 0 var(--osc)}
 .btn.solid:hover{background:var(--turquesa-2)}
 .btn.big{padding:14px 26px;font-size:1rem}
 .btn.glow{background:var(--turquesa);color:#FFFDF8;border-color:var(--turquesa);box-shadow:0 0 0 4px color-mix(in srgb,var(--turquesa) 16%,transparent),0 0 26px 6px color-mix(in srgb,var(--turquesa) 50%,transparent)}
