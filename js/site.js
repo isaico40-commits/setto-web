@@ -758,6 +758,22 @@
     if (API.normPhone(form.tel) && !(cardCache && cardCache.tel === API.normPhone(form.tel))) loadCard().then(() => { if (view === "cart" && $("#drawer").classList.contains("on")) drawDrawer(); });
   }
   function closeDrawer() { $("#drawer").classList.remove("on"); $("#scrim").classList.remove("on"); if (view === "sent") { view = "cart"; } renderBadge(); }
+  function sugeridos() { // "¿Le sumás algo?": lo que hay hoy y no está en el pedido; primero lo que falta (mochi o bebida)
+    const ya = new Set(cart.map((c) => c.id));
+    const ok = (p) => p.activo !== false && !p.agotado && !sinStock(p) && !ya.has(p.id) && (unit(p) ? Number(p.precio) : Number((p.precios || {})["12 oz"])) > 0;
+    const hayMochi = cart.some((c) => { const p = find(c.id); return p && unit(p); }), hayBebida = cart.some((c) => { const p = find(c.id); return p && bebida(p); });
+    const esp = espOpen() ? on(ESP) : [], m = [...esp.filter(unit), ...MOCHIS], d = [...esp.filter((p) => fmt(p) === "dirty"), ...DIRTY], st = [...esp.filter((p) => fmt(p) === "set"), ...SETS];
+    const orden = hayBebida && !hayMochi ? [m, st, d] : hayMochi && !hayBebida ? [d, st, m] : [m, d, st];
+    return orden.flat().filter(ok).slice(0, 6);
+  }
+  function sugHtml() {
+    const l = sugeridos(); if (!l.length) return "";
+    return `<div class="sug"><b class="sug-t">¿Le sumás algo?</b><div class="sug-r">${l.map((p) => `<div class="sug-i">
+      <button class="sug-ph" data-open="${p.id}" aria-label="Ver ${esc(nameOf(p))}"><img src="${esc(p.img || "img/mochito-lie.png")}" alt="" loading="lazy"></button>
+      <button class="add sug-add" ${unit(p) ? `data-quick="${p.id}"` : `data-open="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>
+      <b>${esc(p.nombre)}</b><small class="num">${unit(p) ? "" : "Desde "}${money(unit(p) ? p.precio : p.precios["12 oz"])}</small></div>`).join("")}</div></div>`;
+  }
+  const giftCta = () => gcfg().activo === false ? "" : `<a class="gift-cta" href="/gift-cards" data-closedrawer><span class="gc-ico" aria-hidden="true">🎁</span><span><b>¿Es para regalar?</b><small>Mandá una gift card digital de Setto.</small></span><span class="go" aria-hidden="true">→</span></a>`;
   function drawDrawer() {
     const body = $("#dBody"), foot = $("#dFoot");
     $("#dBack").hidden = view !== "checkout" && view !== "buscar";
@@ -766,7 +782,7 @@
       if (!cart.length) { body.innerHTML = `${trackHtml()}<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><div class="empty-acts"><a class="btn" href="#sets" data-closedrawer>Ver sets</a><button class="btn" id="toBuscar">Consultar mi pedido</button></div></div>`; foot.innerHTML = ""; return; }
       body.innerHTML = trackHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
-        <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("");
+        <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("") + sugHtml() + giftCta();
       foot.innerHTML = `${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
         <p class="muted" style="font-size:.78rem;text-align:center">${envioOn() ? "Retiro o envío: lo elegís después." : "¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats."}</p>`;
     }
@@ -878,11 +894,11 @@
   document.addEventListener("click", (e) => {
     const b = e.target.closest("button, a"); if (!b) return;
     if (b.dataset.open) openSheet(b.dataset.open);
-    if (b.dataset.quick) { const p = find(b.dataset.quick); if (p) addItem(p); }
+    if (b.dataset.quick) { const p = find(b.dataset.quick); if (p && addItem(p) && view === "cart" && $("#drawer").classList.contains("on")) drawDrawer(); }
     if (b.dataset.close !== undefined) closeSheet();
     if (b.dataset.sz) { sheetState.sz = b.dataset.sz; drawSheet(); }
     if (b.dataset.sq) { sheetState.qty = Math.max(1, sheetState.qty + +b.dataset.sq); drawSheet(); }
-    if (b.id === "sheetAdd") { if (addItem(sheetState.p, sheetState.sz, sheetState.qty, sheetState.leche, sheetState.sin)) closeSheet(); }
+    if (b.id === "sheetAdd") { if (addItem(sheetState.p, sheetState.sz, sheetState.qty, sheetState.leche, sheetState.sin)) { closeSheet(); if (view === "cart" && $("#drawer").classList.contains("on")) drawDrawer(); } }
     if (b.dataset.leche !== undefined && sheetState) { sheetState.leche = b.dataset.leche; drawSheet(); }
     if (b.dataset.sin !== undefined && sheetState) { const x = b.dataset.sin, s = sheetState.sin; sheetState.sin = s.includes(x) ? s.filter((y) => y !== x) : [...s, x]; drawSheet(); }
     if (b.id === "tab-dirty" || b.id === "tab-mochi") { tab = b.id.slice(4); renderCarta(); }
