@@ -973,13 +973,23 @@
     // pendientes; entregados sin reseña (3 días); el resto hasta 3 horas
     const ocultos = ocultosTrk();
     const vivos = data.filter((o) => !ocultos.includes(o.code) && (o.status === "pendiente" || (o.status === "entregado" && !o.resena) || Date.now() - new Date(o.created_at) < 3 * 36e5)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-    trackVivos = vivos;
+    avisarCambios(vivos); trackVivos = vivos;
+    // en vivo: cuando el equipo cambia el estado, la base avisa y refrescamos sin recargar la página
+    if (API.onTrack) API.onTrack(vivos.filter((o) => o.status === "pendiente" && o.track).map((o) => o.track), enVivo);
     if ((view === "cart" || view === "sent") && $("#drawer").classList.contains("on")) drawDrawer();
     if (!vivos.length) { box.hidden = true; return; }
     if (box.querySelector(".rv-form")) return; // no pisar una reseña a medio escribir
     if (box.querySelector(".cmb-busy")) return; // ni un cambio que se está enviando
     box.hidden = false; box.innerHTML = `<div class="wrap">${vivos.map(trackCard).join("")}</div>`;
-    if (vivos.some((o) => o.status === "pendiente")) trackT = setTimeout(verSeguimiento, 30000);
+    if (vivos.some((o) => o.status === "pendiente")) trackT = setTimeout(verSeguimiento, 20000); // respaldo si el canal en vivo se corta
+  }
+  let vivoT = null, etapasVistas = null;
+  const enVivo = () => { clearTimeout(vivoT); vivoT = setTimeout(verSeguimiento, 250); };
+  const pasoTxt = (o) => (o.status === "entregado" ? "Entregado" : o.status === "cancelado" ? "Cancelado" : o.etapa === "listo" ? (o.modo === "envio" ? "En camino" : "Listo para retirar") : o.etapa === "preparando" ? "En preparación" : "Recibido");
+  function avisarCambios(l) { // aviso corto en pantalla cuando el pedido avanza mientras la página está abierta
+    const ahora = Object.fromEntries(l.map((o) => [o.code, pasoTxt(o)]));
+    if (etapasVistas) { const c = l.find((o) => etapasVistas[o.code] && etapasVistas[o.code] !== ahora[o.code]); if (c) toast(`Tu pedido ${c.code}: ${ahora[c.code]}`); }
+    etapasVistas = ahora;
   }
   function trackCard(o) {
     const env = o.modo === "envio";

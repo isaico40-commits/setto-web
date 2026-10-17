@@ -193,6 +193,8 @@
       return { estado: "resuelto", code: o.code, total: o.total, total_antes: antes, items: nuevo, cambios: res };
     },
     async setEtapa(id, etapa) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o || o.status !== "pendiente") throw new Error("El pedido no está pendiente"); o.etapa = etapa; dbSave(db); },
+    async marcarAviso(id, etapa) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o) return; o.avisos = { ...(o.avisos || {}), [etapa]: new Date().toISOString() }; dbSave(db); },
+    onTrack(tracks, cb) { if (this._trk) return; this._trk = 1; window.addEventListener("storage", (e) => { if (e.key === KEY) cb(); }); },
     async orderStatus(codes, phone) {
       const db = dbLoad(), ph = normPhone(phone), since = Date.now() - 3 * 864e5;
       return db.orders.filter((o) => o.phone === ph && codes.includes(o.code) && new Date(o.created_at) > since)
@@ -317,6 +319,7 @@
   };
 
   /* =================== SUPABASE =================== */
+  const trkChans = new Map();
   const live = {
     async loadAll() {
       const [s, p] = await Promise.all([
@@ -357,6 +360,13 @@
     async cambioOpciones(track) { const { data, error } = await sb.rpc("cambio_opciones", { p_track: track }); fail(error); return data; },
     async resolverCambio(track, elecciones, cancelar) { const { data, error } = await sb.rpc("resolver_cambio", { p_track: track, p_elecciones: elecciones || [], p_cancelar: !!cancelar }); fail(error); return data; },
     async setEtapa(id, etapa) { const { error } = await sb.rpc("set_order_etapa", { p_id: id, p_etapa: etapa }); fail(error); },
+    async marcarAviso(id, etapa) { const { error } = await sb.rpc("marcar_aviso", { p_id: id, p_etapa: etapa }); fail(error); },
+    // seguimiento en vivo: un canal público por link de pedido; la base avisa cuando el pedido cambia (migración 024)
+    onTrack(tracks, cb) {
+      const want = new Set(tracks);
+      for (const [t, ch] of trkChans) if (!want.has(t)) { sb.removeChannel(ch); trkChans.delete(t); }
+      want.forEach((t) => { if (!trkChans.has(t)) trkChans.set(t, sb.channel("pedido-" + t).on("broadcast", { event: "cambio" }, () => cb(t)).subscribe()); });
+    },
     async orderStatus(codes, phone) { const { data, error } = await sb.rpc("get_order_status", { p_codes: codes, p_phone: phone }); fail(error); return data || []; },
     async buscarPedido(phone, code) { const { data, error } = await sb.rpc("buscar_pedido", { p_phone: phone || null, p_code: code || null }); fail(error); return data || []; },
     async trackStatus(tracks) { const { data, error } = await sb.rpc("track_status", { p_tracks: tracks }); fail(error); return data || []; },
