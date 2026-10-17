@@ -5,6 +5,11 @@
   const app = $("#app");
   const money = (n) => (Number(n) < 0 ? "−$" : "$") + Math.abs(Number(n || 0)).toLocaleString("es-AR");
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  // Portada: a dónde puede llevar cada botón y los botones que tenían las slides antes de poder elegirlos (igual que en site.js)
+  const HERO_LINKS = [["#sets", "Sets (armar pedido)"], ["#carta", "Carta"], ["#especial", "Edición especial"], ["#club", "Setto Club"], ["/gift-cards", "Gift cards"], ["#apps", "Pedir por apps"]];
+  const heroBotones = (x) => Array.isArray(x.botones) ? x.botones.filter((b) => b && b.texto)
+    : x.tipo === "media" ? (x.boton ? [{ texto: x.boton, link: x.link || "#sets", estilo: "principal" }] : [])
+    : (x.img || x.titulo) ? [{ texto: "Armar mi pedido", link: "#sets", estilo: "principal" }, { texto: "Pedir por apps", link: "#apps", estilo: "secundario" }] : [];
   const pretty = API.prettyPhone;
   let toastT;
   const toast = (m) => { const t = $("#toast"); t.textContent = m; t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 2600); };
@@ -406,16 +411,25 @@
           <span class="hintp">El recargo se suma al precio de la bebida o del set.</span>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard wide" data-set="hero"><b>Portada (slides del inicio)</b>
-          <span class="hintp">Cada slide es una imagen o un video con el texto ya diseñado adentro. Medidas: <b>compu 2000 × 1000</b> (horizontal 2:1) y <b>celular 1080 × 1350</b> (vertical 4:5). Si no subís la de celular, se usa la de compu recortada. Video: corto (5–15 s), sin sonido, MP4, hasta 25 MB; la imagen de esa medida se usa como portada mientras carga.</span>
-          ${[0, 1, 2, 3, 4, 5].map((i) => { const x = ((S.hero || {}).slides || [])[i] || {};
+          <span class="hintp">Dos tipos de slide. <b>Foto + texto de la web</b>: subís la foto y escribís título y texto acá (el texto va siempre abajo). <b>Diseño propio</b>: imagen o video con el texto ya diseñado adentro. Medidas: <b>compu 2000 × 1000</b> (2:1) y <b>celular 1080 × 1350</b> (4:5); si no subís la de celular, se usa la de compu recortada. Video: corto (5–15 s), sin sonido, MP4, hasta 25 MB.</span>
+          <span class="hintp">Los botones van debajo de la portada y cambian con cada slide. Dejá el texto vacío para no mostrar ese botón. Recomendado: 1 o 2 por slide, uno solo "Principal".</span>
+          ${[0, 1, 2, 3, 4, 5].map((i) => { const x = ((S.hero || {}).slides || [])[i] || {}, tp = x.tipo === "media" ? "media" : "texto", bs = heroBotones(x);
             const prev = (n, v, vid) => `<span class="upprev ${vid ? "vid" : ""}" data-prevfor="${n}${i}">${v ? (vid ? `<video src="${esc(v)}" muted playsinline></video>` : `<img src="${esc(v)}" alt="">`) : "—"}</span>`;
-            const up = (n, label, vid, max) => `<div class="upbox"><small>${label}</small>${prev(n, x[{ si: "img", sm: "img_m", sv: "video", sw: "video_m" }[n]], vid)}<input type="hidden" name="${n}${i}" value="${esc(x[{ si: "img", sm: "img_m", sv: "video", sw: "video_m" }[n]] || "")}">
+            const up = (n, label, vid, max, cls = "") => `<div class="upbox ${cls}"><small>${label}</small>${prev(n, x[{ si: "img", sm: "img_m", sv: "video", sw: "video_m" }[n]], vid)}<input type="hidden" name="${n}${i}" value="${esc(x[{ si: "img", sm: "img_m", sv: "video", sw: "video_m" }[n]] || "")}">
               <span class="acts" style="gap:4px"><label class="linkbtn">${vid ? "Subir video" : "Subir"}<input type="file" accept="${vid ? "video/mp4,video/webm,video/quicktime" : "image/*"}" ${vid ? `data-upvid="${n}${i}"` : `data-upimg="${n}${i}" data-upmax="${max}"`} hidden></label><button type="button" class="linkbtn warn" data-upx="${n}${i}">✕</button></span></div>`;
-            return `<div class="slrow2"><b class="sln">Slide ${i + 1}</b>
-              <div class="upgrid">${up("si", "Imagen compu", false, 2000)}${up("sm", "Imagen celu", false, 1350)}${up("sv", "Video compu", true)}${up("sw", "Video celu", true)}</div>
-              <div class="slf2"><label>Descripción (no se muestra, ayuda a Google)<input class="inp" name="st${i}" maxlength="80" value="${esc(x.alt || x.titulo || "")}" placeholder="Ej: Set Sakura: strawberry matcha + mochi sakura"></label>
-                <label>Botón (opcional)<input class="inp" name="sb${i}" maxlength="22" value="${esc(x.boton || "")}" placeholder="Ej: Pedir ahora"></label>
-                <label>Lleva a<select class="inp" name="sl${i}">${[["#sets", "Sets"], ["#carta", "Carta"], ["#especial", "Edición especial"], ["#club", "Setto Club"], ["/gift-cards", "Gift cards"], ["#apps", "Pedir por apps"]].map(([v, l]) => `<option value="${v}" ${(x.link || "#sets") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label></div></div>`; }).join("")}
+            const opt = (list, cur) => list.map(([v, l]) => `<option value="${v}" ${cur === v ? "selected" : ""}>${l}</option>`).join("");
+            return `<div class="slrow2" data-tipo="${tp}"><div class="slhead"><b class="sln">Slide ${i + 1}</b>
+              <select class="inp" name="sk${i}" data-sltipo aria-label="Tipo de slide ${i + 1}">${opt([["texto", "Foto + texto de la web"], ["media", "Diseño propio (imagen o video)"]], tp)}</select></div>
+              <div class="upgrid">${up("si", "Imagen compu", false, 2000)}${up("sm", "Imagen celu", false, 1350)}${up("sv", "Video compu", true, 0, "only-media")}${up("sw", "Video celu", true, 0, "only-media")}</div>
+              <div class="slf3 only-texto"><label>Título<input class="inp" name="sti${i}" maxlength="40" value="${esc(x.titulo || "")}" placeholder="Ej: Mochis rellenos"></label>
+                <label>Texto<input class="inp" name="stx${i}" maxlength="90" value="${esc(x.texto || "")}" placeholder="Ej: Masa suave por fuera, crema por dentro."></label>
+                <label>La foto es<select class="inp" name="sa${i}">${opt([["foto", "Foto de fondo completo"], ["recorte", "Producto recortado sin fondo"]], x.ajuste === "recorte" ? "recorte" : "foto")}</select></label>
+                <label>Encuadre<select class="inp" name="sp${i}">${opt([["arriba", "Arriba"], ["centro", "Centro"], ["abajo", "Abajo"]], x.pos || "centro")}</select></label></div>
+              <label class="only-media">Descripción (no se muestra, ayuda a Google)<input class="inp" name="st${i}" maxlength="80" value="${esc(x.alt || x.titulo || "")}" placeholder="Ej: Set Sakura: strawberry matcha + mochi sakura"></label>
+              <div class="slbtns">${[0, 1, 2].map((j) => { const b = bs[j] || {}; return `<div class="slbtn"><small>Botón ${j + 1}</small>
+                <input class="inp" name="bt${i}_${j}" maxlength="24" value="${esc(b.texto || "")}" placeholder="${["Ej: Armar mi pedido", "Ej: Pedir por apps", "Sin botón"][j]}" aria-label="Texto del botón ${j + 1}">
+                <select class="inp" name="bl${i}_${j}" aria-label="A dónde lleva el botón ${j + 1}">${opt(HERO_LINKS, b.link || "#sets")}</select>
+                <select class="inp" name="be${i}_${j}" aria-label="Estilo del botón ${j + 1}">${opt([["principal", "Principal (lleno)"], ["secundario", "Secundario (borde)"]], b.estilo === "secundario" ? "secundario" : (j ? "secundario" : "principal"))}</select></div>`; }).join("")}</div></div>`; }).join("")}
           <label>Cambia cada (segundos)<input class="inp" name="intervalo" type="number" min="3" max="15" value="${(S.hero || {}).intervalo || 5}" style="width:120px"></label>
           <button class="btn solid">Guardar portada</button></form>
         <form class="pcard" data-set="stickers"><b>Stickers de WhatsApp</b>
@@ -525,9 +539,16 @@
         await API.saveSetting("personalizacion", { activo: !!f.activo, leches, sin: (f.sin || "").split("\n").map((s) => s.trim()).filter(Boolean) });
       }
       if (k === "hero") {
-        const slides = [0, 1, 2, 3, 4, 5].map((i) => ({ tipo: "media", img: (f["si" + i] || "").trim(), img_m: (f["sm" + i] || "").trim(), video: (f["sv" + i] || "").trim(), video_m: (f["sw" + i] || "").trim(),
-          alt: (f["st" + i] || "").trim(), boton: (f["sb" + i] || "").trim(), link: f["sl" + i] || "#sets" })).filter((x) => x.img || x.img_m || x.video || x.video_m);
+        const slides = [0, 1, 2, 3, 4, 5].map((i) => {
+          const tipo = f["sk" + i] === "media" ? "media" : "texto", g = (n) => (f[n + i] || "").trim();
+          const botones = [0, 1, 2].map((j) => ({ texto: (f[`bt${i}_${j}`] || "").trim(), link: f[`bl${i}_${j}`] || "#sets", estilo: f[`be${i}_${j}`] === "secundario" ? "secundario" : "principal" })).filter((b) => b.texto);
+          const x = { tipo, img: g("si"), img_m: g("sm"), botones };
+          if (tipo === "media") Object.assign(x, { video: g("sv"), video_m: g("sw"), alt: g("st") });
+          else Object.assign(x, { titulo: g("sti"), texto: g("stx"), ajuste: f["sa" + i] === "recorte" ? "recorte" : "foto", pos: f["sp" + i] || "centro", alt: g("sti") });
+          return x;
+        }).filter((x) => x.img || x.img_m || x.video || x.video_m);
         if (!slides.length) throw new Error("Subí al menos una imagen o video");
+        if (slides.some((x) => x.tipo === "texto" && !x.titulo)) throw new Error("A las slides de foto + texto les falta el título");
         await API.saveSetting("hero", { slides, intervalo: Math.max(3, Math.min(15, +f.intervalo || 5)) });
       }
       if (k === "mensajes") { const out = {}; Object.keys(M.MSG).forEach((key) => { const v = (f["m_" + key] || "").replace(/\r/g, "").trim(); if (v && v !== M.MSG[key].texto) out[key] = v; }); await API.saveSetting("mensajes", out); }
@@ -670,6 +691,7 @@
   });
   document.addEventListener("change", async (e) => {
     const t = e.target;
+    if (t.matches("[data-sltipo]")) { t.closest(".slrow2").dataset.tipo = t.value; return; }
     if (t.matches("[data-fsel]")) { const id = t.closest("[data-oid]").dataset.oid, F = P.falta[id], ix = +t.dataset.fsel, o = P.orders.find((x) => x.id === id);
       if (t.checked) F.sel[ix] = o.items[ix].qty; else delete F.sel[ix]; drawOrders(); return; }
     if (t.matches("[data-upimg]") && t.files && t.files[0]) {
