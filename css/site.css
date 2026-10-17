@@ -260,6 +260,23 @@ footer .fine{grid-column:1/-1;font-size:.78rem;background:var(--bg);justify-self
 .qty{display:inline-flex;align-items:center;gap:8px;margin-top:6px}
 .qty button{width:28px;height:28px;border-radius:50%;border:2px solid var(--turquesa);background:var(--card);font-weight:700;line-height:1;color:var(--turquesa)}
 .lp{font-weight:700}
+.sug{display:grid;gap:10px;padding-top:4px}
+.sug-t{font-family:var(--display);font-weight:400;font-size:1.15rem}
+.sug-r{display:grid;grid-auto-flow:column;grid-auto-columns:104px;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin-inline:-20px;padding:2px 20px 6px;scroll-padding-inline:20px}
+.sug-r::-webkit-scrollbar{display:none}
+.sug-i{position:relative;scroll-snap-align:start;display:grid;gap:2px;align-content:start}
+.sug-ph{all:unset;cursor:pointer;width:104px;height:104px;border-radius:16px;background:var(--bg-2);display:grid;place-items:center;margin-bottom:6px}
+.sug-ph:focus-visible{outline:3px solid var(--turquesa);outline-offset:2px}
+.sug-ph img{max-width:84px;max-height:88px}
+.sug .sug-add{position:absolute;top:6px;right:6px;width:32px;height:32px;font-size:1.1rem;box-shadow:2px 2px 0 var(--turquesa)}
+.sug-i b{font-weight:600;font-size:.84rem;line-height:1.2}
+.sug-i small{font-size:.78rem;color:var(--ink-2)}
+.gift-cta{display:flex;align-items:center;gap:12px;border-radius:16px;background:var(--coral-2);padding:12px 14px;text-decoration:none;color:var(--ink);border:1.5px solid transparent;transition:border-color .15s}
+.gift-cta:hover{border-color:var(--turquesa)}
+.gift-cta .gc-ico{width:38px;height:38px;flex:none;border-radius:50%;background:var(--card);display:grid;place-items:center;font-size:1.15rem}
+.gift-cta b{display:block;font-weight:600;font-size:.92rem}
+.gift-cta small{font-size:.8rem;color:var(--ink-2)}
+.gift-cta .go{margin-left:auto;color:var(--turquesa);font-weight:700}
 .tot{display:flex;justify-content:space-between;font-weight:700;font-size:1.12rem}
 .empty{text-align:center;padding:30px 10px;display:grid;gap:12px;justify-items:center}
 .empty img{width:120px}
