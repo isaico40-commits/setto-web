@@ -100,6 +100,22 @@
     return M.render(key, { nombre: primerNombre(o), codigo: o.code, link: linkSeguir(o) }, P.settings);
   }
   const avisoBase = (o) => avisoTxt(o).split("\n")[0];
+  // qué aviso de WhatsApp ya se mandó por etapa: en la base (orders.avisos, lo ven todos) o, si falta la migración, en este navegador
+  const AVK = "setto-avisos";
+  const avisosLocal = () => { try { return JSON.parse(localStorage.getItem(AVK) || "{}"); } catch (_) { return {}; } };
+  const avisadoEn = (o, e) => (o.avisos || {})[e] || avisosLocal()[o.id + ":" + e] || null;
+  const faltaAvisar = (o) => o.status === "pendiente" && !avisadoEn(o, o.etapa || "recibido");
+  const etapaNom = (o, e) => (e === "listo" ? (o.modo === "envio" ? "En camino" : "Listo para retirar") : e === "preparando" ? "En preparación" : "Recibido");
+  function estadoBox(o) {
+    const et = o.etapa || "recibido", orden = ["recibido", "preparando", "listo"], idx = orden.indexOf(et), av = avisadoEn(o, et);
+    const wa = `https://wa.me/${esc(o.phone)}?text=${encodeURIComponent(avisoTxt(o))}`;
+    return `<div class="estado">
+      <div class="estado-h"><b>Estado que ve el cliente</b><span class="hintp">Se actualiza solo en su celular</span></div>
+      <div class="pasos">${orden.map((k, i) => `<button class="paso ${i < idx ? "done" : i === idx ? "now" : ""}" data-etapa="${k}" aria-pressed="${i === idx}"><i>${i < idx ? "✓" : i + 1}</i><span>${etapaNom(o, k)}</span></button>`).join("")}</div>
+      ${av ? `<div class="aviso ok"><span class="aviso-t"><b>✓ Ya le avisaste por WhatsApp</b><small>“${esc(etapaNom(o, et))}” · ${ago(av)}</small></span><a class="linkbtn" target="_blank" rel="noopener" data-aviso="${et}" href="${wa}">Reenviar</a></div>`
+        : `<div class="aviso pend"><span class="aviso-t"><b>💬 Falta avisarle: “${esc(etapaNom(o, et))}”</b><small>“${esc(avisoBase(o).slice(0, 70))}…”</small></span><a class="btn solid wa" target="_blank" rel="noopener" data-aviso="${et}" href="${wa}">Enviar WhatsApp</a></div>`}
+    </div>`;
+  }
 
   /* =================== GIFT CARDS =================== */
   const GDN = { cumple: "Cumpleaños", gracias: "Gracias", tequiero: "Te quiero", felicitaciones: "Felicitaciones", porquesi: "Porque sí", halloween: "Halloween" };
@@ -209,18 +225,17 @@
       return `<article class="pcard" data-oid="${o.id}">
         <div class="ohead"><span class="ocode num">${esc(o.code)}</span><span class="ago">${ago(o.created_at)}</span><span class="st ${o.status}">${o.status}</span></div>
         <div class="who2"><b>${esc(o.nombre)}</b><span class="num">${esc(pretty(o.phone))}</span><a class="chat" href="https://wa.me/${esc(o.phone)}" target="_blank" rel="noopener">Abrir chat</a></div>
-        <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}</div>
+        <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}${faltaAvisar(o) ? `<span class="falta-tag">💬 Falta avisar</span>` : ""}</div>
         ${env ? `<div class="dirbox"><b>${esc(o.direccion || "")}</b><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.direccion || "") + ", Mar del Plata")}" target="_blank" rel="noopener">Ver en Maps</a></div>` : ""}
         ${o.premio && o.status === "pendiente" ? `<div class="premiobox">Este pedido completa la tarjeta del Club. Premio elegido: <b>${esc(o.premio_txt || "a confirmar con el cliente")}</b>${/off/.test(o.premio_txt || "") ? " (ya descontado del total)" : ""}. Al tocar Entregado se canjea solo.</div>` : ""}
         <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>Pago: <b>${esc(o.pago || "—")}</b></span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}</div>
         <div class="olines">${(o.items || []).map((i) => `<div><span>${i.qty}× ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""}${i.detalle ? `<small class="det">${esc(i.detalle)}</small>` : ""}</span><span class="num">${money(i.subtotal)}</span></div>`).join("")}</div>
         <div class="otot"><span>Total</span><span class="num">${money(o.total)}</span></div>
         ${cambioBox(o)}
+        ${o.status === "pendiente" ? estadoBox(o) : ""}
         ${o.status === "pendiente" ? `<div class="confirm">
             <label>Número del chat de WhatsApp<input class="inp" data-cphone value="${esc(c.phone)}" inputmode="tel"></label>
             <div class="acts"><span style="font-size:.85rem;font-weight:600">Sellos a sumar</span><span class="stepper"><button data-cn="-1" aria-label="Menos">−</button><span>${c.n}</span><button data-cn="1" aria-label="Más">+</button></span></div>
-            <div class="acts etapas"><span style="font-size:.85rem;font-weight:600">Estado que ve el cliente</span>${[["recibido", "Recibido"], ["preparando", "En preparación"], ["listo", env ? "En camino" : "Listo para retirar"]].map(([k, l]) => `<button class="chipb" data-etapa="${k}" aria-pressed="${(o.etapa || "recibido") === k}">${l}</button>`).join("")}</div>
-            <a class="linkbtn" target="_blank" rel="noopener" href="https://wa.me/${esc(o.phone)}?text=${encodeURIComponent(avisoTxt(o))}">Avisar por WhatsApp: “${esc(avisoBase(o).slice(0, 48))}…”</a>
             <div class="acts"><button class="btn solid" data-deliver>Entregado ✓</button><button class="linkbtn warn" data-cancel>${P.cancelArm === o.id ? "¿Seguro? Tocá de nuevo para cancelar" : "Cancelar pedido"}</button></div>
           </div>` : o.status === "entregado" ? `<p class="hintp">Entregado ${o.closed_at ? ago(o.closed_at) : ""} · ${o.sellos || 0} sello(s) sumado(s) a ${esc(pretty(o.phone))}</p>
             <a class="btn solid" style="margin-top:8px" target="_blank" rel="noopener" href="https://wa.me/${esc(o.phone)}?text=${encodeURIComponent(resenaTxt(o))}">Pedir reseña por WhatsApp</a>` : ""}
@@ -562,8 +577,15 @@
       const id = oc.dataset.oid, c = P.confirm[id];
       if (b.dataset.etapa) {
         const o = P.orders.find((x) => x.id === id); b.disabled = true;
-        try { await API.setEtapa(id, b.dataset.etapa); if (o) o.etapa = b.dataset.etapa; drawOrders(); toast("Estado actualizado · el cliente lo ve en la web"); }
+        if (o && (o.etapa || "recibido") === b.dataset.etapa) return;
+        try { await API.setEtapa(id, b.dataset.etapa); if (o) o.etapa = b.dataset.etapa; drawOrders(); toast(o && avisadoEn(o, b.dataset.etapa) ? "Estado actualizado" : "Estado actualizado · ahora mandale el WhatsApp"); }
         catch (err) { toast(err.message); b.disabled = false; }
+      }
+      if (b.dataset.aviso) { // el link abre WhatsApp; acá solo lo marcamos como avisado
+        const o = P.orders.find((x) => x.id === id), et = b.dataset.aviso, at = new Date().toISOString();
+        if (o) o.avisos = { ...(o.avisos || {}), [et]: at };
+        API.marcarAviso(id, et).catch(() => { try { localStorage.setItem(AVK, JSON.stringify({ ...avisosLocal(), [id + ":" + et]: at })); } catch (_) {} });
+        setTimeout(drawOrders, 400); return;
       }
       if (b.dataset.falta !== undefined) { P.falta[id] = { sel: {}, nota: "" }; drawOrders(); return; }
       if (b.dataset.fx !== undefined) { delete P.falta[id]; drawOrders(); return; }

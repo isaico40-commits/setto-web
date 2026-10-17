@@ -92,7 +92,30 @@ main.pmain{padding-block:24px 80px}
 .olines small.det{display:block;color:var(--turquesa,#296A67);font-weight:600;font-size:.78rem}
 .applogo{display:flex;align-items:center;gap:10px;margin:-2px 0 6px}.applogo .lprev{width:44px;height:44px;border-radius:12px;background:#fff;border:1px solid #0002;display:grid;place-items:center;font-size:.6rem;color:#0008;overflow:hidden;text-align:center}.applogo .lprev img{width:100%;height:100%;object-fit:contain}.applogo .btn{padding:6px 12px;font-size:.8rem}
 a.ptab{text-decoration:none}
-.etapas{flex-wrap:wrap;gap:6px}.chipb{border:1.5px solid #296A67;background:#fff;color:#296A67;border-radius:99px;padding:6px 12px;font-weight:600;font-size:.82rem;cursor:pointer}.chipb[aria-pressed="true"]{background:#296A67;color:#fff}
+/* estado que ve el cliente: pasos + aviso de WhatsApp */
+.falta-tag{font-size:.74rem;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--coral-2);color:var(--ink)}
+.estado{border:1.5px solid color-mix(in srgb,var(--turquesa) 35%,transparent);border-radius:16px;padding:12px;display:grid;gap:10px}
+.estado-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.estado-h b{font-size:.92rem}
+.pasos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;position:relative}
+.paso{display:grid;justify-items:center;gap:4px;background:none;border:0;padding:4px 2px;cursor:pointer;color:var(--ink-2);font:inherit;font-size:.78rem;font-weight:600;line-height:1.15;text-align:center;position:relative}
+.paso i{font-style:normal;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:2px solid color-mix(in srgb,var(--turquesa) 35%,transparent);background:var(--card);color:var(--ink-2);font-weight:700;font-size:.85rem;position:relative;z-index:1}
+.paso:not(:last-child)::after{content:"";position:absolute;top:19px;left:calc(50% + 17px);right:calc(-50% + 17px);height:2px;background:color-mix(in srgb,var(--turquesa) 25%,transparent)}
+.paso.done{color:var(--ink)}
+.paso.done i{border-color:var(--turquesa);color:var(--turquesa)}
+.paso.done::after{background:var(--turquesa)!important}
+.paso.now{color:var(--ink)}
+.paso.now i{background:var(--turquesa);border-color:var(--turquesa);color:#fff;box-shadow:0 0 0 4px color-mix(in srgb,var(--turquesa) 18%,transparent)}
+.paso:hover:not(.now) i{border-color:var(--turquesa)}
+.paso:disabled{opacity:.6}
+.aviso{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-radius:12px;padding:10px 12px}
+.aviso-t{display:grid;gap:2px;min-width:0;flex:1 1 180px}
+.aviso-t b{font-size:.88rem}
+.aviso-t small{font-size:.78rem;color:var(--ink-2);overflow-wrap:anywhere}
+.aviso.pend{background:var(--coral-2);border-left:4px solid var(--coral)}
+.aviso.ok{background:var(--bg)}
+.aviso.ok b{color:var(--turquesa)}
+.aviso .btn.wa{padding:9px 16px;font-size:.88rem;white-space:nowrap}
 .justdel{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:#e6f0ef;border:1.5px solid #296A67;border-radius:18px;padding:14px 16px;margin:14px 0}.justdel>div{display:grid;flex:1 1 220px}.justdel span{font-size:.85rem;color:#4a4a4a}
 .pcard.wide{grid-column:1/-1}.slrow{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:start;border-top:1px dashed #0002;padding-top:10px}.slf{display:grid;gap:6px}.upprev{width:96px;height:72px;border-radius:12px;background:#f1e4ca;display:grid;place-items:center;overflow:hidden;font-size:.72rem;color:#0008;text-align:center}.upprev img{width:100%;height:100%;object-fit:cover}.acts .upprev{width:64px;height:64px}
 .msg-gr{font-size:.95rem;margin:10px 0 0;color:#296A67}.msg-row{display:grid;gap:4px}.msg-vars{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:.78rem}.msg-vars code,.pcard details code{background:#f1e4ca;border-radius:6px;padding:1px 6px}.msg-vars .linkbtn{margin-left:auto}
