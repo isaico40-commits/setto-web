@@ -721,6 +721,7 @@ body:not([data-page="home"]) .tema-aviso{display:none!important}
 .gcard.gimg::before{display:none}
 .gcard.gimg .g-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1}
 .gcard.gimg .g-bot{position:absolute;left:14px;bottom:14px}
+.gcard.gimg .g-logo{position:absolute;left:14px;top:14px;box-shadow:0 2px 8px rgba(31,28,24,.12)}
 /* ---------- Cómo armar tu bebida ---------- */
 .ar-sub{text-align:center;font-size:1.3rem;margin:26px 0 14px;color:var(--turquesa)}
 .ar-inc{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
