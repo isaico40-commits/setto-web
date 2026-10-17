@@ -178,31 +178,37 @@
     { img: "img/set-yoru.webp", titulo: "Un set distinto cada día", texto: "Una bebida y un mochi que van juntos.", ajuste: "recorte" },
     { img: "img/mochi-sakura.webp", titulo: "Mochis rellenos", texto: "Masa suave por fuera, crema por dentro.", ajuste: "recorte" },
   ];
+  // Botones de cada slide (Panel → Ajustes → Portada). Las slides viejas sin "botones" usan los de siempre.
+  const heroBotones = (x) => Array.isArray(x.botones) ? x.botones.filter((b) => b && b.texto)
+    : x.tipo === "media" ? (x.boton ? [{ texto: x.boton, link: x.link || "#sets", estilo: "principal" }] : [])
+    : [{ texto: "Armar mi pedido", link: "#sets", estilo: "principal" }, { texto: "Pedir por apps", link: "#apps", estilo: "secundario" }];
   let heroI = 0, heroT = null, HS = [], heroPausa = false, heroHold = 0;
   const RMH = matchMedia("(prefers-reduced-motion: reduce)").matches;
   function renderHero() {
-    const h = S.hero || {}; HS = (h.slides || []).filter((x) => x && (x.img || x.titulo)); if (!HS.length) HS = HERO_DEF;
+    const h = S.hero || {}; HS = (h.slides || []).filter((x) => x && (x.img || x.img_m || x.video || x.titulo)); if (!HS.length) HS = HERO_DEF;
     const MOB = matchMedia("(max-width: 820px)").matches, todoMedia = HS.every((x) => x.tipo === "media");
     $("#heroSlides").classList.toggle("all-media", todoMedia);
+    const pic = (x, i, alt, style = "") => `<picture>${x.img_m ? `<source media="(max-width: 820px)" srcset="${esc(x.img_m)}">` : ""}<img src="${esc(x.img || x.img_m || "img/mochito-lie.png")}" alt="${alt}" ${i ? 'loading="lazy"' : 'fetchpriority="high"'}${style}></picture>`;
     $("#heroSlides").innerHTML = HS.map((x, i) => {
       if (x.tipo === "media") {
         const vid = MOB ? x.video_m || x.video : x.video || x.video_m, poster = MOB ? x.img_m || x.img : x.img || x.img_m, alt = esc(x.alt || "Setto");
-        const media = vid ? `<video muted loop playsinline preload="${i ? "none" : "metadata"}" ${poster ? `poster="${esc(poster)}"` : ""} data-src="${esc(vid)}" aria-label="${alt}"></video>`
-          : `<picture>${x.img_m ? `<source media="(max-width: 820px)" srcset="${esc(x.img_m)}">` : ""}<img src="${esc(x.img || x.img_m || "img/mochito-lie.png")}" alt="${alt}" ${i ? 'loading="lazy"' : 'fetchpriority="high"'}></picture>`;
-        const cta = x.boton ? `<a class="btn solid hcta" href="${esc(x.link || "#sets")}">${esc(x.boton)}</a>` : "";
-        return `<article class="hcard media" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">${i === 0 ? `<h1 class="sr-only">${esc(x.alt || "Setto · Asian Inspired Home Cafe en Mar del Plata")}</h1>` : ""}<div class="hmedia">${media}</div>${cta}</article>`;
+        const media = vid ? `<video muted loop playsinline preload="${i ? "none" : "metadata"}" ${poster ? `poster="${esc(poster)}"` : ""} data-src="${esc(vid)}" aria-label="${alt}"></video>` : pic(x, i, alt);
+        return `<article class="hcard media" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">${i === 0 ? `<h1 class="sr-only">${esc(x.alt || "Setto · Asian Inspired Home Cafe en Mar del Plata")}</h1>` : ""}<div class="hmedia">${media}</div></article>`;
       }
       const foto = x.ajuste === "foto", T = i === 0 ? "h1" : "h2";
       return `<article class="hcard ${foto ? "foto" : "recorte"}" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">
-        <div class="hmedia"><img src="${esc(x.img || "img/mochito-lie.png")}" alt="${esc(x.alt || x.titulo || "Setto")}" ${i ? 'loading="lazy"' : 'fetchpriority="high"'} style="object-position:center ${esc({ arriba: "top", abajo: "bottom" }[x.pos] || "center")}"></div>
+        <div class="hmedia">${pic(x, i, esc(x.alt || x.titulo || "Setto"), ` style="object-position:center ${esc({ arriba: "top", abajo: "bottom" }[x.pos] || "center")}"`)}</div>
         <div class="h2txt">
           <${T} class="ht">${esc(x.titulo || "Asian Inspired Home Cafe")}</${T}>
           ${x.texto ? `<p class="lead">${esc(x.texto)}</p>` : ""}
-          <div class="ctas"><a class="btn glow big" href="#sets">Armar mi pedido</a><a class="btn big ghost" href="#apps">Pedir por apps</a></div>
         </div></article>`;
     }).join("");
+    // los botones van debajo del carrusel: un grupo por slide, todos en la misma celda (así el alto no salta al cambiar)
+    $("#heroCtas").innerHTML = HS.map((x, i) => `<div class="hgrp" data-hg="${i}">${heroBotones(x).slice(0, 3).map((b) =>
+      `<a class="btn big ${b.estilo === "secundario" ? "ghost" : "solid"}" href="${esc(b.link || "#sets")}">${esc(b.texto)}</a>`).join("")}</div>`).join("");
+    $("#heroCtas").hidden = !HS.some((x) => heroBotones(x).length);
     $("#heroDots").innerHTML = HS.length > 1 ? HS.map((_, i) => `<button role="tab" aria-selected="${i === 0}" aria-label="Slide ${i + 1}" data-hero="${i}"></button>`).join("") : "";
-    document.querySelector(".harr").hidden = HS.length < 2;
+    document.querySelector(".hnav").hidden = HS.length < 2;
     heroI = 0; $("#heroSlides").scrollLeft = 0; heroMarcar(); heroAuto();
   }
   const heroCards = () => Array.from(document.querySelectorAll("#heroSlides .hcard"));
@@ -215,6 +221,7 @@
   }
   function heroMarcar() {
     document.querySelectorAll("[data-hero]").forEach((d, k) => d.setAttribute("aria-selected", String(k === heroI)));
+    document.querySelectorAll("#heroCtas .hgrp").forEach((g, k) => { g.classList.toggle("on", k === heroI); g.inert = k !== heroI; });
     heroCards().forEach((c, k) => {
       c.classList.toggle("on", k === heroI);
       const v = c.querySelector("video"); if (!v) return;
@@ -244,6 +251,9 @@
       }, 80);
     }, { passive: true });
     ["pointerdown", "wheel", "touchstart", "focusin"].forEach((ev) => tr.addEventListener(ev, heroEspera, { passive: true }));
+    // si la persona va a tocar un botón, que la slide no cambie justo debajo del dedo
+    const ct = document.getElementById("heroCtas");
+    if (ct) ["pointerenter", "pointerdown", "touchstart", "focusin"].forEach((ev) => ct.addEventListener(ev, heroEspera, { passive: true }));
   })();
 
   /* ---------- Ubicación (Panel → Ajustes → Ubicación) ---------- */
