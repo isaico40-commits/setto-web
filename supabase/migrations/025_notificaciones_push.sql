@@ -1,4 +1,4 @@
--- 023 · Notificaciones push al cliente (Web Push).
+-- 025 · Notificaciones push al cliente (Web Push).
 --   El cliente, desde su link de seguimiento, acepta avisos → se guarda la suscripción del navegador por pedido.
 --   Cuando el pedido cambia de etapa, se entrega/cancela o el equipo marca que falta algo,
 --   un trigger llama a la Edge Function "push-pedido" (pg_net), que manda la notificación.

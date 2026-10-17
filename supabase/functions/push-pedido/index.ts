@@ -1,5 +1,5 @@
 // Edge Function · push-pedido
-// La llama el trigger orders_push (migración 023) cuando un pedido cambia.
+// La llama el trigger orders_push (migración 025) cuando un pedido cambia.
 // Busca las suscripciones del pedido y manda la notificación. Sin JWT: se valida con x-setto-hook.
 // Las claves (hook y VAPID) se leen de Vault con push_config(); SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY ya vienen.
 import webpush from "npm:web-push@3.6.7";
