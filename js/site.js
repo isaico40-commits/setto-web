@@ -97,6 +97,17 @@
   const clubOn = () => club().activo !== false && (club().sellos_por_pedido ?? 1) > 0;
   const spp = () => club().sellos_por_pedido ?? 1;
   const sellosTxt = (n) => n + (n === 1 ? " sello" : " sellos");
+  /* regalo de cada pedido (Panel → Setto Club) y fichas de la maquinita (Panel → Maquinita) */
+  const regaloTxt = () => { const r = club().regalo; return r === undefined || r === null ? "un sticker de Mochito" : String(r).trim(); };
+  const maq = () => S.maquinita || {};
+  const maqOn = () => maq().boton !== false;
+  const fichasPP = () => Math.max(0, Math.round(Number(maq().fichas_por_pedido) || 0));
+  const fichasTxt = (n) => n + (n === 1 ? " ficha" : " fichas");
+  function regaloPartes() { const f = fichasPP(); return [regaloTxt() && esc(regaloTxt()), f && `<b>${fichasTxt(f)}</b> para la maquinita`].filter(Boolean); }
+  function regaloLine() {
+    const p = regaloPartes(); if (!p.length) return "";
+    return `<div class="regaloline"><span class="rg-ico" aria-hidden="true">🎁</span><span>Tu pedido trae de regalo ${p.join(" y ")}.</span></div>`;
+  }
   let cardCache = null; // {tel, data}
   async function loadCard(force) {
     const tel = API.normPhone(form.tel); if (!tel || !clubOn()) return null;
@@ -132,17 +143,17 @@
   function clubLine() {
     if (!clubOn()) return "";
     const min = Number(club().minimo) || 0;
-    if (min > 0 && total() < min) return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div>Sumá <b>${money(min - total())}</b> más y este pedido suma ${sellosTxt(spp())} del Setto Club.</div></div>`;
-    const n = spp(), meta = club().meta || 8, premio = club().premio && club().premio !== "Premio a definir" ? club().premio : "tu premio";
+    if (min > 0 && total() < min) return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div>Sumá <b>${money(min - total())}</b> más y sumás ${sellosTxt(spp())} del Club.</div></div>`;
+    const n = spp(), meta = club().meta || 8;
     const c = cardCache && cardCache.tel === API.normPhone(form.tel) ? cardCache.data : null;
     let txt, pct = null;
     if (c && c.existe) {
       const after = c.sellos + n;
       pct = Math.min(100, Math.round((after / meta) * 100));
-      txt = after >= meta ? (form.premio ? `<b>¡Este pedido completa tu tarjeta!</b> Tu premio: ${esc(form.premio === "descuento" ? premioDesc() + "% off en este pedido" : ((SETS.find((x) => "set:" + x.id === form.premio) || {}).nombre || "set") + " (12 oz) de regalo")}.` : `<b>¡Este pedido completa tu tarjeta!</b> Elegí tu premio: ${esc(premioTxt())}.`)
-        : `Tenés <b>${c.sellos} de ${meta}</b> sellos. Con este pedido llegás a <b>${after}</b>.`;
+      txt = after >= meta ? (form.premio ? `<b>¡Completás tu tarjeta!</b> Premio: ${esc(form.premio === "descuento" ? premioDesc() + "% off" : ((SETS.find((x) => "set:" + x.id === form.premio) || {}).nombre || "set") + " de regalo")}.` : `<b>¡Completás tu tarjeta!</b> Elegí tu premio al seguir.`)
+        : `Con este pedido llegás a <b>${after} de ${meta}</b> sellos.`;
     } else {
-      txt = `Este pedido suma <b>${sellosTxt(n)}</b> del Setto Club. El pedido que completa los ${meta} sellos viene con ${esc(premioTxt())}.`;
+      txt = `Este pedido suma <b>${sellosTxt(n)}</b> del Setto Club.`;
     }
     return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div style="flex:1">${txt}${pct !== null ? `<div class="clubbar"><i style="width:${pct}%"></i></div>` : ""}</div></div>`;
   }
@@ -708,6 +719,8 @@
     $("#club").hidden = c.activo === false;
     $("#clubPremio").textContent = `El pedido que completa los ${c.meta || 8} sellos viene con ${premioTxt()}.` + (c.minimo > 0 ? ` Suman sello los pedidos desde ${money(c.minimo)}.` : "");
 
+    const p = regaloPartes(), rg = $("#clubRegalo");
+    if (rg) { rg.hidden = !p.length && !maqOn(); rg.innerHTML = (p.length ? `<span class="rg-ico" aria-hidden="true">🎁</span><span>Además, cada pedido trae de regalo ${p.join(" y ")}.</span>` : "") + (maqOn() ? `<a class="btn" href="/maquinita">Probar la maquinita</a>` : ""); }
     $("#mnavClub").hidden = !clubOn();
     drawStamps(0, c.meta || 8, true);
   }
@@ -873,6 +886,7 @@
       <b>${esc(p.nombre)}</b><small class="num">${unit(p) ? "" : "Desde "}${money(unit(p) ? p.precio : p.precios["12 oz"])}</small></div>`).join("")}</div></div>`;
   }
   const giftCta = () => gcfg().activo === false ? "" : `<a class="gift-cta" href="/gift-cards" data-closedrawer><span class="gc-ico" aria-hidden="true">🎁</span><span><b>¿Es para regalar?</b><small>Mandá una gift card digital de Setto.</small></span><span class="go" aria-hidden="true">→</span></a>`;
+  const maqCta = () => !maqOn() ? "" : `<a class="gift-cta maq-cta" href="/maquinita" data-closedrawer><span class="gc-ico" aria-hidden="true"><img src="img/mochito-cup.png" alt=""></span><span><b>¿Probás suerte?</b><small>Tirá en la maquinita de Mochito antes de pedir.</small></span><span class="go" aria-hidden="true">→</span></a>`;
   function drawDrawer() {
     const body = $("#dBody"), foot = $("#dFoot");
     $("#dBack").hidden = view !== "checkout" && view !== "buscar";
@@ -881,8 +895,8 @@
       if (!cart.length) { body.innerHTML = `${trackHtml()}<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><div class="empty-acts"><a class="btn" href="#sets" data-closedrawer>Ver sets</a><button class="btn" id="toBuscar">Consultar mi pedido</button></div></div>`; foot.innerHTML = ""; return; }
       body.innerHTML = trackHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
-        <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("") + sugHtml() + giftCta();
-      foot.innerHTML = `${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
+        <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("") + sugHtml() + `<div class="ctas">${giftCta()}${maqCta()}</div>`;
+      foot.innerHTML = `${regaloLine()}${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
         <p class="muted" style="font-size:.78rem;text-align:center">${envioOn() ? "Retiro o envío: lo elegís después." : "¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats."}</p>`;
     }
     if (view === "buscar") { $("#dTitle").textContent = "Consultar pedido"; body.innerHTML = buscarDrawerHtml(); foot.innerHTML = ""; return; }
@@ -908,7 +922,7 @@
         ${giftBox()}
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>
         <div id="fErr" class="err" hidden></div>`;
-      foot.innerHTML = `${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
+      foot.innerHTML = `${regaloLine()}${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
       [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; }); });
       $("#fTel").addEventListener("change", async () => {
         if (!(await loadCard()) || view !== "checkout") return;

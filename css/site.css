@@ -277,6 +277,15 @@ footer .fine{grid-column:1/-1;font-size:.78rem;background:var(--bg);justify-self
 .gift-cta b{display:block;font-weight:600;font-size:.92rem}
 .gift-cta small{font-size:.8rem;color:var(--ink-2)}
 .gift-cta .go{margin-left:auto;color:var(--turquesa);font-weight:700}
+.ctas{display:grid;gap:8px}
+.maq-cta{background:var(--menta)}
+.maq-cta .gc-ico img{width:26px;height:26px;object-fit:contain}
+.regaloline{display:flex;align-items:center;gap:10px;background:var(--coral-2);border-radius:14px;padding:7px 12px;font-size:.82rem;line-height:1.35;color:var(--ink)}
+.regaloline b,.clubregalo b{font-weight:700}
+.rg-ico{flex:none;font-size:1.05rem}
+.clubregalo{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin-top:18px;max-width:52ch;font-size:.9rem;background:var(--coral-2);border-radius:16px;padding:12px 14px}
+.clubregalo[hidden]{display:none}
+.clubregalo > span:nth-child(2){flex:1 1 220px;min-width:0}
 .tot{display:flex;justify-content:space-between;font-weight:700;font-size:1.12rem}
 .empty{text-align:center;padding:30px 10px;display:grid;gap:12px;justify-items:center}
 .empty img{width:120px}
