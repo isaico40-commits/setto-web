@@ -771,7 +771,7 @@ body:not([data-page="home"]) .tema-aviso{display:none!important}
 .mito.in{opacity:1;transform:none}
 .mito.lift{bottom:calc(82px + env(safe-area-inset-bottom,0px))}
 .mito.hide,.mito.bye{opacity:0;transform:translateY(30px) scale(.7)}
-.mito-btn{pointer-events:auto;position:relative;width:66px;height:66px;border:0;background:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mito-btn{pointer-events:auto;touch-action:manipulation;position:relative;width:66px;height:66px;border:0;background:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .mito-ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
 .mito-ring circle{fill:var(--card,#fffaf0);stroke:color-mix(in srgb,var(--turquesa) 16%,transparent);stroke-width:4}
 .mito-ring .p{fill:none;stroke:var(--coral,#f8a29a);stroke-linecap:round;stroke-dasharray:0 100;transition:stroke-dasharray .15s linear}
@@ -803,9 +803,12 @@ body:not([data-page="home"]) .tema-aviso{display:none!important}
 .mito-body.hop{animation:mitohop .55s cubic-bezier(.3,1.6,.5,1)}
 @keyframes mitohop{0%{translate:0 0}35%{translate:0 -16px;scale:1.06 .94}60%{translate:0 0;scale:.95 1.05}100%{translate:0 0;scale:1 1}}
 .mito-body.hop .rig.latte{opacity:1}.mito-body.hop .rig.quieto{opacity:0}.mito-body.hop .rig.latte .lg.l{animation:mitolegl .18s infinite}.mito-body.hop .rig.latte .lg.r{animation:mitolegr .18s infinite}
-.mito-bubble{pointer-events:auto;position:relative;max-width:min(260px,calc(100vw - 40px));background:var(--card,#fffaf0);color:var(--ink);border:1.5px solid var(--turquesa);border-radius:18px 18px 6px 18px;
+.mito-bubble{pointer-events:none;position:relative;max-width:min(260px,calc(100vw - 40px));background:var(--card,#fffaf0);color:var(--ink);border:1.5px solid var(--turquesa);border-radius:18px 18px 6px 18px;
   padding:10px 30px 10px 13px;box-shadow:var(--sombra-chica);font-size:.86rem;line-height:1.35;opacity:0;transform:translateY(8px) scale(.96);transform-origin:100% 100%;transition:opacity .2s,transform .25s cubic-bezier(.3,1.4,.5,1)}
 .mito-bubble.on{opacity:1;transform:none}
+/* El globo deja pasar el dedo (se puede scrollear encima); solo sus botones se tocan. Mochito invisible no atrapa toques */
+.mito-bubble.on :is(.mito-a,.mito-x){pointer-events:auto;touch-action:manipulation}
+.mito:not(.in) .mito-btn,.mito.hide .mito-btn,.mito.bye .mito-btn,.mito.hide .mito-bubble *,.mito.bye .mito-bubble *{pointer-events:none!important}
 .mito-bubble p{margin:0}
 .mito-acts{display:flex;gap:6px;flex-wrap:wrap}
 .mito-acts:not(:empty){margin-top:8px}

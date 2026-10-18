@@ -41,7 +41,15 @@
         bub = el.querySelector(".mito-bubble"), bubP = bub.querySelector("p"), bubA = bub.querySelector(".mito-acts"), ring = el.querySelector(".mito-ring .p");
 
   const items = () => { try { return JSON.parse(localStorage.getItem("setto-cart") || "[]").reduce((a, c) => a + (c.qty || 1), 0); } catch (_) { return 0; } };
-  const go = (sel) => { const t = document.querySelector(sel); if (t) t.scrollIntoView({ behavior: RM ? "auto" : "smooth", block: "start" }); };
+  // Si Mochito te lleva a una sección y vos tocás o scrolleás en el camino, frena ahí: nunca pelea con tu dedo
+  let auto = false, autoT = null;
+  const soltar = () => { if (!auto) return; auto = false; scrollTo({ top: scrollY, behavior: "instant" }); };
+  ["touchstart", "wheel", "keydown"].forEach((ev) => addEventListener(ev, soltar, { passive: true }));
+  const go = (sel) => { const t = document.querySelector(sel); if (!t) return; auto = !RM; clearTimeout(autoT); autoT = setTimeout(() => (auto = false), 1500); t.scrollIntoView({ behavior: RM ? "auto" : "smooth", block: "start" }); };
+  addEventListener("scrollend", () => (auto = false));
+  // Un toque para frenar el scroll no cuenta como tocar a Mochito
+  let lastMove = 0;
+  const recien = () => performance.now() - lastMove < 450;
   const abrirPedido = () => { const b = document.getElementById("openCart"); if (b) b.click(); };
   const wa = () => { const a = document.querySelector("#navWa, a[href*='wa.me']"); if (a) window.open(a.href, "_blank", "noopener"); };
 
@@ -61,13 +69,14 @@
   function say(tip, ms = 4800) {
     if (!tip) return;
     bubP.textContent = tip.t;
-    bubA.innerHTML = ""; (tip.a || []).forEach(([l, fn]) => { const b = document.createElement("button"); b.className = "mito-a"; b.textContent = l; b.onclick = () => { fn(); hideBub(); }; bubA.appendChild(b); });
+    bubA.innerHTML = ""; (tip.a || []).forEach(([l, fn]) => { const b = document.createElement("button"); b.className = "mito-a"; b.textContent = l; b.onclick = () => { if (recien()) return; fn(); hideBub(); }; bubA.appendChild(b); });
     bub.hidden = false; requestAnimationFrame(() => bub.classList.add("on"));
     clearTimeout(bubT); bubT = setTimeout(hideBub, ms);
   }
   function hideBub() { bub.classList.remove("on"); clearTimeout(bubT); bubT = setTimeout(() => (bub.hidden = true), 220); }
 
   btn.addEventListener("click", () => {
+    if (recien()) return;
     if (!bub.hidden && bub.classList.contains("on")) { hideBub(); }
     if (items()) { abrirPedido(); return; }
     hop(); go("#sets");
@@ -101,11 +110,12 @@
   let dir = 1;
   function onScroll() {
     const y = scrollY, dy = y - lastY; lastY = y;
+    if (!auto) lastMove = performance.now();
     vel += dy * 0.25; if (Math.abs(dy) > 1) dir = dy > 0 ? 1 : -1;
     const max = document.documentElement.scrollHeight - innerHeight;
     ring.style.strokeDasharray = `${max > 0 ? Math.min(100, (y / max) * 100) : 0} 100`;
     el.classList.toggle("lift", document.getElementById("mbar")?.classList.contains("on"));
-    if (!moving && Math.abs(dy) > 2) { moving = true; pose("run"); }
+    if (!moving && Math.abs(dy) > 2) { moving = true; pose("run"); if (!bub.hidden) hideBub(); }
     clearTimeout(stopT);
     stopT = setTimeout(() => {
       moving = false;
