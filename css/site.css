@@ -297,8 +297,9 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .ok img{width:110px}
 
 /* hoja de producto */
-.sheet{position:fixed;z-index:55;left:50%;top:50%;width:min(520px,calc(100% - 32px));max-height:calc(100% - 40px);overflow:auto;background:var(--bg);border-radius:28px;transform:translate(-50%,-46%);opacity:0;pointer-events:none;transition:.22s}
-.sheet.on{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+/* centrada con margin:auto y sin transform al quedar abierta: un translate(-50%) con medio píxel hace que la foto se vea borrosa */
+.sheet{position:fixed;z-index:55;inset:0;margin:auto;height:fit-content;width:min(520px,calc(100% - 32px));max-height:calc(100% - 40px);overflow:auto;background:var(--bg);border-radius:28px;transform:translateY(4%);opacity:0;pointer-events:none;transition:.22s}
+.sheet.on{opacity:1;pointer-events:auto;transform:none}
 .sheet .sph{background:var(--bg-2);display:grid;place-items:center;height:260px;position:relative;border-radius:28px 28px 0 0}
 .sheet .sph::before{content:"";position:absolute;width:190px;aspect-ratio:1;border-radius:50%;background:var(--coral)}
 .sheet .sph img{position:relative;max-height:230px;width:auto}
@@ -316,7 +317,7 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .sheet .act{display:flex;gap:12px;align-items:center}
 .sheet .act .btn{flex:1}
 @media (max-width:640px){
-  .sheet{left:0;right:0;top:auto;bottom:0;width:100%;max-height:92%;border-radius:28px 28px 0 0;transform:translateY(100%);opacity:1;padding-bottom:env(safe-area-inset-bottom,0px)}
+  .sheet{left:0;right:0;top:auto;bottom:0;margin:0;width:100%;max-height:92%;border-radius:28px 28px 0 0;transform:translateY(100%);opacity:1;padding-bottom:env(safe-area-inset-bottom,0px)}
   .sheet.on{transform:none}
   .sheet .sph{height:220px}
 }
@@ -365,6 +366,10 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .modo button{display:grid;gap:2px;text-align:left;border:1.5px solid color-mix(in srgb,var(--turquesa) 45%,transparent);background:var(--card);border-radius:14px;padding:10px 12px;color:var(--ink)}
 .modo button b{font-weight:600;font-size:.92rem}
 .modo button small{font-size:.76rem;color:var(--ink-2)}
+.ret-donde{display:flex;gap:10px;align-items:flex-start;background:var(--bg-2);border-radius:14px;padding:10px 12px;font-size:.88rem}
+.ret-donde b{font-weight:600}
+.ret-donde p{margin:2px 0 4px;color:var(--ink-2)}
+.ret-donde a{color:var(--turquesa);font-weight:600}
 .modo button[aria-checked="true"]{border:2px solid var(--turquesa);background:color-mix(in srgb,var(--menta) 55%,var(--card))}
 
 .premio-pick{background:var(--coral-2);border-radius:14px;padding:12px}
@@ -833,9 +838,6 @@ body:not([data-page="home"]) .tema-aviso{display:none!important}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){#especial .prem.soon .ph img{filter:blur(14px)}}
 .t-halloween #especial .prem{background:#fde3df;color:var(--ink)}
 .t-halloween #especial .prem h3{color:var(--ink)}
-.sph.frost{position:relative}
-.sph.frost::after{content:"";position:absolute;inset:0;border-radius:inherit;z-index:1;background:rgba(253,227,223,.32);-webkit-backdrop-filter:blur(16px) saturate(1.25);backdrop-filter:blur(16px) saturate(1.25)}
-.sph.frost .x{z-index:2}
 
 /* ---------- Stickers de WhatsApp ---------- */
 .stk-in{display:grid;grid-template-columns:1fr 1.15fr;gap:clamp(20px,4vw,56px);align-items:center}
