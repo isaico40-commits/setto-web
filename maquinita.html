@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Maquinita de Mochito · Setto</title>
+<link rel="icon" href="img/mochito-cup.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Poppins:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: una sola columna; la máquina es la protagonista y abajo, mínimo, los premios. Mismo sistema visual que setto.com.ar. */
+:root{
+  --bg:#FAF4E8; --bg-2:#F1E4CA; --card:#FFFDF8;
+  --ink:#1F1C18; --ink-2:#5B5549;
+  --turquesa:#296A67; --turquesa-2:#1F5452;
+  --coral:#F8A29A; --coral-2:#FBC9C2; --oro:#F2C14E;
+  --display:"Lilita One","Arial Rounded MT Bold","Trebuchet MS",sans-serif;
+  --texto:"Poppins",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --line:2px solid var(--turquesa);
+  --sombra:5px 5px 0 var(--turquesa);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--texto);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 40px}
+h1,h2,h3{font-family:var(--display);font-weight:400;line-height:1.05;margin:0}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+.wrap{max-width:560px;margin:0 auto;display:grid;gap:18px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.top img{height:30px;width:auto}
+.sonido{width:36px;height:36px;border-radius:50%;border:var(--line);background:var(--card);color:var(--turquesa);display:grid;place-items:center}
+.sonido svg{width:16px;height:16px}
+
+/* ---------- la máquina ---------- */
+.maq{display:grid;gap:14px;justify-items:center;padding:18px 14px 20px;background:var(--turquesa);border-radius:32px 32px 26px 26px;border:3px solid var(--turquesa-2);box-shadow:6px 6px 0 var(--turquesa-2);color:var(--card)}
+.marquee{width:100%;display:grid;justify-items:center;background:var(--turquesa-2);border-radius:18px;padding:16px 12px 12px;position:relative}
+.marquee h1{font-size:clamp(1.6rem,6.4vw,2.2rem);color:var(--card);text-align:center}
+.luces{position:absolute;top:5px;left:12px;right:12px;display:flex;justify-content:space-between;pointer-events:none}
+.luces i{width:7px;height:7px;border-radius:50%;background:var(--oro);opacity:.3;transition:opacity .15s}
+.luces i.on{opacity:1;box-shadow:0 0 8px var(--oro)}
+
+.ventana{--h:96px;width:100%;background:var(--card);border-radius:18px;padding:8px;border:3px solid var(--turquesa-2);display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.reel{height:var(--h);overflow:hidden;border-radius:12px;background:linear-gradient(var(--bg-2),var(--card) 30%,var(--card) 70%,var(--bg-2));position:relative;transition:box-shadow .2s}
+.reel::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(rgba(31,84,82,.2),transparent 22%,transparent 78%,rgba(31,84,82,.2))}
+.strip{display:grid;will-change:transform}
+.sym{height:var(--h);display:grid;place-items:center;padding:8px}
+.sym img{max-width:100%;max-height:100%;object-fit:contain;filter:drop-shadow(0 3px 3px rgba(31,28,24,.15))}
+.sym svg{width:80%;height:80%}
+.reel.win{box-shadow:inset 0 0 0 3px var(--oro)}
+@media (max-width:420px){.ventana{--h:72px;gap:4px;padding:6px}.sym{padding:5px}}
+
+.msg{min-height:2.8em;display:grid;place-items:center;text-align:center;font-weight:600}
+.msg b{font-family:var(--display);font-weight:400;font-size:1.5rem;color:var(--oro);display:block}
+
+.tirar{font-family:var(--display);font-size:1.5rem;border:3px solid var(--turquesa-2);background:var(--coral);color:var(--ink);border-radius:999px;padding:11px 40px;box-shadow:0 5px 0 var(--turquesa-2);transition:transform .08s,box-shadow .08s}
+.tirar:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0 var(--turquesa-2)}
+.tirar:disabled{opacity:.5;cursor:not-allowed}
+.fichas{display:flex;gap:6px;align-items:center;font-size:.85rem;font-weight:600;color:var(--coral-2)}
+.ficha{width:20px;height:20px;border-radius:50%;background:radial-gradient(circle,var(--oro) 38%,#e2ab33 40%,#e2ab33 52%,var(--oro) 54%);border:2px solid var(--turquesa-2)}
+.ficha.vacia{background:transparent;border:2px dashed var(--coral-2);opacity:.6}
+
+/* ---------- premios ---------- */
+.premios{display:grid;gap:4px;font-size:.9rem}
+.fila{display:flex;align-items:center;gap:10px;padding:8px 2px;border-top:1px solid var(--bg-2)}
+.fila:first-child{border-top:0}
+.fila .combo{display:flex;flex:none;width:118px}
+.fila .combo img,.fila .combo svg{width:24px;height:24px;object-fit:contain;margin-right:-2px}
+.fila .combo span{font-size:.78rem;color:var(--ink-2)}
+.fila b{flex:1;min-width:0}
+.fila .pct{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.letra{font-size:.78rem;color:var(--ink-2);text-align:center}
+
+details.test{font-size:.82rem;color:var(--ink-2);text-align:center}
+details.test summary{cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}
+.chip{border:2px solid var(--turquesa);background:var(--card);border-radius:999px;padding:4px 11px;font-size:.78rem;font-weight:600;color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--turquesa);color:var(--card)}
+
+/* ---------- cupón ---------- */
+.velo{position:fixed;inset:0;z-index:20;background:rgba(31,28,24,.45);display:grid;place-items:center;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.cupon{width:min(360px,100%);background:var(--card);border-radius:26px;border:3px solid var(--turquesa);box-shadow:var(--sombra);padding:22px;display:grid;gap:12px;justify-items:center;text-align:center;animation:pop .45s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{from{transform:scale(.7) rotate(-4deg);opacity:0}to{transform:none;opacity:1}}
+.cupon img{width:96px}
+.cupon h2{font-size:1.8rem;color:var(--turquesa)}
+.codigo{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;border:2px dashed var(--coral);border-radius:14px;padding:9px 12px;font-weight:700;letter-spacing:.08em}
+.copiar{border:0;background:var(--coral-2);border-radius:999px;padding:5px 12px;font-size:.8rem;font-weight:600;letter-spacing:0}
+.cupon small{color:var(--ink-2)}
+.btn{border:var(--line);background:var(--card);border-radius:999px;box-shadow:3px 3px 0 var(--turquesa);padding:9px 22px;font-weight:600}
+canvas#confeti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30}
+@media (prefers-reduced-motion:reduce){.cupon{animation:none}}
+.aviso-prueba{max-width:560px;margin:0 auto 14px;background:var(--coral-2);border-radius:999px;padding:6px 14px;text-align:center;font-size:.8rem;font-weight:600}
+body{margin:0}
+</style>
+</head>
+<body>
+<p class="aviso-prueba">Prueba: los premios no son reales</p>
+
+<div class="wrap">
+  <header class="top">
+    <a href="/"><img src="img/logo.svg" alt="Setto"></a>
+    <button class="sonido" id="sonido" type="button" aria-pressed="false" aria-label="Activar sonido"></button>
+  </header>
+
+  <section class="maq" aria-label="Maquinita">
+    <div class="marquee">
+      <div class="luces" id="luces" aria-hidden="true"></div>
+      <h1>La maquinita de Mochito</h1>
+    </div>
+    <div class="ventana" id="ventana">
+      <div class="reel"><div class="strip"></div></div>
+      <div class="reel"><div class="strip"></div></div>
+      <div class="reel"><div class="strip"></div></div>
+      <div class="reel"><div class="strip"></div></div>
+      <div class="reel"><div class="strip"></div></div>
+    </div>
+    <p class="msg" id="msg" aria-live="polite">¡Probá suerte!</p>
+    <button class="tirar" id="tirar" type="button">Tirar</button>
+    <div class="fichas" id="fichas" aria-live="polite"></div>
+  </section>
+
+  <section class="premios" id="premios" aria-label="Premios"></section>
+  <p class="letra">Una tirada gratis por día. No apostás nada.</p>
+
+  <details class="test">
+    <summary>Prueba</summary>
+    <div class="chips" id="forzar"></div>
+    <div class="chips"><button class="chip" id="reponer" type="button">Reponer fichas</button><button class="chip" id="infinitas" type="button" aria-pressed="false">Fichas infinitas</button></div>
+  </details>
+</div>
+
+<div class="velo" id="velo" hidden>
+  <div class="cupon" role="dialog" aria-modal="true" aria-labelledby="cTit">
+    <img src="img/mochito-cup.png" alt="">
+    <h2 id="cTit"></h2>
+    <div class="codigo"><span id="cCod"></span><button class="copiar" id="copiar" type="button">Copiar</button></div>
+    <small id="cNota"></small>
+    <button class="btn" id="cerrar" type="button">Listo</button>
+  </div>
+</div>
+<canvas id="confeti" aria-hidden="true"></canvas>
+
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const IMG = { mochito: "img/mochito-cup.png", frutilla: "img/mochi-frutilla.webp", oreo: "img/mochi-oreo.webp", dirty: "img/dirty-caramel.webp", matcha: "img/dirty-strawberry.webp" };
+  const ESTRELLA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1 6.1 20.3l1.3-6.5L2.5 9.3l6.6-.8z" fill="#F2C14E" stroke="#1F5452" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+  const SIMBOLOS = ["mochito", "frutilla", "oreo", "dirty", "matcha", "estrella"];
+  const NOMBRE = { mochito: "Mochito", frutilla: "Mochi frutilla", oreo: "Mochi oreo", dirty: "Dirty caramel", matcha: "Strawberry matcha", estrella: "Estrella" };
+  const symHtml = (k) => k === "estrella" ? ESTRELLA : `<img src="${IMG[k]}" alt="${NOMBRE[k]}" draggable="false">`;
+  const N = 5; // rodillos
+
+  // En la versión real esta tabla se edita desde el panel y el resultado lo decide la base
+  const PREMIOS = [
+    { id: "gift", titulo: "Gift card $10.000", chance: 0.1, combo: () => symHtml("mochito").repeat(5) },
+    { id: "mochi", titulo: "Mochi gratis", chance: 0.5, combo: () => `<span>5 iguales</span>` },
+    { id: "off", titulo: "10% off", chance: 2, combo: () => `<span>4 iguales</span>` },
+  ];
+  const fmt = (n) => n.toLocaleString("es-AR") + "%";
+  $("#premios").innerHTML = PREMIOS.map((p) => `<div class="fila"><span class="combo">${p.combo()}</span><b>${p.titulo}</b><span class="pct">${fmt(p.chance)}</span></div>`).join("");
+
+  /* ---------- fichas (solo este navegador) ---------- */
+  const KEY = "setto-maquinita-demo";
+  const hoy = () => new Date().toISOString().slice(0, 10);
+  let st = { dia: hoy(), fichas: 2 };
+  try { const g = JSON.parse(localStorage.getItem(KEY) || "null"); if (g && g.dia === hoy() && typeof g.fichas === "number") st = g; } catch (_) {}
+  const guardar = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (_) {} };
+  let infinitas = false, forzado = null, girando = false, sonidoOn = false;
+  const quedan = () => (infinitas ? Infinity : st.fichas);
+  function pintarFichas() {
+    const n = quedan();
+    $("#fichas").innerHTML = infinitas ? "∞ fichas" : [0, 1].map((i) => `<span class="ficha ${i < n ? "" : "vacia"}"></span>`).join("") + `<span>${n === 1 ? "1 ficha" : n + " fichas"}</span>`;
+    $("#tirar").disabled = n === 0 || girando;
+    if (n === 0 && !girando) $("#msg").textContent = "Volvé mañana por otra tirada";
+  }
+
+  /* ---------- rodillos ---------- */
+  const reels = [...document.querySelectorAll(".reel")];
+  const azar = () => SIMBOLOS[Math.floor(Math.random() * SIMBOLOS.length)];
+  reels.forEach((r) => { r.querySelector(".strip").innerHTML = `<div class="sym">${symHtml(azar())}</div>`; });
+
+  function sortear() {
+    if (forzado) { const f = forzado; forzado = null; marcar(); return f; }
+    let x = Math.random() * 100;
+    for (const p of PREMIOS) { if (x < p.chance) return p.id; x -= p.chance; }
+    return "nada";
+  }
+  const mezclar = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const maxIguales = (a) => Math.max(...SIMBOLOS.map((s) => a.filter((x) => x === s).length));
+  function finales(res) {
+    const otros = SIMBOLOS.filter((s) => s !== "mochito"), pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    if (res === "gift") return Array(N).fill("mochito");
+    if (res === "mochi") return Array(N).fill(pick(otros));
+    if (res === "off") { const s = pick(otros); return mezclar([s, s, s, s, pick(SIMBOLOS.filter((x) => x !== s))]); }
+    let t; do { t = Array.from({ length: N }, azar); } while (maxIguales(t) >= 4); // sin premio: al azar, nunca 4 o 5 iguales
+    return t;
+  }
+
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function girar() {
+    if (girando || quedan() === 0) return;
+    girando = true; if (!infinitas) { st.fichas--; guardar(); }
+    pintarFichas(); reels.forEach((r) => r.classList.remove("win"));
+    $("#msg").textContent = "…"; luces(true); beep(330, .05);
+    const res = sortear(), fin = finales(res), h = reels[0].getBoundingClientRect().height;
+    Promise.all(reels.map((r, i) => new Promise((ok) => {
+      const strip = r.querySelector(".strip"), items = [strip.lastElementChild.innerHTML];
+      const vueltas = reduce ? 3 : 14 + i * 5;
+      for (let k = 0; k < vueltas; k++) items.push(symHtml(azar()));
+      items.push(symHtml(fin[i]));
+      strip.style.transition = "none"; strip.style.transform = "translateY(0)";
+      strip.innerHTML = items.map((x) => `<div class="sym">${x}</div>`).join("");
+      void strip.offsetHeight;
+      const dur = reduce ? 300 : 900 + i * 380;
+      strip.style.transition = `transform ${dur}ms cubic-bezier(.12,.8,.2,1.04)`;
+      strip.style.transform = `translateY(${-(items.length - 1) * h}px)`;
+      setTimeout(() => { strip.innerHTML = `<div class="sym">${symHtml(fin[i])}</div>`; strip.style.transition = "none"; strip.style.transform = "translateY(0)"; beep(220 + i * 60, .07); ok(); }, dur + 30);
+    }))).then(() => { girando = false; luces(false); resultado(res, fin); });
+  }
+
+  function resultado(res, fin) {
+    const p = PREMIOS.find((x) => x.id === res);
+    if (!p) { $("#msg").textContent = "¡Casi! Volvé mañana"; pintarFichas(); return; }
+    const top = SIMBOLOS.find((s) => fin.filter((x) => x === s).length >= 4);
+    reels.forEach((r, i) => { if (fin[i] === top) r.classList.add("win"); });
+    $("#msg").innerHTML = `<span><b>¡${p.titulo}!</b></span>`;
+    fanfarria(res === "gift"); confeti(res === "gift" ? 220 : res === "mochi" ? 140 : 70);
+    setTimeout(() => cupon(p), reduce ? 200 : 700);
+    pintarFichas();
+  }
+
+  /* ---------- cupón ---------- */
+  function cupon(p) {
+    $("#cTit").textContent = p.titulo;
+    $("#cCod").textContent = p.id.toUpperCase().replace("OFF", "OFF10") + "-" + Math.random().toString(36).slice(2, 6).toUpperCase();
+    $("#cNota").textContent = "Usalo en tu próximo pedido · vence el " + new Date(Date.now() + 7 * 864e5).toLocaleDateString("es-AR", { day: "numeric", month: "numeric" });
+    $("#velo").hidden = false; $("#cerrar").focus();
+  }
+  const cerrar = () => { $("#velo").hidden = true; };
+  $("#cerrar").addEventListener("click", cerrar);
+  $("#velo").addEventListener("click", (e) => { if (e.target.id === "velo") cerrar(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") cerrar(); });
+  $("#copiar").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText($("#cCod").textContent); $("#copiar").textContent = "Copiado"; }
+    catch (_) { const r = document.createRange(); r.selectNodeContents($("#cCod")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $("#copiar").textContent = "Seleccionado"; }
+    setTimeout(() => ($("#copiar").textContent = "Copiar"), 1600);
+  });
+  $("#tirar").addEventListener("click", girar);
+
+  /* ---------- luces ---------- */
+  const lucesEl = $("#luces"); lucesEl.innerHTML = "<i></i>".repeat(12);
+  let lt = null, paso = 0;
+  function luces(on) {
+    clearInterval(lt); const is = [...lucesEl.children];
+    if (!on) { is.forEach((x, i) => x.classList.toggle("on", i % 2 === 0)); return; }
+    lt = setInterval(() => { paso++; is.forEach((x, i) => x.classList.toggle("on", (i + paso) % 3 === 0)); }, 90);
+  }
+  luces(false);
+
+  /* ---------- sonido (opcional, arranca apagado) ---------- */
+  const OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>';
+  const ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>';
+  let ac = null; $("#sonido").innerHTML = OFF;
+  $("#sonido").addEventListener("click", () => {
+    sonidoOn = !sonidoOn; $("#sonido").innerHTML = sonidoOn ? ON : OFF;
+    $("#sonido").setAttribute("aria-pressed", sonidoOn); $("#sonido").setAttribute("aria-label", sonidoOn ? "Silenciar" : "Activar sonido");
+    if (sonidoOn && !ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {} }
+    if (sonidoOn) beep(520, .08);
+  });
+  function beep(f, d, t0 = 0) {
+    if (!sonidoOn || !ac) return;
+    const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + t0;
+    o.type = "square"; o.frequency.value = f; g.gain.setValueAtTime(.05, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d + .02);
+  }
+  function fanfarria(grande) { [523, 659, 784, 1047].concat(grande ? [784, 1047, 1319] : []).forEach((f, i) => beep(f, .14, i * .11)); }
+
+  /* ---------- confeti ---------- */
+  const cv = $("#confeti"), cx = cv.getContext("2d");
+  function confeti(n) {
+    if (reduce) return;
+    const d = devicePixelRatio || 1, W = (cv.width = innerWidth * d), H = (cv.height = innerHeight * d);
+    const cols = ["#F8A29A", "#296A67", "#F2C14E", "#D0DEC3", "#FBC9C2"];
+    const ps = Array.from({ length: n }, () => ({ x: W / 2 + (Math.random() - .5) * W * .3, y: H * .35, vx: (Math.random() - .5) * 18 * d, vy: (-Math.random() * 16 - 6) * d, r: (4 + Math.random() * 5) * d, c: cols[Math.floor(Math.random() * cols.length)], a: Math.random() * 6, va: (Math.random() - .5) * .4 }));
+    let f = 0;
+    (function frame() {
+      cx.clearRect(0, 0, W, H); f++;
+      ps.forEach((p) => { p.vy += .55 * d; p.x += p.vx; p.y += p.vy; p.vx *= .99; p.a += p.va; cx.save(); cx.translate(p.x, p.y); cx.rotate(p.a); cx.fillStyle = p.c; cx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); cx.restore(); });
+      if (f < 150) requestAnimationFrame(frame); else cx.clearRect(0, 0, W, H);
+    })();
+  }
+
+  /* ---------- prueba ---------- */
+  const OPC = [["gift", "Gift card"], ["mochi", "Mochi"], ["off", "10% off"], ["nada", "Nada"]];
+  $("#forzar").innerHTML = OPC.map(([k, l]) => `<button class="chip" type="button" data-f="${k}" aria-pressed="false">Próxima: ${l}</button>`).join("");
+  function marcar() { document.querySelectorAll("[data-f]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === forzado)); }
+  $("#forzar").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (!b) return; forzado = forzado === b.dataset.f ? null : b.dataset.f; marcar(); });
+  $("#reponer").addEventListener("click", () => { st.fichas = 2; guardar(); $("#msg").textContent = "¡Probá suerte!"; pintarFichas(); });
+  $("#infinitas").addEventListener("click", () => { infinitas = !infinitas; $("#infinitas").setAttribute("aria-pressed", infinitas); if (infinitas) $("#msg").textContent = "¡Probá suerte!"; pintarFichas(); });
+  pintarFichas();
+})();
+</script>
+</body>
+</html>

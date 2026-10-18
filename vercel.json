@@ -40,6 +40,15 @@
           "value": "public, max-age=604800"
         }
       ]
+    },
+    {
+      "source": "/maquinita",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
     }
   ]
 }
