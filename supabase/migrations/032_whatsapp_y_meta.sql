@@ -68,6 +68,7 @@ do $$ declare t text; begin
     execute format('drop policy if exists %I on public.%I', t || '_staff_read', t);
     execute format('create policy %I on public.%I for select to authenticated using (public.is_staff())', t || '_staff_read', t);
     execute format('revoke all on public.%I from anon', t);
+    execute format('revoke insert, update, delete, truncate on public.%I from authenticated', t);
     execute format('grant select on public.%I to authenticated', t);
   end loop;
 end $$;
