@@ -759,9 +759,10 @@
     if (e.target.closest("[data-mqclose]") || e.target.id === "mqView") return cerrarMaq();
     const a = e.target.closest("[data-maq]"); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
     e.preventDefault();
-    if (a.id !== "mqTirar") return abrirMaq(); // botón del carrito: directo
+    const card = a.closest("#mqCard"); if (!card) return abrirMaq(); // botón del carrito: directo
     if (mqGirando) return; mqGirando = true;
-    girarMini(() => { mqGirando = false; abrirMaq(); });
+    card.classList.add("tirando"); // baja la palanca, después giran los rodillos y se abre
+    setTimeout(() => girarMini(() => { mqGirando = false; card.classList.remove("tirando"); abrirMaq(); }), 380);
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#mqView").hidden) cerrarMaq(); });
   function renderFooter() {
