@@ -45,6 +45,7 @@
   const cleanMsg = (m) => String(m).replace(/^.*?ERROR:\s*/, "").replace(/\s*CONTEXT:.*$/s, "");
 
   /* =================== MODO DEMO =================== */
+  const demoPuede = (db, ph, canal) => ((db.consents || []).find((x) => x.phone === ph && x.canal === canal) || {}).estado === "otorgado";
   const KEY = "setto-demo-db";
   function dbLoad() {
     let db = null;
@@ -203,6 +204,20 @@
     },
     async setEtapa(id, etapa) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o || o.status !== "pendiente") throw new Error("El pedido no está pendiente"); o.etapa = etapa; dbSave(db); },
     async marcarAviso(id, etapa) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o) return; o.avisos = { ...(o.avisos || {}), [etapa]: new Date().toISOString() }; dbSave(db); },
+    // consentimientos de marketing (migración 030): historial; vale la última fila por celular y canal
+    async registrarConsentimiento(code, phone, canales, version) {
+      const db = dbLoad(), ph = normPhone(phone), o = db.orders.find((x) => x.code === code && x.phone === ph && x.status === "pendiente"); if (!o) return;
+      db.consents = db.consents || [];
+      canales.filter((c) => ["whatsapp", "meta_ads"].includes(c) && !demoPuede(db, ph, c)).forEach((c) => db.consents.unshift({ phone: ph, canal: c, finalidad: c === "whatsapp" ? "novedades" : "publicidad", estado: "otorgado", origen: "checkout_web", aviso_version: version, order_id: o.id, created_at: new Date().toISOString() }));
+      dbSave(db);
+    },
+    async bajaMarketing(phone, canal) {
+      const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("Revisá el número: código de área + número, por ejemplo 223 347-1277.");
+      db.consents = db.consents || [];
+      ["whatsapp", "meta_ads"].filter((c) => (!canal || canal === c) && demoPuede(db, ph, c)).forEach((c) => db.consents.unshift({ phone: ph, canal: c, finalidad: c === "whatsapp" ? "novedades" : "publicidad", estado: "revocado", origen: sessionStorage.getItem("setto-demo-staff") ? "panel" : "preferencias_web", created_at: new Date().toISOString() }));
+      dbSave(db);
+    },
+    async consentimientos(phone) { const ph = normPhone(phone); return (dbLoad().consents || []).filter((x) => x.phone === ph); },
     async marcarContacto(code, phone) { const db = dbLoad(), ph = normPhone(phone), o = db.orders.find((x) => x.code === code && x.phone === ph && x.status === "pendiente"); if (o && !o.contacto_at) { o.contacto_at = new Date().toISOString(); dbSave(db); } },
     onTrack(tracks, cb) { if (this._trk) return; this._trk = 1; window.addEventListener("storage", (e) => { if (e.key === KEY) cb(); }); },
     async orderStatus(codes, phone) {
@@ -382,6 +397,10 @@
     async marcarAviso(id, etapa) { const { error } = await sb.rpc("marcar_aviso", { p_id: id, p_etapa: etapa }); fail(error); },
     // el cliente abrió WhatsApp para mandar el pedido (migración 029; sin ella, no pasa nada)
     async marcarContacto(code, phone) { await sb.rpc("marcar_contacto", { p_code: code, p_phone: phone }); },
+    // consentimientos de marketing (migración 030)
+    async registrarConsentimiento(code, phone, canales, version) { const { error } = await sb.rpc("registrar_consentimiento", { p_code: code, p_phone: phone, p_canales: canales, p_version: version }); fail(error); },
+    async bajaMarketing(phone, canal) { const { error } = await sb.rpc("baja_marketing", { p_phone: phone, p_canal: canal || null }); fail(error); },
+    async consentimientos(phone) { const { data, error } = await sb.from("customer_consents").select("*").eq("phone", normPhone(phone)).order("created_at", { ascending: false }).limit(20); fail(error); return data || []; },
     // seguimiento en vivo: un canal público por link de pedido; la base avisa cuando el pedido cambia (migración 024)
     onTrack(tracks, cb) {
       const want = new Set(tracks);
