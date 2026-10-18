@@ -725,24 +725,37 @@
     }).join("");
     $("#stamps").style.opacity = ejemplo ? ".55" : "1";
   }
-  /* ---------- maquinita en la landing: los rodillos giran un toque y abre /maquinita ---------- */
+  /* ---------- maquinita en la landing: los rodillos giran un toque y se abre en un pop up ---------- */
   const MQ_IMG = ["img/mochito-cup.png", "img/mochi-frutilla.webp", "img/mochi-oreo.webp", "img/dirty-caramel.webp", "img/dirty-strawberry.webp"];
   function renderMaquinita() { const sec = $("#maquinita"); if (sec) sec.hidden = !maqOn(); }
-  document.addEventListener("click", (e) => {
-    const a = e.target.closest("#mqTirar"); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    e.preventDefault(); if (a.dataset.giro) return; a.dataset.giro = "1";
-    const reels = [...document.querySelectorAll("#maquinita .mq-reel")], h = reels[0].getBoundingClientRect().height;
+  function abrirMaq() {
+    const f = $("#mqFrame"); if (!f.getAttribute("src")) f.src = "maquinita.html?embed";
+    $("#mqView").hidden = false; document.body.style.overflow = "hidden"; $("[data-mqclose]").focus();
+  }
+  function cerrarMaq() { $("#mqView").hidden = true; document.body.style.overflow = ""; }
+  function girarMini(done) {
+    const reels = [...document.querySelectorAll("#maquinita .mq-reel")];
+    if (!reels.length || matchMedia("(prefers-reduced-motion: reduce)").matches) return done();
+    const h = reels[0].getBoundingClientRect().height;
     reels.forEach((r, i) => {
       const st = r.querySelector(".mq-strip"), imgs = [st.lastElementChild.getAttribute("src")];
       for (let k = 0; k < 8 + i * 3; k++) imgs.push(MQ_IMG[Math.floor(Math.random() * MQ_IMG.length)]);
       st.style.transition = "none"; st.style.transform = "translateY(0)";
       st.innerHTML = imgs.map((x) => `<img src="${x}" alt="">`).join(""); void st.offsetHeight;
-      st.style.transition = `transform ${500 + i * 180}ms cubic-bezier(.3,.1,.3,1)`; st.style.transform = `translateY(${-(imgs.length - 1) * h}px)`;
+      st.style.transition = `transform ${450 + i * 150}ms cubic-bezier(.3,.1,.3,1)`; st.style.transform = `translateY(${-(imgs.length - 1) * h}px)`;
     });
-    setTimeout(() => { location.href = a.getAttribute("href"); }, 1000);
+    setTimeout(done, 800);
+  }
+  let mqGirando = false;
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-mqclose]") || e.target.id === "mqView") return cerrarMaq();
+    const a = e.target.closest("[data-maq]"); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    e.preventDefault();
+    if (a.id !== "mqTirar") return abrirMaq(); // botón del carrito: directo
+    if (mqGirando) return; mqGirando = true;
+    girarMini(() => { mqGirando = false; abrirMaq(); });
   });
-  window.addEventListener("pageshow", () => { const a = $("#mqTirar"); if (a) delete a.dataset.giro; });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#mqView").hidden) cerrarMaq(); });
   function renderFooter() {
     const r = S.retiro || { rangos: [] };
     HORARIO = "De " + r.rangos.map(([a, b]) => a.replace(":00", "") + " a " + b.replace(":00", "")).join(" y de ") + " hs.";
@@ -896,7 +909,7 @@
       <b>${esc(p.nombre)}</b><small class="num">${unit(p) ? "" : "Desde "}${money(unit(p) ? p.precio : p.precios["12 oz"])}</small></div>`).join("")}</div></div>`;
   }
   const giftCta = () => gcfg().activo === false ? "" : `<a class="gift-cta" href="/gift-cards" data-closedrawer><span class="gc-ico" aria-hidden="true">🎁</span><span><b>¿Es para regalar?</b><small>Mandá una gift card digital de Setto.</small></span><span class="go" aria-hidden="true">→</span></a>`;
-  const maqCta = () => !maqOn() ? "" : `<a class="gift-cta maq-cta" href="/maquinita" data-closedrawer><span class="gc-ico" aria-hidden="true"><img src="img/mochito-cup.png" alt=""></span><span><b>¿Probás suerte?</b><small>Tirá en la maquinita de Mochito antes de pedir.</small></span><span class="go" aria-hidden="true">→</span></a>`;
+  const maqCta = () => !maqOn() ? "" : `<a class="gift-cta maq-cta" href="/maquinita" data-maq data-closedrawer><span class="gc-ico" aria-hidden="true"><img src="img/mochito-cup.png" alt=""></span><span><b>¿Probás suerte?</b><small>Tirá en la maquinita de Mochito antes de pedir.</small></span><span class="go" aria-hidden="true">→</span></a>`;
   function drawDrawer() {
     const body = $("#dBody"), foot = $("#dFoot");
     $("#dBack").hidden = view !== "checkout" && view !== "buscar";

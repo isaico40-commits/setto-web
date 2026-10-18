@@ -104,6 +104,7 @@
           <div><span class="k">1</span><span><b>Tocá “Tirar”</b></span></div>
           <div><span class="k">2</span><span><b>Juntá 4 o 5 iguales</b><small>Mirá los premios en la maquinita.</small></span></div>
           <div><span class="k">3</span><span><b>Una tirada gratis por día</b><small>No apostás nada.</small></span></div>
+          <div><span class="k">4</span><span><b>Tu compra trae fichas</b><small>Más fichas, más tiradas.</small></span></div>
         </div>
       </div>
       <div class="stampcard maqcard">
@@ -113,7 +114,7 @@
           <span class="mq-reel"><span class="mq-strip"><img src="img/mochi-frutilla.webp" alt=""></span></span>
           <span class="mq-reel"><span class="mq-strip"><img src="img/dirty-caramel.webp" alt=""></span></span>
         </div>
-        <a class="btn solid mq-tirar" id="mqTirar" href="/maquinita">Tirar</a>
+        <a class="btn solid mq-tirar" id="mqTirar" href="/maquinita" data-maq>Tirar</a>
       </div>
     </div>
   </section>
@@ -314,6 +315,12 @@
   </section>
 </main>
 
+<div class="allrev mqover" id="mqView" role="dialog" aria-modal="true" aria-label="La maquinita de Mochito" hidden>
+  <div class="mq-in">
+    <button class="x mq-x" data-mqclose aria-label="Cerrar">✕</button>
+    <iframe id="mqFrame" title="La maquinita de Mochito"></iframe>
+  </div>
+</div>
 <div class="allrev gcover" id="gcBuy" role="dialog" aria-modal="true" aria-labelledby="gbTitle" hidden>
   <div class="ar-in">
     <div class="ar-h"><h2 id="gbTitle">Tu gift card</h2><button class="x" data-gbclose aria-label="Cerrar">✕</button></div>
