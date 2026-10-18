@@ -74,12 +74,12 @@ export function leerWebhook(body: any) {
   }
   return { entrantes, estados };
 }
-const quitarTildes = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "");
-// "BAJA", "stop", "no quiero recibir más", "desuscribirme"… / "ALTA" para volver
+const quitarTildes = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+// "BAJA", "stop", "no quiero recibir más", el botón "No quiero más novedades" de las plantillas… / "ALTA" para volver
 export function intencion(texto: string): "baja" | "alta" | null {
   const t = quitarTildes(String(texto || "")).toLowerCase().trim();
   const cola = "[\\s!.,]*(por favor|porfa|gracias)?[\\s!.]*$"; // el mensaje es solo eso, no "bajá el precio?"
-  if (new RegExp("^(baja|stop|parar|unsubscribe|desuscrib\\w*|quiero darme de baja|darme de baja)" + cola).test(t) || /no (quiero|me) (recibir|manden|mandes|escriban)/.test(t)) return "baja";
+  if (new RegExp("^(baja|stop|parar|unsubscribe|desuscrib\\w*|quiero darme de baja|darme de baja)" + cola).test(t) || /no (quiero|me) (recibir|manden|mandes|escriban)/.test(t) || /^no quiero (mas )?(novedades|mensajes|promos)[\s!.]*$/.test(t)) return "baja";
   if (new RegExp("^alta" + cola).test(t)) return "alta";
   return null;
 }

@@ -357,7 +357,7 @@
   const EST_C = { borrador: "pendiente", enviando: "pendiente", enviada: "entregado", error: "cancelado" };
   async function viewCampanas() {
     $("#view").innerHTML = `<h1 class="ph1">Campañas</h1>
-      <p class="muted">Solo le llega a quien aceptó en la web o escribió ALTA. Quien escribe BAJA sale solo de todo. Los mensajes usan plantillas aprobadas en WhatsApp Manager.</p>
+      <p class="muted">Solo le llega a quien aceptó en la web o escribió ALTA. Quien toca "No quiero más novedades" (o escribe BAJA) sale solo de todo. Los mensajes usan plantillas aprobadas en WhatsApp Manager.</p>
       <section class="sec"><h2>Segmentos</h2><div class="pcard"><div class="hist" id="segList"><span class="muted">Cargando…</span></div>
         <div class="acts"><button class="btn" id="syncAud">Actualizar públicos de Meta</button></div><span class="hintp">Crea o actualiza un público "Setto · segmento" por cada uno, solo con quienes aceptaron anuncios.</span></div></section>
       <section class="sec"><h2>Nueva campaña de WhatsApp</h2>

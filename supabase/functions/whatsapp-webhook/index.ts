@@ -2,7 +2,7 @@
 // GET: verificación del webhook en la app de Meta (hub.verify_token = WA_VERIFY_TOKEN).
 // POST: mensajes entrantes y estados de los enviados. Firma X-Hub-Signature-256 con WA_APP_SECRET.
 //   - Guarda respuestas y estados en message_logs.
-//   - "BAJA" (o "stop", "no quiero recibir…") revoca el permiso de WhatsApp; "ALTA" lo vuelve a dar. Responde confirmando.
+//   - "BAJA" (o "stop", "no quiero recibir…", o el botón "No quiero más novedades" de las plantillas) revoca el permiso de WhatsApp; "ALTA" lo vuelve a dar. Responde confirmando.
 import { env, sb, VERSION } from "../_shared/supa.ts";
 import { firmaValida, leerWebhook, intencion } from "../_shared/crm.ts";
 
