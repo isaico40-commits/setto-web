@@ -89,6 +89,19 @@ body{margin:0}
 .embed .top > a{display:none}
 .embed .aviso-prueba{margin-right:56px}
 .embed details.test{display:none}
+/* palanca al costado de la máquina */
+.maq{position:relative;margin-right:34px}
+.palanca{all:unset;cursor:pointer;position:absolute;right:-37px;top:96px;width:34px;height:150px}
+.palanca:focus-visible{outline:3px solid var(--coral);outline-offset:3px;border-radius:8px}
+.palanca:disabled{cursor:not-allowed}
+.eje{position:absolute;left:0;bottom:22px;width:22px;height:30px;border-radius:0 10px 10px 0;background:var(--turquesa-2)}
+.brazo{position:absolute;left:14px;bottom:34px;width:7px;height:104px;border-radius:4px;background:linear-gradient(90deg,#c9c3b6,#f3efe6 45%,#a9a296);transform-origin:50% 100%;transition:transform .12s}
+.bola{position:absolute;left:50%;top:-14px;width:26px;height:26px;margin-left:-13px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffd4cf,var(--coral) 55%,#e07e74);border:2.5px solid var(--turquesa-2)}
+.palanca:hover:not(:disabled) .brazo{transform:rotate(6deg)}
+.maq.tirando .brazo{animation:tirar-palanca .55s cubic-bezier(.4,0,.3,1)}
+@keyframes tirar-palanca{0%{transform:perspective(260px) rotateX(0)}45%,62%{transform:perspective(260px) rotateX(165deg)}100%{transform:perspective(260px) rotateX(0)}}
+@media (prefers-reduced-motion:reduce){.maq.tirando .brazo{animation:none}}
+@media (max-width:420px){.maq{margin-right:30px}.palanca{right:-33px;top:80px;transform:scale(.88);transform-origin:0 50%}}
 </style>
 </head>
 <body>
@@ -115,6 +128,7 @@ body{margin:0}
     <p class="msg" id="msg" aria-live="polite">¡Probá suerte!</p>
     <button class="tirar" id="tirar" type="button">Tirar</button>
     <div class="fichas" id="fichas" aria-live="polite"></div>
+    <button class="palanca" id="palanca" type="button" aria-label="Bajar la palanca y tirar"><span class="brazo"><span class="bola"></span></span><span class="eje"></span></button>
   </section>
 
   <section class="premios" id="premios" aria-label="Premios"></section>
@@ -179,7 +193,7 @@ body{margin:0}
   function pintarFichas() {
     const n = quedan();
     $("#fichas").innerHTML = infinitas ? "∞ fichas" : Array.from({ length: FICHAS }, (_, i) => `<span class="ficha ${i < n ? "" : "vacia"}"></span>`).join("") + `<span>${n === 1 ? "1 ficha" : n + " fichas"}</span>`;
-    $("#tirar").disabled = n === 0 || girando;
+    $("#tirar").disabled = $("#palanca").disabled = n === 0 || girando;
     if (n === 0 && !girando) $("#msg").textContent = "Volvé mañana por otra tirada";
   }
 
@@ -209,6 +223,7 @@ body{margin:0}
   function girar() {
     if (girando || quedan() === 0) return;
     if (sonidoOn) { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); ac.resume && ac.resume(); } catch (_) {} } // el toque en Tirar habilita el audio
+    const maq = $(".maq"); maq.classList.remove("tirando"); void maq.offsetWidth; maq.classList.add("tirando"); setTimeout(() => maq.classList.remove("tirando"), 600);
     girando = true; if (!infinitas) { st.fichas--; guardar(); }
     pintarFichas(); reels.forEach((r) => r.classList.remove("win"));
     $("#msg").textContent = "…"; luces(true); beep(330, .05);
@@ -239,6 +254,7 @@ body{margin:0}
   }
 
   $("#tirar").addEventListener("click", girar);
+  $("#palanca").addEventListener("click", girar);
 
   /* ---------- luces ---------- */
   const lucesEl = $("#luces"); lucesEl.innerHTML = "<i></i>".repeat(12);

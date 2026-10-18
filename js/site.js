@@ -760,9 +760,10 @@
     const a = e.target.closest("[data-maq]"); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
     e.preventDefault();
     const card = a.closest("#mqCard"); if (!card) return abrirMaq(); // botón del carrito: directo
+    abrirMaq(); // se abre al instante; la palanca y los rodillos se mueven detrás
     if (mqGirando) return; mqGirando = true;
-    card.classList.add("tirando"); // baja la palanca, después giran los rodillos y se abre
-    setTimeout(() => girarMini(() => { mqGirando = false; card.classList.remove("tirando"); abrirMaq(); }), 380);
+    card.classList.add("tirando");
+    setTimeout(() => girarMini(() => { mqGirando = false; card.classList.remove("tirando"); }), 380);
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#mqView").hidden) cerrarMaq(); });
   function renderFooter() {
