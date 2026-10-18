@@ -965,6 +965,8 @@
       if (window.SettoPixel) window.SettoPixel.once("order_created:" + o.code, () => window.SettoPixel.custom("order_created", { ...pxPed, value: Number(o.total) || 0 }, "creado-" + o.code));
       const ph = o.phone || API.normPhone(form.tel);
       const canales = [form.okWa && "whatsapp", form.okAds && "meta_ads"].filter(Boolean); // solo lo que marcó; no marcar no da de baja
+      const org = window.SettoOrigen && window.SettoOrigen.paraPedido(); // de dónde llegó (UTM, red, QR): queda en el pedido
+      if (org && API.registrarOrigen) API.registrarOrigen(o.code, ph, org).catch(() => {});
       if (canales.length && API.registrarConsentimiento) API.registrarConsentimiento(o.code, ph, canales, (window.SettoPrivacidad || {}).VERSION || "").catch(() => {});
       let track = o.track || null;
       if (!track) { try { const st = await API.orderStatus([o.code], ph); track = (st.find((x) => x.code === o.code) || {}).track || null; } catch (_) {} }

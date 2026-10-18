@@ -63,7 +63,7 @@
   async function loadBase() { const { settings, products } = await API.loadAll(); P.settings = settings; P.products = products; }
 
   /* =================== ESTRUCTURA =================== */
-  const VISTAS = ["pedidos", "club", "carta", "resenas", "gift", "ajustes"]; // también sirven como #hash (lo usan los avisos push)
+  const VISTAS = ["pedidos", "club", "campanas", "carta", "resenas", "gift", "ajustes"]; // también sirven como #hash (lo usan los avisos push)
   // #vista, #ajustes/seccion o #pedidos/estado/codigo (lo usa la caja para abrir un pedido)
   function leerHash() {
     const [v, a, b] = location.hash.slice(1).split("/").map((x) => decodeURIComponent(x || ""));
@@ -78,7 +78,7 @@
         <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.svg" alt="Setto"></a>
         <nav class="appsw" aria-label="Cambiar de app"><a href="panel.html" aria-current="page">Pedidos</a><a href="caja.html">Caja</a></nav>
         <nav class="ptabs" role="tablist">
-          ${[["pedidos", "Pedidos"], ["club", "Club"], ["carta", "Carta"], ["resenas", "Reseñas"], ["gift", "Gift cards"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : k === "resenas" ? ' <span class="n" id="resN" hidden>0</span>' : k === "gift" ? ' <span class="n" id="gcN" hidden>0</span>' : ""}</button>`).join("")}
+          ${[["pedidos", "Pedidos"], ["club", "Club"], ["campanas", "Campañas"], ["carta", "Carta"], ["resenas", "Reseñas"], ["gift", "Gift cards"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : k === "resenas" ? ' <span class="n" id="resN" hidden>0</span>' : k === "gift" ? ' <span class="n" id="gcN" hidden>0</span>' : ""}</button>`).join("")}
         </nav>
         <button class="avisos-btn" id="avisosBtn" aria-expanded="false" aria-controls="avisos" title="Avisos en este dispositivo"><span>🔔</span><i hidden></i></button>
         <span class="who">${esc(P.user && P.user.email || "")}<button id="logout">Salir</button></span>
@@ -90,7 +90,7 @@
     if (!sinCheck && P.view === "ajustes" && !ajSalir()) return;
     P.view = v; marcarHash();
     document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === v)));
-    ({ pedidos: viewPedidos, club: viewClub, carta: viewCarta, resenas: viewResenas, gift: viewGift, ajustes: viewAjustes })[v]();
+    ({ pedidos: viewPedidos, club: viewClub, campanas: viewCampanas, carta: viewCarta, resenas: viewResenas, gift: viewGift, ajustes: viewAjustes })[v]();
   }
 
   /* =================== PEDIDOS =================== */
@@ -255,7 +255,7 @@
         <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}${faltaAvisar(o) ? `<span class="falta-tag">💬 Falta avisar</span>` : ""}</div>
         ${env ? `<div class="dirbox"><b>${esc(o.direccion || "")}</b><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.direccion || "") + ", Mar del Plata")}" target="_blank" rel="noopener">Ver en Maps</a></div>` : ""}
         ${o.premio && o.status === "pendiente" ? `<div class="premiobox">Este pedido completa la tarjeta del Club. Premio elegido: <b>${esc(o.premio_txt || "a confirmar con el cliente")}</b>${/off/.test(o.premio_txt || "") ? " (ya descontado del total)" : ""}. Al tocar Entregado se canjea solo.</div>` : ""}
-        <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>Pago: <b>${esc(o.pago || "—")}</b></span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}</div>
+        <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>Pago: <b>${esc(o.pago || "—")}</b></span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}${o.last_touch_source ? `<span>Llegó por: <b>${esc(origenTxt(o.last_touch_source, o.last_touch_campaign))}</b></span>` : ""}</div>
         <div class="olines">${(o.items || []).map((i) => `<div><span>${i.qty}× ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""}${i.detalle ? `<small class="det">${esc(i.detalle)}</small>` : ""}</span><span class="num">${money(i.subtotal)}</span></div>`).join("")}</div>
         <div class="otot"><span>Total</span><span class="num">${money(o.total)}</span></div>
         ${cambioBox(o)}
@@ -308,6 +308,7 @@
     const box = $("#cResult"); if (!box) return;
     try {
       const r = await API.findCustomer(phone); P.client = r.phone;
+      let crm = null; try { crm = API.crmCliente ? await API.crmCliente(r.phone) : null; } catch (_) { crm = null; } // sin migración 031: no se muestra
       let cons = null; try { cons = API.consentimientos ? await API.consentimientos(r.phone) : null; } catch (_) { cons = null; } // sin migración 030: no se muestra
       const meta = (P.settings.club || {}).meta || 8, c = r.customer || { sellos: 0, canjes: 0 };
       const stamps = Array.from({ length: meta }, (_, i) => `<div class="stamp ${i < c.sellos ? "on" : ""} ${i === meta - 1 ? "gift" : ""}">${i < c.sellos ? '<img src="img/mochito-run.png" alt="">' : i === meta - 1 ? "★" : i + 1}</div>`).join("");
@@ -318,6 +319,7 @@
         <p><b class="num">${c.sellos}</b> de ${meta} sellos · ${c.canjes} canje(s)</p>
         <div class="acts"><button class="btn" data-cadd="1">+1 sello</button><button class="btn" data-cadd="-1">−1</button>
           <button class="btn solid" data-redeem ${c.sellos >= meta ? "" : "disabled style='opacity:.5'"}>Canjear premio</button></div>
+        ${crm ? crmHtml(crm) : ""}
         ${cons ? consentHtml(cons) : ""}
         <b style="margin-top:6px">Historial</b>
         <div class="hist">${(r.events || []).map((e) => `<div><span>${esc(e.motivo || "")} <span class="muted">${ago(e.created_at)}</span></span><span class="${e.delta > 0 ? "pos" : "neg"} num">${e.delta > 0 ? "+" : ""}${e.delta}</span></div>`).join("") || '<span class="muted">Sin movimientos.</span>'}</div>
@@ -326,6 +328,17 @@
     } catch (e) { box.innerHTML = `<p class="err" style="margin-top:14px">${esc(e.message)}</p>`; }
   }
 
+  const origenTxt = (src, camp) => [src, camp].filter(Boolean).join(" · ");
+  function crmHtml(c) {
+    const fecha = (d) => (d ? new Date(d).toLocaleDateString("es-AR", { day: "numeric", month: "short" }) : "—");
+    return `<b style="margin-top:6px">Resumen</b><div class="hist">
+      <div><span>Compras entregadas</span><span class="num">${c.compras || 0} · ${money(c.total_gastado || 0)}</span></div>
+      <div><span>Primera / última compra</span><span class="num">${fecha(c.primera_compra)} / ${fecha(c.ultima_compra)}</span></div>
+      ${(c.favoritos || []).length ? `<div><span>Lo que más pide</span><span>${c.favoritos.map((f) => `${esc(f.nombre || f.id)} ×${f.qty}`).join(", ")}</span></div>` : ""}
+      <div><span>Llegó por primera vez</span><span>${esc(origenTxt(c.first_touch_source, c.first_touch_campaign) || "sin dato")}</span></div>
+      ${c.last_touch_source ? `<div><span>Último origen</span><span>${esc(origenTxt(c.last_touch_source, c.last_touch_campaign))}</span></div>` : ""}
+    </div>`;
+  }
   // permisos de marketing: vale el último registro de cada canal. El equipo solo puede dar de baja, nunca autorizar.
   const CANALES = [["whatsapp", "Novedades por WhatsApp"], ["meta_ads", "Anuncios de Meta"]];
   const ORIGEN = { checkout_web: "al pedir en la web", preferencias_web: "desde la web", panel: "desde el panel", whatsapp: "por WhatsApp" };
@@ -334,6 +347,57 @@
       const u = l.find((x) => x.canal === k), si = u && u.estado === "otorgado";
       return `<div><span>${nom} · ${si ? "<b>Sí</b>" : u ? "Se dio de baja" : "No"} <span class="muted">${u ? `${ORIGEN[u.origen] || u.origen} · ${ago(u.created_at)}` : "nunca lo aceptó"}</span></span>${si ? `<button class="linkbtn" data-baja="${k}">Dar de baja</button>` : ""}</div>`;
     }).join("")}</div>`;
+  }
+
+  /* =================== CAMPAÑAS (WhatsApp y públicos de Meta) =================== */
+  const SEGS = [["nuevos", "Clientes nuevos", "1 compra: incentivo para la segunda"], ["recurrentes", "Recurrentes", "3 compras o más: acceso anticipado a sets"],
+    ["fans_mochis", "Fans de los mochis", "3+ mochis y más mochis que bebidas: lanzamientos de sabores"], ["bebidas", "Compran bebidas", "Novedades de matcha y lattes"],
+    ["inactivos", "Inactivos", "Sin compras hace más de 45 días: campaña de regreso"], ["todos", "Todos", "Cualquiera con permiso"]];
+  const segNom = (k) => (SEGS.find((x) => x[0] === k) || [k, k])[1];
+  const EST_C = { borrador: "pendiente", enviando: "pendiente", enviada: "entregado", error: "cancelado" };
+  async function viewCampanas() {
+    $("#view").innerHTML = `<h1 class="ph1">Campañas</h1>
+      <p class="muted">Solo le llega a quien aceptó en la web o escribió ALTA. Quien escribe BAJA sale solo de todo. Los mensajes usan plantillas aprobadas en WhatsApp Manager.</p>
+      <section class="sec"><h2>Segmentos</h2><div class="pcard"><div class="hist" id="segList"><span class="muted">Cargando…</span></div>
+        <div class="acts"><button class="btn" id="syncAud">Actualizar públicos de Meta</button></div><span class="hintp">Crea o actualiza un público "Setto · segmento" por cada uno, solo con quienes aceptaron anuncios.</span></div></section>
+      <section class="sec"><h2>Nueva campaña de WhatsApp</h2>
+        <form class="pcard" id="campForm">
+          <div class="row2"><label>Nombre (para vos)<input class="inp" name="nombre" required placeholder="Ej: Lanzamiento Lemon pie"></label>
+          <label>Segmento<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></label></div>
+          <div class="row2"><label>Plantilla aprobada (nombre exacto)<input class="inp" name="plantilla" required placeholder="lanzamiento_sabor"></label>
+          <label>Idioma de la plantilla<input class="inp" name="idioma" value="es_AR"></label></div>
+          <label>Variables del texto, una por línea, en orden ({nombre} = nombre del cliente)<textarea class="inp" name="variables" rows="3" placeholder="{nombre}&#10;Lemon pie"></textarea></label>
+          <button class="btn solid" type="submit">Guardar borrador</button></form></section>
+      <section class="sec"><h2>Campañas</h2><div class="pgrid" id="campList"><p class="muted">Cargando…</p></div></section>
+      <section class="sec"><h2>Respuestas y bajas por WhatsApp</h2><div class="pcard"><div class="hist" id="msgList"><span class="muted">Cargando…</span></div></div></section>
+      <section class="sec"><h2>Envíos a Meta</h2><div class="pcard"><div class="hist" id="syncList"><span class="muted">Cargando…</span></div></div></section>`;
+    $("#campForm").addEventListener("submit", async (e) => {
+      e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+      try { await API.createCampaign({ nombre: f.nombre.trim(), segmento: f.segmento, plantilla: f.plantilla.trim(), idioma: (f.idioma || "es_AR").trim(), variables: (f.variables || "").split("\n").map((x) => x.trim()).filter(Boolean) });
+        toast("Borrador guardado"); e.target.reset(); cargarCampanas(); } catch (err) { toast(err.message); }
+    });
+    cargarCampanas();
+  }
+  async function cargarCampanas() {
+    try {
+      const r = await API.segmentosResumen(); P.segs = r;
+      $("#segList").innerHTML = `<div><span class="muted">Segmento</span><span class="muted">WhatsApp · Anuncios</span></div>` + SEGS.map(([k, n, d]) => `<div><span><b>${n}</b> <span class="muted">${d}</span></span><span class="num">${(r[k] || {}).whatsapp || 0} · ${(r[k] || {}).meta_ads || 0}</span></div>`).join("");
+    } catch (e) { $("#segList").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+    try {
+      const l = await API.listCampaigns(); P.camps = l;
+      $("#campList").innerHTML = l.length ? l.map((c) => `<article class="pcard" data-camp="${esc(c.id)}">
+        <div class="ohead"><b>${esc(c.nombre)}</b><span class="ago">${ago(c.created_at)}</span><span class="st ${EST_C[c.estado] || "pendiente"}">${c.estado}</span></div>
+        <p class="hintp">${esc(segNom(c.segmento))} · plantilla <b>${esc(c.plantilla)}</b> (${esc(c.idioma)})${(c.variables || []).length ? " · " + c.variables.map(esc).join(" / ") : ""}</p>
+        ${c.estado === "borrador" ? `<div class="row2"><label>Probar con un número<input class="inp" data-prueba inputmode="tel" placeholder="223 347-1277"></label></div>
+          <div class="acts"><button class="btn" data-cprobar>Mandar prueba</button><button class="btn solid wa" data-cenviar>Mandar a ${(P.segs && P.segs[c.segmento] || {}).whatsapp || 0}</button></div>`
+          : `<p class="num">${c.enviados} enviados · ${c.fallidos} con error${c.enviada_at ? " · " + ago(c.enviada_at) : ""}</p>`}
+      </article>`).join("") : '<p class="muted">Todavía no hay campañas.</p>';
+    } catch (e) { $("#campList").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+    try {
+      const a = await API.crmActividad();
+      $("#msgList").innerHTML = a.mensajes.map((m) => `<div><span>${esc(pretty(m.phone))} · ${m.estado === "baja" ? "<b>Se dio de baja</b>" : m.estado === "alta" ? "<b>Se suscribió</b>" : esc(m.texto || "")} <span class="muted">${ago(m.created_at)}</span></span><button class="linkbtn" data-client-go="${esc(m.phone)}">Ver</button></div>`).join("") || '<span class="muted">Sin mensajes todavía.</span>';
+      $("#syncList").innerHTML = a.sync.map((x) => `<div><span>${x.tipo === "capi" ? "Compra " + esc(x.ref) : "Público " + esc(segNom(x.ref))} · ${x.estado === "ok" ? "ok" : x.estado === "omitido" ? "no se mandó" : "<b>error</b>"} <span class="muted">${esc(x.detalle || "")} · ${ago(x.created_at)}</span></span><span class="num">${x.registros || ""}</span></div>`).join("") || '<span class="muted">Sin envíos todavía.</span>';
+    } catch (e) { $("#msgList").innerHTML = $("#syncList").innerHTML = `<span class="muted">${esc(e.message)}</span>`; }
   }
 
   /* =================== CARTA =================== */
@@ -846,6 +910,16 @@
       }
     }
     if (b.dataset.cadd) { try { const r = await API.addStamps(P.client, "", +b.dataset.cadd, b.dataset.cadd > 0 ? "Manual" : "Corrección"); toast(`Ahora tiene ${r.sellos} sello(s)`); openClient(P.client); listClients(); } catch (err) { toast(err.message); } }
+    if (b.id === "syncAud") { b.disabled = true; toast("Actualizando públicos…"); try { const r = await API.syncAudiencias(); const t = Object.entries(r.segmentos || {}).map(([k, v]) => v.error ? `${segNom(k)}: error` : `${segNom(k)} +${v.sumados} −${v.sacados}`).join(" · "); toast(t || "Listo"); cargarCampanas(); } catch (err) { toast(err.message); } b.disabled = false; }
+    if (b.dataset.cprobar !== undefined || b.dataset.cenviar !== undefined) {
+      const card = b.closest("[data-camp]"), id = card.dataset.camp, c = (P.camps || []).find((x) => x.id === id);
+      const prueba = b.dataset.cprobar !== undefined ? card.querySelector("[data-prueba]").value.trim() : null;
+      if (prueba === "") { toast("Poné el número para la prueba"); return; }
+      if (!prueba && !confirm(`¿Mandar "${c.nombre}" a ${(P.segs && P.segs[c.segmento] || {}).whatsapp || 0} cliente(s) con permiso? No se puede deshacer.`)) return;
+      b.disabled = true;
+      try { const r = await API.sendCampaign(id, prueba); toast(prueba ? "Prueba enviada" : `Listo: ${r.enviados} enviados, ${r.fallidos} con error`); cargarCampanas(); } catch (err) { toast(err.message); b.disabled = false; }
+    }
+    if (b.dataset.clientGo) { P.client = b.dataset.clientGo; go("club"); }
     if (b.dataset.baja) { if (!confirm("¿Dar de baja este permiso? Las automatizaciones dejan de usar este número para eso.")) return; try { await API.bajaMarketing(P.client, b.dataset.baja); toast("Listo, quedó dado de baja"); openClient(P.client); } catch (err) { toast(err.message); } }
     if (b.dataset.redeem !== undefined) { try { await API.redeem(P.client); toast("Premio canjeado"); openClient(P.client); listClients(); } catch (err) { toast(err.message); } }
 
