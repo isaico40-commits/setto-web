@@ -313,15 +313,62 @@
     $("#view").innerHTML = `<h1 class="ph1">Carta</h1>
       <p class="muted">Cada tarjeta se guarda por separado con su botón <b>Guardar</b>. Los cambios se ven en la web al instante. Las tarjetas con borde rosa tienen cambios sin guardar.</p>
       ${CATS.map(([c, l]) => `<section class="sec"><h2>${l}</h2>
-        ${c === "especial" ? `<div class="pcard" id="espCfg" style="margin-bottom:16px"><div class="row2">
-            <label>Título de la sección<input data-esp="titulo" value="${esc(E.titulo || "")}" placeholder="Edición especial · Ej: Edición Halloween"></label>
-            <label>Estado<select data-esp="estado"><option value="proximamente" ${E.estado !== "disponible" ? "selected" : ""}>Próximamente (no se puede pedir)</option><option value="disponible" ${E.estado === "disponible" ? "selected" : ""}>Disponible ahora (se puede pedir)</option></select></label>
-            <label>Etiqueta de arriba<input data-esp="chip" value="${esc(E.chip || "")}" placeholder="Ej: Edición de noviembre · del 14 al 16"></label></div>
-            <label>Texto debajo del título<textarea data-esp="intro">${esc(E.intro || "")}</textarea></label>
-            <div class="savebar"><span class="hintp">Este bloque controla toda la sección.</span><button class="btn solid" data-saveesp>Guardar sección</button></div></div>` : ""}
+        ${c === "especial" ? espCfgHtml(E) : ""}
         <div class="pgrid">${byCat(c).map(cardP).join("")}</div>
         <button class="btn" data-addp="${c}" style="margin-top:14px">+ Agregar ${l === "Sets" ? "set" : l === "Mochis" ? "mochi" : l === "Dirty lattes" ? "dirty" : "sabor especial"}</button>
       </section>`).join("")}`;
+    loadDropInfo();
+  }
+  /* ---------- Drop de la edición especial: todo lo que se ve antes, durante y después del lanzamiento ---------- */
+  const aLocal = (iso) => { const d = new Date(iso || ""); if (isNaN(d)) return ""; const z = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`; };
+  const fechaTxt = (iso) => new Date(iso).toLocaleString("es-AR", { weekday: "long", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) + " hs";
+  const faltaTxt = (ms) => { const d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24, m = Math.floor(ms / 6e4) % 60; return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`; };
+  function dropStateTxt(E) {
+    const f = API.dropEstado(E), visibles = byCat("especial").filter((x) => x.activo !== false).length;
+    const sinProd = visibles ? "" : " · <b>Ojo:</b> no hay sabores especiales marcados como Visible, la sección no se ve";
+    if (E.modo !== "programado") return (f === "abierto" ? "🟢 Abierta a mano: se puede pedir" : "⏸ Próximamente (a mano): no se puede pedir") + sinProd;
+    if (!E.lanzamiento) return "⚠️ Falta la fecha de lanzamiento" + sinProd;
+    const ini = Date.parse(E.lanzamiento);
+    if (f === "antes") return `⏳ Programado: sale el ${fechaTxt(E.lanzamiento)} (faltan ${faltaTxt(ini - Date.now())})` + sinProd;
+    if (f === "abierto") return `🟢 Salió el ${fechaTxt(E.lanzamiento)}: se puede pedir${E.fin ? ` hasta el ${fechaTxt(E.fin)}` : ""}` + sinProd;
+    return `⏹ Terminó el ${fechaTxt(E.fin)}: ${E.al_terminar === "mostrar" ? "se muestra como terminado" : "la sección está oculta"}`;
+  }
+  function espCfgHtml(E) {
+    const prog = E.modo === "programado", modo = prog ? "programado" : E.estado === "disponible" ? "disponible" : "proximamente";
+    const t = (k, label, ph = "", max = 80) => `<label>${label}<input data-esp="${k}" value="${esc(E[k] || "")}" placeholder="${esc(ph)}" maxlength="${max}"></label>`;
+    const si = (k, label, def = true) => `<label><input type="checkbox" data-esp="${k}" ${(def ? E[k] !== false : !!E[k]) ? "checked" : ""}> ${label}</label>`;
+    return `<div class="pcard" id="espCfg" style="margin-bottom:16px">
+      <b>Lanzamiento de la edición especial</b>
+      <p class="dropst" id="dropState">${dropStateTxt(E)}</p>
+      <div class="row2">${t("titulo", "Nombre del drop (título de la sección)", "Ej: Mochis Premium · Noviembre")}
+        <label>¿Cómo se abre la venta?<select data-esp="modo">
+          <option value="programado" ${modo === "programado" ? "selected" : ""}>Drop programado: se abre sola en la fecha</option>
+          <option value="proximamente" ${modo === "proximamente" ? "selected" : ""}>A mano: próximamente (no se puede pedir)</option>
+          <option value="disponible" ${modo === "disponible" ? "selected" : ""}>A mano: disponible ahora</option></select></label></div>
+      <div class="dropprog" ${prog ? "" : "hidden"}>
+        <div class="row2"><label>Sale el (día y hora de Argentina)<input type="datetime-local" data-esp="lanzamiento" value="${aLocal(E.lanzamiento)}"></label>
+          <label>Termina el (opcional)<input type="datetime-local" data-esp="fin" value="${aLocal(E.fin)}"></label></div>
+        <label>Cuando termina<select data-esp="al_terminar"><option value="ocultar" ${E.al_terminar !== "mostrar" ? "selected" : ""}>Ocultar la sección</option><option value="mostrar" ${E.al_terminar === "mostrar" ? "selected" : ""}>Mostrarla como "terminó" (sin poder pedir) para invitar al próximo</option></select></label>
+        <b class="dsub">Antes del lanzamiento</b>
+        <div class="checks">${si("cuenta", "Cuenta regresiva")}${si("esmerilar", "Esmerilar todas las fotos")}${si("ocultar_nombres", "Ocultar nombres (\"Sabor sorpresa\")", false)}${si("ocultar_precios", "Ocultar precios", false)}${si("barra", "Barra con cuenta regresiva arriba de toda la web")}${si("calendario", "Botón Agendar en el calendario")}${si("avisame", "Botón Avisame (notificación)")}</div>
+        <span class="hintp">Al llegar la hora, la web destapa las fotos y habilita los pedidos sola, sin tocar nada. La barra de arriba muestra "¡Ya salió!" durante 48 hs.</span>
+        <b class="dsub">Notificación de lanzamiento</b>
+        <div class="row2">${t("push_titulo", "Título", "¡Salió " + (E.titulo || "la edición especial") + "!", 60)}${t("push_texto", "Texto", "Ya se puede pedir. Entrá antes de que se agote.", 140)}</div>
+        <div class="checks">${si("avisar_auto", "Mandarla sola a la hora del lanzamiento")}</div>
+        <div class="dropinfo" id="dropInfo"><span class="muted">Cargando avisos…</span></div>
+      </div>
+      <div class="row2">${t("chip", "Etiqueta de arriba (antes)", "Ej: Drop mensual · solo 3 días")}${t("chip_post", "Etiqueta de arriba (cuando sale)", "Ej: ¡Ya salió! Hasta agotar stock")}</div>
+      <label>Texto debajo del título (antes)<textarea data-esp="intro">${esc(E.intro || "")}</textarea></label>
+      <label>Texto debajo del título (cuando sale, opcional)<textarea data-esp="intro_post" placeholder="Si lo dejás vacío se usa el de arriba">${esc(E.intro_post || "")}</textarea></label>
+      <div class="savebar"><span class="hintp">Los sabores del drop son los de abajo marcados como Visible.</span><button class="btn solid" data-saveesp>Guardar lanzamiento</button></div></div>`;
+  }
+  async function loadDropInfo() {
+    const box = $("#dropInfo"); if (!box) return;
+    try {
+      const r = await API.dropAvisos();
+      box.innerHTML = `<span>🔔 <b>${r.suscriptos}</b> ${r.suscriptos === 1 ? "persona anotada" : "personas anotadas"} para los avisos${r.avisado ? ` · ya se avisó este lanzamiento (${new Date(r.avisado).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })})` : ""}</span>
+        <button class="btn" data-dropavisar ${r.suscriptos ? "" : "disabled"}>Mandar aviso ahora</button>`;
+    } catch (_) { box.innerHTML = `<span class="muted">Los avisos todavía no están activos en la base.</span>`; }
   }
   function setCalc(p) {
     const b = P.products.find((x) => x.id === p.set_bebida), m = P.products.find((x) => x.id === p.set_mochi);
@@ -638,8 +685,23 @@
 
     /* carta */
     if (b.dataset.saveesp !== undefined) {
-      const box = $("#espCfg"), v = (k) => box.querySelector(`[data-esp="${k}"]`).value;
-      try { await API.saveSetting("especial", { titulo: v("titulo").trim(), estado: v("estado"), chip: v("chip").trim(), intro: v("intro").trim() }); await loadBase(); toast("Sección guardada"); } catch (err) { toast(err.message); }
+      const box = $("#espCfg"), el = (k) => box.querySelector(`[data-esp="${k}"]`), v = (k) => el(k).value.trim(), on = (k) => el(k).checked;
+      const modo = v("modo"), prog = modo === "programado", iso = (k) => (v(k) ? new Date(v(k)).toISOString() : "");
+      const lan = iso("lanzamiento"), fin = iso("fin");
+      if (prog && !lan) return toast("Poné el día y la hora del lanzamiento");
+      if (prog && fin && fin <= lan) return toast("La fecha de fin tiene que ser después del lanzamiento");
+      const E = { titulo: v("titulo"), modo: prog ? "programado" : "manual", estado: modo === "disponible" ? "disponible" : "proximamente",
+        lanzamiento: lan, fin, al_terminar: v("al_terminar"),
+        cuenta: on("cuenta"), esmerilar: on("esmerilar"), ocultar_nombres: on("ocultar_nombres"), ocultar_precios: on("ocultar_precios"), barra: on("barra"), calendario: on("calendario"), avisame: on("avisame"),
+        avisar_auto: on("avisar_auto"), push_titulo: v("push_titulo"), push_texto: v("push_texto"),
+        chip: v("chip"), chip_post: v("chip_post"), intro: v("intro"), intro_post: v("intro_post") };
+      try { await API.saveSetting("especial", E); await loadBase(); toast(prog && API.dropEstado(E) === "antes" ? "Drop programado" : "Lanzamiento guardado"); $("#dropState").innerHTML = dropStateTxt(E); } catch (err) { toast(err.message); }
+    }
+    if (b.dataset.dropavisar !== undefined) {
+      if (!confirmar(b)) return;
+      b.disabled = true;
+      try { const n = await API.dropAvisar(); toast(`Aviso enviado a ${n} ${n === 1 ? "persona" : "personas"}`); } catch (err) { toast(err.message); }
+      loadDropInfo();
     }
     if (b.dataset.addp) {
       const c = b.dataset.addp, base = { especial: "esp", set: "set", dirty: "dirty", mochi: "mochi" }[c];
@@ -695,6 +757,7 @@
   document.addEventListener("change", async (e) => {
     const t = e.target;
     if (t.matches("[data-sltipo]")) { t.closest(".slrow2").dataset.tipo = t.value; return; }
+    if (t.matches('[data-esp="modo"]')) { t.closest("#espCfg").querySelector(".dropprog").hidden = t.value !== "programado"; return; }
     if (t.matches("[data-fsel]")) { const id = t.closest("[data-oid]").dataset.oid, F = P.falta[id], ix = +t.dataset.fsel, o = P.orders.find((x) => x.id === id);
       if (t.checked) F.sel[ix] = o.items[ix].qty; else delete F.sel[ix]; drawOrders(); return; }
     if (t.matches("[data-upimg]") && t.files && t.files[0]) {

@@ -1,4 +1,4 @@
-/* Service worker de Setto: solo para las notificaciones del pedido (no guarda nada en caché). */
+/* Service worker de Setto: solo para las notificaciones (pedido y drops). No guarda nada en caché. */
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
@@ -11,7 +11,7 @@ self.addEventListener("push", (e) => {
     badge: "/img/icon-192.png",
     tag: d.tag || "setto-pedido",
     renotify: true,
-    data: { url: d.track ? `/?seguir=${encodeURIComponent(d.track)}` : "/" },
+    data: { url: d.url || (d.track ? `/?seguir=${encodeURIComponent(d.track)}` : "/") },
   }));
 });
 
