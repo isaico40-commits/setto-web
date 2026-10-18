@@ -666,7 +666,7 @@
     btn.setAttribute("aria-expanded", String(AV.open)); btn.classList.toggle("on", AV.estado === "activo");
     btn.querySelector("i").hidden = !["apagado", "ios"].includes(AV.estado);
     box.hidden = !AV.open; if (!AV.open) return;
-    const qué = "pedido nuevo, gift card, cliente que responde un cambio y reseña para aprobar";
+    const qué = "pedido nuevo, gift card, cliente que responde un cambio, reseña para aprobar y tarea nueva en la caja";
     const x = `<button class="linkbtn" data-avx>Cerrar</button>`;
     const body = {
       cargando: `<p>Revisando los avisos…</p>`,

@@ -21,8 +21,9 @@ self.addEventListener("notificationclick", (e) => {
   e.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     const mismo = (c) => new URL(c.url).origin === self.location.origin;
-    const panel = url.includes("/panel"), esPanel = (c) => new URL(c.url).pathname.startsWith("/panel");
-    // un aviso del panel abre el panel (si ya está abierto, lo trae adelante); uno del cliente, el sitio
+    const equipo = (p) => /^\/(panel|caja)/.test(p);
+    const panel = equipo(new URL(url).pathname), esPanel = (c) => equipo(new URL(c.url).pathname);
+    // un aviso del equipo abre el panel o la caja (si ya hay una abierta, la reusa); uno del cliente, el sitio
     const w = wins.find((c) => mismo(c) && esPanel(c) === panel) || (!panel && wins.find(mismo));
     if (w) {
       await w.focus();
