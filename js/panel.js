@@ -47,9 +47,14 @@
       app.innerHTML = `<div class="loginwrap"><div class="loginbox"><h1 class="ph1">Usuario sin permiso</h1><p>Tu usuario existe pero no está habilitado como equipo de Setto. Pedile a Isa que lo agregue (ver README, paso 4).</p><button class="btn" id="logout">Salir</button></div></div>`;
       return;
     }
-    const h = location.hash.slice(1); if (VISTAS.includes(h)) P.view = h;
+    leerHash();
     await loadBase(); drawShell(); go(P.view); avisosInit();
-    window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (VISTAS.includes(v) && v !== P.view) go(v); });
+    window.addEventListener("hashchange", () => {
+      const v = P.view, a = P.ajSec, sucio = v === "ajustes" && ajSucio();
+      if (!leerHash()) return;
+      if (sucio && !confirm("Tenés cambios sin guardar. ¿Salir igual y perderlos?")) { P.view = v; P.ajSec = a; marcarHash(); return; }
+      go(P.view, true);
+    });
     API.listReviews().then((l) => { P.reviews = l; contarResenas(); }).catch(() => {});
     API.listGiftcards().then((l) => { P.gifts = l; contarGift(); }).catch(() => {});
     API.onOrders(() => { refreshOrders(true); });
@@ -59,20 +64,31 @@
 
   /* =================== ESTRUCTURA =================== */
   const VISTAS = ["pedidos", "club", "carta", "resenas", "gift", "ajustes"]; // también sirven como #hash (lo usan los avisos push)
+  // #vista, #ajustes/seccion o #pedidos/estado/codigo (lo usa la caja para abrir un pedido)
+  function leerHash() {
+    const [v, a, b] = location.hash.slice(1).split("/").map((x) => decodeURIComponent(x || ""));
+    if (!VISTAS.includes(v)) return false;
+    P.view = v;
+    if (v === "ajustes") P.ajSec = AJ_SEC.some((x) => x.k === a) ? a : null;
+    if (v === "pedidos" && ["pendiente", "entregado", "cancelado"].includes(a)) { P.sub = a; P.q = b || ""; }
+    return true;
+  }
   function drawShell() {
     app.innerHTML = `<header class="pbar"><div class="wrap">
-        <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.svg" alt="Setto"></a><span class="tag">Panel</span>
+        <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.svg" alt="Setto"></a>
+        <nav class="appsw" aria-label="Cambiar de app"><a href="panel.html" aria-current="page">Pedidos</a><a href="caja.html">Caja</a></nav>
         <nav class="ptabs" role="tablist">
           ${[["pedidos", "Pedidos"], ["club", "Club"], ["carta", "Carta"], ["resenas", "Reseñas"], ["gift", "Gift cards"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : k === "resenas" ? ' <span class="n" id="resN" hidden>0</span>' : k === "gift" ? ' <span class="n" id="gcN" hidden>0</span>' : ""}</button>`).join("")}
-          <a class="ptab" href="caja.html">Caja</a>
         </nav>
         <button class="avisos-btn" id="avisosBtn" aria-expanded="false" aria-controls="avisos" title="Avisos en este dispositivo"><span>🔔</span><i hidden></i></button>
         <span class="who">${esc(P.user && P.user.email || "")}<button id="logout">Salir</button></span>
       </div></header>
       <main class="pmain"><div class="wrap"><div class="avisos" id="avisos" hidden></div><div id="view"></div></div></main>`;
   }
-  function go(v) {
-    P.view = v;
+  function marcarHash() { history.replaceState(null, "", "#" + P.view + (P.view === "ajustes" && P.ajSec ? "/" + P.ajSec : "")); }
+  function go(v, sinCheck) {
+    if (!sinCheck && P.view === "ajustes" && !ajSalir()) return;
+    P.view = v; marcarHash();
     document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === v)));
     ({ pedidos: viewPedidos, club: viewClub, carta: viewCarta, resenas: viewResenas, gift: viewGift, ajustes: viewAjustes })[v]();
   }
@@ -219,7 +235,7 @@
   function drawJust() {
     const el = $("#justDel"); if (!el) return; const o = P.justDelivered;
     el.hidden = !o; if (!o) return;
-    el.innerHTML = `<div><b>Entregado ${esc(o.code)} · ${esc((o.nombre || "").split(" ")[0])}</b><span>Mandale el link para que deje su reseña y vea sus sellos.</span></div>
+    el.innerHTML = `<div><b>Entregado ${esc(o.code)} · ${esc((o.nombre || "").split(" ")[0])}</b><span>Mandale el link para que deje su reseña y vea sus sellos. El cobro y los mochis ya se cargaron en la <a class="tocaja" href="caja.html#movs">Caja</a>.</span></div>
       <a class="btn solid" target="_blank" rel="noopener" data-justgo href="https://wa.me/${esc(o.phone)}?text=${encodeURIComponent(resenaTxt(o))}">Pedir reseña por WhatsApp</a><button class="linkbtn" data-justx>Ahora no</button>`;
   }
   function drawOrders() {
@@ -248,7 +264,7 @@
             <label>Número del chat de WhatsApp<input class="inp" data-cphone value="${esc(c.phone)}" inputmode="tel"></label>
             <div class="acts"><span style="font-size:.85rem;font-weight:600">Sellos a sumar</span><span class="stepper"><button data-cn="-1" aria-label="Menos">−</button><span>${c.n}</span><button data-cn="1" aria-label="Más">+</button></span></div>
             <div class="acts"><button class="btn solid" data-deliver>Entregado ✓</button><button class="linkbtn warn" data-cancel>${P.cancelArm === o.id ? "¿Seguro? Tocá de nuevo para cancelar" : "Cancelar pedido"}</button></div>
-          </div>` : o.status === "entregado" ? `<p class="hintp">Entregado ${o.closed_at ? ago(o.closed_at) : ""} · ${o.sellos || 0} sello(s) sumado(s) a ${esc(pretty(o.phone))}</p>
+          </div>` : o.status === "entregado" ? `<p class="hintp">Entregado ${o.closed_at ? ago(o.closed_at) : ""} · ${o.sellos || 0} sello(s) sumado(s) a ${esc(pretty(o.phone))} · <a class="tocaja" href="caja.html#movs">Cobro en la Caja →</a></p>
             <a class="btn solid" style="margin-top:8px" target="_blank" rel="noopener" href="https://wa.me/${esc(o.phone)}?text=${encodeURIComponent(resenaTxt(o))}">Pedir reseña por WhatsApp</a>` : ""}
       </article>`;
     }).join("");
@@ -258,7 +274,7 @@
   function viewClub() {
     const club = P.settings.club || {};
     $("#view").innerHTML = `<h1 class="ph1">Setto Club</h1>
-      <p class="muted">Tarjeta de ${club.meta || 8} sellos · Premio: <b>${esc(club.premio || "a definir")}</b> · Cambialo en Ajustes.</p>
+      <p class="muted">Tarjeta de ${club.meta || 8} sellos · Premio: <b>${esc(club.premio || "a definir")}</b> · <a class="tocaja" href="#ajustes/club">Cambialo en Ajustes</a>.</p>
       <div class="pgrid" style="margin-top:18px">
         <form class="pcard" id="cSearch"><b>Buscar cliente</b>
           <label>Celular<input class="inp" id="csPhone" inputmode="tel" placeholder="223 347-1277"></label>
@@ -431,12 +447,10 @@
   }
 
   /* =================== AJUSTES =================== */
-  function viewAjustes() {
-    setTimeout(votResultados, 0);
+  function ajustesHTML() {
     const S = P.settings, r = S.retiro || { dias: [], rangos: [] }, club = S.club || {};
     const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-    $("#view").innerHTML = `<h1 class="ph1">Ajustes</h1>
-      <div class="pgrid" style="margin-top:18px">
+    return `<div>
         <form class="pcard" data-set="contacto"><b>Contacto</b>
           <label>WhatsApp de Setto (recibe los pedidos)<input class="inp" name="whatsapp" value="${esc(pretty(S.whatsapp))}" inputmode="tel"></label>
           <label>Instagram (sin @)<input class="inp" name="instagram" value="${esc(S.instagram || "")}"></label>
@@ -553,6 +567,7 @@
           <label>Mostrar "¡Últimos!" cuando queden (o menos)<input class="inp" name="umbral" type="number" min="1" max="50" value="${(S.stock_web || {}).umbral || 3}"></label>
           <div class="checks"><label><input type="checkbox" name="bloquear" ${(S.stock_web || {}).bloquear !== false ? "checked" : ""}> No dejar pedir más de lo que hay</label></div>
           <span class="hintp">Se toma el stock del Café, el que cargan en la Caja, menos lo que ya está pedido y pendiente. Los pedidos entregados lo descuentan solos.</span>
+          <a class="btn" href="caja.html#stock">Cargar stock en la Caja →</a>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="pagos"><b>Formas de pago</b>
           <label>Una por línea<textarea class="inp" name="pagos">${esc((S.pagos || []).join("\n"))}</textarea></label>
@@ -563,8 +578,65 @@
           <span class="hintp">Logo: usá el ícono oficial de cada app (cuadrado). Después tocá Guardar.</span>
           <span class="hintp">Dejá vacío el nombre para ocultar una fila.</span>
           <button class="btn solid">Guardar</button></form>
-        ${API.DEMO ? `<div class="pcard"><b>Modo demo</b><p class="hintp">Borra pedidos, clientes y cambios de prueba de este navegador.</p><button class="btn" id="resetDemo">Reiniciar demo</button></div>` : ""}
       </div>`;
+  }
+  /* Ajustes por secciones: una lista a la izquierda (en el celu, una pantalla con la lista) y la sección abierta
+     a la derecha, con una sola barra de Guardar que avisa cuando hay cambios sin guardar. */
+  const AJ_SEC = [
+    { k: "contacto", g: "Pedidos", t: "Contacto", d: "El WhatsApp que recibe los pedidos, Instagram y tu link de links.", s: (S) => pretty(S.whatsapp) || "Sin WhatsApp" },
+    { k: "retiro", g: "Pedidos", t: "Horarios de retiro", d: "Qué días y en qué franjas pueden elegir retirar.", s: (S) => { const r = S.retiro || {}; return (r.dias || []).length ? `${r.dias.length} días · ${(r.rangos || []).map((x) => x.join("–")).join(", ")}` : "Sin días"; } },
+    { k: "envio", g: "Pedidos", t: "Envío a domicilio", d: "Si ofrecés envío, cuánto cuesta y cómo se paga.", s: (S) => ((S.envio || {}).activo ? ((S.envio || {}).costo ? "Activo · " + money((S.envio || {}).costo) : "Activo · a coordinar") : "Apagado") },
+    { k: "pagos", g: "Pedidos", t: "Formas de pago", d: "Las opciones que ve el cliente al pedir.", s: (S) => `${(S.pagos || []).length} formas` },
+    { k: "personalizacion", g: "Pedidos", t: "Personalizar bebidas", d: "Leches con recargo y lo que se puede sacar.", s: (S) => ((S.personalizacion || {}).activo !== false ? `Activo · ${((S.personalizacion || {}).leches || []).length} leches` : "Apagado") },
+    { k: "stock_web", g: "Pedidos", t: "Stock en la web", d: "Cuántos mochis se ven disponibles y si se frena al llegar a 0.", s: (S) => ((S.stock_web || {}).activo !== false ? ((S.stock_web || {}).bloquear !== false ? "Visible · frena en 0" : "Visible · no frena") : "Oculto") },
+    { k: "mensajes", g: "Pedidos", t: "Mensajes de WhatsApp", d: "Los textos que se arman solos para el cliente y para ustedes.", s: (S) => { const n = Object.keys(S.mensajes || {}).length; return n ? `${n} cambiados` : "Los originales"; } },
+    { k: "club", g: "Clientes", t: "Setto Club", d: "Sellos, premio y pedido mínimo.", s: (S) => ((S.club || {}).activo !== false ? `${(S.club || {}).meta || 8} sellos` : "Apagado") },
+    { k: "giftcards", g: "Clientes", t: "Gift cards", d: "Montos y diseños de las tarjetas de regalo.", s: (S) => ((S.giftcards || {}).activo !== false ? "A la venta" : "Apagado") },
+    { k: "votacion", g: "Clientes", t: "Votación", d: "Una pregunta con opciones para que voten en la web.", s: (S) => ((S.votacion || {}).activo ? "Abierta" : "Apagada") },
+    { k: "hero", g: "Web", t: "Portada", d: "Las slides del inicio y sus botones.", s: (S) => `${((S.hero || {}).slides || []).length} slides` },
+    { k: "ventajas", g: "Web", t: "Pedir acá te conviene", d: "Los motivos para pedir por la web.", s: (S) => ((S.ventajas || {}).activo !== false ? `${((S.ventajas || {}).items || []).length} motivos` : "Oculto") },
+    { k: "faq", g: "Web", t: "Preguntas frecuentes", d: "Las preguntas del final de la web.", s: (S) => `${(((S.faq || {}).items) || FAQ_DEF).length} preguntas` },
+    { k: "apps", g: "Web", t: "Apps de delivery", d: "Links y logos de PedidosYa, Rappi y Uber Eats.", s: (S) => `${(S.apps || []).length} apps` },
+    { k: "ubicacion", g: "Web", t: "Ubicación", d: "El mapa público de la web.", s: (S) => ((S.ubicacion || {}).activo ? "Visible" : "Oculto") },
+    { k: "stickers", g: "Web", t: "Stickers de WhatsApp", d: "El link al pack de Mochito.", s: (S) => ((S.stickers || {}).activo ? "Visibles" : "Ocultos") },
+    { k: "tema", g: "Web", t: "Decoración de temporada", d: "Colores y aviso especial, por ejemplo Halloween.", s: (S) => ((S.tema || {}).nombre ? (S.tema || {}).nombre : "Ninguna") },
+  ];
+  const ajKey = (form) => JSON.stringify([...new FormData(form).entries()].filter(([, v]) => typeof v === "string")) + (form.dataset.newid || "");
+  const ajForm = () => $(".ajbody form[data-set]");
+  const ajSucio = () => { const f = ajForm(); return !!f && f.dataset.orig !== ajKey(f); };
+  function ajSalir() { return !ajSucio() || confirm("Tenés cambios sin guardar. ¿Salir igual y perderlos?"); }
+  function ajCheck() {
+    const f = ajForm(); if (!f) return;
+    const sucio = ajSucio(), bar = f.querySelector(".ajbar");
+    if (!bar || bar.classList.contains("dirty") === sucio) return;
+    bar.classList.toggle("dirty", sucio);
+    bar.querySelector(".ajst").textContent = sucio ? "Tenés cambios sin guardar" : "Todo guardado";
+    bar.querySelector("[data-ajundo]").hidden = !sucio;
+  }
+  function viewAjustes() {
+    const S = P.settings, sec = AJ_SEC.find((x) => x.k === P.ajSec), desk = matchMedia("(min-width:861px)").matches;
+    const cur = sec || (desk ? AJ_SEC[0] : null);
+    const grupos = [...new Set(AJ_SEC.map((x) => x.g))];
+    $("#view").innerHTML = `<div class="aj ${cur && sec ? "abierta" : ""}">
+      <aside class="ajnav">
+        <h1 class="ph1">Ajustes</h1>
+        <input class="inp ajq" type="search" placeholder="Buscar ajuste…" aria-label="Buscar ajuste">
+        ${grupos.map((g) => `<div class="ajg"><small>${g}</small>${AJ_SEC.filter((x) => x.g === g).map((x) => `<a href="#ajustes/${x.k}" class="ajit" data-q="${esc((x.t + " " + x.d).toLowerCase())}" ${cur && cur.k === x.k ? 'aria-current="page"' : ""}><b>${esc(x.t)}</b><span>${esc(x.s(S))}</span></a>`).join("")}</div>`).join("")}
+        ${API.DEMO ? `<div class="ajg"><small>Demo</small><button class="btn" id="resetDemo">Reiniciar demo</button></div>` : ""}
+      </aside>
+      <section class="ajbody">${cur ? "" : ""}</section></div>`;
+    if (!cur) return;
+    const tpl = document.createElement("template"); tpl.innerHTML = ajustesHTML();
+    const form = tpl.content.querySelector(`form[data-set="${cur.k}"]`);
+    form.className = "pcard ajform";
+    form.querySelector(":scope > b").remove();
+    [...form.querySelectorAll(":scope button.btn.solid:not([type=button])")].forEach((b) => b.remove());
+    const acts = form.querySelector(":scope > .acts"); if (acts && !acts.children.length) acts.remove();
+    form.insertAdjacentHTML("afterbegin", `<header class="ajhead"><a href="#ajustes" class="ajback">← Ajustes</a><h2>${esc(cur.t)}</h2><p class="hintp">${esc(cur.d)}</p></header>`);
+    form.insertAdjacentHTML("beforeend", `<div class="ajbar"><span class="ajst">Todo guardado</span><button type="button" class="linkbtn" data-ajundo hidden>Descartar</button><button class="btn solid">Guardar</button></div>`);
+    $(".ajbody").append(form);
+    form.dataset.orig = ajKey(form);
+    if (cur.k === "votacion") setTimeout(votResultados, 0);
   }
   async function votResultados() {
     const v = P.settings.votacion || {}, el = $("#votRes"); if (!el || !v.id) return;
@@ -635,6 +707,7 @@
       if (k === "pagos") await API.saveSetting("pagos", (f.pagos || "").split("\n").map((s) => s.trim()).filter(Boolean));
       if (k === "apps") await API.saveSetting("apps", [0, 1, 2, 3].map((i) => ({ nombre: (f["an" + i] || "").trim(), url: (f["au" + i] || "").trim(), logo: (f["al" + i] || "").trim() })).filter((a) => a.nombre));
       await loadBase(); toast("Guardado"); viewAjustes();
+      const ok = $(".ajbar .ajst"); if (ok) { ok.textContent = "✓ Guardado"; }
     } catch (e) { toast(e.message); }
   }
 
@@ -876,7 +949,27 @@
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-votnew]"); if (!b) return; if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = "¿Seguro? Tocá de nuevo y después Guardar"; return; } const f = b.closest("form"); f.dataset.newid = "v" + Date.now().toString(36); [0, 1, 2, 3, 4, 5].forEach((i) => (f.querySelector(`[name=oid${i}]`).value = "")); b.textContent = "Lista: tocá Guardar"; });
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-msgreset]"); if (!b) return; const ta = b.closest("form").querySelector(`[name=m_${b.dataset.msgreset}]`); ta.value = window.SettoMSG.MSG[b.dataset.msgreset].texto; toast("Restaurado · tocá Guardar mensajes"); });
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-gix]"); if (!b) return; const r = b.closest(".slrow"); r.querySelector(`[name=gi${b.dataset.gix}]`).value = ""; r.querySelector(".upprev").textContent = "Sin imagen · tocá Guardar"; b.remove(); });
-  document.addEventListener("submit", (e) => { if (e.target.matches("form[data-set]")) { e.preventDefault(); saveAjuste(e.target); } });
+  document.addEventListener("submit", (e) => { if (e.target.matches("form[data-set]")) { e.preventDefault(); const b = e.target.querySelector(".ajbar .btn"); if (b) { b.disabled = true; b.textContent = "Guardando…"; } saveAjuste(e.target).finally(() => { const b2 = e.target.querySelector(".ajbar .btn"); if (b2) { b2.disabled = false; b2.textContent = "Guardar"; } }); } });
+  // cambios sin guardar en Ajustes: se revisan al tocar algo y cada tanto (las fotos subidas cambian campos ocultos)
+  ["input", "change", "click"].forEach((ev) => document.addEventListener(ev, () => setTimeout(ajCheck, 0)));
+  setInterval(ajCheck, 1000);
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-ajundo]")) viewAjustes(); });
+  // links a una sección de Ajustes (lista, volver, "Cambialo en Ajustes")
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href^="#ajustes"]'); if (!a) return;
+    e.preventDefault();
+    const k = a.getAttribute("href").split("/")[1] || null;
+    if (P.view === "ajustes" && P.ajSec === k) return;
+    if (!ajSalir()) return;
+    P.ajSec = k; go("ajustes", true); window.scrollTo(0, 0);
+  });
+  document.addEventListener("input", (e) => {
+    if (!e.target.matches(".ajq")) return;
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll(".ajit").forEach((a) => (a.hidden = !!q && !a.dataset.q.includes(q)));
+    document.querySelectorAll(".ajg").forEach((g) => (g.hidden = !!q && !g.querySelector(".ajit:not([hidden])")));
+  });
+  window.addEventListener("beforeunload", (e) => { if (P.view === "ajustes" && ajSucio()) { e.preventDefault(); e.returnValue = ""; } });
 
   /* =================== ARRANQUE =================== */
   (async () => {
