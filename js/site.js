@@ -294,6 +294,12 @@
     $("#ubiLink").href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
   }
 
+  // dónde se retira: sale de Panel → Ajustes → Ubicación; si el mapa está apagado no se muestra nada
+  function retiroDondeHtml() {
+    const u = S.ubicacion || {}, q = (u.mapa || "").trim(); if (!(u.activo && q)) return "";
+    return `<div class="ret-donde"><span aria-hidden="true">📍</span><div><b>Dónde retirás</b><p>${esc(u.texto || q)}</p><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}" target="_blank" rel="noopener">Ver en Google Maps</a></div></div>`;
+  }
+
   /* ---------- Stickers para WhatsApp (Panel → Ajustes → Stickers). El pack vive en Sticker.ly:
      WhatsApp no deja instalar packs desde una web, solo desde una app. ---------- */
   const STK_DEF = ["01_fantasma", "02_calabaza", "03_diablito", "04_bruja", "05_latte", "06_gatito", "07_momia", "08_durmiendo", "09_fantasmita"].map((n) => `img/stickers/halloween/${n}.webp`);
@@ -768,7 +774,7 @@
     }).join("")}</div></div>`;
     const sinSt = sinStock(p) && !(k === "premium" && !espOpen());
     const blocked = p.agotado || sinSt || (k === "premium" && (!espOpen() || !(Number(bebida(p) ? p.precios[sz || "12 oz"] : p.precio) > 0)));
-    $("#sheet").innerHTML = `<div class="sph ${tapado(p) ? "frost" : ""}"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
+    $("#sheet").innerHTML = `<div class="sph"><img src="${esc(tapado(p) ? "img/mochito-lie.png" : p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
       <div class="sb">
         ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
         <h3 id="sTitle">${esc(nameOf(p))}</h3>
@@ -898,6 +904,7 @@
           <button data-modo="retiro" role="radio" aria-checked="${!isEnv}"><b>Retiro</b><small>Pasás a buscarlo</small></button>
           <button data-modo="envio" role="radio" aria-checked="${isEnv}"><b>Envío a domicilio</b><small>${costo > 0 ? "Costo " + money(costo) : "Costo a coordinar"}</small></button>
         </div>` : ""}
+        ${isEnv ? "" : retiroDondeHtml()}
         ${isEnv ? `<label class="f" for="fDir">Dirección exacta<input id="fDir" autocomplete="street-address" value="${esc(form.dir)}" placeholder="Calle y número"><span class="hintf">${esc((S.envio || {}).aviso || "")}</span></label>
           <label class="f" for="fDir2">Piso, depto o referencia (opcional)<input id="fDir2" value="${esc(form.dirExtra)}" placeholder="Ej: 3° B, timbre 2, entre Colón y Moreno"></label>` : ""}
         <label class="f" for="fNombre">Nombre<input id="fNombre" autocomplete="given-name" value="${esc(form.nombre)}" placeholder="Cómo te llamamos"></label>
