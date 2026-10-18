@@ -79,19 +79,7 @@ details.test summary{cursor:pointer}
 .chip{border:2px solid var(--turquesa);background:var(--card);border-radius:999px;padding:4px 11px;font-size:.78rem;font-weight:600;color:var(--ink)}
 .chip[aria-pressed="true"]{background:var(--turquesa);color:var(--card)}
 
-/* ---------- cupón ---------- */
-.velo{position:fixed;inset:0;z-index:20;background:rgba(31,28,24,.45);display:grid;place-items:center;
-  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
-.cupon{width:min(360px,100%);background:var(--card);border-radius:26px;border:3px solid var(--turquesa);box-shadow:var(--sombra);padding:22px;display:grid;gap:12px;justify-items:center;text-align:center;animation:pop .45s cubic-bezier(.2,1.4,.4,1)}
-@keyframes pop{from{transform:scale(.7) rotate(-4deg);opacity:0}to{transform:none;opacity:1}}
-.cupon img{width:96px}
-.cupon h2{font-size:1.8rem;color:var(--turquesa)}
-.codigo{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;border:2px dashed var(--coral);border-radius:14px;padding:9px 12px;font-weight:700;letter-spacing:.08em}
-.copiar{border:0;background:var(--coral-2);border-radius:999px;padding:5px 12px;font-size:.8rem;font-weight:600;letter-spacing:0}
-.cupon small{color:var(--ink-2)}
-.btn{border:var(--line);background:var(--card);border-radius:999px;box-shadow:3px 3px 0 var(--turquesa);padding:9px 22px;font-weight:600}
 canvas#confeti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30}
-@media (prefers-reduced-motion:reduce){.cupon{animation:none}}
 .aviso-prueba{max-width:560px;margin:0 auto 14px;background:var(--coral-2);border-radius:999px;padding:6px 14px;text-align:center;font-size:.8rem;font-weight:600}
 body{margin:0}
 </style>
@@ -132,15 +120,6 @@ body{margin:0}
   </details>
 </div>
 
-<div class="velo" id="velo" hidden>
-  <div class="cupon" role="dialog" aria-modal="true" aria-labelledby="cTit">
-    <img src="img/mochito-cup.png" alt="">
-    <h2 id="cTit"></h2>
-    <div class="codigo"><span id="cCod"></span><button class="copiar" id="copiar" type="button">Copiar</button></div>
-    <small id="cNota"></small>
-    <button class="btn" id="cerrar" type="button">Listo</button>
-  </div>
-</div>
 <canvas id="confeti" aria-hidden="true"></canvas>
 
 <script>
@@ -226,28 +205,11 @@ body{margin:0}
     if (!p) { $("#msg").textContent = "¡Casi! Volvé mañana"; pintarFichas(); return; }
     const top = SIMBOLOS.find((s) => fin.filter((x) => x === s).length >= 4);
     reels.forEach((r, i) => { if (fin[i] === top) r.classList.add("win"); });
-    $("#msg").innerHTML = `<span><b>¡${p.titulo}!</b></span>`;
+    $("#msg").innerHTML = `<span><b>¡${p.titulo}!</b>Premio de prueba</span>`;
     fanfarria(res === "gift"); confeti(res === "gift" ? 220 : res === "mochi" ? 140 : 70);
-    setTimeout(() => cupon(p), reduce ? 200 : 700);
     pintarFichas();
   }
 
-  /* ---------- cupón ---------- */
-  function cupon(p) {
-    $("#cTit").textContent = p.titulo;
-    $("#cCod").textContent = p.id.toUpperCase().replace("OFF", "OFF10") + "-" + Math.random().toString(36).slice(2, 6).toUpperCase();
-    $("#cNota").textContent = "Usalo en tu próximo pedido · vence el " + new Date(Date.now() + 7 * 864e5).toLocaleDateString("es-AR", { day: "numeric", month: "numeric" });
-    $("#velo").hidden = false; $("#cerrar").focus();
-  }
-  const cerrar = () => { $("#velo").hidden = true; };
-  $("#cerrar").addEventListener("click", cerrar);
-  $("#velo").addEventListener("click", (e) => { if (e.target.id === "velo") cerrar(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") cerrar(); });
-  $("#copiar").addEventListener("click", async () => {
-    try { await navigator.clipboard.writeText($("#cCod").textContent); $("#copiar").textContent = "Copiado"; }
-    catch (_) { const r = document.createRange(); r.selectNodeContents($("#cCod")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $("#copiar").textContent = "Seleccionado"; }
-    setTimeout(() => ($("#copiar").textContent = "Copiar"), 1600);
-  });
   $("#tirar").addEventListener("click", girar);
 
   /* ---------- luces ---------- */
