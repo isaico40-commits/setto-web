@@ -47,7 +47,9 @@
       app.innerHTML = `<div class="loginwrap"><div class="loginbox"><h1 class="ph1">Usuario sin permiso</h1><p>Tu usuario existe pero no está habilitado como equipo de Setto. Pedile a Isa que lo agregue (ver README, paso 4).</p><button class="btn" id="logout">Salir</button></div></div>`;
       return;
     }
-    await loadBase(); drawShell(); go(P.view);
+    const h = location.hash.slice(1); if (VISTAS.includes(h)) P.view = h;
+    await loadBase(); drawShell(); go(P.view); avisosInit();
+    window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (VISTAS.includes(v) && v !== P.view) go(v); });
     API.listReviews().then((l) => { P.reviews = l; contarResenas(); }).catch(() => {});
     API.listGiftcards().then((l) => { P.gifts = l; contarGift(); }).catch(() => {});
     API.onOrders(() => { refreshOrders(true); });
@@ -56,6 +58,7 @@
   async function loadBase() { const { settings, products } = await API.loadAll(); P.settings = settings; P.products = products; }
 
   /* =================== ESTRUCTURA =================== */
+  const VISTAS = ["pedidos", "club", "carta", "resenas", "gift", "ajustes"]; // también sirven como #hash (lo usan los avisos push)
   function drawShell() {
     app.innerHTML = `<header class="pbar"><div class="wrap">
         <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.svg" alt="Setto"></a><span class="tag">Panel</span>
@@ -63,9 +66,10 @@
           ${[["pedidos", "Pedidos"], ["club", "Club"], ["carta", "Carta"], ["resenas", "Reseñas"], ["gift", "Gift cards"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : k === "resenas" ? ' <span class="n" id="resN" hidden>0</span>' : k === "gift" ? ' <span class="n" id="gcN" hidden>0</span>' : ""}</button>`).join("")}
           <a class="ptab" href="caja.html">Caja</a>
         </nav>
+        <button class="avisos-btn" id="avisosBtn" aria-expanded="false" aria-controls="avisos" title="Avisos en este dispositivo"><span>🔔</span><i hidden></i></button>
         <span class="who">${esc(P.user && P.user.email || "")}<button id="logout">Salir</button></span>
       </div></header>
-      <main class="pmain"><div class="wrap" id="view"></div></main>`;
+      <main class="pmain"><div class="wrap"><div class="avisos" id="avisos" hidden></div><div id="view"></div></div></main>`;
   }
   function go(v) {
     P.view = v;
@@ -633,6 +637,82 @@
       await loadBase(); toast("Guardado"); viewAjustes();
     } catch (e) { toast(e.message); }
   }
+
+  /* =================== AVISOS PUSH AL EQUIPO =================== */
+  // Este dispositivo recibe una notificación cuando entra un pedido, una gift card, un cambio resuelto o una reseña (migración 027).
+  const AV = { open: false, estado: "cargando", busy: false };
+  const AVX = "setto-avisos-equipo-visto";
+  const vapidKey = (window.SETTO_CONFIG || {}).vapidPublicKey;
+  const avSoporte = () => !!vapidKey && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  const esIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const instalada = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const claveVapid = (k) => { const b = atob((k + "=".repeat((4 - (k.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(b, (c) => c.charCodeAt(0)); };
+  const avSub = async () => { const reg = await navigator.serviceWorker.getRegistration("/sw.js"); return reg ? reg.pushManager.getSubscription() : null; };
+  async function avEstado() {
+    if (API.DEMO) return "demo";
+    if (!avSoporte()) return esIOS && !instalada ? "ios" : "nosoporta";
+    if (Notification.permission === "denied") return "bloqueado";
+    if (Notification.permission !== "granted") return "apagado";
+    try { const sub = await avSub(); return sub && (await API.equipoPushActivo(sub.endpoint)) ? "activo" : "apagado"; } catch (_) { return "apagado"; }
+  }
+  async function avisosInit() {
+    AV.estado = await avEstado();
+    let visto = false; try { visto = !!localStorage.getItem(AVX); } catch (_) {}
+    if (AV.estado === "apagado" && !visto) AV.open = true; // la primera vez se muestra solo, después queda en la campanita
+    drawAvisos();
+  }
+  function drawAvisos() {
+    const box = $("#avisos"), btn = $("#avisosBtn"); if (!box || !btn) return;
+    btn.setAttribute("aria-expanded", String(AV.open)); btn.classList.toggle("on", AV.estado === "activo");
+    btn.querySelector("i").hidden = !["apagado", "ios"].includes(AV.estado);
+    box.hidden = !AV.open; if (!AV.open) return;
+    const qué = "pedido nuevo, gift card, cliente que responde un cambio y reseña para aprobar";
+    const x = `<button class="linkbtn" data-avx>Cerrar</button>`;
+    const body = {
+      cargando: `<p>Revisando los avisos…</p>`,
+      demo: `<p>En modo demo no hay avisos.</p>${x}`,
+      nosoporta: `<p><b>Este navegador no recibe notificaciones.</b> Probá desde Chrome en Android o en la compu.</p>${x}`,
+      ios: `<p><b>En iPhone los avisos llegan solo con el panel en tu pantalla de inicio</b> (iOS 16.4 o más).</p>
+        <ol><li>Tocá <b>Compartir</b> en Safari.</li><li>Elegí <b>Agregar a inicio</b>.</li><li>Abrí el panel desde ese ícono y activá los avisos acá.</li></ol>${x}`,
+      bloqueado: `<p><b>Las notificaciones del panel están bloqueadas</b> en este navegador. Si las querés, activalas en los ajustes del sitio y volvé a entrar.</p>${x}`,
+      apagado: `<p><b>Avisos en este dispositivo</b><br>Te llega una notificación con cada ${qué}, aunque tengas el panel cerrado.</p>
+        ${esIOS ? `<span class="hintp">En iPhone funciona solo con el panel agregado a inicio (iOS 16.4 o más).</span>` : ""}
+        <div class="acts"><button class="btn solid" data-avon ${AV.busy ? "disabled" : ""}>${AV.busy ? "Activando…" : "Activar avisos"}</button>${x}</div>`,
+      activo: `<p><b>✓ Este dispositivo recibe avisos</b><br>Con cada ${qué}.</p>
+        <div class="acts"><button class="btn" data-avtest>Probar</button><button class="linkbtn" data-avoff ${AV.busy ? "disabled" : ""}>Apagar en este dispositivo</button>${x}</div>`,
+    }[AV.estado];
+    box.innerHTML = body;
+  }
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("#avisosBtn,[data-avx],[data-avon],[data-avoff],[data-avtest]"); if (!b) return;
+    if (b.id === "avisosBtn" || b.dataset.avx !== undefined) {
+      AV.open = b.id === "avisosBtn" ? !AV.open : false;
+      if (!AV.open) { try { localStorage.setItem(AVX, "1"); } catch (_) {} }
+      if (AV.open && AV.estado !== "activo") AV.estado = await avEstado();
+      return drawAvisos();
+    }
+    if (b.dataset.avtest !== undefined) {
+      try { const reg = await navigator.serviceWorker.ready; await reg.showNotification("🛎️ Prueba de Setto", { body: "Así te van a llegar los avisos del panel.", icon: "/img/icon-192.png", badge: "/img/icon-192.png", tag: "setto-prueba", data: { url: "/panel" } }); }
+      catch (err) { toast("No se pudo mostrar la prueba"); }
+      return;
+    }
+    AV.busy = true; drawAvisos();
+    try {
+      if (b.dataset.avon !== undefined) {
+        const perm = await Notification.requestPermission();
+        if (perm !== "granted") { AV.estado = perm === "denied" ? "bloqueado" : "apagado"; return; }
+        const reg = await navigator.serviceWorker.register("/sw.js"); await navigator.serviceWorker.ready;
+        const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: claveVapid(vapidKey) }));
+        await API.equipoPushSuscribir(sub);
+        AV.estado = "activo"; toast("Listo: este dispositivo recibe avisos");
+      } else {
+        const sub = await avSub();
+        if (sub) await API.equipoPushDesuscribir(sub.endpoint); // la suscripción del navegador queda: la puede usar el seguimiento o los drops
+        AV.estado = "apagado"; toast("Avisos apagados en este dispositivo");
+      }
+    } catch (err) { toast(err.message || "No se pudieron cambiar los avisos"); }
+    finally { AV.busy = false; drawAvisos(); }
+  });
 
   /* =================== EVENTOS =================== */
   document.addEventListener("click", async (e) => {

@@ -1,6 +1,7 @@
 // Edge Function · push-pedido
 // La llama el trigger orders_push (migración 025) cuando un pedido cambia: busca las suscripciones del pedido y manda la notificación.
-// Con tipo "drop" (migración 026) avisa el lanzamiento de la edición especial a todos los anotados en drop_subs. Sin JWT: se valida con x-setto-hook.
+// Con tipo "drop" (migración 026) avisa el lanzamiento de la edición especial a todos los anotados en drop_subs.
+// Con tipo "equipo" (migración 027) avisa al equipo en el panel: pedido nuevo, gift card, cambio resuelto o reseña. Sin JWT: se valida con x-setto-hook.
 // Las claves (hook y VAPID) se leen de Vault con push_config(); SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY ya vienen.
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -63,13 +64,37 @@ async function avisarDrop() {
   return Response.json({ enviadas: ok, de: subs?.length ?? 0 });
 }
 
+const plata = (n: number) => "$" + Number(n || 0).toLocaleString("es-AR");
+
+// aviso para el panel: arma el texto según el evento y lo manda a todos los navegadores del equipo
+async function avisarEquipo(evento: string, id: string) {
+  let n: { title: string; body: string; url: string; tag: string } | null = null;
+  if (evento === "pedido" || evento === "cambio") {
+    const { data: o } = await sb.from("orders").select("code,nombre,total,modo,retiro,cambio").eq("id", id).maybeSingle();
+    if (o && evento === "pedido") n = { title: `🛎️ Pedido nuevo · ${o.code}`, body: `${o.nombre} · ${plata(o.total)} · ${o.modo === "envio" ? "envío" : "retira"}${o.retiro ? " " + o.retiro : ""}`, url: "/panel", tag: `pedido-${o.code}` };
+    if (o && evento === "cambio") n = { title: `🔁 ${o.code}: el cliente respondió`, body: o.cambio?.resolucion === "cancelado" ? `${o.nombre} canceló el pedido.` : `${o.nombre} eligió el reemplazo. Revisá el pedido.`, url: "/panel", tag: `cambio-${o.code}` };
+  } else if (evento === "gift") {
+    const { data: g } = await sb.from("giftcards").select("code,monto,de,para").eq("id", id).maybeSingle();
+    if (g) n = { title: `🎁 Gift card nueva · ${plata(g.monto)}`, body: `${g.de || "Alguien"} para ${g.para || "alguien"}. Falta confirmar el pago y activarla.`, url: "/panel#gift", tag: `gift-${g.code}` };
+  } else if (evento === "resena") {
+    const { data: r } = await sb.from("reviews").select("nombre,rating").eq("id", id).maybeSingle();
+    if (r) n = { title: `⭐ Reseña para aprobar`, body: `${r.nombre} dejó ${r.rating} ${r.rating === 1 ? "estrella" : "estrellas"}.`, url: "/panel#resenas", tag: `resena-${id}` };
+  }
+  if (!n) return new Response("sin aviso", { status: 200 });
+  const { data: subs } = await sb.from("staff_push_subs").select("endpoint,p256dh,auth");
+  const { ok, muertas } = await enviar(subs ?? [], JSON.stringify(n), 24 * 3600);
+  if (muertas.length) await sb.from("staff_push_subs").delete().in("endpoint", muertas);
+  return Response.json({ enviadas: ok, de: subs?.length ?? 0 });
+}
+
 Deno.serve(async (req) => {
   const c = await config();
   if (req.method !== "POST" || req.headers.get("x-setto-hook") !== c.push_hook_secret) {
     return new Response("no", { status: 401 });
   }
-  const { order_id, tipo } = await req.json().catch(() => ({}));
+  const { order_id, tipo, evento, id } = await req.json().catch(() => ({}));
   if (tipo === "drop") return avisarDrop();
+  if (tipo === "equipo") return avisarEquipo(evento, id);
   const { data: o } = await sb.from("orders").select("id,code,track,modo,status").eq("id", order_id).maybeSingle<Order>();
   const body = o && mensaje(tipo, o);
   if (!o || !body) return new Response("sin aviso", { status: 200 });
