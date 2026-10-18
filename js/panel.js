@@ -255,7 +255,7 @@
         <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}${faltaAvisar(o) ? `<span class="falta-tag">💬 Falta avisar</span>` : ""}</div>
         ${env ? `<div class="dirbox"><b>${esc(o.direccion || "")}</b><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.direccion || "") + ", Mar del Plata")}" target="_blank" rel="noopener">Ver en Maps</a></div>` : ""}
         ${o.premio && o.status === "pendiente" ? `<div class="premiobox">Este pedido completa la tarjeta del Club. Premio elegido: <b>${esc(o.premio_txt || "a confirmar con el cliente")}</b>${/off/.test(o.premio_txt || "") ? " (ya descontado del total)" : ""}. Al tocar Entregado se canjea solo.</div>` : ""}
-        <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>Pago: <b>${esc(o.pago || "—")}</b></span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}</div>
+        <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>Pago: <b>${esc(o.pago || "—")}</b></span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}${o.last_touch_source ? `<span>Llegó por: <b>${esc(origenTxt(o.last_touch_source, o.last_touch_campaign))}</b></span>` : ""}</div>
         <div class="olines">${(o.items || []).map((i) => `<div><span>${i.qty}× ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""}${i.detalle ? `<small class="det">${esc(i.detalle)}</small>` : ""}</span><span class="num">${money(i.subtotal)}</span></div>`).join("")}</div>
         <div class="otot"><span>Total</span><span class="num">${money(o.total)}</span></div>
         ${cambioBox(o)}
@@ -308,6 +308,7 @@
     const box = $("#cResult"); if (!box) return;
     try {
       const r = await API.findCustomer(phone); P.client = r.phone;
+      let crm = null; try { crm = API.crmCliente ? await API.crmCliente(r.phone) : null; } catch (_) { crm = null; } // sin migración 031: no se muestra
       let cons = null; try { cons = API.consentimientos ? await API.consentimientos(r.phone) : null; } catch (_) { cons = null; } // sin migración 030: no se muestra
       const meta = (P.settings.club || {}).meta || 8, c = r.customer || { sellos: 0, canjes: 0 };
       const stamps = Array.from({ length: meta }, (_, i) => `<div class="stamp ${i < c.sellos ? "on" : ""} ${i === meta - 1 ? "gift" : ""}">${i < c.sellos ? '<img src="img/mochito-run.png" alt="">' : i === meta - 1 ? "★" : i + 1}</div>`).join("");
@@ -318,6 +319,7 @@
         <p><b class="num">${c.sellos}</b> de ${meta} sellos · ${c.canjes} canje(s)</p>
         <div class="acts"><button class="btn" data-cadd="1">+1 sello</button><button class="btn" data-cadd="-1">−1</button>
           <button class="btn solid" data-redeem ${c.sellos >= meta ? "" : "disabled style='opacity:.5'"}>Canjear premio</button></div>
+        ${crm ? crmHtml(crm) : ""}
         ${cons ? consentHtml(cons) : ""}
         <b style="margin-top:6px">Historial</b>
         <div class="hist">${(r.events || []).map((e) => `<div><span>${esc(e.motivo || "")} <span class="muted">${ago(e.created_at)}</span></span><span class="${e.delta > 0 ? "pos" : "neg"} num">${e.delta > 0 ? "+" : ""}${e.delta}</span></div>`).join("") || '<span class="muted">Sin movimientos.</span>'}</div>
@@ -326,6 +328,17 @@
     } catch (e) { box.innerHTML = `<p class="err" style="margin-top:14px">${esc(e.message)}</p>`; }
   }
 
+  const origenTxt = (src, camp) => [src, camp].filter(Boolean).join(" · ");
+  function crmHtml(c) {
+    const fecha = (d) => (d ? new Date(d).toLocaleDateString("es-AR", { day: "numeric", month: "short" }) : "—");
+    return `<b style="margin-top:6px">Resumen</b><div class="hist">
+      <div><span>Compras entregadas</span><span class="num">${c.compras || 0} · ${money(c.total_gastado || 0)}</span></div>
+      <div><span>Primera / última compra</span><span class="num">${fecha(c.primera_compra)} / ${fecha(c.ultima_compra)}</span></div>
+      ${(c.favoritos || []).length ? `<div><span>Lo que más pide</span><span>${c.favoritos.map((f) => `${esc(f.nombre || f.id)} ×${f.qty}`).join(", ")}</span></div>` : ""}
+      <div><span>Llegó por primera vez</span><span>${esc(origenTxt(c.first_touch_source, c.first_touch_campaign) || "sin dato")}</span></div>
+      ${c.last_touch_source ? `<div><span>Último origen</span><span>${esc(origenTxt(c.last_touch_source, c.last_touch_campaign))}</span></div>` : ""}
+    </div>`;
+  }
   // permisos de marketing: vale el último registro de cada canal. El equipo solo puede dar de baja, nunca autorizar.
   const CANALES = [["whatsapp", "Novedades por WhatsApp"], ["meta_ads", "Anuncios de Meta"]];
   const ORIGEN = { checkout_web: "al pedir en la web", preferencias_web: "desde la web", panel: "desde el panel", whatsapp: "por WhatsApp" };

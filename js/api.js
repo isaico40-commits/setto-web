@@ -217,6 +217,18 @@
       ["whatsapp", "meta_ads"].filter((c) => (!canal || canal === c) && demoPuede(db, ph, c)).forEach((c) => db.consents.unshift({ phone: ph, canal: c, finalidad: c === "whatsapp" ? "novedades" : "publicidad", estado: "revocado", origen: sessionStorage.getItem("setto-demo-staff") ? "panel" : "preferencias_web", created_at: new Date().toISOString() }));
       dbSave(db);
     },
+    async registrarOrigen(code, phone, origen) {
+      const db = dbLoad(), ph = normPhone(phone), o = db.orders.find((x) => x.code === code && x.phone === ph && x.status === "pendiente"); if (!o || o.origen) return;
+      const f = origen.first || {}, l = origen.last || {};
+      Object.assign(o, { origen, first_touch_source: f.source, first_touch_campaign: f.campaign, last_touch_source: l.source, last_touch_campaign: l.campaign, landing_page: l.landing || f.landing, fbclid: l.fbclid || f.fbclid || null }); dbSave(db);
+    },
+    async crmCliente(phone) {
+      const db = dbLoad(), ph = normPhone(phone), all = db.orders.filter((o) => o.phone === ph), ent = all.filter((o) => o.status === "entregado");
+      const q = {}; ent.forEach((o) => (o.items || []).forEach((i) => { if (i.id && i.id !== "gift") q[i.id] = { id: i.id, nombre: i.nombre, qty: ((q[i.id] || {}).qty || 0) + (i.qty || 1) }; }));
+      const pri = all.filter((o) => o.first_touch_source).sort((a, b) => a.created_at.localeCompare(b.created_at))[0] || {}, ult = all.filter((o) => o.last_touch_source).sort((a, b) => b.created_at.localeCompare(a.created_at))[0] || {};
+      return { phone: ph, compras: ent.length, total_gastado: ent.reduce((s, o) => s + (o.total || 0), 0), primera_compra: ent.map((o) => o.created_at).sort()[0] || null, ultima_compra: ent.map((o) => o.created_at).sort().pop() || null,
+        favoritos: Object.values(q).sort((a, b) => b.qty - a.qty).slice(0, 3), first_touch_source: pri.first_touch_source || null, first_touch_campaign: pri.first_touch_campaign || null, last_touch_source: ult.last_touch_source || null, last_touch_campaign: ult.last_touch_campaign || null };
+    },
     async consentimientos(phone) { const ph = normPhone(phone); return (dbLoad().consents || []).filter((x) => x.phone === ph); },
     async marcarContacto(code, phone) { const db = dbLoad(), ph = normPhone(phone), o = db.orders.find((x) => x.code === code && x.phone === ph && x.status === "pendiente"); if (o && !o.contacto_at) { o.contacto_at = new Date().toISOString(); dbSave(db); } },
     onTrack(tracks, cb) { if (this._trk) return; this._trk = 1; window.addEventListener("storage", (e) => { if (e.key === KEY) cb(); }); },
@@ -400,6 +412,8 @@
     // consentimientos de marketing (migración 030)
     async registrarConsentimiento(code, phone, canales, version) { const { error } = await sb.rpc("registrar_consentimiento", { p_code: code, p_phone: phone, p_canales: canales, p_version: version }); fail(error); },
     async bajaMarketing(phone, canal) { const { error } = await sb.rpc("baja_marketing", { p_phone: phone, p_canal: canal || null }); fail(error); },
+    async registrarOrigen(code, phone, origen) { const { error } = await sb.rpc("registrar_origen", { p_code: code, p_phone: phone, p_origen: origen }); fail(error); },
+    async crmCliente(phone) { const { data, error } = await sb.from("crm_clientes").select("*").eq("phone", normPhone(phone)).maybeSingle(); fail(error); return data; },
     async consentimientos(phone) { const { data, error } = await sb.from("customer_consents").select("*").eq("phone", normPhone(phone)).order("created_at", { ascending: false }).limit(20); fail(error); return data || []; },
     // seguimiento en vivo: un canal público por link de pedido; la base avisa cuando el pedido cambia (migración 024)
     onTrack(tracks, cb) {
