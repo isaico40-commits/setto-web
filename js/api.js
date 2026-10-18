@@ -44,6 +44,12 @@
   const fail = (error) => { if (error) throw new Error(cleanMsg(error.message || String(error))); };
   const cleanMsg = (m) => String(m).replace(/^.*?ERROR:\s*/, "").replace(/\s*CONTEXT:.*$/s, "");
 
+  // llama una Edge Function y devuelve su mensaje de error tal cual (ej. "Faltan las credenciales…")
+  async function fn(nombre, body) {
+    const { data, error } = await sb.functions.invoke(nombre, { body });
+    if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch (_) {} throw new Error(m); }
+    return data;
+  }
   /* =================== MODO DEMO =================== */
   const demoPuede = (db, ph, canal) => ((db.consents || []).find((x) => x.phone === ph && x.canal === canal) || {}).estado === "otorgado";
   const KEY = "setto-demo-db";
@@ -229,6 +235,13 @@
       return { phone: ph, compras: ent.length, total_gastado: ent.reduce((s, o) => s + (o.total || 0), 0), primera_compra: ent.map((o) => o.created_at).sort()[0] || null, ultima_compra: ent.map((o) => o.created_at).sort().pop() || null,
         favoritos: Object.values(q).sort((a, b) => b.qty - a.qty).slice(0, 3), first_touch_source: pri.first_touch_source || null, first_touch_campaign: pri.first_touch_campaign || null, last_touch_source: ult.last_touch_source || null, last_touch_campaign: ult.last_touch_campaign || null };
     },
+    // campañas y Meta (migración 032): en modo demo se pueden armar borradores, pero no se manda nada
+    async segmentosResumen() { const db = dbLoad(), z = { whatsapp: 0, meta_ads: 0 }; return { nuevos: z, recurrentes: z, fans_mochis: z, bebidas: z, inactivos: z, todos: z, clientes: db.customers.length }; },
+    async listCampaigns() { return (dbLoad().campaigns || []).slice(0, 20); },
+    async createCampaign(c) { const db = dbLoad(); db.campaigns = db.campaigns || []; const n = { id: "c" + Date.now(), estado: "borrador", total: 0, enviados: 0, fallidos: 0, created_at: new Date().toISOString(), ...c }; db.campaigns.unshift(n); dbSave(db); return n; },
+    async sendCampaign() { throw new Error("En modo demo no se mandan mensajes de WhatsApp"); },
+    async syncAudiencias() { throw new Error("En modo demo no hay conexión con Meta"); },
+    async crmActividad() { return { mensajes: [], sync: [] }; },
     async consentimientos(phone) { const ph = normPhone(phone); return (dbLoad().consents || []).filter((x) => x.phone === ph); },
     async marcarContacto(code, phone) { const db = dbLoad(), ph = normPhone(phone), o = db.orders.find((x) => x.code === code && x.phone === ph && x.status === "pendiente"); if (o && !o.contacto_at) { o.contacto_at = new Date().toISOString(); dbSave(db); } },
     onTrack(tracks, cb) { if (this._trk) return; this._trk = 1; window.addEventListener("storage", (e) => { if (e.key === KEY) cb(); }); },
@@ -414,6 +427,17 @@
     async bajaMarketing(phone, canal) { const { error } = await sb.rpc("baja_marketing", { p_phone: phone, p_canal: canal || null }); fail(error); },
     async registrarOrigen(code, phone, origen) { const { error } = await sb.rpc("registrar_origen", { p_code: code, p_phone: phone, p_origen: origen }); fail(error); },
     async crmCliente(phone) { const { data, error } = await sb.from("crm_clientes").select("*").eq("phone", normPhone(phone)).maybeSingle(); fail(error); return data; },
+    async segmentosResumen() { const { data, error } = await sb.rpc("segmentos_resumen"); fail(error); return data; },
+    async listCampaigns() { const { data, error } = await sb.from("marketing_campaigns").select("*").order("created_at", { ascending: false }).limit(20); fail(error); return data || []; },
+    async createCampaign(c) { const { data, error } = await sb.from("marketing_campaigns").insert({ ...c, estado: "borrador" }).select().single(); fail(error); return data; },
+    // Edge Functions: las credenciales de Meta y WhatsApp viven solo ahí (secretos de Supabase)
+    async sendCampaign(id, prueba) { return fn("whatsapp-campana", { campaign_id: id, prueba: prueba || null }); },
+    async syncAudiencias() { return fn("meta-audiencias", {}); },
+    async crmActividad() {
+      const [m, s] = await Promise.all([sb.from("message_logs").select("*").eq("direccion", "entrante").order("created_at", { ascending: false }).limit(15),
+        sb.from("marketing_sync_logs").select("*").order("created_at", { ascending: false }).limit(10)]);
+      fail(m.error); fail(s.error); return { mensajes: m.data || [], sync: s.data || [] };
+    },
     async consentimientos(phone) { const { data, error } = await sb.from("customer_consents").select("*").eq("phone", normPhone(phone)).order("created_at", { ascending: false }).limit(20); fail(error); return data || []; },
     // seguimiento en vivo: un canal público por link de pedido; la base avisa cuando el pedido cambia (migración 024)
     onTrack(tracks, cb) {

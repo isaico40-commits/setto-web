@@ -31,6 +31,15 @@
   }
   window.SettoOrigen = {
     // lo que viaja con el pedido (sin la marca interna "externo")
-    paraPedido() { const x = leer(); if (!x) return null; const lim = (t) => { const { externo, ...r } = t; return r; }; return { first: lim(x.first), last: lim(x.last) }; },
+    paraPedido() {
+      const x = leer(); if (!x) return null; const lim = (t) => { const { externo, ...r } = t; return r; };
+      const r = { first: lim(x.first), last: lim(x.last) };
+      if (permisoPixel()) { // para que Conversions API asocie la compra al navegador (solo con el pixel aceptado)
+        const ck = (n) => (document.cookie.match(new RegExp("(?:^|; )" + n + "=([^;]*)")) || [])[1] || "";
+        const clic = x.last.fbclid || x.first.fbclid, t = x.last.fbclid ? x.last : x.first;
+        r.px = { fbp: ck("_fbp"), fbc: ck("_fbc") || (clic ? `fb.1.${new Date(t.at).getTime()}.${clic}` : ""), ua: corto(navigator.userAgent, 400), url: corto(location.origin + (x.last.landing || "/"), 300) };
+      }
+      return r;
+    },
   };
 })();
