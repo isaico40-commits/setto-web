@@ -65,9 +65,11 @@
     cuentas: [], socios: [], cats: [], saldos: [], deudas: [], movs: [], stock: [], tareas: [], compras: [],
     f: { tipo: "todos", cuenta: "todas", q: "", anul: false },
     verHechas: false,
+    r: { modo: "semana", socio: "todos", ref: hoy() },
   };
   const cuentaN = (id) => (S.cuentas.find((c) => c.id === id) || {}).nombre || id || "—";
   const socioN = (id) => (S.socios.find((c) => c.id === id) || {}).nombre || id || "—";
+  const movPorId = (id) => S.movs.find((x) => x.id === id) || (S.retiros || []).find((x) => x.id === id);
   const catN = (id) => (S.cats.find((c) => c.id === id) || {}).nombre || "Sin categoría";
 
   /* efecto de un movimiento (igual que la vista caja_efectos; solo para mostrar) */
@@ -101,8 +103,10 @@
       sb.from("caja_stock_actual").select("*").order("orden"),
       sb.from("caja_tareas").select("*").order("created_at", { ascending: false }).limit(300),
       sb.from("caja_compras").select("*").order("created_at", { ascending: false }).limit(300),
+      /* los retiros van aparte para que el historial no dependa del límite de movimientos */
+      sb.from("caja_movimientos").select("*").eq("tipo", "retiro").order("fecha", { ascending: false }).order("created_at", { ascending: false }).limit(10000),
     ]);
-    [S.cuentas, S.socios, S.cats, S.saldos, S.deudas, S.movs, S.stock, S.tareas, S.compras] = r.map(fail);
+    [S.cuentas, S.socios, S.cats, S.saldos, S.deudas, S.movs, S.stock, S.tareas, S.compras, S.retiros] = r.map(fail);
     // reservado en pedidos web pendientes y disponible en la web (si falla, la pestaña sigue igual)
     try { const { data } = await sb.rpc("caja_stock_reservas"); S.reservas = {}; (data || []).forEach((x) => (S.reservas[x.item_id] = x)); } catch (_) { S.reservas = {}; }
   }
@@ -170,14 +174,14 @@
   }
   function render() {
     if (!$("#view")) return;
-    document.querySelectorAll(".bnav [data-go]").forEach((b) => { if (b.dataset.go === S.view) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+    document.querySelectorAll(".bnav [data-go]").forEach((b) => { if (b.dataset.go === (S.view === "retiros" ? "inicio" : S.view)) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
     const pt = S.tareas.filter((t) => t.estado === "pendiente").length, pc = S.compras.filter((c) => c.estado === "pendiente").length;
     const dt = $('[data-dot="tareas"]'), dc = $('[data-dot="compras"]');
     if (dt) { dt.textContent = pt; dt.hidden = !pt; } if (dc) { dc.textContent = pc; dc.hidden = !pc; }
     const mb = $("[data-who]"); if (mb) mb.innerHTML = `<i>${esc((S.me || "?")[0])}</i>${esc(S.me || "¿Quién sos?")}`;
-    $(".fab").hidden = !["inicio", "movs"].includes(S.view);
+    $(".fab").hidden = !["inicio", "movs", "retiros"].includes(S.view);
     const y = window.scrollY;
-    ({ inicio: vInicio, movs: vMovs, stock: vStock, tareas: vTareas, compras: vCompras }[S.view] || vInicio)();
+    ({ inicio: vInicio, movs: vMovs, retiros: vRetiros, stock: vStock, tareas: vTareas, compras: vCompras }[S.view] || vInicio)();
     window.scrollTo(0, y);
   }
   function go(v) { S.view = v; history.replaceState(null, "", "#" + v); render(); window.scrollTo(0, 0); }
@@ -207,7 +211,7 @@
         <div class="saldo total"><span class="k">Total en caja</span><span class="v num">${money(total)}</span></div>
       </div>
 
-      <h2 class="h2">Socios <small>${deben.length ? "Setto les debe" : "Nadie tiene plata puesta"}</small></h2>
+      <h2 class="h2">Socios <small>${deben.length ? "Setto les debe" : "Nadie tiene plata puesta"}</small><button class="more" data-go="retiros">Ver retiros</button></h2>
       <div class="deudas">${S.deudas.map((d) => `<div class="deuda"><span class="av">${esc(d.nombre[0])}</span>
           <span class="t"><b>${esc(d.nombre)}</b>${Number(d.retirado) ? `Retiró ${fmt(d.retirado)} de ganancias` : "Sin retiros"}</span>
           <span class="m num ${d.le_debemos >= 1 ? "pend" : ""}">${d.le_debemos >= 1 ? fmt(d.le_debemos) : d.le_debemos <= -1 ? "debe " + fmt(d.le_debemos) : "al día"}</span>
@@ -269,6 +273,71 @@
     }));
     const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `setto-caja-${S.mes}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  /* ---------- RETIROS (por semana o mes, por socio) ---------- */
+  const fd = (d) => { const [y, m, dd] = d.split("-").map(Number); return new Date(y, m - 1, dd); };
+  const iso = (dt) => dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
+  const lunes = (d) => { const t = fd(d); t.setDate(t.getDate() - ((t.getDay() + 6) % 7)); return iso(t); };
+  const masDias = (d, n) => { const t = fd(d); t.setDate(t.getDate() + n); return iso(t); };
+  /* clave del período: lunes de la semana (yyyy-mm-dd) o mes (yyyy-mm) */
+  const perDe = (d, modo) => (modo === "mes" ? mesDe(d) : lunes(d));
+  const perMov = (k, modo, n) => (modo === "mes" ? mesMov(k, n) : masDias(k, 7 * n));
+  const perNombre = (k, modo) => {
+    if (modo === "mes") return mesNombre(k);
+    const a = fd(k), b = fd(masDias(k, 6)), mes = (x) => x.toLocaleDateString("es-AR", { month: "short" }).replace(".", "");
+    return a.getMonth() === b.getMonth() ? `${a.getDate()} al ${b.getDate()} ${mes(b)}` : `${a.getDate()} ${mes(a)} al ${b.getDate()} ${mes(b)}`;
+  };
+  const diaCorto = (d) => { const t = fd(d).toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, ""); return t[0].toUpperCase() + t.slice(1); };
+  function vRetiros() {
+    const R = S.r, act = perDe(hoy(), R.modo), cur = perDe(R.ref, R.modo);
+    const socs = S.socios.filter((s) => s.activo || S.retiros.some((m) => m.socio_id === s.id));
+    const verSocs = R.socio === "todos" ? socs : socs.filter((s) => s.id === R.socio);
+    const todos = S.retiros.filter((m) => m.estado === "activo" && (R.socio === "todos" || m.socio_id === R.socio));
+    const enPer = todos.filter((m) => perDe(m.fecha, R.modo) === cur).sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : a.created_at < b.created_at ? 1 : -1));
+    const suma = (ms, sid) => ms.filter((m) => !sid || m.socio_id === sid).reduce((a, m) => a + Number(m.monto), 0);
+    const tot = suma(enPer), mx = Math.max(1, ...verSocs.map((s) => suma(enPer, s.id)));
+    /* historial: desde el primer retiro hasta el período actual (máx. 12 filas) */
+    const prim = todos.length ? todos.reduce((a, m) => (m.fecha < a ? m.fecha : a), hoy()) : hoy();
+    const hist = []; for (let k = act, i = 0; k >= perDe(prim, R.modo) && i < 12; k = perMov(k, R.modo, -1), i++) hist.push(k);
+    const histRow = (k) => { const ms = todos.filter((m) => perDe(m.fecha, R.modo) === k); return { k, ms, t: suma(ms), dias: new Set(ms.map((m) => m.fecha)).size }; };
+    const rows = hist.map(histRow), conRet = rows.filter((r) => r.t > 0);
+    const prom = rows.length ? rows.reduce((a, r) => a + r.t, 0) / rows.length : 0;
+    const chip = (k, v, l) => `<button class="chip" data-rf="${k}" data-v="${esc(v)}" aria-pressed="${R[k] === v}">${esc(l)}</button>`;
+    const days = {}; enPer.forEach((m) => (days[m.fecha] = days[m.fecha] || []).push(m));
+    const unidad = R.modo === "mes" ? "mes" : "semana";
+    $("#view").innerHTML = `
+      <button class="back" data-go="inicio">‹ Inicio</button>
+      <h1 class="h1">Retiros de socios</h1>
+      <div class="filters">${chip("modo", "semana", "Por semana")}${chip("modo", "mes", "Por mes")}</div>
+      <div class="filters">${chip("socio", "todos", "Todos")}${socs.map((s) => chip("socio", s.id, s.nombre)).join("")}</div>
+      <div class="rhead"><span class="mesnav"><button data-rper="-1" aria-label="Período anterior">‹</button><b>${esc(R.modo === "semana" && cur === act ? "Esta semana" : perNombre(cur, R.modo))}</b><button data-rper="1" aria-label="Período siguiente" ${cur >= act ? "disabled" : ""}>›</button></span>
+        ${cur !== act ? `<button class="more" data-rhoy>Volver a hoy</button>` : ""}</div>
+      ${R.modo === "semana" ? `<p class="kpinote" style="margin-top:0">Lunes a domingo · ${esc(perNombre(cur, "semana"))}</p>` : ""}
+      <div class="rsoc">${verSocs.map((s) => { const v = suma(enPer, s.id), n = enPer.filter((m) => m.socio_id === s.id).length;
+        return `<div class="rs"><span class="av">${esc(s.nombre[0])}</span><span class="t"><b>${esc(s.nombre)}</b><span>${n ? `${n} retiro${n > 1 ? "s" : ""}` : "Sin retiros"}</span></span>
+          <span class="tr"><i style="width:${v ? Math.max(3, (v / mx) * 100) : 0}%"></i></span><span class="m num">${fmt(v)}</span></div>`; }).join("")}
+        ${verSocs.length > 1 ? `<div class="rs tot"><span class="t"><b>Total del ${unidad}</b></span><span class="m num">${fmt(tot)}</span></div>` : ""}</div>
+
+      <h2 class="h2">Días de retiro <small>${enPer.length ? `${Object.keys(days).length} día${Object.keys(days).length > 1 ? "s" : ""}` : ""}</small><button class="more" data-rnew>+ Cargar retiro</button></h2>
+      ${enPer.length ? Object.entries(days).map(([d, ms]) => `<div class="day"><div class="dayh"><span>${esc(diaNombre(d))}</span><span class="num">${fmt(suma(ms))}</span></div><div class="movs">${ms.map(movRow).join("")}</div></div>`).join("")
+        : `<div class="emptyc"><img src="img/mochito-lie.png" alt=""><span>Nadie retiró ${R.socio === "todos" ? "" : "acá "}en ${R.modo === "mes" ? "este mes" : "esta semana"}.</span></div>`}
+
+      <h2 class="h2">Historial por ${unidad} <small>${conRet.length ? `promedio ${fmt(Math.round(prom))} por ${unidad}` : ""}</small></h2>
+      ${rows.length ? `<div class="rhist">${rows.map((r) => { const dias = r.ms.map((m) => m.fecha).filter((x, i, a) => a.indexOf(x) === i).sort();
+        return `<button class="rh ${r.k === cur ? "on" : ""} ${r.t ? "" : "cero"}" data-rir="${r.k}"><span class="rt"><b>${esc(perNombre(r.k, R.modo))}</b><b class="num">${r.t ? fmt(r.t) : "$0"}</b></span>
+          ${verSocs.length > 1 ? `<span class="rp">${verSocs.map((s) => `<span class="${suma(r.ms, s.id) ? "" : "z"}">${esc(s.nombre)} <b class="num">${fmt(suma(r.ms, s.id))}</b></span>`).join("")}</span>` : ""}
+          <span class="rd">${dias.length ? `${dias.length} día${dias.length > 1 ? "s" : ""}: ${dias.map(diaCorto).join(" · ")}` : "Sin retiros"}</span></button>`; }).join("")}</div>` : ""}
+      <p class="kpinote">Se cuenta por la fecha del retiro, no por cuándo se cargó. Los anulados no suman.</p>
+      <div class="toolsrow"><button class="ghost" data-rcsv>Descargar retiros (CSV)</button></div>`;
+  }
+  function csvRetiros() {
+    const R = S.r, rows = S.retiros.filter((m) => m.estado === "activo" && (R.socio === "todos" || m.socio_id === R.socio)).slice().sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
+    const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = [["Fecha", "Semana (lunes)", "Mes", "Socio", "Monto", "Cuenta", "Detalle", "Cargó"].map(q).join(";")].concat(rows.map((m) =>
+      [m.fecha, lunes(m.fecha), mesDe(m.fecha), socioN(m.socio_id), String(m.monto).replace(".", ","), cuentaN(m.cuenta_id), m.detalle, m.registro].map(q).join(";")));
+    const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `setto-retiros-${hoy()}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
 
   /* ---------- hoja (bottom sheet) ---------- */
@@ -374,6 +443,7 @@
         }
         closeSheet(); toast(editId ? "Cambios guardados" : `Guardado: ${TIPOS[row.tipo].l.toLowerCase()} de ${fmt(v)}`);
         if (mesDe(row.fecha) !== S.mes && !editId) S.mes = mesDe(row.fecha);
+        if (S.view === "retiros" && row.tipo === "retiro") S.r.ref = row.fecha;
         await loadAll(); render();
       } catch (err) { er.textContent = err.message; er.hidden = false; btn.disabled = false; }
     };
@@ -381,7 +451,7 @@
 
   /* --- detalle de un movimiento --- */
   async function movDetail(id) {
-    const m = S.movs.find((x) => x.id === id); if (!m) return;
+    const m = movPorId(id); if (!m) return;
     const t = TIPOS[m.tipo], an = m.estado === "anulado", im = impacto(m);
     const rows = [["Tipo", t.l], ["Fecha", diaNombre(m.fecha) + (m.fecha !== hoy() ? "" : "")], m.cuenta_id ? ["Cuenta", cuentaN(m.cuenta_id) + (m.cuenta_destino_id ? " → " + cuentaN(m.cuenta_destino_id) : "")] : null,
       m.socio_id ? [m.tipo === "gasto" ? "Pagó" : "Socio", socioN(m.socio_id)] : null, ["entrada", "gasto"].includes(m.tipo) ? ["Categoría", catN(m.categoria_id)] : null,
@@ -410,7 +480,7 @@
   }
   function anularSheet(id) {
     if (!needMe()) return;
-    const m = S.movs.find((x) => x.id === id);
+    const m = movPorId(id);
     openSheet(`<div class="sh"><h3>Anular movimiento</h3><button class="x" data-close aria-label="Cerrar">×</button></div>
       <form class="form" id="af"><p class="note">Se deja de contar en saldos y resúmenes, pero queda visible tachado con tu nombre y el motivo. <b>${esc(m.detalle || TIPOS[m.tipo].l)} · ${fmt(m.monto)}</b></p>
       <label class="fl"><span>¿Por qué se anula?</span><input id="aMot" required maxlength="120" placeholder="Ej: cargado dos veces"></label>
@@ -629,15 +699,21 @@
     if (d.go) return go(d.go);
     if (d.who !== undefined) return whoSheet();
     if (d.iam) { S.me = d.iam; localStorage.setItem("setto-caja-yo", S.me); closeSheet(); render(); toast(`Hola, ${S.me}`); return; }
-    if (d.new !== undefined) return movForm();
+    if (d.new !== undefined) return movForm(S.view === "retiros" ? { tipo: "retiro", socio_id: S.r.socio === "todos" ? null : S.r.socio } : {});
     if (d.mes) { S.mes = mesMov(S.mes, +d.mes); return render(); }
     if (d.contar) return contarSheet(d.contar);
     if (d.devolver) { const dd = S.deudas.find((x) => x.id === d.devolver); return movForm({ tipo: "devolucion", socio_id: d.devolver, monto: String(Number(dd.le_debemos)).replace(".", ","), detalle: "Devolución a " + dd.nombre }); }
     if (d.mov) return movDetail(d.mov);
-    if (d.edit) { const m = S.movs.find((x) => x.id === d.edit); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, fecha: m.fecha, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja", _touched: true }, m.id); }
-    if (d.dup) { const m = S.movs.find((x) => x.id === d.dup); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja" }); }
+    if (d.edit) { const m = movPorId(d.edit); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, fecha: m.fecha, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja", _touched: true }, m.id); }
+    if (d.dup) { const m = movPorId(d.dup); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja" }); }
     if (d.anular) { closeSheet(); return anularSheet(d.anular); }
     if (d.f) { S.f[d.f] = d.v; return render(); }
+    if (d.rf) { S.r[d.rf] = d.v; return render(); }
+    if (d.rper) { const k = perMov(perDe(S.r.ref, S.r.modo), S.r.modo, +d.rper); S.r.ref = S.r.modo === "mes" ? k + "-01" : k; return render(); }
+    if (d.rir) { S.r.ref = S.r.modo === "mes" ? d.rir + "-01" : d.rir; render(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    if (d.rhoy !== undefined) { S.r.ref = hoy(); return render(); }
+    if (d.rnew !== undefined) return movForm({ tipo: "retiro", socio_id: S.r.socio === "todos" ? null : S.r.socio });
+    if (d.rcsv !== undefined) return csvRetiros();
     if (d.anul !== undefined) { S.f.anul = !S.f.anul; return render(); }
     if (d.csv !== undefined) return csvMes();
     /* stock */
