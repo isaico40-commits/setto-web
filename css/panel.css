@@ -165,3 +165,49 @@ a.ptab{text-decoration:none}
 .avisos{margin:16px 0 4px;background:var(--card);border:var(--line);border-radius:18px;padding:14px 18px;display:grid;gap:10px;max-width:640px}
 .avisos p{margin:0;line-height:1.45}
 .avisos ol{margin:0;padding-left:20px;line-height:1.6}
+
+/* Selector Pedidos | Caja (mismo en el panel y en la caja) */
+.appsw{display:inline-flex;background:var(--bg-2);border-radius:999px;padding:3px;gap:2px}
+.appsw a{font-family:var(--display);font-size:1rem;color:var(--ink-2);text-decoration:none;padding:4px 14px;border-radius:999px;display:inline-flex;gap:6px;align-items:center}
+.appsw a[aria-current="page"]{background:var(--card);color:var(--turquesa);box-shadow:0 1px 0 #0001,0 0 0 1.5px color-mix(in srgb,var(--turquesa) 35%,transparent)}
+.appsw a:not([aria-current]):hover{color:var(--turquesa)}
+.appsw .n{background:var(--coral);color:var(--ink);border-radius:999px;font-family:var(--texto);font-size:.68rem;font-weight:700;padding:1px 6px}
+.tocaja{color:var(--turquesa);font-weight:600}
+
+/* Ajustes: lista de secciones + sección abierta */
+.aj{display:grid;grid-template-columns:270px minmax(0,1fr);gap:28px;align-items:start}
+.ajnav{position:sticky;top:84px;display:grid;gap:14px;max-height:calc(100vh - 100px);overflow:auto;padding-right:4px;scrollbar-width:thin}
+.ajnav .ph1{margin:0}
+.ajg{display:grid;gap:2px}
+.ajg small{font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin:4px 0 4px 12px}
+.ajit{display:grid;gap:1px;text-decoration:none;color:var(--ink);padding:8px 12px;border-radius:14px;border:1.5px solid transparent}
+.ajit b{font-weight:600;font-size:.92rem}
+.ajit span{font-size:.76rem;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ajit:hover{background:var(--card)}
+.ajit[aria-current="page"]{background:var(--card);border-color:var(--turquesa)}
+.ajit[aria-current="page"] b{color:var(--turquesa)}
+.ajform{border-radius:24px;padding:22px 22px 0;gap:16px}
+.ajform > label,.ajform > .row2,.ajform > .checks,.ajform > .slrow,.ajform > .slrow2{max-width:720px}
+.ajhead{display:grid;gap:4px;padding-bottom:12px;border-bottom:1px solid color-mix(in srgb,var(--turquesa) 18%,transparent)}
+.ajhead h2{font-size:1.6rem;margin:0}
+.ajhead .hintp{font-size:.86rem}
+.ajback{display:none;color:var(--turquesa);font-weight:600;font-size:.88rem;text-decoration:none}
+.ajform .checks label{background:var(--bg);border-radius:12px;padding:9px 12px}
+.ajbar{position:sticky;bottom:0;margin:6px -22px 0;padding:12px 22px calc(12px + env(safe-area-inset-bottom,0px));background:var(--card);border-top:1px solid color-mix(in srgb,var(--turquesa) 18%,transparent);border-radius:0 0 24px 24px;display:flex;gap:12px;align-items:center;justify-content:flex-end}
+.ajbar .ajst{margin-right:auto;font-size:.84rem;color:var(--ink-2)}
+.ajbar .btn{opacity:.55}
+.ajbar.dirty{background:color-mix(in srgb,var(--coral-2) 55%,var(--card))}
+.ajbar.dirty .ajst{color:var(--ink);font-weight:600}
+.ajbar.dirty .btn{opacity:1}
+@media (max-width:860px){
+  .aj{grid-template-columns:1fr}
+  .ajnav{position:static;max-height:none;overflow:visible}
+  .aj.abierta .ajnav{display:none}
+  .aj:not(.abierta) .ajbody{display:none}
+  .ajback{display:inline-block}
+  .ajit{background:var(--card);border-color:color-mix(in srgb,var(--turquesa) 20%,transparent);padding:12px 14px;grid-template-columns:1fr auto;align-items:center}
+  .ajit::after{content:"›";grid-row:1/3;grid-column:2;font-size:1.4rem;color:var(--turquesa)}
+  .ajg{gap:6px}
+  .ajform{padding:16px 16px 0;border-radius:20px}
+  .ajbar{margin:6px -16px 0;padding-inline:16px;bottom:0;border-radius:0 0 20px 20px}
+}

@@ -110,6 +110,7 @@
     // reservado en pedidos web pendientes y disponible en la web (si falla, la pestaña sigue igual)
     try { const { data } = await sb.rpc("caja_stock_reservas"); S.reservas = {}; (data || []).forEach((x) => (S.reservas[x.item_id] = x)); } catch (_) { S.reservas = {}; }
     stockApplyLocal();
+    try { const { count } = await sb.from("orders").select("id", { count: "exact", head: true }).eq("status", "pendiente"); S.pend = count || 0; } catch (_) { S.pend = 0; }
   }
   let reloadT;
   function softReload() {
@@ -169,8 +170,9 @@
   };
   function drawShell() {
     app.innerHTML = `<header class="cbar"><div class="wrap">
-        <a class="logo" href="panel.html" title="Ir al panel de pedidos"><img src="img/logo.svg" alt="Setto"></a><span class="tag">Caja</span>
-        <span class="sp"></span><a class="toplink" href="panel.html">Pedidos</a>
+        <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.svg" alt="Setto"></a>
+        <nav class="appsw" aria-label="Cambiar de app"><a href="panel.html">Pedidos<span class="n" data-pend hidden></span></a><a href="caja.html" aria-current="page">Caja</a></nav>
+        <span class="sp"></span>
         <button class="mebtn" data-who><i>${esc((S.me || "?")[0])}</i>${esc(S.me || "¿Quién sos?")}</button>
       </div></header>
       <main class="cmain"><div class="wrap" id="view"></div></main>
@@ -185,6 +187,7 @@
     const pt = S.tareas.filter((t) => t.estado === "pendiente").length, pc = S.compras.filter((c) => c.estado === "pendiente").length;
     const dt = $('[data-dot="tareas"]'), dc = $('[data-dot="compras"]');
     if (dt) { dt.textContent = pt; dt.hidden = !pt; } if (dc) { dc.textContent = pc; dc.hidden = !pc; }
+    const dp = $("[data-pend]"); if (dp) { dp.textContent = S.pend || ""; dp.hidden = !S.pend; dp.title = `${S.pend} pedido(s) pendiente(s)`; }
     const mb = $("[data-who]"); if (mb) mb.innerHTML = `<i>${esc((S.me || "?")[0])}</i>${esc(S.me || "¿Quién sos?")}`;
     $(".fab").hidden = !["inicio", "movs", "retiros"].includes(S.view);
     const y = window.scrollY;
@@ -466,6 +469,7 @@
     openSheet(`<div class="sh"><h3>${esc(m.detalle || t.l)}</h3><button class="x" data-close aria-label="Cerrar">×</button></div>
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px"><span class="bigamt num ${an ? "" : ""}" style="${an ? "text-decoration:line-through;color:var(--tachado)" : ""}">${im.txt}</span><span class="muted">${esc(im.sub)}</span></div>
       <dl class="dl">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+      ${/^pedido:/.test(m.legacy_id || "") && /STT-\w+/.test(m.detalle || "") ? `<a class="btn" style="margin-top:12px" href="panel.html#pedidos/${an ? "cancelado" : "entregado"}/${encodeURIComponent((m.detalle.match(/STT-\w+/) || [""])[0])}">Ver el pedido en el panel →</a>` : ""}
       <div id="mlog" style="margin-top:14px"></div>
       ${an ? "" : `<div class="btnrow" style="margin-top:16px"><button class="btn" data-edit="${m.id}">Editar</button>${m.tipo !== "ajuste" ? `<button class="btn" data-dup="${m.id}">Repetir</button>` : ""}<button class="btn danger" data-anular="${m.id}">Anular</button></div>`}`);
     try {
@@ -544,7 +548,7 @@
           ${(() => { const rv = (S.reservas || {})[i.id]; return rv ? `<span class="hintp reserva">${rv.reservado > 0 ? `<b>${rv.reservado}</b> reservado${rv.reservado > 1 ? "s" : ""} en pedidos web pendientes · ` : ""}En la web: <b>${Math.max(0, rv.disponible)}</b></span>` : ""; })()}
           ${i.actualizado ? `<span class="hintp">Último cambio ${cuando(i.actualizado)}</span>` : ""}</div>`;
       }).join("") || `<div class="emptyc"><img src="img/mochito-lie.png" alt=""><span>No hay productos en el stock.</span></div>`}</div>
-      <div class="toolsrow"><button class="ghost" data-snew>+ Agregar producto</button><button class="ghost" data-shist>Ver últimos cambios</button></div>`;
+      <div class="toolsrow"><button class="ghost" data-snew>+ Agregar producto</button><button class="ghost" data-shist>Ver últimos cambios</button><a class="ghost" href="panel.html#ajustes/stock_web">Cómo se ve en la web →</a></div>`;
   }
   /* Los + y − se juntan: cada toque cambia el número al instante y recién
      cuando paran de tocar (STOCK_WAIT ms) se guarda un solo movimiento con el

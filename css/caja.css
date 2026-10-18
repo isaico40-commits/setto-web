@@ -207,3 +207,4 @@ main.cmain{padding-block:18px 30px}
 @media (max-width:520px){
   .rs{grid-template-columns:34px minmax(64px,auto) 1fr auto;gap:8px}
 }
+.toolsrow a.ghost{text-decoration:none;display:inline-flex;align-items:center}
