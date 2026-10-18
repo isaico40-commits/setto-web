@@ -150,3 +150,9 @@ a.ptab{text-decoration:none}
 .slbtn{display:grid;grid-template-columns:64px 1.4fr 1fr 1fr;gap:8px;align-items:center}
 .slbtn small{font-size:.72rem;color:#0009;font-weight:600}
 @media (max-width:700px){.upgrid,.slrow2[data-tipo="texto"] .upgrid{grid-template-columns:repeat(2,minmax(0,1fr));max-width:none}.slf2,.slf3{grid-template-columns:1fr}.slbtn{grid-template-columns:1fr 1fr}.slbtn small,.slbtn input{grid-column:1/-1}}
+/* drop de la edición especial */
+.dropst{margin:0;padding:10px 12px;border-radius:12px;background:#f1e4ca;font-size:.9rem}
+.dropprog{display:grid;gap:12px;padding:12px;border-radius:14px;background:color-mix(in srgb,var(--turquesa) 6%,transparent)}
+.dsub{font-size:.9rem;margin-top:4px}
+.dropinfo{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:.88rem}
+.dropprog[hidden]{display:none}

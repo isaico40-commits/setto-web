@@ -26,6 +26,15 @@
     if (d.length === 7) d = "223" + d;
     return d.length === 10 ? "549" + d : null;
   }
+  /* Drop de la edición especial: en qué momento está ("antes", "abierto" o "terminado").
+     Es la misma regla que especial_abierto() en la base, que es la que acepta o no los pedidos. */
+  function dropEstado(E, now = Date.now()) {
+    E = E || {};
+    if (E.modo !== "programado") return E.estado === "disponible" ? "abierto" : "antes";
+    const ini = Date.parse(E.lanzamiento || ""), fin = Date.parse(E.fin || "");
+    if (!ini || now < ini) return "antes";
+    return fin && now >= fin ? "terminado" : "abierto";
+  }
   function prettyPhone(p) {
     const d = normPhone(p) || String(p || "");
     if (d.length !== 13) return d;
@@ -72,7 +81,7 @@
           if (!price) throw new Error("Falta elegir el tamaño de " + pr.nombre);
         } else {
           price = pr.precio; name = "Mochi " + pr.nombre;
-          if (pr.categoria === "especial" && esp.estado !== "disponible") throw new Error(pr.nombre + " no está disponible ahora");
+          if (pr.categoria === "especial" && dropEstado(esp) !== "abierto") throw new Error(pr.nombre + " no está disponible ahora");
         }
         if (pr.agotado) throw new Error(pr.nombre + " está agotado");
         if (!(price > 0)) throw new Error(pr.nombre + " todavía no tiene precio");
@@ -211,6 +220,10 @@
     },
     async pushSuscribir() { throw new Error("En modo demo no hay notificaciones"); },
     async pushDesuscribir() {},
+    async dropSuscribir() { throw new Error("En modo demo no hay notificaciones"); },
+    async dropDesuscribir() {},
+    async dropAvisos() { return { suscriptos: 0, avisado: null }; },
+    async dropAvisar() { throw new Error("En modo demo no hay notificaciones"); },
     async createReviewTrack(track, rating, texto, foto, instagram) { const o = dbLoad().orders.find((x) => x.track === track); if (!o) throw new Error("No encontramos ese pedido"); return this.createReview(o.code, o.phone, rating, texto, foto, instagram); },
     async uploadReviewPhoto(blob) { return await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); }); },
     async productRatings() {
@@ -374,6 +387,11 @@
     async trackStatus(tracks) { const { data, error } = await sb.rpc("track_status", { p_tracks: tracks }); fail(error); return data || []; },
     async pushSuscribir(track, sub) { const k = sub.toJSON().keys || {}; const { error } = await sb.rpc("push_suscribir", { p_track: track, p_endpoint: sub.endpoint, p_p256dh: k.p256dh, p_auth: k.auth }); fail(error); },
     async pushDesuscribir(track, endpoint) { const { error } = await sb.rpc("push_desuscribir", { p_track: track, p_endpoint: endpoint }); fail(error); },
+    /* avisos de drops: el cliente se anota una vez y le llega cada lanzamiento */
+    async dropSuscribir(sub) { const k = sub.toJSON().keys || {}; const { error } = await sb.rpc("drop_suscribir", { p_endpoint: sub.endpoint, p_p256dh: k.p256dh, p_auth: k.auth }); fail(error); },
+    async dropDesuscribir(endpoint) { const { error } = await sb.rpc("drop_desuscribir", { p_endpoint: endpoint }); fail(error); },
+    async dropAvisos() { const { data, error } = await sb.rpc("drop_avisos_info"); fail(error); return data; },
+    async dropAvisar() { const { data, error } = await sb.rpc("drop_avisar"); fail(error); return data; },
     async createReviewTrack(track, rating, texto, foto, instagram) { const { error } = await sb.rpc("create_review_track", { p_track: track, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); },
     async createReview(code, phone, rating, texto, foto, instagram) { const { error } = await sb.rpc("create_review_v2", { p_code: code, p_phone: phone, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); },
     async uploadReviewPhoto(blob) {
@@ -434,5 +452,5 @@
     },
   };
 
-  window.SettoAPI = Object.assign({ DEMO, normPhone, prettyPhone }, DEMO ? demo : live);
+  window.SettoAPI = Object.assign({ DEMO, normPhone, prettyPhone, dropEstado }, DEMO ? demo : live);
 })();

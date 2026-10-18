@@ -76,7 +76,18 @@
   const unit = (p) => !bebida(p);
   const priceOf = (p, sz) => (unit(p) ? p.precio : p.precios[sz]);
   const nameOf = (p) => (unit(p) ? "Mochi " + p.nombre : p.nombre);
-  const espOpen = () => (S.especial || {}).estado === "disponible";
+  /* ---------- Drop de la edición especial (se abre sola en la fecha programada) ---------- */
+  let SKEW = 0; // diferencia con la hora del servidor: la cuenta regresiva no depende del reloj del celular
+  const ahora = () => Date.now() + SKEW;
+  const ESPC = () => S.especial || {};
+  const prog = () => ESPC().modo === "programado";
+  const dropFase = () => API.dropEstado(ESPC(), ahora()); // "antes" | "abierto" | "terminado"
+  const espOpen = () => dropFase() === "abierto";
+  const antesProg = () => prog() && dropFase() === "antes";
+  // la foto va esmerilada: en un drop programado, hasta el lanzamiento; en modo manual, según cada producto
+  const tapado = (p) => (prog() ? antesProg() && (ESPC().esmerilar !== false || !!p.esmerilado) : !!p.esmerilado);
+  const fechaDrop = (iso) => { const d = new Date(iso); if (isNaN(d)) return ""; const o = { timeZone: "America/Argentina/Buenos_Aires" };
+    return d.toLocaleDateString("es-AR", { ...o, weekday: "long", day: "numeric", month: "numeric" }) + " a las " + d.toLocaleTimeString("es-AR", { ...o, hour: "2-digit", minute: "2-digit", hour12: false }) + " hs"; };
   const setParts = (s) => ({ b: DIRTY.find((x) => x.id === s.bebida), m: MOCHIS.find((x) => x.id === s.mochi) });
   const suelto = (s, sz) => { const { b, m } = setParts(s); return (b ? Number(b.precios[sz]) : 0) + (m ? Number(m.precio) : 0); };
   const descOf = (p) => { if (p.categoria !== "set") return p.desc; const { b, m } = setParts(p); return (b ? b.nombre : "Bebida") + " + mochi " + (m ? m.nombre.toLowerCase() : ""); };
@@ -150,7 +161,7 @@
   const detalleOf = (leche, sin) => [leche && (lechePrecio(leche) > 0 || leche !== (leches()[0] || {}).nombre) ? leche : "", ...(sin || [])].filter(Boolean).join(" · ");
   function syncCart() { // si cambió la carta, actualiza precios y saca lo que ya no existe
     cart = cart.filter((c) => {
-      const p = find(c.id); if (!p || p.activo === false) return false; const pr = priceOf(p, c.size); if (!(pr > 0)) return false;
+      const p = find(c.id); if (!p || p.activo === false || (p.categoria === "especial" && !espOpen())) return false; const pr = priceOf(p, c.size); if (!(pr > 0)) return false;
       if (persOn(p)) {
         if (c.leche && !leches().some((l) => l.nombre === c.leche)) c.leche = (leches()[0] || {}).nombre || "";
         c.sin = (c.sin || []).filter((x) => sinOpts().includes(x));
@@ -556,26 +567,96 @@
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
   }
   function renderEspecial() {
-    const E = S.especial || {}, items = on(ESP), open = espOpen();
-    $("#espChip").textContent = E.chip || (open ? "Disponible ahora" : "Próxima edición");
+    const E = ESPC(), items = on(ESP), fase = dropFase(), open = fase === "abierto", fin = fase === "terminado", P = prog();
+    const sec = $("#especial"); renderDropBar();
+    if (items.length === 0 || (fin && E.al_terminar !== "mostrar")) { sec.hidden = true; return; }
+    sec.hidden = false; sec.classList.toggle("drop-antes", antesProg());
+    $("#espChip").textContent = fin ? "Este drop terminó" : (open ? E.chip_post || (P ? "¡Ya salió!" : E.chip) : E.chip) || (open ? "Disponible ahora" : P && E.lanzamiento ? "Sale el " + fechaDrop(E.lanzamiento) : "Próxima edición");
     $("#t-esp").textContent = E.titulo || "Edición especial";
     document.querySelectorAll('a[href="#especial"]').forEach((a) => (a.textContent = E.titulo || "Edición especial"));
-    $("#espIntro").textContent = E.intro || "";
-    $("#espGrid").innerHTML = items.map((p) => {
+    $("#espIntro").textContent = (open && E.intro_post) || E.intro || "";
+    const hideN = antesProg() && !!E.ocultar_nombres, hideP = antesProg() && !!E.ocultar_precios;
+    $("#espGrid").innerHTML = items.map((p, i) => {
       const beb = bebida(p), base = beb ? Number(p.precios["12 oz"]) : Number(p.precio);
       const foto = !!p.img, canBuy = open && !p.agotado && !sinStock(p) && base > 0;
-      const pic = foto ? `<img src="${esc(p.img)}" alt="${esc(nameOf(p))}" loading="lazy">` : `<span class="pend"><img src="img/mochito-lie.png" alt="">Foto en camino</span>`;
-      const tag = p.agotado ? '<span class="badge">Agotado</span>' : !open ? '<span class="badge">Próximamente</span>' : stockBadge(p);
-      return `<article class="prem ${p.agotado ? "agotado" : ""} ${p.esmerilado ? "soon" : ""}">
-        <button class="ph ${foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${tag}${pic}</button>
-        <h3>${esc(p.nombre)}</h3><p class="desc">${esc(p.desc)}</p>${open ? stockLine(p) : ""}
-        <div class="row">${base > 0 ? `<span class="price num">${beb ? "Desde " : ""}${money(base)}</span>` : `<span class="muted" style="font-size:.85rem">Precio a confirmar</span>`}
+      const nom = hideN ? "Sabor sorpresa" + (items.length > 1 ? " #" + (i + 1) : "") : p.nombre;
+      const pic = foto ? `<img src="${esc(p.img)}" alt="${esc(hideN ? nom : nameOf(p))}" loading="lazy">` : `<span class="pend"><img src="img/mochito-lie.png" alt="">Foto en camino</span>`;
+      const tag = p.agotado ? '<span class="badge">Agotado</span>' : fin ? '<span class="badge">Terminó</span>' : !open ? '<span class="badge">Próximamente</span>' : stockBadge(p);
+      const ph = hideN ? `<div class="ph ${foto ? "foto" : ""}">${tag}${pic}</div>` : `<button class="ph ${foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${tag}${pic}</button>`;
+      const precio = hideP ? '<span class="muted" style="font-size:.85rem">Precio el día del drop</span>' : base > 0 ? `<span class="price num">${beb ? "Desde " : ""}${money(base)}</span>` : '<span class="muted" style="font-size:.85rem">Precio a confirmar</span>';
+      return `<article class="prem ${p.agotado || fin ? "agotado" : ""} ${tapado(p) ? "soon" : ""}" style="--i:${i}">
+        ${ph}<h3>${esc(nom)}</h3><p class="desc">${esc(hideN ? "Se revela el día del drop." : p.desc)}</p>${open ? stockLine(p) : ""}
+        <div class="row">${precio}
         ${canBuy ? `<button class="add" ${beb ? `data-open="${p.id}"` : `data-quick="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>` : ""}</div>
       </article>`;
     }).join("");
-    $("#espSoon").innerHTML = open ? "" : `<div class="prem-soon"><img src="img/mochito-run.png" alt=""><div><b>Todavía no salió</b><p>Avisamos en Instagram <strong>@${esc(S.instagram || "setto.project")}</strong>.</p></div></div>`;
-    $("#especial").hidden = items.length === 0;
-    dots("espGrid");
+    const ig = `<strong>@${esc(S.instagram || "setto.project")}</strong>`;
+    $("#espSoon").innerHTML = fin ? `<div class="prem-soon"><img src="img/mochito-lie.png" alt=""><div><b>Este drop terminó</b><p>${E.avisame !== false && dropAvHtml("x") ? "Anotate y te avisamos cuando salga el próximo." : `Seguinos en Instagram ${ig} para enterarte del próximo.`}</p>${E.avisame !== false ? `<div class="cd-acts">${dropAvHtml("Avisame del próximo drop")}</div>` : ""}</div></div>`
+      : antesProg() && E.lanzamiento ? dropCdHtml()
+      : !open ? `<div class="prem-soon"><img src="img/mochito-run.png" alt=""><div><b>Todavía no salió</b><p>Avisamos en Instagram ${ig}.</p></div></div>` : "";
+    dots("espGrid"); tickDrop();
+  }
+  /* cuenta regresiva + avisame + agendar */
+  function dropCdHtml() {
+    const E = ESPC();
+    return `<div class="drop-cd">
+      ${E.cuenta !== false ? `<div class="cd" role="timer" aria-label="Falta para el lanzamiento">${[["d", "días"], ["h", "horas"], ["m", "min"], ["s", "seg"]].map(([u, l]) => `<span><b class="num" data-cd="${u}">00</b><small>${l}</small></span>`).join("")}</div>` : ""}
+      <p class="cd-when">Sale el <b>${esc(fechaDrop(E.lanzamiento))}</b></p>
+      <div class="cd-acts">${E.avisame !== false ? dropAvHtml("Avisame cuando salga") : ""}${E.calendario !== false ? calHtml() : ""}</div>
+    </div>`;
+  }
+  const faltan = () => { const ms = Math.max(0, Date.parse(ESPC().lanzamiento || "") - ahora()) || 0; return { d: Math.floor(ms / 864e5), h: Math.floor(ms / 36e5) % 24, m: Math.floor(ms / 6e4) % 60, s: Math.floor(ms / 1e3) % 60 }; };
+  const dos = (n) => String(n).padStart(2, "0");
+  let dropUlt = null;
+  function tickDrop() {
+    if (!S.especial) return;
+    const f = dropFase();
+    if (dropUlt && f !== dropUlt) { const salio = dropUlt === "antes" && f === "abierto"; dropUlt = f; syncCart(); renderEspecial(); renderCarta(); renderBadge(); if (salio) revelarDrop(); return; }
+    dropUlt = f;
+    if (f !== "antes") return;
+    const t = faltan();
+    document.querySelectorAll("[data-cd]").forEach((el) => { const v = dos(t[el.dataset.cd]); if (el.textContent !== v) el.textContent = v; });
+    const txt = (t.d ? t.d + "d " : "") + dos(t.h) + ":" + dos(t.m) + ":" + dos(t.s);
+    document.querySelectorAll("[data-cdtxt]").forEach((el) => { if (el.textContent !== txt) el.textContent = txt; });
+  }
+  setInterval(tickDrop, 1000);
+  // el momento del lanzamiento con la página abierta: se destapan las fotos
+  function revelarDrop() {
+    const sec = $("#especial"); if (!sec || sec.hidden) return;
+    sec.classList.remove("drop-reveal"); void sec.offsetWidth; sec.classList.add("drop-reveal");
+    setTimeout(() => sec.classList.remove("drop-reveal"), 2600);
+    toast(`¡Salió ${ESPC().titulo || "la edición especial"}! Ya se puede pedir`);
+  }
+  /* barra arriba de toda la web: cuenta regresiva y, al salir, "ya salió" por 48 hs */
+  const DBX = "setto-dropbar-x";
+  function renderDropBar() {
+    const E = ESPC(), f = dropFase(), lan = Date.parse(E.lanzamiento || "");
+    let cerrada = false; try { cerrada = localStorage.getItem(DBX) === f + lan; } catch (_) {}
+    const show = prog() && E.barra !== false && lan && on(ESP).length && !cerrada && (f === "antes" || (f === "abierto" && ahora() - lan < 48 * 36e5));
+    let bar = $("#dropBar");
+    if (!show) { if (bar) bar.remove(); return; }
+    if (!bar) { document.body.insertAdjacentHTML("afterbegin", '<div class="drop-bar" id="dropBar" role="region" aria-label="Lanzamiento"></div>'); bar = $("#dropBar"); }
+    const t = esc(E.titulo || "la edición especial");
+    bar.innerHTML = `<a href="/#especial">${f === "antes" ? `<i class="db-dot"></i><span><b>${t}</b> sale en <span class="num" data-cdtxt></span></span>` : `<i class="db-dot on"></i><span><b>¡Ya salió ${t}!</b> Pedilo →</span>`}</a><button type="button" class="db-x" data-dropx aria-label="Cerrar aviso">✕</button>`;
+    bar.dataset.k = f + lan;
+  }
+  /* agendar en el calendario */
+  function calDatos() {
+    const E = ESPC(), ini = new Date(Date.parse(E.lanzamiento)), fin = new Date(ini.getTime() + 36e5);
+    return { ini, fin, tit: `${E.titulo || "Edición especial"} · Setto`, det: `${E.intro ? E.intro + "\n\n" : ""}Pedilo en ${location.origin}/#especial` };
+  }
+  const zulu = (d) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  function calHtml() {
+    const c = calDatos();
+    const g = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(c.tit)}&dates=${zulu(c.ini)}/${zulu(c.fin)}&details=${encodeURIComponent(c.det)}&location=${encodeURIComponent(location.origin)}`;
+    return `<details class="cal"><summary class="btn">📅 Agendar</summary><div class="cal-m"><a href="${esc(g)}" target="_blank" rel="noopener">Google Calendar</a><button type="button" data-ics>iPhone u otro calendario</button></div></details>`;
+  }
+  function bajarIcs() {
+    const c = calDatos(), e = (t) => t.replace(/[\\;,]/g, (m) => "\\" + m).replace(/\n/g, "\\n");
+    const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Setto//Drops//ES", "BEGIN:VEVENT", `UID:drop-${c.ini.getTime()}@setto.com.ar`, `DTSTAMP:${zulu(new Date())}`, `DTSTART:${zulu(c.ini)}`, `DTEND:${zulu(c.fin)}`,
+      `SUMMARY:${e(c.tit)}`, `DESCRIPTION:${e(c.det)}`, `URL:${location.origin}/#especial`, "BEGIN:VALARM", "TRIGGER:-PT15M", "ACTION:DISPLAY", `DESCRIPTION:${e(c.tit)}`, "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([ics], { type: "text/calendar" })); a.download = "setto-drop.ics";
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
   function renderSets() {
     $("#setsGrid").innerHTML = on(SETS).map((s) => {
@@ -681,7 +762,7 @@
     }).join("")}</div></div>`;
     const sinSt = sinStock(p) && !(k === "premium" && !espOpen());
     const blocked = p.agotado || sinSt || (k === "premium" && (!espOpen() || !(Number(bebida(p) ? p.precios[sz || "12 oz"] : p.precio) > 0)));
-    $("#sheet").innerHTML = `<div class="sph ${p.esmerilado ? "frost" : ""}"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
+    $("#sheet").innerHTML = `<div class="sph ${tapado(p) ? "frost" : ""}"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
       <div class="sb">
         ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
         <h3 id="sTitle">${esc(nameOf(p))}</h3>
@@ -1104,6 +1185,46 @@
     verSeguimiento();
   });
 
+  /* ---------- avisos de drops: el cliente se anota una vez y le llega cada lanzamiento ---------- */
+  const DAV = "setto-drop-av";
+  const dropAvOn = () => { try { return localStorage.getItem(DAV) === "1"; } catch (_) { return false; } };
+  let dropIOS = false;
+  function dropAvHtml(txt) {
+    const btn = `<button type="button" class="btn solid" data-dropav>🔔 ${esc(txt)}</button>`;
+    if (!pushOk()) {
+      if (!esIOS || instalada || API.DEMO) return "";
+      return !dropIOS ? btn : `<div class="push-ios"><b>En iPhone los avisos llegan solo con Setto en tu inicio</b>
+        <ol><li>Tocá <b>Compartir</b> (el cuadrado con la flecha) abajo en Safari.</li><li>Elegí <b>Agregar a inicio</b>.</li><li>Abrí Setto desde ese ícono y tocá <b>${esc(txt)}</b>.</li></ol>
+        <small>Necesitás iOS 16.4 o más nuevo.</small></div>`;
+    }
+    if (Notification.permission === "denied") return `<p class="push-off">Bloqueaste las notificaciones de Setto. Si las querés, activalas en los ajustes del navegador.</p>`;
+    if (Notification.permission === "granted" && dropAvOn()) return `<p class="push-on">🔔 Te avisamos con una notificación. <button type="button" class="lnk" data-dropnoav>No avisarme más</button></p>`;
+    return btn;
+  }
+  document.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-dropx]")) { const bar = $("#dropBar"); try { localStorage.setItem(DBX, bar.dataset.k); } catch (_) {} bar.remove(); return; }
+    if (e.target.closest("[data-ics]")) { bajarIcs(); e.target.closest("details").open = false; return; }
+    if (e.target.closest("[data-dropnoav]")) {
+      try { const reg = await navigator.serviceWorker.getRegistration("/sw.js"); const sub = reg && (await reg.pushManager.getSubscription()); if (sub) await API.dropDesuscribir(sub.endpoint); } catch (_) {}
+      try { localStorage.removeItem(DAV); } catch (_) {}
+      toast("Listo, no te avisamos más de los drops"); renderEspecial(); return;
+    }
+    const b = e.target.closest("[data-dropav]"); if (!b) return;
+    if (!pushOk()) { dropIOS = true; renderEspecial(); return; }
+    b.disabled = true; b.textContent = "Activando…";
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") throw new Error(perm === "denied" ? "Bloqueaste las notificaciones" : "Sin permiso no podemos avisarte");
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+      const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: claveVapid(vapid) }));
+      await API.dropSuscribir(sub);
+      try { localStorage.setItem(DAV, "1"); } catch (_) {}
+      toast("¡Listo! Te avisamos cuando salga");
+    } catch (ex) { toast(ex.message || "No pudimos activar los avisos"); }
+    renderEspecial();
+  });
+
   /* ---------- cambio de pedido: el cliente elige reemplazo, sacarlo o cancelar ---------- */
   const CMB = {};
   function cambioHtml(o) {
@@ -1292,6 +1413,7 @@
   }
   async function boot() {
     $("#demoBar").hidden = !API.DEMO;
+    fetch("/", { method: "HEAD", cache: "no-store" }).then((r) => { const d = Date.parse(r.headers.get("date") || ""); if (d && Math.abs(d - Date.now()) > 3000) { SKEW = d - Date.now(); tickDrop(); } }).catch(() => {});
     renderBand(); loading();
     try {
       const stockP = API.getStock ? API.getStock().catch(() => null) : Promise.resolve(null);

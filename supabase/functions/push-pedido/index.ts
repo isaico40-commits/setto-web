@@ -1,6 +1,6 @@
 // Edge Function · push-pedido
-// La llama el trigger orders_push (migración 025) cuando un pedido cambia.
-// Busca las suscripciones del pedido y manda la notificación. Sin JWT: se valida con x-setto-hook.
+// La llama el trigger orders_push (migración 025) cuando un pedido cambia: busca las suscripciones del pedido y manda la notificación.
+// Con tipo "drop" (migración 026) avisa el lanzamiento de la edición especial a todos los anotados en drop_subs. Sin JWT: se valida con x-setto-hook.
 // Las claves (hook y VAPID) se leen de Vault con push_config(); SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY ya vienen.
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -31,12 +31,45 @@ function mensaje(tipo: string, o: Order) {
   }
 }
 
+type Sub = { endpoint: string; p256dh: string; auth: string };
+// manda a todos y devuelve los endpoints que el navegador ya no acepta
+async function enviar(subs: Sub[], payload: string, ttl: number) {
+  const muertas: string[] = [];
+  let ok = 0;
+  for (let i = 0; i < subs.length; i += 200) { // de a tandas para no saturar
+    await Promise.all(subs.slice(i, i + 200).map(async (s) => {
+      try {
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: ttl, urgency: "high" });
+        ok++;
+      } catch (e) {
+        const st = (e as { statusCode?: number }).statusCode;
+        if (st === 404 || st === 410) muertas.push(s.endpoint);
+        else console.error("push", st, (e as Error).message);
+      }
+    }));
+  }
+  return { ok, muertas };
+}
+
+async function avisarDrop() {
+  const { data: st } = await sb.from("settings").select("value").eq("key", "especial").maybeSingle<{ value: Record<string, string> }>();
+  const E = st?.value ?? {};
+  const titulo = (E.push_titulo || "").trim() || `¡Salió ${(E.titulo || "la edición especial").trim()}!`;
+  const texto = (E.push_texto || "").trim() || "Ya se puede pedir. Entrá antes de que se agote.";
+  const { data: subs } = await sb.from("drop_subs").select("endpoint,p256dh,auth");
+  const payload = JSON.stringify({ title: titulo, body: texto, url: "/#especial", tag: "setto-drop" });
+  const { ok, muertas } = await enviar(subs ?? [], payload, 12 * 3600);
+  if (muertas.length) await sb.from("drop_subs").delete().in("endpoint", muertas);
+  return Response.json({ enviadas: ok, de: subs?.length ?? 0 });
+}
+
 Deno.serve(async (req) => {
   const c = await config();
   if (req.method !== "POST" || req.headers.get("x-setto-hook") !== c.push_hook_secret) {
     return new Response("no", { status: 401 });
   }
   const { order_id, tipo } = await req.json().catch(() => ({}));
+  if (tipo === "drop") return avisarDrop();
   const { data: o } = await sb.from("orders").select("id,code,track,modo,status").eq("id", order_id).maybeSingle<Order>();
   const body = o && mensaje(tipo, o);
   if (!o || !body) return new Response("sin aviso", { status: 200 });
