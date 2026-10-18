@@ -24,6 +24,7 @@ drop policy if exists customer_consents_staff_read on public.customer_consents;
 create policy customer_consents_staff_read on public.customer_consents for select to authenticated using (public.is_staff());
 -- sin políticas de insert/update/delete: solo se escribe por las funciones de abajo
 revoke all on public.customer_consents from anon;
+revoke insert, update, delete, truncate on public.customer_consents from authenticated;
 grant select on public.customer_consents to authenticated;
 
 -- ¿se le puede escribir / usar para anuncios? Única fuente de verdad para las automatizaciones.
