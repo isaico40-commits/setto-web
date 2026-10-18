@@ -193,6 +193,8 @@ Reemplaza la app de Apps Script y la planilla "SETTO — Gastos, ingresos y resu
 
 **Stock en la web:** los mochis, la edición especial (cuando está disponible) y los sets muestran cuántos quedan en el Café, con cartel "¡Últimos!" cuando quedan pocos y "Sin stock hoy" en 0. Se prende/apaga y se cambia el umbral en **Panel → Ajustes → Stock en la web**. Desde `009_stock_bloquea_pedidos.sql` también frena: no se puede pedir más de lo disponible (stock del Café menos lo pedido y pendiente). Lo controla la base, no solo la página. Se apaga en Ajustes → "No dejar pedir más de lo que hay".
 
+**Retiros de socios:** en Inicio → Socios → **Ver retiros** (o `caja.html#retiros`). Muestra cuánto retiró cada socio por semana (lunes a domingo) o por mes, qué días retiró y el historial de períodos anteriores con el promedio. Se filtra por socio, se navega con ‹ › y se descarga en CSV. Lee los mismos movimientos de tipo *Retiro de ganancias* de `caja_movimientos`: no hay tabla aparte, así que lo cargado antes ya aparece. Cuenta por la fecha del retiro y no suma los anulados.
+
 Además: **Stock** (Café / Produ, con traslados y conteos), **Tareas** y **Lista de compras** (al tildar algo, ofrece cargar el gasto y lo deja enlazado). En Movimientos se puede descargar cada mes en CSV.
 
 ---

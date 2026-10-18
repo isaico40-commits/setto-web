@@ -179,3 +179,31 @@ main.cmain{padding-block:18px 30px}
 .loading{padding:60px 0;text-align:center;color:var(--ink-2)}
 @media (max-width:380px){.kpis{grid-template-columns:1fr 1fr}.kpi.res{grid-column:1/-1}.who-grid{grid-template-columns:1fr 1fr 1fr}}
 .hintp.reserva{display:block;color:#296A67}
+
+/* retiros de socios */
+.back{border:0;background:none;color:var(--turquesa);font-weight:600;font-size:.85rem;padding:0;margin-bottom:4px}
+.rhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 8px}
+.rhead .more{font-size:.8rem;font-weight:600;color:var(--turquesa);background:none;border:0;padding:0}
+.mesnav button:disabled{opacity:.35}
+.rsoc{display:grid;gap:8px;background:var(--card);border-radius:16px;padding:12px 14px;border:1.5px solid color-mix(in srgb,var(--turquesa) 22%,transparent)}
+.rs{display:grid;grid-template-columns:34px minmax(70px,26%) 1fr auto;gap:10px;align-items:center;font-size:.85rem}
+.rs .av{width:34px;height:34px;border-radius:50%;background:var(--menta);display:grid;place-items:center;font-weight:700;font-size:.85rem}
+.rs .t{line-height:1.25;min-width:0}
+.rs .t b{display:block;font-size:.95rem}
+.rs .t span{color:var(--ink-2);font-size:.76rem}
+.rs .tr{height:10px;border-radius:5px;background:var(--bg-2);overflow:hidden}
+.rs .tr i{display:block;height:100%;border-radius:5px;background:var(--turquesa)}
+.rs .m{font-weight:700;font-variant-numeric:tabular-nums}
+.rs.tot{grid-template-columns:1fr auto;border-top:1.5px dashed color-mix(in srgb,var(--turquesa) 30%,transparent);padding-top:8px}
+.rhist{display:grid;gap:8px}
+.rh{display:grid;gap:5px;text-align:left;width:100%;background:var(--card);border-radius:16px;padding:10px 14px;border:1.5px solid color-mix(in srgb,var(--turquesa) 22%,transparent);font-size:.82rem;color:var(--ink)}
+.rh.on{background:color-mix(in srgb,var(--menta) 60%,var(--card));border-color:var(--turquesa)}
+.rh.cero{color:var(--tachado)}
+.rh .rt{display:flex;justify-content:space-between;gap:10px;font-size:.92rem}
+.rh .rp{display:flex;flex-wrap:wrap;gap:4px 14px}
+.rh .rp .z{color:var(--tachado)}
+.rh .rd{color:var(--ink-2);font-size:.76rem}
+.rh.cero .rd{color:var(--tachado)}
+@media (max-width:520px){
+  .rs{grid-template-columns:34px minmax(64px,auto) 1fr auto;gap:8px}
+}
