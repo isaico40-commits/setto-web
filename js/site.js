@@ -144,9 +144,9 @@
       const after = c.sellos + n;
       pct = Math.min(100, Math.round((after / meta) * 100));
       txt = after >= meta ? (form.premio ? `<b>¡Completás tu tarjeta!</b> Premio: ${esc(form.premio === "descuento" ? premioDesc() + "% off" : ((SETS.find((x) => "set:" + x.id === form.premio) || {}).nombre || "set") + " de regalo")}.` : `<b>¡Completás tu tarjeta!</b> Elegí tu premio al seguir.`)
-        : `Con este pedido llegás a <b>${after} de ${meta}</b> sellos.`;
+        : `Con este pedido llegás a <b>${after} de ${meta}</b> sellos. Te ${meta - after === 1 ? "falta 1" : "faltan " + (meta - after)} para tu premio.`;
     } else {
-      txt = `Este pedido suma <b>${sellosTxt(n)}</b> del Setto Club.`;
+      txt = `Este pedido suma <b>${sellosTxt(n)}</b> del Setto Club. Con ${meta} sellos tenés premio.`;
     }
     return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div style="flex:1">${txt}${pct !== null ? `<div class="clubbar"><i style="width:${pct}%"></i></div>` : ""}</div></div>`;
   }
@@ -726,8 +726,16 @@
     $("#stamps").style.opacity = ejemplo ? ".55" : "1";
   }
   /* ---------- maquinita en la landing: los rodillos giran un toque y se abre en un pop up ---------- */
-  const MQ_IMG = ["img/mochito-cup.png", "img/mochi-frutilla.webp", "img/mochi-oreo.webp", "img/dirty-caramel.webp", "img/dirty-strawberry.webp"];
-  function renderMaquinita() { const sec = $("#maquinita"); if (sec) sec.hidden = !maqOn(); }
+  const MAQ_BASE = ["img/mochito-cup.png", "img/mochi-frutilla.webp", "img/mochi-oreo.webp", "img/dirty-caramel.webp", "img/dirty-strawberry.webp"];
+  let MQ_IMG = MAQ_BASE;
+  function renderMaquinita() {
+    const sec = $("#maquinita"); if (!sec) return; sec.hidden = !maqOn();
+    const n = Math.max(1, Math.min(5, Math.round(+(S.maquinita || {}).fichas_dia || 1)));
+    $("#mqTiradas").textContent = `${n === 1 ? "Una tirada gratis" : n + " tiradas gratis"} por día`;
+    const sim = (S.maquinita || {}).simbolos || [];
+    MQ_IMG = MAQ_BASE.map((d, i) => (sim[i] && sim[i].img) || d); // Panel → Maquinita → símbolos
+    sec.querySelectorAll(".mq-strip").forEach((st, i) => { st.innerHTML = `<img src="${esc(MQ_IMG[i])}" alt="">`; });
+  }
   function abrirMaq() {
     const f = $("#mqFrame"); if (!f.getAttribute("src")) f.src = "maquinita.html?embed";
     $("#mqView").hidden = false; document.body.style.overflow = "hidden"; $("[data-mqclose]").focus();

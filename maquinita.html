@@ -129,36 +129,56 @@ body{margin:0}
 
 <canvas id="confeti" aria-hidden="true"></canvas>
 
+<script src="js/config.js"></script>
 <script>
-(function () {
+(async function () {
   const $ = (s) => document.querySelector(s);
-  const IMG = { mochito: "img/mochito-cup.png", frutilla: "img/mochi-frutilla.webp", oreo: "img/mochi-oreo.webp", dirty: "img/dirty-caramel.webp", matcha: "img/dirty-strawberry.webp" };
+  const EMBED = document.documentElement.classList.contains("embed");
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  /* ajustes: Panel → Ajustes → Maquinita (tabla settings, lectura pública). Sin claves = modo demo del navegador. */
+  async function cargarCfg() {
+    const c = window.SETTO_CONFIG || {};
+    try {
+      if (c.supabaseUrl && c.supabaseAnonKey) {
+        const r = await fetch(`${c.supabaseUrl}/rest/v1/settings?key=eq.maquinita&select=value`, { headers: { apikey: c.supabaseAnonKey, Authorization: "Bearer " + c.supabaseAnonKey } });
+        const d = await r.json(); return (d && d[0] && d[0].value) || {};
+      }
+      const db = JSON.parse(localStorage.getItem("setto-demo-db") || "null"); return (db && db.settings && db.settings.maquinita) || {};
+    } catch (_) { return {}; }
+  }
+  const CFG = await cargarCfg();
+  const DEF_SIM = [["mochito", "Mochito", "img/mochito-cup.png"], ["frutilla", "Mochi frutilla", "img/mochi-frutilla.webp"], ["oreo", "Mochi oreo", "img/mochi-oreo.webp"], ["dirty", "Dirty caramel", "img/dirty-caramel.webp"], ["matcha", "Strawberry matcha", "img/dirty-strawberry.webp"], ["estrella", "Estrella", ""]];
+  const IMG = {}, NOMBRE = {};
+  DEF_SIM.forEach(([k, n, img], i) => { const c = (CFG.simbolos || [])[i] || {}; IMG[k] = c.img || img; NOMBRE[k] = c.nombre || n; });
+  const FICHAS = Math.max(1, Math.min(5, Math.round(+CFG.fichas_dia || 1)));
+  if (CFG.aviso === false) $(".aviso-prueba").hidden = true;
+  $(".letra").textContent = `${FICHAS === 1 ? "Una tirada gratis" : FICHAS + " tiradas gratis"} por día. No apostás nada.`;
   const ESTRELLA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1 6.1 20.3l1.3-6.5L2.5 9.3l6.6-.8z" fill="#F2C14E" stroke="#1F5452" stroke-width="1.4" stroke-linejoin="round"/></svg>';
   const SIMBOLOS = ["mochito", "frutilla", "oreo", "dirty", "matcha", "estrella"];
-  const NOMBRE = { mochito: "Mochito", frutilla: "Mochi frutilla", oreo: "Mochi oreo", dirty: "Dirty caramel", matcha: "Strawberry matcha", estrella: "Estrella" };
-  const symHtml = (k) => k === "estrella" ? ESTRELLA : `<img src="${IMG[k]}" alt="${NOMBRE[k]}" draggable="false">`;
+  const symHtml = (k) => !IMG[k] ? ESTRELLA : `<img src="${esc(IMG[k])}" alt="${esc(NOMBRE[k])}" draggable="false">`;
   const N = 5; // rodillos
 
   // En la versión real esta tabla se edita desde el panel y el resultado lo decide la base
-  const PREMIOS = [
-    { id: "gift", titulo: "Gift card $10.000", chance: 0.1, combo: () => symHtml("mochito").repeat(5) },
-    { id: "mochi", titulo: "Mochi gratis", chance: 0.5, combo: () => `<span>5 iguales</span>` },
-    { id: "off", titulo: "10% off", chance: 2, combo: () => `<span>4 iguales</span>` },
-  ];
+  const DEF_PREM = { gift: ["Gift card $10.000", 0.1], mochi: ["Mochi gratis", 0.5], off: ["10% off", 2] };
+  const COMBO = { gift: () => symHtml("mochito").repeat(5), mochi: () => `<span>5 iguales</span>`, off: () => `<span>4 iguales</span>` };
+  const PREMIOS = ["gift", "mochi", "off"].map((id) => {
+    const c = (CFG.premios || []).find((x) => x.id === id), d = DEF_PREM[id];
+    return { id, titulo: c ? String(c.titulo || "").trim() : d[0], chance: c ? Math.max(0, +c.chance || 0) : d[1], combo: COMBO[id] };
+  }).filter((p) => p.titulo && p.chance > 0);
   const fmt = (n) => n.toLocaleString("es-AR") + "%";
-  $("#premios").innerHTML = PREMIOS.map((p) => `<div class="fila"><span class="combo">${p.combo()}</span><b>${p.titulo}</b><span class="pct">${fmt(p.chance)}</span></div>`).join("");
+  $("#premios").innerHTML = PREMIOS.map((p) => `<div class="fila"><span class="combo">${p.combo()}</span><b>${esc(p.titulo)}</b><span class="pct">${fmt(p.chance)}</span></div>`).join("");
 
   /* ---------- fichas (solo este navegador) ---------- */
   const KEY = "setto-maquinita-demo";
   const hoy = () => new Date().toISOString().slice(0, 10);
-  let st = { dia: hoy(), fichas: 2 };
-  try { const g = JSON.parse(localStorage.getItem(KEY) || "null"); if (g && g.dia === hoy() && typeof g.fichas === "number") st = g; } catch (_) {}
+  let st = { dia: hoy(), fichas: FICHAS };
+  try { const g = JSON.parse(localStorage.getItem(KEY) || "null"); if (g && g.dia === hoy() && typeof g.fichas === "number") st = { dia: g.dia, fichas: Math.min(g.fichas, FICHAS) }; } catch (_) {}
   const guardar = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (_) {} };
-  let infinitas = false, forzado = null, girando = false, sonidoOn = false;
+  let infinitas = false, forzado = null, girando = false, sonidoOn = EMBED; // en el pop up de la landing arranca con sonido
   const quedan = () => (infinitas ? Infinity : st.fichas);
   function pintarFichas() {
     const n = quedan();
-    $("#fichas").innerHTML = infinitas ? "∞ fichas" : [0, 1].map((i) => `<span class="ficha ${i < n ? "" : "vacia"}"></span>`).join("") + `<span>${n === 1 ? "1 ficha" : n + " fichas"}</span>`;
+    $("#fichas").innerHTML = infinitas ? "∞ fichas" : Array.from({ length: FICHAS }, (_, i) => `<span class="ficha ${i < n ? "" : "vacia"}"></span>`).join("") + `<span>${n === 1 ? "1 ficha" : n + " fichas"}</span>`;
     $("#tirar").disabled = n === 0 || girando;
     if (n === 0 && !girando) $("#msg").textContent = "Volvé mañana por otra tirada";
   }
@@ -188,6 +208,7 @@ body{margin:0}
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   function girar() {
     if (girando || quedan() === 0) return;
+    if (sonidoOn) { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); ac.resume && ac.resume(); } catch (_) {} } // el toque en Tirar habilita el audio
     girando = true; if (!infinitas) { st.fichas--; guardar(); }
     pintarFichas(); reels.forEach((r) => r.classList.remove("win"));
     $("#msg").textContent = "…"; luces(true); beep(330, .05);
@@ -212,7 +233,7 @@ body{margin:0}
     if (!p) { $("#msg").textContent = "¡Casi! Volvé mañana"; pintarFichas(); return; }
     const top = SIMBOLOS.find((s) => fin.filter((x) => x === s).length >= 4);
     reels.forEach((r, i) => { if (fin[i] === top) r.classList.add("win"); });
-    $("#msg").innerHTML = `<span><b>¡${p.titulo}!</b>Premio de prueba</span>`;
+    $("#msg").innerHTML = `<span><b>¡${esc(p.titulo)}!</b>${CFG.aviso === false ? "" : "Premio de prueba"}</span>`;
     fanfarria(res === "gift"); confeti(res === "gift" ? 220 : res === "mochi" ? 140 : 70);
     pintarFichas();
   }
@@ -232,7 +253,7 @@ body{margin:0}
   /* ---------- sonido (opcional, arranca apagado) ---------- */
   const OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>';
   const ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>';
-  let ac = null; $("#sonido").innerHTML = OFF;
+  let ac = null; $("#sonido").innerHTML = sonidoOn ? ON : OFF; $("#sonido").setAttribute("aria-pressed", sonidoOn); if (sonidoOn) $("#sonido").setAttribute("aria-label", "Silenciar");
   $("#sonido").addEventListener("click", () => {
     sonidoOn = !sonidoOn; $("#sonido").innerHTML = sonidoOn ? ON : OFF;
     $("#sonido").setAttribute("aria-pressed", sonidoOn); $("#sonido").setAttribute("aria-label", sonidoOn ? "Silenciar" : "Activar sonido");
@@ -267,7 +288,7 @@ body{margin:0}
   $("#forzar").innerHTML = OPC.map(([k, l]) => `<button class="chip" type="button" data-f="${k}" aria-pressed="false">Próxima: ${l}</button>`).join("");
   function marcar() { document.querySelectorAll("[data-f]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === forzado)); }
   $("#forzar").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (!b) return; forzado = forzado === b.dataset.f ? null : b.dataset.f; marcar(); });
-  $("#reponer").addEventListener("click", () => { st.fichas = 2; guardar(); $("#msg").textContent = "¡Probá suerte!"; pintarFichas(); });
+  $("#reponer").addEventListener("click", () => { st.fichas = FICHAS; guardar(); $("#msg").textContent = "¡Probá suerte!"; pintarFichas(); });
   $("#infinitas").addEventListener("click", () => { infinitas = !infinitas; $("#infinitas").setAttribute("aria-pressed", infinitas); if (infinitas) $("#msg").textContent = "¡Probá suerte!"; pintarFichas(); });
   pintarFichas();
 })();
