@@ -836,7 +836,7 @@
     return out;
   }
   let view = "cart", sending = false;
-  let form = { nombre: "", tel: "", hora: "", pago: "", nota: "", modo: "retiro", dir: "", dirExtra: "", premio: "", okWa: false, okAds: false };
+  let form = { nombre: "", tel: "", hora: "", pago: "", nota: "", modo: "retiro", dir: "", dirExtra: "", premio: "", okWa: true, okAds: true }; // vienen tildadas (decisión de Isa); la versión del aviso lo deja registrado
   try { const f = JSON.parse(localStorage.getItem("setto-form") || "null"); if (f) { form.nombre = f.nombre || ""; form.tel = f.tel || ""; form.dir = f.dir || ""; form.dirExtra = f.dirExtra || ""; } } catch (_) {}
   let lastOrder = null;
   try { lastOrder = JSON.parse(sessionStorage.getItem("setto-last-order") || "null"); } catch (_) {}
@@ -913,8 +913,8 @@
         <div class="f"><span>Forma de pago</span><div class="chips">${pagosVer.map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">${form.modo === "envio" ? "Con envío, solo transferencia." : "El pago se coordina por WhatsApp."}</span></div>
         ${premioPicker()}
         ${giftBox()}
-        <div class="consent"><label><input type="checkbox" id="fOkWa" ${form.okWa ? "checked" : ""}> Quiero recibir novedades y promos de Setto por WhatsApp.</label>
-          <label><input type="checkbox" id="fOkAds" ${form.okAds ? "checked" : ""}> Pueden usar mi celular para mostrarme anuncios de Setto en Instagram y Facebook.</label>
+        <div class="consent"><label><input type="checkbox" id="fOkWa" ${form.okWa ? "checked" : ""}> Avisame por WhatsApp cuando salgan sabores nuevos o limitados.</label>
+          <label><input type="checkbox" id="fOkAds" ${form.okAds ? "checked" : ""}> Pueden usar mi número para mostrarme anuncios de Setto en Instagram y Facebook.</label>
           <span class="hintf">Las dos son opcionales y te das de baja cuando quieras en <a href="/privacidad" target="_blank">Privacidad y bajas</a>.</span></div>
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>
         <div id="fErr" class="err" hidden></div>`;
@@ -967,7 +967,7 @@
       const canales = [form.okWa && "whatsapp", form.okAds && "meta_ads"].filter(Boolean); // solo lo que marcó; no marcar no da de baja
       const org = window.SettoOrigen && window.SettoOrigen.paraPedido(); // de dónde llegó (UTM, red, QR): queda en el pedido
       if (org && API.registrarOrigen) API.registrarOrigen(o.code, ph, org).catch(() => {});
-      if (canales.length && API.registrarConsentimiento) API.registrarConsentimiento(o.code, ph, canales, (window.SettoPrivacidad || {}).VERSION || "").catch(() => {});
+      if (canales.length && API.registrarConsentimiento) API.registrarConsentimiento(o.code, ph, canales, ((window.SettoPrivacidad || {}).VERSION || "") + "-pretildada").catch(() => {});
       let track = o.track || null;
       if (!track) { try { const st = await API.orderStatus([o.code], ph); track = (st.find((x) => x.code === o.code) || {}).track || null; } catch (_) {} }
       const full = { ...o, track, nombre: form.nombre.trim(), retiro: form.hora, pago: form.pago, nota: form.nota.trim() };
@@ -978,7 +978,7 @@
       refrescarStock();
       try { sessionStorage.setItem("setto-last-order", JSON.stringify(lastOrder)); localStorage.setItem("setto-form", JSON.stringify({ nombre: form.nombre, tel: form.tel, dir: form.dir, dirExtra: form.dirExtra })); } catch (_) {}
       if (GIFT && o.gift) { const rest = GIFT.saldo - o.gift; if (rest > 0) usarGift(GIFT.code, rest); else quitarGift(); }
-      cart = []; save(); form.hora = ""; form.nota = ""; form.premio = ""; form.okWa = false; form.okAds = false; renderBadge();
+      cart = []; save(); form.hora = ""; form.nota = ""; form.premio = ""; form.okWa = true; form.okAds = true; renderBadge();
       view = "sent"; sending = false; drawDrawer();
       const link = waLink(lastOrder.message);
       abrioWhatsApp(o.code, ph);
