@@ -913,7 +913,7 @@
         <div class="f"><span>Forma de pago</span><div class="chips">${pagosVer.map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">${form.modo === "envio" ? "Con envío, solo transferencia." : "El pago se coordina por WhatsApp."}</span></div>
         ${premioPicker()}
         ${giftBox()}
-        <div class="consent"><label><input type="checkbox" id="fOkWa" ${form.okWa ? "checked" : ""}> Quiero recibir novedades y promos de Setto por WhatsApp.</label>
+        <div class="consent"><label><input type="checkbox" id="fOkWa" ${form.okWa ? "checked" : ""}> Avisame por WhatsApp cuando salgan sabores nuevos o limitados.</label>
           <label><input type="checkbox" id="fOkAds" ${form.okAds ? "checked" : ""}> Pueden usar mi celular para mostrarme anuncios de Setto en Instagram y Facebook.</label>
           <span class="hintf">Las dos son opcionales y te das de baja cuando quieras en <a href="/privacidad" target="_blank">Privacidad y bajas</a>.</span></div>
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>
@@ -935,10 +935,28 @@
         <p class="muted" style="font-size:.9rem">${lastOrder.modo === "envio" ? "Mandanos el WhatsApp y te confirmamos envío y pago." : "Mandanos el WhatsApp y te confirmamos dirección y pago."}${clubOn() ? " Al recibirlo sumás tu sello." : ""}</p></div>
         <div class="dtrk sent-trk">${trackCard(est)}</div>
         <p class="muted" style="font-size:.84rem;text-align:center">Te avisamos acá cuando esté listo. El link para volver va en tu WhatsApp.</p>
+        ${sumarmeHtml()}
         <div class="msg" id="msgText" hidden>${esc(lastOrder.message)}</div>`;
       foot.innerHTML = `<a class="btn wa big" href="${waLink(lastOrder.message)}" target="_blank" rel="noopener" data-resend>${lastOrder.enviado ? "Reenviar mensaje por WhatsApp" : "Enviar por WhatsApp"}</a>
         <div style="display:flex;justify-content:center;gap:18px"><button class="back" id="copyMsg">Copiar mensaje</button><button class="back" id="newOrder">Hacer otro pedido</button></div>`;
     }
+  }
+
+  // si no marcó la casilla al pedir, una segunda chance: un toque y queda con permiso (con el código del pedido de hoy, como la casilla)
+  function sumarmeHtml() {
+    if (!lastOrder || !API.registrarConsentimiento || lastOrder.okWa === undefined) return "";
+    if (lastOrder.okWa) return lastOrder.recienSumado ? `<p class="sumarme ok">Listo, te vas a enterar primero de los sabores nuevos.</p>` : "";
+    return `<div class="sumarme"><div><b>¿Te avisamos cuando salga un sabor nuevo?</b><small>Por WhatsApp, pocas veces al mes. Respondés BAJA y listo.</small></div><button class="btn solid" id="sumarWa">Sí, avisame</button></div>`;
+  }
+  async function sumarWhatsApp(b) {
+    const ph = telDe(lastOrder.code); if (!ph) return;
+    b.disabled = true; b.textContent = "Un momento…";
+    try {
+      await API.registrarConsentimiento(lastOrder.code, ph, ["whatsapp"], (window.SettoPrivacidad || {}).VERSION || "");
+      lastOrder.okWa = true; lastOrder.recienSumado = true;
+      try { sessionStorage.setItem("setto-last-order", JSON.stringify(lastOrder)); } catch (_) {}
+      drawDrawer();
+    } catch (_) { b.disabled = false; b.textContent = "Probá de nuevo"; }
   }
 
   // el cliente abre WhatsApp para mandar el pedido: Contact en Meta (no es una compra) y queda anotado en el pedido
@@ -971,7 +989,7 @@
       let track = o.track || null;
       if (!track) { try { const st = await API.orderStatus([o.code], ph); track = (st.find((x) => x.code === o.code) || {}).track || null; } catch (_) {} }
       const full = { ...o, track, nombre: form.nombre.trim(), retiro: form.hora, pago: form.pago, nota: form.nota.trim() };
-      lastOrder = { code: o.code, track, message: buildMessage(full), modo: o.modo || "retiro", premio: !!o.premio, premio_txt: o.premio_txt, enviado: true };
+      lastOrder = { code: o.code, track, message: buildMessage(full), modo: o.modo || "retiro", premio: !!o.premio, premio_txt: o.premio_txt, enviado: true, okWa: canales.includes("whatsapp") };
       cardCache = null;
       trackVivos = [{ code: o.code, status: "pendiente", etapa: "recibido", modo: o.modo || "retiro", retiro: form.hora, created_at: new Date().toISOString(), track }, ...trackVivos.filter((x) => x.code !== o.code)];
       guardarSeguimiento({ code: o.code, phone: ph, track, at: Date.now(), px: pxPed });
@@ -1035,6 +1053,7 @@
     if (b.dataset.pago) { form.pago = b.dataset.pago; document.querySelectorAll("[data-pago]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); }
     if (b.id === "toWA") sendOrder();
     if (b.dataset.resend !== undefined && lastOrder) abrioWhatsApp(lastOrder.code, telDe(lastOrder.code));
+    if (b.id === "sumarWa" && lastOrder) sumarWhatsApp(b);
     if (b.dataset.premio) { form.premio = b.dataset.premio; drawDrawer(); }
     if (b.dataset.modo) { form.modo = b.dataset.modo; drawDrawer(); if (form.modo === "envio") setTimeout(() => { const d = $("#fDir"); if (d && !d.value) d.focus(); }, 30); }
     if (b.id === "copyMsg") {
