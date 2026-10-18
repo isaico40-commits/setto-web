@@ -222,7 +222,8 @@ index.html          sitio público
 panel.html          panel del equipo
 css/site.css        estilos (sistema visual Setto)
 css/panel.css       estilos del panel
-js/config.js        ← acá van las claves de Supabase
+js/config.js        ← acá van las claves de Supabase y el ID del Pixel de Meta
+js/pixel.js         Pixel de Meta (solo en la web pública; sin ID no carga)
 js/api.js           conexión a Supabase / modo demo
 js/site.js          lógica del sitio
 js/panel.js         lógica del panel

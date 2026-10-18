@@ -170,6 +170,9 @@
     });
     save();
   }
+  /* Pixel de Meta (js/pixel.js): solo IDs de producto, cantidades y montos */
+  const px = (name, data) => { if (window.SettoPixel) window.SettoPixel.track(name, data); };
+  const pxCarrito = () => ({ content_type: "product", content_ids: [...new Set(cart.map((c) => c.id))], contents: cart.map((c) => ({ id: c.id, quantity: c.qty, item_price: c.precio })), num_items: units() });
   function addItem(p, sz, qty = 1, leche = "", sin = []) {
     const fr = frenoStock(p, qty); if (fr) { toast(fr); return false; }
     if (!persOn(p)) { leche = ""; sin = []; }
@@ -178,6 +181,8 @@
     if (ex) ex.qty += qty;
     else cart.push({ key, id: p.id, nombre: nameOf(p), size: sz || "", leche, sin: [...sin], detalle: detalleOf(leche, sin), precio: priceOf(p, sz) + lechePrecio(leche), img: p.img || "img/mochito-lie.png", qty });
     save(); renderBadge(); toast("Sumado: " + nameOf(p) + (sz ? " · " + sz : ""));
+    const pu = priceOf(p, sz) + lechePrecio(leche);
+    px("AddToCart", { content_type: "product", content_ids: [p.id], content_name: nameOf(p), contents: [{ id: p.id, quantity: qty, item_price: pu }], value: pu * qty });
     return true;
   }
   let toastT;
@@ -748,6 +753,7 @@
     const p = find(id); if (!p) return;
     sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1, leche: persOn(p) ? (leches()[0] || {}).nombre || "" : "", sin: [], rvOpen: false };
     drawSheet();
+    px("ViewContent", { content_type: "product", content_ids: [p.id], content_name: nameOf(p), value: Number(priceOf(p, sheetState.sz)) || 0 });
     $("#sheet").classList.add("on"); $("#scrim").classList.add("on"); renderBadge();
     setTimeout(() => $("#sheet .x").focus(), 60);
   }
@@ -938,6 +944,7 @@
     try {
       const isEnv = form.modo === "envio";
       const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [] })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null, gift: GIFT ? GIFT.code : null });
+      if (window.SettoPixel) window.SettoPixel.purchase(o.code, { ...pxCarrito(), value: Number(o.total) || 0 });
       const ph = o.phone || API.normPhone(form.tel);
       let track = o.track || null;
       if (!track) { try { const st = await API.orderStatus([o.code], ph); track = (st.find((x) => x.code === o.code) || {}).track || null; } catch (_) {} }
@@ -952,7 +959,7 @@
       cart = []; save(); form.hora = ""; form.nota = ""; form.premio = ""; renderBadge();
       view = "sent"; sending = false; drawDrawer();
       const link = waLink(lastOrder.message);
-      if (matchMedia("(pointer:coarse)").matches) location.href = link;
+      if (matchMedia("(pointer:coarse)").matches) setTimeout(() => { location.href = link; }, window.SettoPixel && window.SettoPixel.on ? 350 : 0); // le damos tiempo al pixel antes de abrir WhatsApp
       else window.open(link, "_blank", "noopener");
     } catch (e) {
       sending = false;
@@ -1000,7 +1007,7 @@
     if (b.id === "openCart" || b.id === "mbarBtn") openDrawer();
     if (b.id === "dClose" || b.dataset.closedrawer !== undefined) closeDrawer();
     if (b.id === "dBack") { view = "cart"; drawDrawer(); }
-    if (b.id === "toCheckout") { view = "checkout"; drawDrawer(); }
+    if (b.id === "toCheckout") { view = "checkout"; drawDrawer(); if (cart.length) px("InitiateCheckout", { ...pxCarrito(), value: total() }); }
     if (b.id === "toBuscar") { BQ.res = null; BQ.err = ""; BQ.tel = BQ.tel || form.tel; view = "buscar"; drawDrawer(); setTimeout(() => { const i = $("#bqTel"); if (i && !i.value) i.focus(); }, 30); }
     if (b.dataset.pago) { form.pago = b.dataset.pago; document.querySelectorAll("[data-pago]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); }
     if (b.id === "toWA") sendOrder();
