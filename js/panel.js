@@ -469,8 +469,7 @@
           <div class="row2"><label>Opción: % de descuento (0 = no ofrecer)<input class="inp" name="pdesc" type="number" min="0" max="100" value="${club.premio_descuento ?? 35}"></label>
           <label>Tope del descuento en $ (0 = sin tope)<input class="inp" name="ptope" type="number" min="0" step="500" value="${club.premio_tope || 0}"></label></div>
           <label>Pedido mínimo para sumar sello (0 = sin mínimo)<input class="inp" name="minimo" type="number" min="0" step="500" value="${club.minimo || 0}"></label>
-          <label>Regalo que trae cada pedido (vacío = no mostrar)<input class="inp" name="regalo" maxlength="80" value="${esc(club.regalo ?? "un sticker de Mochito")}" placeholder="Ej: un sticker de Mochito"></label>
-          <span class="hintp">Se muestra en el Club y en el carrito: “Tu pedido trae de regalo …”.</span>
+          <div class="checks"><label><input type="checkbox" name="regalo" ${club.regalo !== false && club.regalo !== "" ? "checked" : ""}> Avisar que cada pedido trae un regalo (en el Club y en el carrito)</label></div>
           <span class="hintp">El premio se entrega en el mismo pedido que completa la tarjeta.</span>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="personalizacion"><b>Personalización de bebidas</b>
@@ -502,9 +501,7 @@
           <label>Cambia cada (segundos)<input class="inp" name="intervalo" type="number" min="3" max="15" value="${(S.hero || {}).intervalo || 5}" style="width:120px"></label>
           <button class="btn solid">Guardar portada</button></form>
         <form class="pcard" data-set="maquinita"><b>Maquinita</b>
-          <label class="chk"><input type="checkbox" name="boton" ${(S.maquinita || {}).boton !== false ? "checked" : ""}> Mostrar el botón “¿Probás suerte?” en el carrito y en el Club</label>
-          <label>Fichas de regalo por pedido (0 = no avisar)<input class="inp" name="fichas" type="number" min="0" max="10" value="${(S.maquinita || {}).fichas_por_pedido || 0}" style="width:120px"></label>
-          <span class="hintp">Por ahora la web solo avisa las fichas: todavía no se cargan solas en la maquinita.</span>
+          <label class="chk"><input type="checkbox" name="activo" ${(S.maquinita || {}).activo !== false ? "checked" : ""}> Mostrar la maquinita en la web (sección entre Sets y Carta y botón del carrito)</label>
           <button class="btn solid">Guardar maquinita</button></form>
         <form class="pcard" data-set="stickers"><b>Stickers de WhatsApp</b>
           <span class="hintp">Subí el pack a Sticker.ly desde el celu, tocá Compartir y pegá acá el link. Sin link la sección no se muestra.</span>
@@ -599,7 +596,7 @@
     { k: "mensajes", g: "Pedidos", t: "Mensajes de WhatsApp", d: "Los textos que se arman solos para el cliente y para ustedes.", s: (S) => { const n = Object.keys(S.mensajes || {}).length; return n ? `${n} cambiados` : "Los originales"; } },
     { k: "club", g: "Clientes", t: "Setto Club", d: "Sellos, premio, pedido mínimo y regalo de cada pedido.", s: (S) => ((S.club || {}).activo !== false ? `${(S.club || {}).meta || 8} sellos` : "Apagado") },
     { k: "giftcards", g: "Clientes", t: "Gift cards", d: "Montos y diseños de las tarjetas de regalo.", s: (S) => ((S.giftcards || {}).activo !== false ? "A la venta" : "Apagado") },
-    { k: "maquinita", g: "Clientes", t: "Maquinita", d: "El botón para probar suerte y las fichas que regala cada pedido.", s: (S) => { const m = S.maquinita || {}, n = +m.fichas_por_pedido || 0; return (m.boton !== false ? "Botón visible" : "Botón oculto") + (n ? ` · ${n} ${n === 1 ? "ficha" : "fichas"} por pedido` : " · sin fichas"); } },
+    { k: "maquinita", g: "Clientes", t: "Maquinita", d: "La sección para probar suerte y el botón del carrito.", s: (S) => ((S.maquinita || {}).activo !== false ? "Visible" : "Oculta") },
     { k: "votacion", g: "Clientes", t: "Votación", d: "Una pregunta con opciones para que voten en la web.", s: (S) => ((S.votacion || {}).activo ? "Abierta" : "Apagada") },
     { k: "hero", g: "Web", t: "Portada", d: "Las slides del inicio y sus botones.", s: (S) => `${((S.hero || {}).slides || []).length} slides` },
     { k: "ventajas", g: "Web", t: "Pedir acá te conviene", d: "Los motivos para pedir por la web.", s: (S) => ((S.ventajas || {}).activo !== false ? `${((S.ventajas || {}).items || []).length} motivos` : "Oculto") },
@@ -667,8 +664,8 @@
         await API.saveSetting("retiro", { dias, rangos: rangos.map(([a, b]) => [a.padStart(5, "0"), b.padStart(5, "0")]), cadaMin: Math.max(5, +f.cada || 30), anticipacionMin: Math.max(0, +f.antic || 0) });
       }
       if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: Math.max(0, Math.min(10, +f.spp)), premio: (f.premio || "").trim(), minimo: Math.max(0, +f.minimo || 0),
-        premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0), regalo: (f.regalo || "").trim() });
-      if (k === "maquinita") await API.saveSetting("maquinita", { boton: !!f.boton, fichas_por_pedido: Math.max(0, Math.min(10, Math.round(+f.fichas || 0))) });
+        premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0), regalo: !!f.regalo });
+      if (k === "maquinita") await API.saveSetting("maquinita", { activo: !!f.activo });
       if (k === "personalizacion") {
         const leches = (f.leches || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const [n, pr] = s.split("|").map((x) => x.trim()); return { nombre: n, precio: Math.max(0, Math.round(+String(pr || "0").replace(/[^0-9.,]/g, "").replace(/\.(?=\d{3})/g, "").replace(",", ".")) || 0) }; }).filter((l) => l.nombre);
         await API.saveSetting("personalizacion", { activo: !!f.activo, leches, sin: (f.sin || "").split("\n").map((s) => s.trim()).filter(Boolean) });

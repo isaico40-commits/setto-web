@@ -97,17 +97,10 @@
   const clubOn = () => club().activo !== false && (club().sellos_por_pedido ?? 1) > 0;
   const spp = () => club().sellos_por_pedido ?? 1;
   const sellosTxt = (n) => n + (n === 1 ? " sello" : " sellos");
-  /* regalo de cada pedido (Panel → Setto Club) y fichas de la maquinita (Panel → Maquinita) */
-  const regaloTxt = () => { const r = club().regalo; return r === undefined || r === null ? "un sticker de Mochito" : String(r).trim(); };
-  const maq = () => S.maquinita || {};
-  const maqOn = () => maq().boton !== false;
-  const fichasPP = () => Math.max(0, Math.round(Number(maq().fichas_por_pedido) || 0));
-  const fichasTxt = (n) => n + (n === 1 ? " ficha" : " fichas");
-  function regaloPartes() { const f = fichasPP(); return [regaloTxt() && esc(regaloTxt()), f && `<b>${fichasTxt(f)}</b> para la maquinita`].filter(Boolean); }
-  function regaloLine() {
-    const p = regaloPartes(); if (!p.length) return "";
-    return `<div class="regaloline"><span class="rg-ico" aria-hidden="true">🎁</span><span>Tu pedido trae de regalo ${p.join(" y ")}.</span></div>`;
-  }
+  /* regalo de cada pedido (Panel → Setto Club) y maquinita (Panel → Maquinita) */
+  const regaloOn = () => club().regalo !== false && club().regalo !== "";
+  const maqOn = () => (S.maquinita || {}).activo !== false;
+  const regaloLine = () => regaloOn() ? `<div class="regaloline"><span class="rg-ico" aria-hidden="true">🎁</span><span>Tu pedido trae un regalo.</span></div>` : "";
   let cardCache = null; // {tel, data}
   async function loadCard(force) {
     const tel = API.normPhone(form.tel); if (!tel || !clubOn()) return null;
@@ -719,8 +712,7 @@
     $("#club").hidden = c.activo === false;
     $("#clubPremio").textContent = `El pedido que completa los ${c.meta || 8} sellos viene con ${premioTxt()}.` + (c.minimo > 0 ? ` Suman sello los pedidos desde ${money(c.minimo)}.` : "");
 
-    const p = regaloPartes(), rg = $("#clubRegalo");
-    if (rg) { rg.hidden = !p.length && !maqOn(); rg.innerHTML = (p.length ? `<span class="rg-ico" aria-hidden="true">🎁</span><span>Además, cada pedido trae de regalo ${p.join(" y ")}.</span>` : "") + (maqOn() ? `<a class="btn" href="/maquinita">Probar la maquinita</a>` : ""); }
+    $("#clubRegalo").hidden = !regaloOn();
     $("#mnavClub").hidden = !clubOn();
     drawStamps(0, c.meta || 8, true);
   }
@@ -733,6 +725,24 @@
     }).join("");
     $("#stamps").style.opacity = ejemplo ? ".55" : "1";
   }
+  /* ---------- maquinita en la landing: los rodillos giran un toque y abre /maquinita ---------- */
+  const MQ_IMG = ["img/mochito-cup.png", "img/mochi-frutilla.webp", "img/mochi-oreo.webp", "img/dirty-caramel.webp", "img/dirty-strawberry.webp"];
+  function renderMaquinita() { const sec = $("#maquinita"); if (sec) sec.hidden = !maqOn(); }
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("#mqTirar"); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    e.preventDefault(); if (a.dataset.giro) return; a.dataset.giro = "1";
+    const reels = [...document.querySelectorAll("#maquinita .mq-reel")], h = reels[0].getBoundingClientRect().height;
+    reels.forEach((r, i) => {
+      const st = r.querySelector(".mq-strip"), imgs = [st.lastElementChild.getAttribute("src")];
+      for (let k = 0; k < 8 + i * 3; k++) imgs.push(MQ_IMG[Math.floor(Math.random() * MQ_IMG.length)]);
+      st.style.transition = "none"; st.style.transform = "translateY(0)";
+      st.innerHTML = imgs.map((x) => `<img src="${x}" alt="">`).join(""); void st.offsetHeight;
+      st.style.transition = `transform ${500 + i * 180}ms cubic-bezier(.3,.1,.3,1)`; st.style.transform = `translateY(${-(imgs.length - 1) * h}px)`;
+    });
+    setTimeout(() => { location.href = a.getAttribute("href"); }, 1000);
+  });
+  window.addEventListener("pageshow", () => { const a = $("#mqTirar"); if (a) delete a.dataset.giro; });
   function renderFooter() {
     const r = S.retiro || { rangos: [] };
     HORARIO = "De " + r.rangos.map(([a, b]) => a.replace(":00", "") + " a " + b.replace(":00", "")).join(" y de ") + " hs.";
@@ -1443,7 +1453,7 @@
       verSeguimiento(); renderResenas();
       API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
       S = settings; adapt(products); syncCart();
-      renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
+      renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
       if (PAGE === "listo" && form.tel && clubOn()) setTimeout(() => { if (!lsTel) { lsTel = true; $("#cardForm").requestSubmit(); } }, 1500);
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
