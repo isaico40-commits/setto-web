@@ -7,6 +7,8 @@
     supabaseUrl     → "Project URL"      (ej: https://abcdxyz.supabase.co)
     supabaseAnonKey → "anon public" key  (es pública, se puede ver en el navegador)
     vapidPublicKey  → clave pública de las notificaciones push (la privada va solo en Supabase)
+    metaPixelId     → ID del Pixel de Meta (Administrador de eventos → Orígenes de datos). Solo números.
+                      Vacío = el pixel no carga. Solo se usa en la web pública, no en el panel ni en la caja.
 
   Si los dejás vacíos, el sitio y el panel funcionan en MODO DEMO:
   todo se guarda solo en el navegador, sirve para probar el flujo.
@@ -16,5 +18,6 @@
 window.SETTO_CONFIG = {
   supabaseUrl: "https://vqgfckswnqoekotmsyam.supabase.co",
   supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxZ2Zja3N3bnFvZWtvdG1zeWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MTg1MDAsImV4cCI6MjEwNzQ5NDUwMH0.-NXk57js5N6LN2PG0tGL7HEBNbwM9vc0zngbtTmSDeI",
-  vapidPublicKey: "BL2Sm_fE53J-B1j21yYKMB1uKOTLMNZ0d5nxxeqVS0nQ4PHyr8iWeSbJA9uYLUzf8cd3Y7cZ4l9O_XQD50RdAp4"
+  vapidPublicKey: "BL2Sm_fE53J-B1j21yYKMB1uKOTLMNZ0d5nxxeqVS0nQ4PHyr8iWeSbJA9uYLUzf8cd3Y7cZ4l9O_XQD50RdAp4",
+  metaPixelId: "1587354699748340"
 };
