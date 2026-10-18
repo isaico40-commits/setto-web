@@ -121,6 +121,11 @@ En el panel, pestaña **Reseñas**: **Publicar** u **Ocultar**. En la web, en "L
 
 - **Todas las reseñas:** botón "Ver todas las reseñas" y link "Reseñas" en el menú: promedio, barras por estrellas, filtros (con foto, con comentario, por estrellas) e incluye las que son solo puntaje.
 
+### Avisos en tu celu (panel)
+Tocá la campanita 🔔 del panel y **Activar avisos**. Ese dispositivo recibe una notificación con cada pedido nuevo, gift card pedida, cliente que responde un cambio y reseña para aprobar, aunque el panel esté cerrado. Solo le llega a quien la active en su dispositivo; se apaga desde el mismo lugar.
+En iPhone funciona solo con el panel agregado a la pantalla de inicio (Safari → Compartir → Agregar a inicio, iOS 16.4 o más) y activando desde ese ícono.
+Usa la tabla `staff_push_subs` y la misma Edge Function `push-pedido` (migración `027_avisos_equipo.sql`). En producción, crear cada trigger por separado con `set lock_timeout`.
+
 ### Avisar por WhatsApp
 Cada pedido pendiente tiene **Avisar por WhatsApp**: abre el chat del cliente con el mensaje del estado actual (recibido, en preparación, listo o en camino). Lo mandás vos con un toque, sin costo.
 
