@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es-AR" data-privacidad="pagina">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Privacidad y bajas · Setto</title>
+<meta name="description" content="Qué datos guarda Setto cuando pedís, para qué los usa y cómo darte de baja de las novedades por WhatsApp y de los anuncios.">
+<meta name="theme-color" content="#FAF4E8">
+<link rel="icon" href="img/mochito-cup.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Poppins:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/site.css">
+<style>
+  .priv{max-width:680px;margin-inline:auto;padding:28px 16px 64px;display:grid;gap:22px}
+  .priv h1{font-size:clamp(2rem,6vw,2.6rem)}
+  .priv h2{font-size:1.35rem;margin-bottom:6px}
+  .priv .card{background:var(--card);border:var(--line);border-radius:var(--r);box-shadow:var(--sombra-chica);padding:18px;display:grid;gap:10px}
+  .priv ul{margin:0;padding-left:20px;display:grid;gap:4px}
+  .priv .acts{display:flex;gap:10px;flex-wrap:wrap}
+  .priv .estado{font-weight:600;color:var(--turquesa)}
+  .priv .msg{font-size:.9rem;min-height:1.4em}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap"><a class="logo" href="/" aria-label="Setto, inicio"><img src="img/logo.svg" alt="Setto"></a></div></header>
+<main class="priv">
+  <div><span class="eyebrow">Setto</span><h1>Privacidad y bajas</h1></div>
+
+  <section class="card">
+    <h2>Qué guardamos cuando pedís</h2>
+    <ul>
+      <li>Tu nombre y tu celular, para coordinar el pedido por WhatsApp y sumar sellos del Setto Club.</li>
+      <li>Lo que pediste, el horario y la forma de pago. Si pedís envío, la dirección.</li>
+    </ul>
+    <p class="muted">No te creamos una cuenta y no te pedimos email.</p>
+  </section>
+
+  <section class="card" id="pixelBox">
+    <h2>Medición y anuncios en la web</h2>
+    <p>Usamos el Pixel de Meta para saber qué productos se miran y qué pedidos se concretan, y para mostrar anuncios de Setto en Instagram y Facebook. No le mandamos tu nombre, tu celular ni tu dirección.</p>
+    <p>Ahora: <span class="estado" id="pxEstado">…</span></p>
+    <div class="acts"><button class="btn solid" id="pxSi">Activar</button><button class="btn" id="pxNo">Desactivar</button></div>
+  </section>
+
+  <section class="card">
+    <h2>Novedades por WhatsApp y anuncios con tu celular</h2>
+    <p>Solo te escribimos novedades o usamos tu celular para anuncios si lo marcaste al hacer un pedido. Comprar no te suscribe a nada.</p>
+    <form id="bajaForm" style="display:grid;gap:10px">
+      <label class="f" for="bajaTel">Tu celular<input id="bajaTel" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 347-1277" required></label>
+      <div class="acts">
+        <button class="btn" type="submit" data-canal="whatsapp">Baja de WhatsApp</button>
+        <button class="btn" type="submit" data-canal="meta_ads">Baja de anuncios</button>
+        <button class="btn solid" type="submit" data-canal="">Baja de todo</button>
+      </div>
+      <p class="msg" id="bajaMsg" role="status"></p>
+    </form>
+    <p class="muted" style="font-size:.88rem">También podés escribirnos <b>BAJA</b> por WhatsApp y lo hacemos nosotros.</p>
+  </section>
+
+  <p><a class="btn" href="/">Volver a Setto</a></p>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/pixel.js"></script>
+<script src="js/privacidad.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/api.js"></script>
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s), API = window.SettoAPI, PV = window.SettoPrivacidad;
+  function pintar() {
+    if (!window.SettoPixel.disponible) { $("#pixelBox").hidden = true; return; }
+    const p = PV.leer();
+    $("#pxEstado").textContent = p && p.anuncios ? "activado" : p ? "desactivado" : "desactivado (todavía no elegiste)";
+  }
+  $("#pxSi").addEventListener("click", () => { PV.elegir(true); pintar(); });
+  $("#pxNo").addEventListener("click", () => { PV.elegir(false); pintar(); });
+  pintar();
+  let canal = "";
+  document.querySelectorAll("#bajaForm [data-canal]").forEach((b) => b.addEventListener("click", () => { canal = b.dataset.canal; }));
+  $("#bajaForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = $("#bajaMsg"), tel = $("#bajaTel").value;
+    if (!API.normPhone(tel)) { msg.textContent = "Revisá el número: código de área + número, por ejemplo 223 347-1277."; return; }
+    msg.textContent = "Un momento…";
+    try {
+      await API.bajaMarketing(tel, canal || null);
+      msg.textContent = canal === "whatsapp" ? "Listo. No te vamos a mandar más novedades por WhatsApp." : canal === "meta_ads" ? "Listo. No vamos a usar tu celular para anuncios." : "Listo. Quedaste fuera de las novedades por WhatsApp y de los anuncios.";
+    } catch (err) { msg.textContent = err.message || "No pudimos registrar la baja. Escribinos BAJA por WhatsApp."; }
+  });
+})();
+</script>
+</body>
+</html>

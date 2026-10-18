@@ -308,6 +308,7 @@
     const box = $("#cResult"); if (!box) return;
     try {
       const r = await API.findCustomer(phone); P.client = r.phone;
+      let cons = null; try { cons = API.consentimientos ? await API.consentimientos(r.phone) : null; } catch (_) { cons = null; } // sin migración 030: no se muestra
       const meta = (P.settings.club || {}).meta || 8, c = r.customer || { sellos: 0, canjes: 0 };
       const stamps = Array.from({ length: meta }, (_, i) => `<div class="stamp ${i < c.sellos ? "on" : ""} ${i === meta - 1 ? "gift" : ""}">${i < c.sellos ? '<img src="img/mochito-run.png" alt="">' : i === meta - 1 ? "★" : i + 1}</div>`).join("");
       box.innerHTML = `<section class="sec"><div class="pcard">
@@ -317,11 +318,22 @@
         <p><b class="num">${c.sellos}</b> de ${meta} sellos · ${c.canjes} canje(s)</p>
         <div class="acts"><button class="btn" data-cadd="1">+1 sello</button><button class="btn" data-cadd="-1">−1</button>
           <button class="btn solid" data-redeem ${c.sellos >= meta ? "" : "disabled style='opacity:.5'"}>Canjear premio</button></div>
+        ${cons ? consentHtml(cons) : ""}
         <b style="margin-top:6px">Historial</b>
         <div class="hist">${(r.events || []).map((e) => `<div><span>${esc(e.motivo || "")} <span class="muted">${ago(e.created_at)}</span></span><span class="${e.delta > 0 ? "pos" : "neg"} num">${e.delta > 0 ? "+" : ""}${e.delta}</span></div>`).join("") || '<span class="muted">Sin movimientos.</span>'}</div>
         ${(r.orders || []).length ? `<b>Pedidos</b><div class="hist">${r.orders.map((o) => `<div><span>${esc(o.code)} · ${esc(o.status)} <span class="muted">${ago(o.created_at)}</span></span><span class="num">${money(o.total)}</span></div>`).join("")}</div>` : ""}
       </div></section>`;
     } catch (e) { box.innerHTML = `<p class="err" style="margin-top:14px">${esc(e.message)}</p>`; }
+  }
+
+  // permisos de marketing: vale el último registro de cada canal. El equipo solo puede dar de baja, nunca autorizar.
+  const CANALES = [["whatsapp", "Novedades por WhatsApp"], ["meta_ads", "Anuncios de Meta"]];
+  const ORIGEN = { checkout_web: "al pedir en la web", preferencias_web: "desde la web", panel: "desde el panel", whatsapp: "por WhatsApp" };
+  function consentHtml(l) {
+    return `<b style="margin-top:6px">Permisos de marketing</b><div class="hist">${CANALES.map(([k, nom]) => {
+      const u = l.find((x) => x.canal === k), si = u && u.estado === "otorgado";
+      return `<div><span>${nom} · ${si ? "<b>Sí</b>" : u ? "Se dio de baja" : "No"} <span class="muted">${u ? `${ORIGEN[u.origen] || u.origen} · ${ago(u.created_at)}` : "nunca lo aceptó"}</span></span>${si ? `<button class="linkbtn" data-baja="${k}">Dar de baja</button>` : ""}</div>`;
+    }).join("")}</div>`;
   }
 
   /* =================== CARTA =================== */
@@ -834,6 +846,7 @@
       }
     }
     if (b.dataset.cadd) { try { const r = await API.addStamps(P.client, "", +b.dataset.cadd, b.dataset.cadd > 0 ? "Manual" : "Corrección"); toast(`Ahora tiene ${r.sellos} sello(s)`); openClient(P.client); listClients(); } catch (err) { toast(err.message); } }
+    if (b.dataset.baja) { if (!confirm("¿Dar de baja este permiso? Las automatizaciones dejan de usar este número para eso.")) return; try { await API.bajaMarketing(P.client, b.dataset.baja); toast("Listo, quedó dado de baja"); openClient(P.client); } catch (err) { toast(err.message); } }
     if (b.dataset.redeem !== undefined) { try { await API.redeem(P.client); toast("Premio canjeado"); openClient(P.client); listClients(); } catch (err) { toast(err.message); } }
 
     /* carta */
