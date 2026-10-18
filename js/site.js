@@ -930,6 +930,12 @@
     }
   }
 
+  // el cliente abre WhatsApp para mandar el pedido: Contact en Meta (no es una compra) y queda anotado en el pedido
+  function abrioWhatsApp(code, phone) {
+    if (!code) return;
+    if (window.SettoPixel) window.SettoPixel.once("Contact:" + code, () => window.SettoPixel.track("Contact", { content_category: "pedido" }, "contacto-" + code));
+    if (API.marcarContacto && phone) API.marcarContacto(code, phone).catch(() => {});
+  }
   async function sendOrder() {
     const err = []; const el = $("#fErr");
     if (!form.nombre.trim()) err.push("tu nombre");
@@ -944,7 +950,8 @@
     try {
       const isEnv = form.modo === "envio";
       const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [] })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null, gift: GIFT ? GIFT.code : null });
-      if (window.SettoPixel) window.SettoPixel.purchase(o.code, { ...pxCarrito(), value: Number(o.total) || 0 });
+      const pxPed = pxCarrito(); // para mandar Purchase con los mismos productos cuando el pedido se entregue
+      if (window.SettoPixel) window.SettoPixel.once("order_created:" + o.code, () => window.SettoPixel.custom("order_created", { ...pxPed, value: Number(o.total) || 0 }, "creado-" + o.code));
       const ph = o.phone || API.normPhone(form.tel);
       let track = o.track || null;
       if (!track) { try { const st = await API.orderStatus([o.code], ph); track = (st.find((x) => x.code === o.code) || {}).track || null; } catch (_) {} }
@@ -952,13 +959,14 @@
       lastOrder = { code: o.code, track, message: buildMessage(full), modo: o.modo || "retiro", premio: !!o.premio, premio_txt: o.premio_txt, enviado: true };
       cardCache = null;
       trackVivos = [{ code: o.code, status: "pendiente", etapa: "recibido", modo: o.modo || "retiro", retiro: form.hora, created_at: new Date().toISOString(), track }, ...trackVivos.filter((x) => x.code !== o.code)];
-      guardarSeguimiento({ code: o.code, phone: ph, track, at: Date.now() });
+      guardarSeguimiento({ code: o.code, phone: ph, track, at: Date.now(), px: pxPed });
       refrescarStock();
       try { sessionStorage.setItem("setto-last-order", JSON.stringify(lastOrder)); localStorage.setItem("setto-form", JSON.stringify({ nombre: form.nombre, tel: form.tel, dir: form.dir, dirExtra: form.dirExtra })); } catch (_) {}
       if (GIFT && o.gift) { const rest = GIFT.saldo - o.gift; if (rest > 0) usarGift(GIFT.code, rest); else quitarGift(); }
       cart = []; save(); form.hora = ""; form.nota = ""; form.premio = ""; renderBadge();
       view = "sent"; sending = false; drawDrawer();
       const link = waLink(lastOrder.message);
+      abrioWhatsApp(o.code, ph);
       if (matchMedia("(pointer:coarse)").matches) setTimeout(() => { location.href = link; }, window.SettoPixel && window.SettoPixel.on ? 350 : 0); // le damos tiempo al pixel antes de abrir WhatsApp
       else window.open(link, "_blank", "noopener");
     } catch (e) {
@@ -1011,6 +1019,7 @@
     if (b.id === "toBuscar") { BQ.res = null; BQ.err = ""; BQ.tel = BQ.tel || form.tel; view = "buscar"; drawDrawer(); setTimeout(() => { const i = $("#bqTel"); if (i && !i.value) i.focus(); }, 30); }
     if (b.dataset.pago) { form.pago = b.dataset.pago; document.querySelectorAll("[data-pago]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); }
     if (b.id === "toWA") sendOrder();
+    if (b.dataset.resend !== undefined && lastOrder) abrioWhatsApp(lastOrder.code, telDe(lastOrder.code));
     if (b.dataset.premio) { form.premio = b.dataset.premio; drawDrawer(); }
     if (b.dataset.modo) { form.modo = b.dataset.modo; drawDrawer(); if (form.modo === "envio") setTimeout(() => { const d = $("#fDir"); if (d && !d.value) d.focus(); }, 30); }
     if (b.id === "copyMsg") {
@@ -1115,6 +1124,7 @@
     const ocultos = ocultosTrk();
     const vivos = data.filter((o) => !ocultos.includes(o.code) && (o.status === "pendiente" || (o.status === "entregado" && !o.resena) || Date.now() - new Date(o.created_at) < 3 * 36e5)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
     avisarCambios(vivos); trackVivos = vivos;
+    comprasConcretadas(data);
     // en vivo: cuando el equipo cambia el estado, la base avisa y refrescamos sin recargar la página
     if (API.onTrack) API.onTrack(vivos.filter((o) => o.status === "pendiente" && o.track).map((o) => o.track), enVivo);
     if ((view === "cart" || view === "sent") && $("#drawer").classList.contains("on")) drawDrawer();
@@ -1123,6 +1133,15 @@
     if (box.querySelector(".cmb-busy")) return; // ni un cambio que se está enviando
     box.hidden = false; box.innerHTML = `<div class="wrap">${vivos.map(trackCard).join("")}</div>`;
     if (vivos.some((o) => o.status === "pendiente")) trackT = setTimeout(verSeguimiento, 20000); // respaldo si el canal en vivo se corta
+  }
+  // Purchase recién cuando el equipo marca el pedido como entregado (cobrado). Solo pedidos hechos desde este navegador.
+  function comprasConcretadas(data) {
+    if (!window.SettoPixel || !window.SettoPixel.on) return;
+    const mios = misPedidos();
+    data.filter((o) => o.status === "entregado" && o.code).forEach((o) => {
+      const m = mios.find((x) => x.code === o.code || (o.track && x.track === o.track)); if (!m || !m.px) return;
+      window.SettoPixel.purchase(o.code, { ...m.px, value: Number(o.total) || 0 });
+    });
   }
   let vivoT = null, etapasVistas = null;
   const enVivo = () => { clearTimeout(vivoT); vivoT = setTimeout(verSeguimiento, 250); };

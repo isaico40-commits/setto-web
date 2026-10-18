@@ -203,6 +203,7 @@
     },
     async setEtapa(id, etapa) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o || o.status !== "pendiente") throw new Error("El pedido no está pendiente"); o.etapa = etapa; dbSave(db); },
     async marcarAviso(id, etapa) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o) return; o.avisos = { ...(o.avisos || {}), [etapa]: new Date().toISOString() }; dbSave(db); },
+    async marcarContacto(code, phone) { const db = dbLoad(), ph = normPhone(phone), o = db.orders.find((x) => x.code === code && x.phone === ph && x.status === "pendiente"); if (o && !o.contacto_at) { o.contacto_at = new Date().toISOString(); dbSave(db); } },
     onTrack(tracks, cb) { if (this._trk) return; this._trk = 1; window.addEventListener("storage", (e) => { if (e.key === KEY) cb(); }); },
     async orderStatus(codes, phone) {
       const db = dbLoad(), ph = normPhone(phone), since = Date.now() - 3 * 864e5;
@@ -379,6 +380,8 @@
     async resolverCambio(track, elecciones, cancelar) { const { data, error } = await sb.rpc("resolver_cambio", { p_track: track, p_elecciones: elecciones || [], p_cancelar: !!cancelar }); fail(error); return data; },
     async setEtapa(id, etapa) { const { error } = await sb.rpc("set_order_etapa", { p_id: id, p_etapa: etapa }); fail(error); },
     async marcarAviso(id, etapa) { const { error } = await sb.rpc("marcar_aviso", { p_id: id, p_etapa: etapa }); fail(error); },
+    // el cliente abrió WhatsApp para mandar el pedido (migración 029; sin ella, no pasa nada)
+    async marcarContacto(code, phone) { await sb.rpc("marcar_contacto", { p_code: code, p_phone: phone }); },
     // seguimiento en vivo: un canal público por link de pedido; la base avisa cuando el pedido cambia (migración 024)
     onTrack(tracks, cb) {
       const want = new Set(tracks);
