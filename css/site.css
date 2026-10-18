@@ -911,7 +911,3 @@ body[data-page="listo"] #stickers{scroll-margin-top:80px}
 .consent{display:grid;gap:8px;font-size:.86rem;color:var(--ink-2)}
 .consent label{display:flex;gap:10px;align-items:flex-start;cursor:pointer;line-height:1.4}
 .consent input{width:18px;height:18px;margin-top:1px;flex:none;accent-color:var(--turquesa)}
-.sumarme{display:flex;gap:12px;align-items:center;justify-content:space-between;background:var(--card);border:var(--line);border-radius:var(--r);padding:12px 14px;font-size:.9rem}
-.sumarme small{display:block;color:var(--ink-2);font-size:.8rem;margin-top:2px}
-.sumarme .btn{flex:none}
-.sumarme.ok{justify-content:center;color:var(--turquesa);font-weight:600}
