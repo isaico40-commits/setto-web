@@ -109,9 +109,16 @@
     [S.cuentas, S.socios, S.cats, S.saldos, S.deudas, S.movs, S.stock, S.tareas, S.compras, S.retiros] = r.map(fail);
     // reservado en pedidos web pendientes y disponible en la web (si falla, la pestaña sigue igual)
     try { const { data } = await sb.rpc("caja_stock_reservas"); S.reservas = {}; (data || []).forEach((x) => (S.reservas[x.item_id] = x)); } catch (_) { S.reservas = {}; }
+    stockApplyLocal();
   }
   let reloadT;
-  function softReload() { clearTimeout(reloadT); reloadT = setTimeout(async () => { try { await loadAll(); render(); } catch (e) { console.error(e); } }, 250); }
+  function softReload() {
+    clearTimeout(reloadT);
+    reloadT = setTimeout(async () => {
+      if (stockBusy()) return softReload(); // con toques de stock sin guardar, esperar a que se guarden
+      try { await loadAll(); render(); } catch (e) { console.error(e); }
+    }, 250);
+  }
 
   /* ---------- login ---------- */
   function drawLogin(msg) {
@@ -528,7 +535,7 @@
   function vStock() {
     const items = S.stock.filter((i) => i.activo);
     $("#view").innerHTML = `<h1 class="h1">Stock</h1>
-      <p class="muted" style="font-size:.88rem;margin-bottom:12px"><b>+</b> suma producción y <b>−</b> descuenta una venta, de a uno. Para cantidades grandes, trasladar o corregir, tocá <b>Más</b>.</p>
+      <p class="muted" style="font-size:.88rem;margin-bottom:12px"><b>+</b> suma producción y <b>−</b> descuenta una venta. Podés tocar varias veces seguidas: se guarda todo junto cuando parás. Para cantidades grandes, trasladar o corregir, tocá <b>Más</b>.</p>
       <div class="stk">${items.map((i) => {
         const low = i.minimo > 0 && i.cafe + i.produ <= i.minimo;
         return `<div class="sitem ${low ? "low" : ""}" data-item="${i.id}"><div class="top"><b>${esc(i.nombre)}</b>${low ? '<span class="pri urg">poco</span>' : ""}<button data-smas="${i.id}">Más</button></div>
@@ -539,16 +546,53 @@
       }).join("") || `<div class="emptyc"><img src="img/mochito-lie.png" alt=""><span>No hay productos en el stock.</span></div>`}</div>
       <div class="toolsrow"><button class="ghost" data-snew>+ Agregar producto</button><button class="ghost" data-shist>Ver últimos cambios</button></div>`;
   }
-  let sqBusy = false;
-  async function stockQuick(item, lugar, d) {
-    if (!needMe() || sqBusy) return;
-    const it = S.stock.find((x) => x.id === item);
-    if (d < 0 && it[lugar] + d < 0) return toast(`No hay en ${LUG[lugar]}. Usá Más → Contar si el número está mal.`);
-    sqBusy = true; it[lugar] += d; vStock();
-    try { fail(await sb.from("caja_stock_mov").insert({ item_id: item, lugar, delta: d, motivo: d > 0 ? "produccion" : "venta", registro: S.me })); toast(`${it.nombre}: ${d > 0 ? "+1" : "−1"} en ${LUG[lugar]}`); }
-    catch (e) { it[lugar] -= d; vStock(); toast(e.message); }
-    finally { sqBusy = false; softReload(); }
+  /* Los + y − se juntan: cada toque cambia el número al instante y recién
+     cuando paran de tocar (STOCK_WAIT ms) se guarda un solo movimiento con el
+     total. Así varios toques seguidos no se pisan ni hacen una llamada cada uno. */
+  const STOCK_WAIT = 800;
+  const stockPend = {};   // "item|lugar" → { delta, t } todavía sin enviar
+  const stockFly = {};    // "item|lugar" → delta enviándose ahora
+  const sgn = (n) => (n > 0 ? "+" : "−") + Math.abs(n);
+  const stockBusy = () => Object.keys(stockPend).length > 0 || Object.keys(stockFly).length > 0;
+  function stockApplyLocal() {
+    // al recargar de la base, volver a sumar lo que todavía no llegó
+    [stockPend, stockFly].forEach((m) => Object.keys(m).forEach((k) => {
+      const [item, lugar] = k.split("|"), it = S.stock.find((x) => x.id === item);
+      if (it) it[lugar] += m === stockPend ? m[k].delta : m[k];
+    }));
   }
+  function stockQuick(item, lugar, d) {
+    if (!needMe()) return;
+    const it = S.stock.find((x) => x.id === item);
+    if (!it) return;
+    if (d < 0 && it[lugar] + d < 0) return toast(`No hay en ${LUG[lugar]}. Usá Más → Contar si el número está mal.`);
+    const k = `${item}|${lugar}`, p = stockPend[k] || (stockPend[k] = { delta: 0, t: 0 });
+    p.delta += d; it[lugar] += d;
+    if (S.view === "stock") vStock();
+    clearTimeout(p.t);
+    p.t = setTimeout(() => stockFlush(k), STOCK_WAIT);
+  }
+  async function stockFlush(k) {
+    const p = stockPend[k];
+    if (!p) return;
+    clearTimeout(p.t); delete stockPend[k];
+    if (!p.delta) return softReload();
+    while (stockFly[k] !== undefined) await new Promise((r) => setTimeout(r, 100)); // uno por vez por producto
+    const [item, lugar] = k.split("|"), d = p.delta, it = S.stock.find((x) => x.id === item);
+    stockFly[k] = d;
+    try {
+      fail(await sb.from("caja_stock_mov").insert({ item_id: item, lugar, delta: d, motivo: d > 0 ? "produccion" : "venta", registro: S.me }));
+      toast(`${it ? it.nombre : "Stock"}: ${sgn(d)} en ${LUG[lugar]}`);
+    } catch (e) {
+      if (it) it[lugar] -= d;
+      if (S.view === "stock") vStock();
+      toast(`No se guardó ${sgn(d)} de ${it ? it.nombre : "stock"}: ${e.message}`);
+    } finally { delete stockFly[k]; softReload(); }
+  }
+  // si cierran o minimizan la app, guardar ya lo pendiente
+  const stockFlushAll = () => Object.keys(stockPend).forEach(stockFlush);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) stockFlushAll(); });
+  window.addEventListener("pagehide", stockFlushAll);
   function stockMas(item) {
     if (!needMe()) return;
     const it = S.stock.find((x) => x.id === item);
