@@ -914,7 +914,7 @@
         ${premioPicker()}
         ${giftBox()}
         <div class="consent"><label><input type="checkbox" id="fOkWa" ${form.okWa ? "checked" : ""}> Avisame por WhatsApp cuando salgan sabores nuevos o limitados.</label>
-          <label><input type="checkbox" id="fOkAds" ${form.okAds ? "checked" : ""}> Pueden usar mi celular para mostrarme anuncios de Setto en Instagram y Facebook.</label>
+          <label><input type="checkbox" id="fOkAds" ${form.okAds ? "checked" : ""}> Pueden usar mi número para mostrarme anuncios de Setto en Instagram y Facebook.</label>
           <span class="hintf">Las dos son opcionales y te das de baja cuando quieras en <a href="/privacidad" target="_blank">Privacidad y bajas</a>.</span></div>
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>
         <div id="fErr" class="err" hidden></div>`;
