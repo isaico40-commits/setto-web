@@ -1453,11 +1453,17 @@
       <span class="rv-err" hidden></span>
       <div class="trk-acts" style="margin:0"><button class="btn solid" data-rvsend>Enviar reseña</button><button class="back" data-rvcancel>Ahora no</button></div></div>`;
   }
+  function verSellos(tel) {
+    $("#club").scrollIntoView({ behavior: "smooth" });
+    if (API.normPhone(tel)) { $("#cardPhone").value = API.prettyPhone ? API.prettyPhone(tel) : tel; $("#cardForm").requestSubmit(); return; }
+    $("#cardMsg").textContent = "Poné el celular con el que pediste y te mostramos tus sellos."; setTimeout(() => $("#cardPhone").focus({ preventScroll: true }), 400);
+  }
   document.addEventListener("click", async (e) => {
     const t = e.target.closest("[data-resena],[data-star],[data-rvsend],[data-rvcancel],[data-vercard]"); if (!t) return;
     if (t.dataset.vercard) {
-      const tel = telDe(t.dataset.vercard); closeDrawer(); $("#cardPhone").value = API.prettyPhone ? API.prettyPhone(tel) : tel;
-      $("#club").scrollIntoView({ behavior: "smooth" }); $("#cardForm").requestSubmit(); return;
+      const tel = telDe(t.dataset.vercard) || form.tel; closeDrawer();
+      if (!$("#club").offsetParent) { try { sessionStorage.setItem("setto-vercard", tel || ""); } catch (_) {} location.href = "/#club"; return; } // en gift cards o armar el club no está: vamos al inicio
+      verSellos(tel); return;
     }
     if (t.dataset.resena) { const card = t.closest(".trk"); const acts = t.closest(".trk-acts"); if (!card.querySelector(".rv-form")) acts.insertAdjacentHTML("afterend", rvForm(t.dataset.resena)); acts.hidden = true; return; }
     const f = t.closest(".rv-form"); if (!f) return;
@@ -1592,6 +1598,8 @@
       S = settings; adapt(products); syncCart();
       renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); if (maqAlCargar && maqOn()) { maqAlCargar = false; abrirMaq(); } renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
+      let vc = null; try { vc = sessionStorage.getItem("setto-vercard"); sessionStorage.removeItem("setto-vercard"); } catch (_) {}
+      if (vc !== null && clubOn()) setTimeout(() => verSellos(vc), 300); // vino desde "Ver mis sellos" en otra página
       if (PAGE === "listo" && form.tel && clubOn()) setTimeout(() => { if (!lsTel) { lsTel = true; $("#cardForm").requestSubmit(); } }, 1500);
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
     } catch (e) {
