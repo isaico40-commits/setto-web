@@ -66,9 +66,26 @@
   function dbSave(db) { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { throw new Error("El navegador no tiene más espacio (modo demo). Probá con fotos más livianas."); } }
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
 
+  /* maquinita en modo demo */
+  const MAQ_DEF = [["gift", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "Mochi gratis", 0.5, "mochi", 0], ["off", "10% off", 2, "porcentaje", 10]];
+  function maqPremiosCfg(cfg) {
+    return MAQ_DEF.map(([id, titulo, chance, tipo, valor]) => {
+      const c = Array.isArray(cfg.premios) ? cfg.premios.find((x) => x.id === id) : null;
+      if (!c) return { id, titulo, chance, tipo, valor };
+      return { id, titulo: String(c.titulo || "").trim() || null, chance: Math.max(0, +c.chance || 0), tipo: c.tipo || tipo, valor: c.valor != null ? Math.max(0, +c.valor || 0) : valor };
+    });
+  }
+  const maqDia = (db) => Math.max(1, Math.min(5, Math.round(+(db.settings.maquinita || {}).fichas_dia || 1)));
+  function maqJug(db, ph) {
+    db.maq = db.maq || { jug: {}, premios: [] }; db.maq.jug = db.maq.jug || {}; db.maq.premios = db.maq.premios || [];
+    const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
+    const j = db.maq.jug[ph] || (db.maq.jug[ph] = { fichas: 0, gratis_dia: hoy, gratis_usadas: 0 });
+    if (j.gratis_dia !== hoy) { j.gratis_dia = hoy; j.gratis_usadas = 0; }
+    return j;
+  }
   const demo = {
     async loadAll() { const db = dbLoad(); return { settings: db.settings, products: db.products }; },
-    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio: elegido, gift }) {
+    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio: elegido, gift, maq }) {
       const db = dbLoad(), ph = normPhone(phone), esp = db.settings.especial || {}, envio = db.settings.envio || {}, club = db.settings.club || {}, pers = db.settings.personalizacion || {};
       modo = modo === "envio" ? "envio" : "retiro";
       if (modo === "envio" && !envio.activo) throw new Error("Por ahora no hacemos envíos desde la web");
@@ -118,6 +135,22 @@
           ptxt = ps.nombre + " (12 oz) de regalo"; lines.push({ id: "premio", nombre: "Premio Setto Club: " + ptxt, size: "12 oz", qty: 1, precio: 0, subtotal: 0 });
         } else throw new Error("Elegí tu premio del Setto Club");
       }
+      let maqOff = 0, mp = null;
+      if (maq && String(maq).trim()) {
+        mp = ((db.maq || {}).premios || []).find((x) => x.code === String(maq).trim().toUpperCase());
+        if (!mp) throw new Error("No encontramos ese premio de la maquinita. Revisá el código.");
+        if (mp.phone !== ph) throw new Error("Ese premio es de otro número: pedí con el celular que tiró en la maquinita");
+        if (mp.estado !== "activo") throw new Error("Ese premio de la maquinita ya se usó");
+        if (mp.tipo === "monto") maqOff = Math.min(mp.saldo, Math.max(total, 0));
+        else if (mp.tipo === "porcentaje") maqOff = Math.min(Math.round((sub * mp.valor) / 100 / 10) * 10, Math.max(total, 0));
+        else {
+          const ms = lines.filter((l) => { const pr = db.products.find((p) => p.id === l.id); return pr && (pr.categoria === "mochi" || pr.categoria === "especial"); }).map((l) => l.precio);
+          if (!ms.length) throw new Error("Para usar el mochi gratis agregá un mochi al pedido");
+          maqOff = Math.min(Math.min(...ms), Math.max(total, 0));
+        }
+        if (maqOff > 0) { lines.push({ id: "maquinita", nombre: "Premio maquinita: " + mp.titulo, size: null, qty: 1, precio: -maqOff, subtotal: -maqOff }); total -= maqOff; }
+        if (mp.tipo === "monto") { mp.saldo -= maqOff; if (mp.saldo <= 0) mp.estado = "usado"; } else mp.estado = "usado";
+      }
       let giftOff = 0, gc = null;
       if (gift && String(gift).trim()) {
         gc = (db.giftcards || []).find((g) => g.code === String(gift).trim().toUpperCase());
@@ -132,8 +165,9 @@
       const o = { id: uid(), code, nombre: String(nombre).trim(), phone: ph, items: lines, total, retiro, pago, nota: nota || null, status: "pendiente", sellos: 0, created_at: new Date().toISOString(),
         modo, direccion: modo === "envio" ? String(direccion).trim() : null, premio, premio_txt: ptxt };
       if (giftOff > 0) o.gift = { code: gc.code, monto: giftOff };
+      if (mp) o.maq = { code: mp.code, monto: maqOff };
       o.etapa = "recibido"; o.track = uid().replace(/-/g, ""); db.orders.unshift(o); dbSave(db);
-      return { id: o.id, code, total, items: lines, phone: ph, modo, direccion: o.direccion, costo_envio: costo, premio, premio_txt: ptxt, descuento: off, gift: giftOff, meta };
+      return { id: o.id, code, total, items: lines, phone: ph, modo, direccion: o.direccion, costo_envio: costo, premio, premio_txt: ptxt, descuento: off, gift: giftOff, maquinita: maqOff, meta };
     },
     async getStock() { return null; },
     async getCard(phone) {
@@ -142,6 +176,36 @@
       return { existe: !!c, sellos: c ? c.sellos : 0, canjes: c ? c.canjes : 0, meta: club.meta || 8, premio: club.premio || "" };
     },
     /* equipo */
+    // maquinita (migración 034): misma regla que maq_tirar en la base. "forzar" solo existe en el demo, para probar premios.
+    async maqEstado(phone) {
+      const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("Revisá tu celular");
+      const j = maqJug(db, ph); dbSave(db);
+      return { gratis: Math.max(0, maqDia(db) - j.gratis_usadas), fichas: j.fichas, premios: (db.maq.premios || []).filter((x) => x.phone === ph && x.estado === "activo") };
+    },
+    async maqTirar(phone, forzar) {
+      const db = dbLoad(), ph = normPhone(phone), cfg = db.settings.maquinita || {};
+      if (cfg.activo === false) throw new Error("La maquinita está apagada por ahora");
+      if (!ph) throw new Error("Revisá tu celular");
+      const j = maqJug(db, ph);
+      if (j.gratis_usadas < maqDia(db)) j.gratis_usadas++;
+      else if (j.fichas > 0) j.fichas--;
+      else throw new Error("No te quedan fichas. Volvé mañana o sumá con tu próxima compra.");
+      let x = Math.random() * 100, p = null;
+      const prem = maqPremiosCfg(cfg).filter((q) => q.titulo && q.chance > 0);
+      if (forzar) p = prem.find((q) => q.id === forzar) || null;
+      else for (const q of prem) { if (x < q.chance) { p = q; break; } x -= q.chance; }
+      let code = null;
+      if (p) {
+        code = "MAQ-" + Math.random().toString(16).slice(2, 6).toUpperCase() + "-" + Math.random().toString(16).slice(2, 6).toUpperCase();
+        db.maq.premios.unshift({ code, phone: ph, premio_id: p.id, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.tipo === "monto" ? p.valor : 0, estado: "activo", created_at: new Date().toISOString() });
+      }
+      dbSave(db);
+      return { resultado: p ? p.id : "nada", titulo: p ? p.titulo : null, code, gratis: Math.max(0, maqDia(db) - j.gratis_usadas), fichas: j.fichas };
+    },
+    async maqPremioCheck(code, phone) {
+      const ph = normPhone(phone), x = ((dbLoad().maq || {}).premios || []).find((q) => q.code === String(code).trim().toUpperCase() && q.phone === ph);
+      return x ? { code: x.code, titulo: x.titulo, tipo: x.tipo, valor: x.valor, saldo: x.saldo, estado: x.estado } : null;
+    },
     async session() { return sessionStorage.getItem("setto-demo-staff") ? { email: "demo@setto" } : null; },
     async signIn() { sessionStorage.setItem("setto-demo-staff", "1"); return { email: "demo@setto" }; },
     async signOut() { sessionStorage.removeItem("setto-demo-staff"); },
@@ -166,13 +230,16 @@
         db.events.unshift({ phone: ph, delta: -meta, motivo: "Premio entregado en " + o.code, created_at: new Date().toISOString() });
       }
       o.premio = canje;
+      const mcfg = db.settings.maquinita || {}, nf = Math.max(0, Math.min(50, mcfg.fichas_compra ?? 5));
+      if (mcfg.activo !== false && nf > 0) { const j = maqJug(db, ph); j.fichas += nf; }
       dbSave(db); return { phone: ph, sellos: c.sellos, canje, premio: club.premio };
     },
     async cancelOrder(id) {
       const db = dbLoad(), o = db.orders.find((x) => x.id === id);
       if (!o || o.status !== "pendiente") throw new Error("El pedido no está pendiente");
       o.status = "cancelado"; o.closed_at = new Date().toISOString();
-      if (o.gift && !o.gift.devuelto) { const g = (db.giftcards || []).find((x) => x.code === o.gift.code); if (g) { g.saldo += o.gift.monto; g.estado = "activa"; } o.gift.devuelto = true; } dbSave(db);
+      if (o.gift && !o.gift.devuelto) { const g = (db.giftcards || []).find((x) => x.code === o.gift.code); if (g) { g.saldo += o.gift.monto; g.estado = "activa"; } o.gift.devuelto = true; }
+      if (o.maq && !o.maq.devuelto) { const m = ((db.maq || {}).premios || []).find((x) => x.code === o.maq.code); if (m) { if (m.tipo === "monto") m.saldo += o.maq.monto; m.estado = "activo"; } o.maq.devuelto = true; } dbSave(db);
     },
     async pedirCambio(id, faltan, nota) {
       const db = dbLoad(), o = db.orders.find((x) => x.id === id);
@@ -276,7 +343,7 @@
     async productRatings() {
       const db = dbLoad(), out = {};
       (db.reviews || []).filter((r) => r.estado === "aprobada").forEach((r) => { const o = db.orders.find((x) => x.id === r.order_id); if (!o) return;
-        [...new Set(o.items.filter((i) => !["envio", "premio"].includes(i.id)).map((i) => i.id))].forEach((id) => { const a = (out[id] = out[id] || { s: 0, cantidad: 0 }); a.s += r.rating; a.cantidad++; }); });
+        [...new Set(o.items.filter((i) => !["envio", "premio", "maquinita"].includes(i.id)).map((i) => i.id))].forEach((id) => { const a = (out[id] = out[id] || { s: 0, cantidad: 0 }); a.s += r.rating; a.cantidad++; }); });
       Object.values(out).forEach((a) => { a.promedio = Math.round((a.s / a.cantidad) * 10) / 10; delete a.s; }); return out;
     },
     async createReview(code, phone, rating, texto, foto, instagram) {
@@ -294,7 +361,7 @@
       const nom = (n) => { const [a, b] = String(n).trim().split(/\s+/); return a.charAt(0).toUpperCase() + a.slice(1) + (b ? " " + b[0].toUpperCase() + "." : ""); };
       return { cantidad: ok.length, promedio: ok.length ? Math.round((ok.reduce((s, r) => s + r.rating, 0) / ok.length) * 10) / 10 : null,
         items: ok.filter((r) => r.texto || r.foto).slice(0, 12).map((r) => { const o = dbLoad().orders.find((x) => x.id === r.order_id) || { items: [] };
-          return { nombre: nom(r.nombre), rating: r.rating, texto: r.texto, foto: r.foto, instagram: r.instagram, fecha: r.created_at, pedido: [...new Set(o.items.filter((i) => !["envio", "premio"].includes(i.id)).map((i) => i.nombre))] }; }) };
+          return { nombre: nom(r.nombre), rating: r.rating, texto: r.texto, foto: r.foto, instagram: r.instagram, fecha: r.created_at, pedido: [...new Set(o.items.filter((i) => !["envio", "premio", "maquinita"].includes(i.id)).map((i) => i.nombre))] }; }) };
     },
     async listReviews() { return (dbLoad().reviews || []).slice(0, 100); },
     async createGiftcard({ diseno, monto, de, para, mensaje, phone }) {
@@ -327,7 +394,7 @@
       const nom = (n) => { const [a, b] = String(n).trim().split(/\s+/); return a.charAt(0).toUpperCase() + a.slice(1) + (b ? " " + b[0].toUpperCase() + "." : ""); };
       return { cantidad: ok.length, promedio: ok.length ? Math.round((ok.reduce((s, r) => s + r.rating, 0) / ok.length) * 10) / 10 : null, por_estrella: por,
         items: ok.slice(offset, offset + 50).map((r) => { const o = db.orders.find((x) => x.id === r.order_id) || { items: [] };
-          return { nombre: nom(r.nombre), rating: r.rating, texto: r.texto, foto: r.foto, instagram: r.instagram, fecha: r.created_at, pedido: [...new Set(o.items.filter((i) => !["envio", "premio"].includes(i.id)).map((i) => i.nombre))] }; }) };
+          return { nombre: nom(r.nombre), rating: r.rating, texto: r.texto, foto: r.foto, instagram: r.instagram, fecha: r.created_at, pedido: [...new Set(o.items.filter((i) => !["envio", "premio", "maquinita"].includes(i.id)).map((i) => i.nombre))] }; }) };
     },
     async productReviews(id) {
       const db = dbLoad(), ok = (db.reviews || []).filter((r) => r.estado === "aprobada" && (db.orders.find((x) => x.id === r.order_id) || { items: [] }).items.some((i) => i.id === id)), por = {};
@@ -392,14 +459,17 @@
       const settings = {}; s.data.forEach((r) => (settings[r.key] = r.value));
       return { settings, products: p.data };
     },
-    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift }) {
-      const { data, error } = await sb.rpc("create_order_v5", {
+    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift, maq }) {
+      const { data, error } = await sb.rpc("create_order_v6", {
         p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty, leche: i.leche || null, sin: i.sin || [] })),
-        p_retiro: retiro, p_pago: pago, p_nota: nota || null, p_modo: modo || "retiro", p_direccion: direccion || null, p_premio: premio || null, p_gift: gift || null,
+        p_retiro: retiro, p_pago: pago, p_nota: nota || null, p_modo: modo || "retiro", p_direccion: direccion || null, p_premio: premio || null, p_gift: gift || null, p_maq: maq || null,
       });
       fail(error); return data;
     },
     async getCard(phone) { const { data, error } = await sb.rpc("get_card", { p_phone: phone }); fail(error); return data; },
+    async maqEstado(phone) { const { data, error } = await sb.rpc("maq_estado", { p_phone: phone }); fail(error); return data; },
+    async maqTirar(phone) { const { data, error } = await sb.rpc("maq_tirar", { p_phone: phone }); fail(error); return data; },
+    async maqPremioCheck(code, phone) { const { data, error } = await sb.rpc("maq_premio_check", { p_code: code, p_phone: phone }); fail(error); return data; },
     /* {producto: unidades en el Café} o null si el stock en la web está apagado */
     async getStock() { const { data, error } = await sb.rpc("stock_publico"); if (error) return null; return data; },
     async session() { const { data } = await sb.auth.getSession(); return data.session ? data.session.user : null; },
