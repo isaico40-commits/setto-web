@@ -1,6 +1,6 @@
 /* Mochito guía: acompaña el scroll, cambia de pose, muestra tips por sección
    y te lleva a comprar. Usa los PNG originales de Mochito (no se redibuja).
-   Si la persona lo cierra (✕) no aparece hasta la próxima visita. En PC recorre un caminito con una parada por sección. */
+   Si la persona lo cierra (✕) no aparece hasta la próxima visita. Recorre un caminito con una parada por sección. */
 (function () {
   if (document.body.dataset.page !== "home") return;
   const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -100,34 +100,28 @@
   const SECS = Object.keys(TIPS).filter((k) => k !== "top").map((id) => document.getElementById(id)).filter(Boolean);
   let cur = "top", curT = null;
 
-  // Caminito (PC): un camino dibujado que serpentea en la esquina de abajo a la derecha (máximo media pantalla).
+  // Caminito: un camino dibujado que serpentea en la esquina de abajo a la derecha (máximo media pantalla en PC
+  // y un cuarto en celu).
   // Mochito lo recorre con el scroll y llega al final del camino al final de la página. Cada sección es una
   // parada (menos la edición especial, que se ve apenas entrás); pasa por ella justo cuando aparece su tip.
-  // Solo las paradas se tocan.
-  // En celu es una versión mini pegada al borde derecho, encima de Mochito: aparece solo mientras scrolleás,
-  // la recorre una carita de Mochito y no se toca nada (no tapa botones ni frena el dedo).
+  // En PC solo las paradas se tocan; en celu no se toca nada del camino (no frena el dedo ni tapa botones).
   const PC = matchMedia("(min-width: 1024px)");
   const VUELTAS = 1.5;
-  let ONDA = 16, M = 44, W = 88; // M = mitad de lo que camina (Mochito en PC mide 88px; la carita en celu, 20px)
+  let ONDA = 16, M = 44, W = 88; // W = ancho de Mochito (88px, 66px en celu); M = la mitad
   const path = document.createElement("div");
   path.className = "mito-path"; path.setAttribute("aria-label", "Secciones de la página");
-  path.innerHTML = `<svg class="mp-svg" aria-hidden="true"><g class="mp-piedras"></g><path class="mp-borde"/><path class="mp-tierra"/><path class="mp-raya"/><path class="mp-hecho" pathLength="1"/></svg><img class="mp-mini" src="img/mochito-run.png" alt=""><span class="mp-stops"></span>`;
+  path.innerHTML = `<svg class="mp-svg" aria-hidden="true"><g class="mp-piedras"></g><path class="mp-borde"/><path class="mp-tierra"/><path class="mp-raya"/><path class="mp-hecho" pathLength="1"/></svg><span class="mp-stops"></span>`;
   document.body.appendChild(path);
-  const pMini = path.querySelector(".mp-mini"), pSvg = path.querySelector("svg"), pHecho = path.querySelector(".mp-hecho"), pStops = path.querySelector(".mp-stops");
+  const pSvg = path.querySelector("svg"), pHecho = path.querySelector(".mp-hecho"), pStops = path.querySelector(".mp-stops");
   let paradas = [], alto = 0;
   const curva = (t) => ONDA * Math.sin(t * Math.PI * 2 * VUELTAS); // corrimiento horizontal en el punto t (0 arriba, 1 abajo)
   const progreso = () => { const max = document.documentElement.scrollHeight - innerHeight; return max > 0 ? Math.min(1, Math.max(0, scrollY / max)) : 0; };
   function armarCamino() {
-    const pc = PC.matches; path.classList.toggle("mini", !pc);
-    [ONDA, M, W] = pc ? [16, 44, 88] : [3, 10, 20];
+    W = innerWidth >= 761 ? 88 : 66; M = W / 2; ONDA = Math.round(W * 0.18); // mismas medidas que el CSS de Mochito
+    path.classList.toggle("lift", el.classList.contains("lift"));
     const hb = Math.max(0, document.querySelector("header.top")?.getBoundingClientRect().bottom || 66);
-    let H;
-    if (pc) { H = Math.round(Math.min(innerHeight * 0.5, innerHeight - hb - 38)); path.style.bottom = ""; } // nunca más de media pantalla
-    else { // celu: termina justo arriba de Mochito
-      el.style.removeProperty("--py"); el.style.removeProperty("--px");
-      const piso = (el.classList.contains("lift") ? 82 : 14) + 66 + 6; // mismo lugar que el CSS de Mochito en celu
-      H = Math.round(Math.min(innerHeight * 0.4, innerHeight - hb - piso - 12)); path.style.bottom = `${Math.round(piso)}px`;
-    }
+    const piso = el.classList.contains("lift") ? 82 : innerWidth >= 761 ? 22 : 14;
+    const H = Math.round(Math.min(innerHeight * (PC.matches ? 0.5 : 0.25), innerHeight - hb - piso - 16)); // nunca más de media pantalla (un cuarto en celu)
     path.style.height = `${H}px`; alto = H - 2 * M;
     // Dibujo: borde, tierra, raya del medio y piedritas a los costados, sobre la misma curva
     let d = "";
@@ -149,10 +143,8 @@
   function moverCamino() {
     if (!path.isConnected) return;
     const p = progreso();
-    if (PC.matches) {
-      el.style.setProperty("--py", `${(-(1 - p) * alto).toFixed(1)}px`);
-      el.style.setProperty("--px", `${curva(p).toFixed(1)}px`);
-    } else pMini.style.transform = `translate(${(M + curva(p) - 10).toFixed(1)}px, ${(M + p * alto - 10).toFixed(1)}px)`;
+    el.style.setProperty("--py", `${(-(1 - p) * alto).toFixed(1)}px`);
+    el.style.setProperty("--px", `${curva(p).toFixed(1)}px`);
     pHecho.style.strokeDasharray = `${p.toFixed(4)} 1`;
     pStops.querySelectorAll(".mp-stop").forEach((b, i) => b.classList.toggle("ok", paradas[i] && p >= paradas[i].p - 0.002));
   }
@@ -187,21 +179,21 @@
     el.style.setProperty("--sh", (1 + bob / 30).toFixed(2));
     raf = requestAnimationFrame(tick);
   }
-  let dir = 1, vivoT = null;
+  let dir = 1;
   function onScroll() {
     const y = scrollY, dy = y - lastY; lastY = y;
     if (!auto) lastMove = performance.now();
     vel += dy * 0.25; if (Math.abs(dy) > 1) dir = dy > 0 ? 1 : -1;
     const max = document.documentElement.scrollHeight - innerHeight;
     ring.style.strokeDasharray = `${max > 0 ? Math.min(100, (y / max) * 100) : 0} 100`;
-    moverCamino(); path.classList.add("vivo");
+    moverCamino();
     const lift = el.classList.contains("lift");
-    if (lift !== el.classList.toggle("lift", !!document.getElementById("mbar")?.classList.contains("on"))) reCamino();
+    const subir = !!document.getElementById("mbar")?.classList.contains("on");
+    if (lift !== subir) { el.classList.toggle("lift", subir); path.classList.toggle("lift", subir); reCamino(); }
     if (!moving && Math.abs(dy) > 2) { moving = true; pose("run"); }
     entrar(seccion());
     clearTimeout(stopT);
     stopT = setTimeout(() => { moving = false; pose("idle"); }, 260);
-    clearTimeout(vivoT); vivoT = setTimeout(() => path.classList.remove("vivo"), 1400);
   }
   body.addEventListener("animationend", (e) => { if (e.animationName === "mitohop") body.classList.remove("hop"); });
   function hop() { if (RM) return; body.classList.remove("hop"); void body.offsetWidth; body.classList.add("hop"); }

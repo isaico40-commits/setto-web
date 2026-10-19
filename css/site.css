@@ -891,43 +891,30 @@ body>.mito.hide,body>.mito.bye{opacity:0;transform:translateY(30px) scale(.7)}
 .mito-a{font:inherit;font-size:.8rem;font-weight:700;background:var(--turquesa);color:#fff;border:0;border-radius:99px;padding:6px 12px;cursor:pointer}
 .mito-x{position:absolute;top:4px;right:4px;width:24px;height:24px;border:0;background:none;color:var(--ink-2);font-size:.8rem;cursor:pointer;border-radius:50%}
 @media (min-width:761px){body>.mito{right:22px;bottom:22px}.mito-btn{width:88px;height:88px}}
-/* Caminito de progreso (PC): camino dibujado que serpentea, máximo media pantalla; cada punto es una sección */
-.mito-path{display:none}
-.mp-mini{display:none}
-/* Celu: camino mini pegado al borde derecho, encima de Mochito; solo se ve mientras scrolleás y no se toca */
-@media (max-width:1023px){
-  .mito-path.mini{display:block;position:fixed;right:2px;width:20px;z-index:33;pointer-events:none!important;opacity:0;transition:opacity .35s}
-  .mito-path.mini.vivo{opacity:1}
-  .mito-path.mini.hide{opacity:0}
-  .mini .mp-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-  .mini .mp-svg path{fill:none;stroke-linecap:round;stroke-linejoin:round}
-  .mini .mp-borde{stroke:color-mix(in srgb,var(--turquesa) 45%,transparent);stroke-width:10}
-  .mini .mp-tierra{stroke:var(--bg-2,#f1e4ca);stroke-width:7}
-  .mini .mp-raya,.mini .mp-piedras{display:none}
-  .mini .mp-hecho{stroke:var(--coral,#f8a29a);stroke-width:3;stroke-dasharray:0 1}
-  .mini .mp-stops{position:absolute;inset:0}
-  .mini .mp-stop{pointer-events:none;position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;border:1.5px solid var(--turquesa);background:var(--card,#fffaf0);padding:0}
-  .mini .mp-stop.ok{background:var(--coral)}
-  .mini .mp-stop span{display:none}
-  .mini .mp-mini{display:block;position:absolute;left:0;top:0;width:20px;height:20px;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(31,28,24,.25))}
-}
+/* Caminito de progreso: camino dibujado que serpentea encima de Mochito (máx. media pantalla en PC, un cuarto en celu); cada punto es una sección.
+   El JS le copia right/bottom/ancho a Mochito para que lo recorra justo */
+.mito-path{position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));width:66px;z-index:33;pointer-events:none;transition:opacity .3s,bottom .25s ease}
+.mito-path.lift{bottom:calc(82px + env(safe-area-inset-bottom,0px))}
+@media (min-width:761px){.mito-path{right:22px;bottom:22px;width:88px}}
+.mito-path.hide{opacity:0}.mito-path.hide .mp-stop{pointer-events:none}
+.mp-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.mp-svg path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.mp-borde{stroke:color-mix(in srgb,var(--turquesa) 45%,transparent);stroke-width:22}
+.mp-tierra{stroke:var(--bg-2,#f1e4ca);stroke-width:17}
+.mp-raya{stroke:color-mix(in srgb,var(--turquesa) 45%,transparent);stroke-width:2;stroke-dasharray:5 8}
+.mp-hecho{stroke:var(--coral,#f8a29a);stroke-width:5;stroke-dasharray:0 1}
+.mp-piedras circle{fill:color-mix(in srgb,var(--turquesa) 30%,transparent)}
+.mp-stops{position:absolute;inset:0}
+.mp-stop{pointer-events:auto;position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2.5px solid var(--turquesa);background:var(--card,#fffaf0);padding:0;cursor:pointer;transition:background .2s,transform .2s}
+.mp-stop.ok{background:var(--coral)}
+.mp-stop span{position:absolute;right:calc(100% + 16px);top:50%;transform:translateY(-50%);white-space:nowrap;background:var(--card,#fffaf0);border:1.5px solid var(--turquesa);border-radius:99px;padding:3px 10px;font-size:.78rem;font-weight:600;color:var(--ink);opacity:0;pointer-events:none;transition:opacity .15s}
+body>.mito{translate:var(--px,0px) var(--py,0px)}
+/* Celu: las paradas no se tocan (el camino nunca frena el dedo ni tapa botones) */
+@media (max-width:1023px){.mp-stop{pointer-events:none!important}.mp-stop span{display:none}}
 @media (min-width:1024px){
-  .mito-path{display:block;position:fixed;right:22px;bottom:22px;width:88px;z-index:33;pointer-events:none;transition:opacity .3s}
-  .mito-path.hide{opacity:0}.mito-path.hide .mp-stop{pointer-events:none}
-  .mp-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-  .mp-svg path{fill:none;stroke-linecap:round;stroke-linejoin:round}
-  .mp-borde{stroke:color-mix(in srgb,var(--turquesa) 45%,transparent);stroke-width:22}
-  .mp-tierra{stroke:var(--bg-2,#f1e4ca);stroke-width:17}
-  .mp-raya{stroke:color-mix(in srgb,var(--turquesa) 45%,transparent);stroke-width:2;stroke-dasharray:5 8}
-  .mp-hecho{stroke:var(--coral,#f8a29a);stroke-width:5;stroke-dasharray:0 1}
-  .mp-piedras circle{fill:color-mix(in srgb,var(--turquesa) 30%,transparent)}
-  .mp-stops{position:absolute;inset:0}
-  .mp-stop{pointer-events:auto;position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2.5px solid var(--turquesa);background:var(--card,#fffaf0);padding:0;cursor:pointer;transition:background .2s,transform .2s}
-  .mp-stop.ok{background:var(--coral)}
   .mp-stop:hover{transform:scale(1.25)}
-  .mp-stop span{position:absolute;right:calc(100% + 16px);top:50%;transform:translateY(-50%);white-space:nowrap;background:var(--card,#fffaf0);border:1.5px solid var(--turquesa);border-radius:99px;padding:3px 10px;font-size:.78rem;font-weight:600;color:var(--ink);opacity:0;pointer-events:none;transition:opacity .15s}
   .mp-stop:hover span,.mp-stop:focus-visible span{opacity:1}
-  body>.mito{translate:var(--px,0px) var(--py,0px);flex-direction:row;align-items:center}
+  body>.mito{flex-direction:row;align-items:center}
 }
 @media (prefers-reduced-motion:reduce){.rv-on .rv-up{opacity:1;transform:none}}
 
