@@ -891,20 +891,25 @@ body>.mito.hide,body>.mito.bye{opacity:0;transform:translateY(30px) scale(.7)}
 .mito-a{font:inherit;font-size:.8rem;font-weight:700;background:var(--turquesa);color:#fff;border:0;border-radius:99px;padding:6px 12px;cursor:pointer}
 .mito-x{position:absolute;top:4px;right:4px;width:24px;height:24px;border:0;background:none;color:var(--ink-2);font-size:.8rem;cursor:pointer;border-radius:50%}
 @media (min-width:761px){body>.mito{right:22px;bottom:22px}.mito-btn{width:88px;height:88px}}
-/* Caminito de progreso (PC): Mochito baja por el borde derecho; cada punto es una sección */
+/* Caminito de progreso (PC): camino dibujado que serpentea, máximo media pantalla; cada punto es una sección */
 .mito-path{display:none}
 @media (min-width:1024px){
-  .mito-path{display:block;position:fixed;right:22px;width:88px;top:90px;bottom:22px;z-index:33;pointer-events:none;transition:opacity .3s}
+  .mito-path{display:block;position:fixed;right:22px;bottom:22px;width:88px;z-index:33;pointer-events:none;transition:opacity .3s}
   .mito-path.hide{opacity:0}.mito-path.hide .mp-stop{pointer-events:none}
-  .mp-line{position:absolute;left:50%;top:44px;bottom:44px;border-left:3px dotted color-mix(in srgb,var(--turquesa) 40%,transparent);margin-left:-1.5px}
-  .mp-fill{position:absolute;left:50%;top:44px;width:3px;margin-left:-1.5px;border-radius:3px;background:var(--turquesa);height:calc((100% - 88px) * var(--p,0))}
-  .mp-stops{position:absolute;left:0;right:0;top:44px;bottom:44px}
-  .mp-stop{pointer-events:auto;position:absolute;left:50%;top:calc(var(--p) * 100%);width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2.5px solid var(--turquesa);background:var(--bg);padding:0;cursor:pointer;transition:background .2s,transform .2s}
+  .mp-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .mp-svg path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .mp-borde{stroke:color-mix(in srgb,var(--turquesa) 45%,transparent);stroke-width:22}
+  .mp-tierra{stroke:var(--bg-2,#f1e4ca);stroke-width:17}
+  .mp-raya{stroke:color-mix(in srgb,var(--turquesa) 45%,transparent);stroke-width:2;stroke-dasharray:5 8}
+  .mp-hecho{stroke:var(--coral,#f8a29a);stroke-width:5;stroke-dasharray:0 1}
+  .mp-piedras circle{fill:color-mix(in srgb,var(--turquesa) 30%,transparent)}
+  .mp-stops{position:absolute;inset:0}
+  .mp-stop{pointer-events:auto;position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2.5px solid var(--turquesa);background:var(--card,#fffaf0);padding:0;cursor:pointer;transition:background .2s,transform .2s}
   .mp-stop.ok{background:var(--coral)}
   .mp-stop:hover{transform:scale(1.25)}
-  .mp-stop span{position:absolute;right:calc(100% + 10px);top:50%;transform:translateY(-50%);white-space:nowrap;background:var(--card,#fffaf0);border:1.5px solid var(--turquesa);border-radius:99px;padding:3px 10px;font-size:.78rem;font-weight:600;color:var(--ink);opacity:0;pointer-events:none;transition:opacity .15s}
+  .mp-stop span{position:absolute;right:calc(100% + 16px);top:50%;transform:translateY(-50%);white-space:nowrap;background:var(--card,#fffaf0);border:1.5px solid var(--turquesa);border-radius:99px;padding:3px 10px;font-size:.78rem;font-weight:600;color:var(--ink);opacity:0;pointer-events:none;transition:opacity .15s}
   .mp-stop:hover span,.mp-stop:focus-visible span{opacity:1}
-  body>.mito{translate:0 var(--py,0px);flex-direction:row;align-items:center}
+  body>.mito{translate:var(--px,0px) var(--py,0px);flex-direction:row;align-items:center}
 }
 @media (prefers-reduced-motion:reduce){.rv-on .rv-up{opacity:1;transform:none}}
 

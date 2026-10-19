@@ -92,7 +92,7 @@
   el.querySelector(".mito-x").addEventListener("click", (e) => {
     e.stopPropagation(); hideBub(); el.classList.add("bye");
     try { sessionStorage.setItem("setto-mochito-off", "1"); } catch (_) {}
-    path.remove(); el.style.removeProperty("--py");
+    path.remove(); el.style.removeProperty("--py"); el.style.removeProperty("--px");
     setTimeout(() => el.remove(), 400);
   });
 
@@ -100,32 +100,48 @@
   const SECS = Object.keys(TIPS).filter((k) => k !== "top").map((id) => document.getElementById(id)).filter(Boolean);
   let cur = "top", curT = null;
 
-  // Caminito (PC): Mochito baja por el borde derecho a medida que scrolleás y llega abajo al final de la página.
-  // Cada sección es una parada; pasa por ella justo cuando aparece su tip. Solo las paradas se tocan.
+  // Caminito (PC): un camino dibujado que serpentea en la esquina de abajo a la derecha (máximo media pantalla).
+  // Mochito lo recorre con el scroll y llega al final del camino al final de la página. Cada sección es una
+  // parada (menos la edición especial, que se ve apenas entrás); pasa por ella justo cuando aparece su tip.
+  // Solo las paradas se tocan.
   const PC = matchMedia("(min-width: 1024px)");
+  const SVGNS = "http://www.w3.org/2000/svg", ONDA = 16, VUELTAS = 1.5, M = 44; // M = mitad de Mochito en PC (88px)
   const path = document.createElement("div");
   path.className = "mito-path"; path.setAttribute("aria-label", "Secciones de la página");
-  path.innerHTML = `<span class="mp-line"></span><span class="mp-fill"></span><span class="mp-stops"></span>`;
+  path.innerHTML = `<svg class="mp-svg" aria-hidden="true"><g class="mp-piedras"></g><path class="mp-borde"/><path class="mp-tierra"/><path class="mp-raya"/><path class="mp-hecho" pathLength="1"/></svg><span class="mp-stops"></span>`;
   document.body.appendChild(path);
-  const pFill = path.querySelector(".mp-fill"), pStops = path.querySelector(".mp-stops");
-  let paradas = [];
+  const pSvg = path.querySelector("svg"), pHecho = path.querySelector(".mp-hecho"), pStops = path.querySelector(".mp-stops");
+  let paradas = [], alto = 0;
+  const curva = (t) => ONDA * Math.sin(t * Math.PI * 2 * VUELTAS); // corrimiento horizontal en el punto t (0 arriba, 1 abajo)
   const progreso = () => { const max = document.documentElement.scrollHeight - innerHeight; return max > 0 ? Math.min(1, Math.max(0, scrollY / max)) : 0; };
   function armarCamino() {
+    if (!PC.matches) { el.style.removeProperty("--py"); el.style.removeProperty("--px"); return; }
+    const hb = Math.max(0, document.querySelector("header.top")?.getBoundingClientRect().bottom || 66);
+    const H = Math.round(Math.min(innerHeight * 0.5, innerHeight - hb - 38)); // nunca más de media pantalla
+    path.style.height = `${H}px`; alto = H - 2 * M;
+    // Dibujo: borde, tierra, raya del medio y piedritas a los costados, sobre la misma curva
+    let d = "";
+    for (let i = 0; i <= 48; i++) { const t = i / 48; d += `${i ? "L" : "M"}${(M + curva(t)).toFixed(1)} ${(M + t * alto).toFixed(1)} `; }
+    pSvg.setAttribute("viewBox", `0 0 88 ${H}`);
+    pSvg.querySelectorAll("path").forEach((p) => p.setAttribute("d", d));
+    pSvg.querySelector(".mp-piedras").innerHTML = Array.from({ length: Math.floor(alto / 34) }, (_, i) => {
+      const t = (i + 0.5) / Math.floor(alto / 34), lado = i % 2 ? 1 : -1;
+      return `<circle cx="${(M + curva(t) + lado * 17).toFixed(1)}" cy="${(M + t * alto).toFixed(1)}" r="${i % 3 ? 2 : 2.8}"/>`;
+    }).join("");
     const max = document.documentElement.scrollHeight - innerHeight;
-    paradas = SECS.filter((sec) => !sec.hidden && sec.offsetParent).map((sec) => {
+    paradas = SECS.filter((sec) => sec.id !== "especial" && !sec.hidden && sec.offsetParent).map((sec) => {
       const top = sec.getBoundingClientRect().top + scrollY;
       return { id: sec.id, p: max > 0 ? Math.min(1, Math.max(0, (top - innerHeight * 0.6) / max)) : 0, nombre: (sec.querySelector("h2")?.textContent || sec.id).trim() };
     });
-    pStops.innerHTML = paradas.map((s) => `<button type="button" class="mp-stop" style="--p:${s.p.toFixed(4)}" data-id="${s.id}" aria-label="Ir a ${s.nombre}"><span>${s.nombre}</span></button>`).join("");
+    pStops.innerHTML = paradas.map((s) => `<button type="button" class="mp-stop" style="top:${(M + s.p * alto).toFixed(1)}px;left:${(M + curva(s.p)).toFixed(1)}px" data-id="${s.id}" aria-label="Ir a ${s.nombre}"><span>${s.nombre}</span></button>`).join("");
     moverCamino();
   }
   function moverCamino() {
-    if (!PC.matches || !path.isConnected) { el.style.removeProperty("--py"); return; }
-    const hb = document.querySelector("header.top")?.getBoundingClientRect().bottom || 66;
-    path.style.top = `${Math.round(Math.max(hb, 0) + 16)}px`; // arranca debajo del menú
-    const p = progreso(), h = path.clientHeight - 88; // 88 = alto de Mochito en PC
-    el.style.setProperty("--py", `${(-(1 - p) * h).toFixed(1)}px`);
-    pFill.style.setProperty("--p", p.toFixed(4));
+    if (!PC.matches || !path.isConnected) { el.style.removeProperty("--py"); el.style.removeProperty("--px"); return; }
+    const p = progreso();
+    el.style.setProperty("--py", `${(-(1 - p) * alto).toFixed(1)}px`);
+    el.style.setProperty("--px", `${curva(p).toFixed(1)}px`);
+    pHecho.style.strokeDasharray = `${p.toFixed(4)} 1`;
     pStops.querySelectorAll(".mp-stop").forEach((b, i) => b.classList.toggle("ok", paradas[i] && p >= paradas[i].p - 0.002));
   }
   pStops.addEventListener("click", (e) => { const b = e.target.closest(".mp-stop"); if (b && !recien()) go("#" + b.dataset.id); });
