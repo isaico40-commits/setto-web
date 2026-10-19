@@ -357,7 +357,7 @@
   const EST_C = { borrador: "pendiente", enviando: "pendiente", enviada: "entregado", error: "cancelado" };
   async function viewCampanas() {
     $("#view").innerHTML = `<h1 class="ph1">Campañas</h1>
-      <p class="muted">Solo le llega a quien aceptó en la web o escribió ALTA. Quien escribe BAJA sale solo de todo. Los mensajes usan plantillas aprobadas en WhatsApp Manager.</p>
+      <p class="muted">Solo le llega a quien aceptó en la web o escribió ALTA. Quien toca "No quiero más novedades" (o escribe BAJA) sale solo de todo. Los mensajes usan plantillas aprobadas en WhatsApp Manager.</p>
       <section class="sec"><h2>Segmentos</h2><div class="pcard"><div class="hist" id="segList"><span class="muted">Cargando…</span></div>
         <div class="acts"><button class="btn" id="syncAud">Actualizar públicos de Meta</button></div><span class="hintp">Crea o actualiza un público "Setto · segmento" por cada uno, solo con quienes aceptaron anuncios.</span></div></section>
       <section class="sec"><h2>Nueva campaña de WhatsApp</h2>
@@ -446,11 +446,14 @@
           <label>Termina el (opcional)<input type="datetime-local" data-esp="fin" value="${aLocal(E.fin)}"></label></div>
         <label>Cuando termina<select data-esp="al_terminar"><option value="ocultar" ${E.al_terminar !== "mostrar" ? "selected" : ""}>Ocultar la sección</option><option value="mostrar" ${E.al_terminar === "mostrar" ? "selected" : ""}>Mostrarla como "terminó" (sin poder pedir) para invitar al próximo</option></select></label>
         <b class="dsub">Antes del lanzamiento</b>
-        <div class="checks">${si("cuenta", "Cuenta regresiva")}${si("esmerilar", "Esmerilar todas las fotos")}${si("ocultar_nombres", "Ocultar nombres (\"Sabor sorpresa\")", false)}${si("ocultar_precios", "Ocultar precios", false)}${si("barra", "Barra con cuenta regresiva arriba de toda la web")}${si("calendario", "Botón Agendar en el calendario")}${si("avisame", "Botón Avisame (notificación)")}</div>
+        <div class="checks">${si("cuenta", "Cuenta regresiva")}${si("esmerilar", "Esmerilar todas las fotos")}${si("ocultar_nombres", "Ocultar nombres (\"Sabor sorpresa\")", false)}${si("ocultar_precios", "Ocultar precios", false)}${si("barra", "Barra con cuenta regresiva arriba de toda la web")}${si("calendario", "Botón Agendar en el calendario")}${si("avisame", "Botón Avisame por WhatsApp")}</div>
         <span class="hintp">Al llegar la hora, la web destapa las fotos y habilita los pedidos sola, sin tocar nada. La barra de arriba muestra "¡Ya salió!" durante 48 hs.</span>
-        <b class="dsub">Notificación de lanzamiento</b>
-        <div class="row2">${t("push_titulo", "Título", "¡Salió " + (E.titulo || "la edición especial") + "!", 60)}${t("push_texto", "Texto", "Ya se puede pedir. Entrá antes de que se agote.", 140)}</div>
-        <div class="checks">${si("avisar_auto", "Mandarla sola a la hora del lanzamiento")}</div>
+        <b class="dsub">Aviso de lanzamiento por WhatsApp</b>
+        ${t("wa_nombre", "Nombre del drop en el mensaje", "Ej: la edición Halloween", 60)}
+        <span class="hintp">El mensaje dice: "Hola Isa, ya salió <b>${esc(waNombreDrop(E))}</b> de Setto, como te avisamos. Pedila en la web mientras dure el stock." Con botones "Ver la edición" y "No quiero más avisos".</span>
+        <details class="dsub-mas"><summary>Notificación para los anotados viejos (push)</summary>
+        <div class="row2">${t("push_titulo", "Título", "¡Salió " + (E.titulo || "la edición especial") + "!", 60)}${t("push_texto", "Texto", "Ya se puede pedir. Entrá antes de que se agote.", 140)}</div></details>
+        <div class="checks">${si("avisar_auto", "Mandar el aviso solo a la hora del lanzamiento")}</div>
         <div class="dropinfo" id="dropInfo"><span class="muted">Cargando avisos…</span></div>
       </div>
       <div class="row2">${t("chip", "Etiqueta de arriba (antes)", "Ej: Drop mensual · solo 3 días")}${t("chip_post", "Etiqueta de arriba (cuando sale)", "Ej: ¡Ya salió! Hasta agotar stock")}</div>
@@ -458,11 +461,18 @@
       <label>Texto debajo del título (cuando sale, opcional)<textarea data-esp="intro_post" placeholder="Si lo dejás vacío se usa el de arriba">${esc(E.intro_post || "")}</textarea></label>
       <div class="savebar"><span class="hintp">Los sabores del drop son los de abajo marcados como Visible.</span><button class="btn solid" data-saveesp>Guardar lanzamiento</button></div></div>`;
   }
+  // mismo criterio que nombreDrop() en supabase/functions/_shared/crm.ts
+  function waNombreDrop(E) {
+    const propio = String(E.wa_nombre || "").trim(); if (propio) return propio.slice(0, 60);
+    const t = String(E.titulo || "").replace(/[¡!]+/g, "").trim(); if (!t) return "la edición especial";
+    return (/^(la |el |los |las )/i.test(t) ? t : /^edici[oó]n /i.test(t) ? t.replace(/^edici[oó]n /i, "la edición ") : "la edición " + t).slice(0, 60);
+  }
   async function loadDropInfo() {
     const box = $("#dropInfo"); if (!box) return;
     try {
       const r = await API.dropAvisos();
-      box.innerHTML = `<span>🔔 <b>${r.suscriptos}</b> ${r.suscriptos === 1 ? "persona anotada" : "personas anotadas"} para los avisos${r.avisado ? ` · ya se avisó este lanzamiento (${new Date(r.avisado).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })})` : ""}</span>
+      const det = r.whatsapp != null ? ` (${r.whatsapp} por WhatsApp${r.push ? `, ${r.push} por notificación` : ""})` : "";
+      box.innerHTML = `<span>📲 <b>${r.suscriptos}</b> ${r.suscriptos === 1 ? "persona anotada" : "personas anotadas"} para los avisos${det}${r.avisado ? ` · ya se avisó este lanzamiento (${new Date(r.avisado).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })})` : ""}</span>
         <button class="btn" data-dropavisar ${r.suscriptos ? "" : "disabled"}>Mandar aviso ahora</button>`;
     } catch (_) { box.innerHTML = `<span class="muted">Los avisos todavía no están activos en la base.</span>`; }
   }
@@ -933,7 +943,7 @@
       const E = { titulo: v("titulo"), modo: prog ? "programado" : "manual", estado: modo === "disponible" ? "disponible" : "proximamente",
         lanzamiento: lan, fin, al_terminar: v("al_terminar"),
         cuenta: on("cuenta"), esmerilar: on("esmerilar"), ocultar_nombres: on("ocultar_nombres"), ocultar_precios: on("ocultar_precios"), barra: on("barra"), calendario: on("calendario"), avisame: on("avisame"),
-        avisar_auto: on("avisar_auto"), push_titulo: v("push_titulo"), push_texto: v("push_texto"),
+        avisar_auto: on("avisar_auto"), push_titulo: v("push_titulo"), push_texto: v("push_texto"), wa_nombre: v("wa_nombre"),
         chip: v("chip"), chip_post: v("chip_post"), intro: v("intro"), intro_post: v("intro_post") };
       try { await API.saveSetting("especial", E); await loadBase(); toast(prog && API.dropEstado(E) === "antes" ? "Drop programado" : "Lanzamiento guardado"); $("#dropState").innerHTML = dropStateTxt(E); } catch (err) { toast(err.message); }
     }

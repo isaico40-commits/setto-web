@@ -1226,43 +1226,45 @@
     verSeguimiento();
   });
 
-  /* ---------- avisos de drops: el cliente se anota una vez y le llega cada lanzamiento ---------- */
-  const DAV = "setto-drop-av";
-  const dropAvOn = () => { try { return localStorage.getItem(DAV) === "1"; } catch (_) { return false; } };
-  let dropIOS = false;
+  /* ---------- avisos de drops por WhatsApp: el cliente deja su número una vez y le llega cada lanzamiento ---------- */
+  const DWA = "setto-drop-wa";
+  const dropWa = () => { try { return localStorage.getItem(DWA) || ""; } catch (_) { return ""; } }; // número anotado en este navegador
+  let dropWaForm = false, dropWaErr = "", dropWaVal = null; // lo tipeado sobrevive si la sección se redibuja (stock, fase)
   function dropAvHtml(txt) {
-    const btn = `<button type="button" class="btn solid" data-dropav>🔔 ${esc(txt)}</button>`;
-    if (!pushOk()) {
-      if (!esIOS || instalada || API.DEMO) return "";
-      return !dropIOS ? btn : `<div class="push-ios"><b>En iPhone los avisos llegan solo con Setto en tu inicio</b>
-        <ol><li>Tocá <b>Compartir</b> (el cuadrado con la flecha) abajo en Safari.</li><li>Elegí <b>Agregar a inicio</b>.</li><li>Abrí Setto desde ese ícono y tocá <b>${esc(txt)}</b>.</li></ol>
-        <small>Necesitás iOS 16.4 o más nuevo.</small></div>`;
-    }
-    if (Notification.permission === "denied") return `<p class="push-off">Bloqueaste las notificaciones de Setto. Si las querés, activalas en los ajustes del navegador.</p>`;
-    if (Notification.permission === "granted" && dropAvOn()) return `<p class="push-on">🔔 Te avisamos con una notificación. <button type="button" class="lnk" data-dropnoav>No avisarme más</button></p>`;
-    return btn;
+    const tel = dropWa();
+    if (tel) return `<p class="push-on">📲 Te avisamos por WhatsApp al ${esc(API.prettyPhone(tel))}. <button type="button" class="lnk" data-dropnowa>No avisarme más</button></p>`;
+    if (!dropWaForm) return `<button type="button" class="btn solid" data-dropav>📲 ${esc(txt)}</button>`;
+    const v = dropWaVal || (dropWaVal = { nombre: form.nombre || "", tel: form.tel || "" });
+    return `<form class="drop-wa f" data-dropwa>
+      <input name="nombre" autocomplete="given-name" placeholder="Tu nombre" value="${esc(v.nombre)}" maxlength="40" required>
+      <input name="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="Tu WhatsApp, ej: 223 347-1277" value="${esc(v.tel)}" required>
+      <button class="btn solid">Avisame por WhatsApp</button>
+      ${dropWaErr ? `<p class="rv-err">${esc(dropWaErr)}</p>` : ""}
+      <small>Te mandamos un WhatsApp cuando salga cada drop, nada más. Lo cortás cuando quieras desde el mismo mensaje.</small></form>`;
   }
   document.addEventListener("click", async (e) => {
     if (e.target.closest("[data-dropx]")) { const bar = $("#dropBar"); try { localStorage.setItem(DBX, bar.dataset.k); } catch (_) {} bar.remove(); return; }
     if (e.target.closest("[data-ics]")) { bajarIcs(); e.target.closest("details").open = false; return; }
-    if (e.target.closest("[data-dropnoav]")) {
-      try { const reg = await navigator.serviceWorker.getRegistration("/sw.js"); const sub = reg && (await reg.pushManager.getSubscription()); if (sub) await API.dropDesuscribir(sub.endpoint); } catch (_) {}
-      try { localStorage.removeItem(DAV); } catch (_) {}
+    if (e.target.closest("[data-dropnowa]")) {
+      try { await API.dropDesanotarWa(dropWa()); } catch (_) {}
+      try { localStorage.removeItem(DWA); } catch (_) {}
       toast("Listo, no te avisamos más de los drops"); renderEspecial(); return;
     }
-    const b = e.target.closest("[data-dropav]"); if (!b) return;
-    if (!pushOk()) { dropIOS = true; renderEspecial(); return; }
-    b.disabled = true; b.textContent = "Activando…";
+    if (e.target.closest("[data-dropav]")) { dropWaForm = true; renderEspecial(); const i = $("[data-dropwa] input[name=" + (form.nombre ? "tel" : "nombre") + "]"); if (i) i.focus(); }
+  });
+  document.addEventListener("input", (e) => { const f = e.target.closest("[data-dropwa]"); if (f && dropWaVal) dropWaVal[e.target.name] = e.target.value; });
+  document.addEventListener("submit", async (e) => {
+    const f = e.target.closest("[data-dropwa]"); if (!f) return;
+    e.preventDefault();
+    const nombre = f.nombre.value.trim(), tel = API.normPhone(f.tel.value);
+    dropWaErr = !nombre ? "Poné tu nombre para el mensaje." : !tel ? "Revisá el número: código de área + número." : "";
+    if (dropWaErr) { renderEspecial(); return; }
+    const b = f.querySelector("button"); b.disabled = true; b.textContent = "Anotando…";
     try {
-      const perm = await Notification.requestPermission();
-      if (perm !== "granted") throw new Error(perm === "denied" ? "Bloqueaste las notificaciones" : "Sin permiso no podemos avisarte");
-      const reg = await navigator.serviceWorker.register("/sw.js");
-      await navigator.serviceWorker.ready;
-      const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: claveVapid(vapid) }));
-      await API.dropSuscribir(sub);
-      try { localStorage.setItem(DAV, "1"); } catch (_) {}
-      toast("¡Listo! Te avisamos cuando salga");
-    } catch (ex) { toast(ex.message || "No pudimos activar los avisos"); }
+      await API.dropAnotarWa(tel, nombre);
+      try { localStorage.setItem(DWA, tel); } catch (_) {}
+      dropWaForm = false; toast("¡Listo! Te avisamos por WhatsApp cuando salga");
+    } catch (ex) { dropWaErr = ex.message || "No pudimos anotarte, probá de nuevo"; }
     renderEspecial();
   });
 
