@@ -298,6 +298,12 @@
     $("#ubiLink").href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
   }
 
+  // dónde se retira: sale de Panel → Ajustes → Ubicación; si el mapa está apagado no se muestra nada
+  function retiroDondeHtml() {
+    const u = S.ubicacion || {}, q = (u.mapa || "").trim(); if (!(u.activo && q)) return "";
+    return `<div class="ret-donde"><span aria-hidden="true">📍</span><div><b>Dónde retirás</b><p>${esc(u.texto || q)}</p><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}" target="_blank" rel="noopener">Ver en Google Maps</a></div></div>`;
+  }
+
   /* ---------- Stickers para WhatsApp (Panel → Ajustes → Stickers). El pack vive en Sticker.ly:
      WhatsApp no deja instalar packs desde una web, solo desde una app. ---------- */
   const STK_DEF = ["01_fantasma", "02_calabaza", "03_diablito", "04_bruja", "05_latte", "06_gatito", "07_momia", "08_durmiendo", "09_fantasmita"].map((n) => `img/stickers/halloween/${n}.webp`);
@@ -814,7 +820,7 @@
     }).join("")}</div></div>`;
     const sinSt = sinStock(p) && !(k === "premium" && !espOpen());
     const blocked = p.agotado || sinSt || (k === "premium" && (!espOpen() || !(Number(bebida(p) ? p.precios[sz || "12 oz"] : p.precio) > 0)));
-    $("#sheet").innerHTML = `<div class="sph ${tapado(p) ? "frost" : ""}"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
+    $("#sheet").innerHTML = `<div class="sph"><img src="${esc(tapado(p) ? "img/mochito-lie.png" : p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
       <div class="sb">
         ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
         <h3 id="sTitle">${esc(nameOf(p))}</h3>
@@ -876,7 +882,7 @@
     return out;
   }
   let view = "cart", sending = false;
-  let form = { nombre: "", tel: "", hora: "", pago: "", nota: "", modo: "retiro", dir: "", dirExtra: "", premio: "" };
+  let form = { nombre: "", tel: "", hora: "", pago: "", nota: "", modo: "retiro", dir: "", dirExtra: "", premio: "", okWa: true, okAds: true }; // vienen tildadas (decisión de Isa); la versión del aviso lo deja registrado
   try { const f = JSON.parse(localStorage.getItem("setto-form") || "null"); if (f) { form.nombre = f.nombre || ""; form.tel = f.tel || ""; form.dir = f.dir || ""; form.dirExtra = f.dirExtra || ""; } } catch (_) {}
   let lastOrder = null;
   try { lastOrder = JSON.parse(sessionStorage.getItem("setto-last-order") || "null"); } catch (_) {}
@@ -945,6 +951,7 @@
           <button data-modo="retiro" role="radio" aria-checked="${!isEnv}"><b>Retiro</b><small>Pasás a buscarlo</small></button>
           <button data-modo="envio" role="radio" aria-checked="${isEnv}"><b>Envío a domicilio</b><small>${costo > 0 ? "Costo " + money(costo) : "Costo a coordinar"}</small></button>
         </div>` : ""}
+        ${isEnv ? "" : retiroDondeHtml()}
         ${isEnv ? `<label class="f" for="fDir">Dirección exacta<input id="fDir" autocomplete="street-address" value="${esc(form.dir)}" placeholder="Calle y número"><span class="hintf">${esc((S.envio || {}).aviso || "")}</span></label>
           <label class="f" for="fDir2">Piso, depto o referencia (opcional)<input id="fDir2" value="${esc(form.dirExtra)}" placeholder="Ej: 3° B, timbre 2, entre Colón y Moreno"></label>` : ""}
         <label class="f" for="fNombre">Nombre<input id="fNombre" autocomplete="given-name" value="${esc(form.nombre)}" placeholder="Cómo te llamamos"></label>
@@ -953,10 +960,14 @@
         <div class="f"><span>Forma de pago</span><div class="chips">${pagosVer.map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">${form.modo === "envio" ? "Con envío, solo transferencia." : "El pago se coordina por WhatsApp."}</span></div>
         ${premioPicker()}
         ${giftBox()}
+        <div class="consent"><label><input type="checkbox" id="fOkWa" ${form.okWa ? "checked" : ""}> Avisame por WhatsApp cuando salgan sabores nuevos o limitados.</label>
+          <label><input type="checkbox" id="fOkAds" ${form.okAds ? "checked" : ""}> Pueden usar mi número para mostrarme anuncios de Setto en Instagram y Facebook.</label>
+          <span class="hintf">Las dos son opcionales y te das de baja cuando quieras en <a href="/privacidad" target="_blank">Privacidad y bajas</a>.</span></div>
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>
         <div id="fErr" class="err" hidden></div>`;
       foot.innerHTML = `${regaloLine()}${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
       [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; }); });
+      [["fOkWa", "okWa"], ["fOkAds", "okAds"]].forEach(([id, k]) => $("#" + id).addEventListener("change", (e) => { form[k] = e.target.checked; }));
       $("#fTel").addEventListener("change", async () => {
         if (!(await loadCard()) || view !== "checkout") return;
         if (completes() && !$(".premio-pick")) return drawDrawer(); // aparece el selector de premio
@@ -977,6 +988,12 @@
     }
   }
 
+  // el cliente abre WhatsApp para mandar el pedido: Contact en Meta (no es una compra) y queda anotado en el pedido
+  function abrioWhatsApp(code, phone) {
+    if (!code) return;
+    if (window.SettoPixel) window.SettoPixel.once("Contact:" + code, () => window.SettoPixel.track("Contact", { content_category: "pedido" }, "contacto-" + code));
+    if (API.marcarContacto && phone) API.marcarContacto(code, phone).catch(() => {});
+  }
   async function sendOrder() {
     const err = []; const el = $("#fErr");
     if (!form.nombre.trim()) err.push("tu nombre");
@@ -991,21 +1008,27 @@
     try {
       const isEnv = form.modo === "envio";
       const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [] })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null, gift: GIFT ? GIFT.code : null });
-      if (window.SettoPixel) window.SettoPixel.purchase(o.code, { ...pxCarrito(), value: Number(o.total) || 0 });
+      const pxPed = pxCarrito(); // para mandar Purchase con los mismos productos cuando el pedido se entregue
+      if (window.SettoPixel) window.SettoPixel.once("order_created:" + o.code, () => window.SettoPixel.custom("order_created", { ...pxPed, value: Number(o.total) || 0 }, "creado-" + o.code));
       const ph = o.phone || API.normPhone(form.tel);
+      const canales = [form.okWa && "whatsapp", form.okAds && "meta_ads"].filter(Boolean); // solo lo que marcó; no marcar no da de baja
+      const org = window.SettoOrigen && window.SettoOrigen.paraPedido(); // de dónde llegó (UTM, red, QR): queda en el pedido
+      if (org && API.registrarOrigen) API.registrarOrigen(o.code, ph, org).catch(() => {});
+      if (canales.length && API.registrarConsentimiento) API.registrarConsentimiento(o.code, ph, canales, ((window.SettoPrivacidad || {}).VERSION || "") + "-pretildada").catch(() => {});
       let track = o.track || null;
       if (!track) { try { const st = await API.orderStatus([o.code], ph); track = (st.find((x) => x.code === o.code) || {}).track || null; } catch (_) {} }
       const full = { ...o, track, nombre: form.nombre.trim(), retiro: form.hora, pago: form.pago, nota: form.nota.trim() };
       lastOrder = { code: o.code, track, message: buildMessage(full), modo: o.modo || "retiro", premio: !!o.premio, premio_txt: o.premio_txt, enviado: true };
       cardCache = null;
       trackVivos = [{ code: o.code, status: "pendiente", etapa: "recibido", modo: o.modo || "retiro", retiro: form.hora, created_at: new Date().toISOString(), track }, ...trackVivos.filter((x) => x.code !== o.code)];
-      guardarSeguimiento({ code: o.code, phone: ph, track, at: Date.now() });
+      guardarSeguimiento({ code: o.code, phone: ph, track, at: Date.now(), px: pxPed });
       refrescarStock();
       try { sessionStorage.setItem("setto-last-order", JSON.stringify(lastOrder)); localStorage.setItem("setto-form", JSON.stringify({ nombre: form.nombre, tel: form.tel, dir: form.dir, dirExtra: form.dirExtra })); } catch (_) {}
       if (GIFT && o.gift) { const rest = GIFT.saldo - o.gift; if (rest > 0) usarGift(GIFT.code, rest); else quitarGift(); }
-      cart = []; save(); form.hora = ""; form.nota = ""; form.premio = ""; renderBadge();
+      cart = []; save(); form.hora = ""; form.nota = ""; form.premio = ""; form.okWa = true; form.okAds = true; renderBadge();
       view = "sent"; sending = false; drawDrawer();
       const link = waLink(lastOrder.message);
+      abrioWhatsApp(o.code, ph);
       if (matchMedia("(pointer:coarse)").matches) setTimeout(() => { location.href = link; }, window.SettoPixel && window.SettoPixel.on ? 350 : 0); // le damos tiempo al pixel antes de abrir WhatsApp
       else window.open(link, "_blank", "noopener");
     } catch (e) {
@@ -1058,6 +1081,7 @@
     if (b.id === "toBuscar") { BQ.res = null; BQ.err = ""; BQ.tel = BQ.tel || form.tel; view = "buscar"; drawDrawer(); setTimeout(() => { const i = $("#bqTel"); if (i && !i.value) i.focus(); }, 30); }
     if (b.dataset.pago) { form.pago = b.dataset.pago; document.querySelectorAll("[data-pago]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); }
     if (b.id === "toWA") sendOrder();
+    if (b.dataset.resend !== undefined && lastOrder) abrioWhatsApp(lastOrder.code, telDe(lastOrder.code));
     if (b.dataset.premio) { form.premio = b.dataset.premio; drawDrawer(); }
     if (b.dataset.modo) { form.modo = b.dataset.modo; drawDrawer(); if (form.modo === "envio") setTimeout(() => { const d = $("#fDir"); if (d && !d.value) d.focus(); }, 30); }
     if (b.id === "copyMsg") {
@@ -1162,6 +1186,7 @@
     const ocultos = ocultosTrk();
     const vivos = data.filter((o) => !ocultos.includes(o.code) && (o.status === "pendiente" || (o.status === "entregado" && !o.resena) || Date.now() - new Date(o.created_at) < 3 * 36e5)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
     avisarCambios(vivos); trackVivos = vivos;
+    comprasConcretadas(data);
     // en vivo: cuando el equipo cambia el estado, la base avisa y refrescamos sin recargar la página
     if (API.onTrack) API.onTrack(vivos.filter((o) => o.status === "pendiente" && o.track).map((o) => o.track), enVivo);
     if ((view === "cart" || view === "sent") && $("#drawer").classList.contains("on")) drawDrawer();
@@ -1170,6 +1195,15 @@
     if (box.querySelector(".cmb-busy")) return; // ni un cambio que se está enviando
     box.hidden = false; box.innerHTML = `<div class="wrap">${vivos.map(trackCard).join("")}</div>`;
     if (vivos.some((o) => o.status === "pendiente")) trackT = setTimeout(verSeguimiento, 20000); // respaldo si el canal en vivo se corta
+  }
+  // Purchase recién cuando el equipo marca el pedido como entregado (cobrado). Solo pedidos hechos desde este navegador.
+  function comprasConcretadas(data) {
+    if (!window.SettoPixel || !window.SettoPixel.on) return;
+    const mios = misPedidos();
+    data.filter((o) => o.status === "entregado" && o.code).forEach((o) => {
+      const m = mios.find((x) => x.code === o.code || (o.track && x.track === o.track)); if (!m || !m.px) return;
+      window.SettoPixel.purchase(o.code, { ...m.px, value: Number(o.total) || 0 });
+    });
   }
   let vivoT = null, etapasVistas = null;
   const enVivo = () => { clearTimeout(vivoT); vivoT = setTimeout(verSeguimiento, 250); };
@@ -1239,43 +1273,45 @@
     verSeguimiento();
   });
 
-  /* ---------- avisos de drops: el cliente se anota una vez y le llega cada lanzamiento ---------- */
-  const DAV = "setto-drop-av";
-  const dropAvOn = () => { try { return localStorage.getItem(DAV) === "1"; } catch (_) { return false; } };
-  let dropIOS = false;
+  /* ---------- avisos de drops por WhatsApp: el cliente deja su número una vez y le llega cada lanzamiento ---------- */
+  const DWA = "setto-drop-wa";
+  const dropWa = () => { try { return localStorage.getItem(DWA) || ""; } catch (_) { return ""; } }; // número anotado en este navegador
+  let dropWaForm = false, dropWaErr = "", dropWaVal = null; // lo tipeado sobrevive si la sección se redibuja (stock, fase)
   function dropAvHtml(txt) {
-    const btn = `<button type="button" class="btn solid" data-dropav>🔔 ${esc(txt)}</button>`;
-    if (!pushOk()) {
-      if (!esIOS || instalada || API.DEMO) return "";
-      return !dropIOS ? btn : `<div class="push-ios"><b>En iPhone los avisos llegan solo con Setto en tu inicio</b>
-        <ol><li>Tocá <b>Compartir</b> (el cuadrado con la flecha) abajo en Safari.</li><li>Elegí <b>Agregar a inicio</b>.</li><li>Abrí Setto desde ese ícono y tocá <b>${esc(txt)}</b>.</li></ol>
-        <small>Necesitás iOS 16.4 o más nuevo.</small></div>`;
-    }
-    if (Notification.permission === "denied") return `<p class="push-off">Bloqueaste las notificaciones de Setto. Si las querés, activalas en los ajustes del navegador.</p>`;
-    if (Notification.permission === "granted" && dropAvOn()) return `<p class="push-on">🔔 Te avisamos con una notificación. <button type="button" class="lnk" data-dropnoav>No avisarme más</button></p>`;
-    return btn;
+    const tel = dropWa();
+    if (tel) return `<p class="push-on">📲 Te avisamos por WhatsApp al ${esc(API.prettyPhone(tel))}. <button type="button" class="lnk" data-dropnowa>No avisarme más</button></p>`;
+    if (!dropWaForm) return `<button type="button" class="btn solid" data-dropav>📲 ${esc(txt)}</button>`;
+    const v = dropWaVal || (dropWaVal = { nombre: form.nombre || "", tel: form.tel || "" });
+    return `<form class="drop-wa f" data-dropwa>
+      <input name="nombre" autocomplete="given-name" placeholder="Tu nombre" value="${esc(v.nombre)}" maxlength="40" required>
+      <input name="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="Tu WhatsApp, ej: 223 347-1277" value="${esc(v.tel)}" required>
+      <button class="btn solid">Avisame por WhatsApp</button>
+      ${dropWaErr ? `<p class="rv-err">${esc(dropWaErr)}</p>` : ""}
+      <small>Te mandamos un WhatsApp cuando salga cada drop, nada más. Lo cortás cuando quieras desde el mismo mensaje.</small></form>`;
   }
   document.addEventListener("click", async (e) => {
     if (e.target.closest("[data-dropx]")) { const bar = $("#dropBar"); try { localStorage.setItem(DBX, bar.dataset.k); } catch (_) {} bar.remove(); return; }
     if (e.target.closest("[data-ics]")) { bajarIcs(); e.target.closest("details").open = false; return; }
-    if (e.target.closest("[data-dropnoav]")) {
-      try { const reg = await navigator.serviceWorker.getRegistration("/sw.js"); const sub = reg && (await reg.pushManager.getSubscription()); if (sub) await API.dropDesuscribir(sub.endpoint); } catch (_) {}
-      try { localStorage.removeItem(DAV); } catch (_) {}
+    if (e.target.closest("[data-dropnowa]")) {
+      try { await API.dropDesanotarWa(dropWa()); } catch (_) {}
+      try { localStorage.removeItem(DWA); } catch (_) {}
       toast("Listo, no te avisamos más de los drops"); renderEspecial(); return;
     }
-    const b = e.target.closest("[data-dropav]"); if (!b) return;
-    if (!pushOk()) { dropIOS = true; renderEspecial(); return; }
-    b.disabled = true; b.textContent = "Activando…";
+    if (e.target.closest("[data-dropav]")) { dropWaForm = true; renderEspecial(); const i = $("[data-dropwa] input[name=" + (form.nombre ? "tel" : "nombre") + "]"); if (i) i.focus(); }
+  });
+  document.addEventListener("input", (e) => { const f = e.target.closest("[data-dropwa]"); if (f && dropWaVal) dropWaVal[e.target.name] = e.target.value; });
+  document.addEventListener("submit", async (e) => {
+    const f = e.target.closest("[data-dropwa]"); if (!f) return;
+    e.preventDefault();
+    const nombre = f.nombre.value.trim(), tel = API.normPhone(f.tel.value);
+    dropWaErr = !nombre ? "Poné tu nombre para el mensaje." : !tel ? "Revisá el número: código de área + número." : "";
+    if (dropWaErr) { renderEspecial(); return; }
+    const b = f.querySelector("button"); b.disabled = true; b.textContent = "Anotando…";
     try {
-      const perm = await Notification.requestPermission();
-      if (perm !== "granted") throw new Error(perm === "denied" ? "Bloqueaste las notificaciones" : "Sin permiso no podemos avisarte");
-      const reg = await navigator.serviceWorker.register("/sw.js");
-      await navigator.serviceWorker.ready;
-      const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: claveVapid(vapid) }));
-      await API.dropSuscribir(sub);
-      try { localStorage.setItem(DAV, "1"); } catch (_) {}
-      toast("¡Listo! Te avisamos cuando salga");
-    } catch (ex) { toast(ex.message || "No pudimos activar los avisos"); }
+      await API.dropAnotarWa(tel, nombre);
+      try { localStorage.setItem(DWA, tel); } catch (_) {}
+      dropWaForm = false; toast("¡Listo! Te avisamos por WhatsApp cuando salga");
+    } catch (ex) { dropWaErr = ex.message || "No pudimos anotarte, probá de nuevo"; }
     renderEspecial();
   });
 

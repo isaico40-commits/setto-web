@@ -1,7 +1,7 @@
 // Edge Function · push-pedido
 // La llama el trigger orders_push (migración 025) cuando un pedido cambia: busca las suscripciones del pedido y manda la notificación.
 // Con tipo "drop" (migración 026) avisa el lanzamiento de la edición especial a todos los anotados en drop_subs.
-// Con tipo "equipo" (migración 027) avisa al equipo en el panel: pedido nuevo, gift card, cambio resuelto o reseña. Sin JWT: se valida con x-setto-hook.
+// Con tipo "equipo" (migraciones 027 y 028) avisa al equipo: pedido nuevo, gift card, cambio resuelto, reseña o tarea nueva en la caja. Sin JWT: se valida con x-setto-hook.
 // Las claves (hook y VAPID) se leen de Vault con push_config(); SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY ya vienen.
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -79,6 +79,9 @@ async function avisarEquipo(evento: string, id: string) {
   } else if (evento === "resena") {
     const { data: r } = await sb.from("reviews").select("nombre,rating").eq("id", id).maybeSingle();
     if (r) n = { title: `⭐ Reseña para aprobar`, body: `${r.nombre} dejó ${r.rating} ${r.rating === 1 ? "estrella" : "estrellas"}.`, url: "/panel#resenas", tag: `resena-${id}` };
+  } else if (evento === "tarea") {
+    const { data: t } = await sb.from("caja_tareas").select("titulo,asignada,prioridad,creada_por").eq("id", id).maybeSingle();
+    if (t) n = { title: `${t.prioridad === "alta" ? "🔴" : "📝"} Tarea nueva de ${t.creada_por}`, body: `${t.titulo}${t.asignada && t.asignada !== "Cualquiera" ? ` · para ${t.asignada}` : ""}`, url: "/caja#tareas", tag: `tarea-${id}` };
   }
   if (!n) return new Response("sin aviso", { status: 200 });
   const { data: subs } = await sb.from("staff_push_subs").select("endpoint,p256dh,auth");
