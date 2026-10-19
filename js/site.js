@@ -208,32 +208,39 @@
     const pic = (x, i, alt, style = "") => `<picture>${x.img_m ? `<source media="(max-width: 820px)" srcset="${esc(x.img_m)}">` : ""}<img src="${esc(x.img || x.img_m || "img/mochito-lie.png")}" alt="${alt}" ${i ? 'loading="lazy"' : 'fetchpriority="high"'}${style}></picture>`;
     // un solo botón, chico y dentro de la slide (el primero de los que se cargan en el panel)
     const cta = (x) => { const b = heroBotones(x)[0]; return b ? `<a class="btn hcta ${b.estilo === "secundario" ? "ghost" : "solid"}" href="${esc(b.link || "#sets")}">${esc(b.texto)}</a>` : ""; };
-    $("#heroSlides").innerHTML = HS.map((x, i) => {
+    // vuelta sin fin (como Crumbl): una copia de todas las slides a cada lado; al quedar sobre una copia saltamos a la real
+    const card = (x, i, clon) => {
+      const cl = clon ? ' clon" aria-hidden="true" inert data-clon="1' : "", h1 = i === 0 && !clon;
       if (x.tipo === "media") {
         const vid = MOB ? x.video_m || x.video : x.video || x.video_m, poster = MOB ? x.img_m || x.img : x.img || x.img_m, alt = esc(x.alt || "Setto");
         const media = vid ? `<video muted loop playsinline preload="${i ? "none" : "metadata"}" ${poster ? `poster="${esc(poster)}"` : ""} data-src="${esc(vid)}" aria-label="${alt}"></video>` : pic(x, i, alt);
-        return `<article class="hcard media" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">${i === 0 ? `<h1 class="sr-only">${esc(x.alt || "Setto · Asian Inspired Home Cafe en Mar del Plata")}</h1>` : ""}<div class="hmedia">${media}</div>${cta(x) ? `<div class="h2txt">${cta(x)}</div>` : ""}</article>`;
+        return `<article class="hcard media${cl}" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">${h1 ? `<h1 class="sr-only">${esc(x.alt || "Setto · Asian Inspired Home Cafe en Mar del Plata")}</h1>` : ""}<div class="hmedia">${media}</div>${cta(x) ? `<div class="h2txt">${cta(x)}</div>` : ""}</article>`;
       }
       // sin título ni texto (se borran desde el panel) la foto ocupa toda la slide y queda solo el botón
-      const foto = x.ajuste === "foto", T = i === 0 ? "h1" : "h2", tit = (x.titulo || "").trim(), txt = (x.texto || "").trim();
-      return `<article class="hcard ${foto ? "foto" : "recorte"}${tit || txt ? "" : " limpia"}" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">
-        ${!tit && i === 0 ? `<h1 class="sr-only">${esc(x.alt || "Setto · Asian Inspired Home Cafe en Mar del Plata")}</h1>` : ""}
+      const foto = x.ajuste === "foto", T = h1 ? "h1" : "h2", tit = (x.titulo || "").trim(), txt = (x.texto || "").trim();
+      return `<article class="hcard ${foto ? "foto" : "recorte"}${tit || txt ? "" : " limpia"}${cl}" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">
+        ${!tit && h1 ? `<h1 class="sr-only">${esc(x.alt || "Setto · Asian Inspired Home Cafe en Mar del Plata")}</h1>` : ""}
         <div class="hmedia">${pic(x, i, esc(x.alt || tit || "Setto"), ` style="object-position:center ${esc({ arriba: "top", abajo: "bottom" }[x.pos] || "center")}"`)}</div>
         <div class="h2txt">
           ${tit ? `<${T} class="ht">${esc(tit)}</${T}>` : ""}
           ${txt ? `<p class="lead">${esc(txt)}</p>` : ""}
           ${cta(x)}
         </div></article>`;
-    }).join("");
+    };
+    const reales = HS.map((x, i) => card(x, i, false)).join(""), copias = HS.length > 1 ? HS.map((x, i) => card(x, i, true)).join("") : "";
+    $("#heroSlides").innerHTML = copias + reales + copias;
     document.querySelector(".hnav").hidden = HS.length < 2;
-    heroI = 0; $("#heroSlides").scrollLeft = 0; heroMarcar(); heroAuto();
+    heroI = 0; heroIr(0, false); heroAuto();
   }
-  const heroCards = () => Array.from(document.querySelectorAll("#heroSlides .hcard"));
+  const heroCards = () => Array.from(document.querySelectorAll("#heroSlides .hcard:not(.clon)"));
+  const heroPad = (tr) => parseFloat(getComputedStyle(tr).scrollPaddingLeft) || 0;
   function heroIr(i, smooth = true) {
-    const cs = heroCards(); if (!cs.length) return;
-    heroI = (i + cs.length) % cs.length;
-    const tr = $("#heroSlides"), pad = parseFloat(getComputedStyle(tr).scrollPaddingLeft) || 0;
-    tr.scrollTo({ left: cs[heroI].offsetLeft - pad, behavior: smooth && !RMH ? "smooth" : "auto" });
+    const cs = heroCards(), n = cs.length; if (!n) return;
+    const tr = $("#heroSlides"), todas = Array.from(tr.querySelectorAll(".hcard"));
+    // pasando la última vamos a la copia de la primera (y al revés), así sigue para el mismo lado
+    const dest = n > 1 && i >= n ? todas[2 * n] : n > 1 && i < 0 ? todas[n - 1] : cs[(i + n) % n];
+    heroI = (i + n) % n;
+    tr.scrollTo({ left: dest.offsetLeft - heroPad(tr), behavior: smooth && !RMH ? "smooth" : "auto" });
     heroMarcar();
   }
   function heroMarcar() {
@@ -265,9 +272,11 @@
     const tr = document.getElementById("heroSlides"), sec = document.querySelector(".hero2"); if (!tr || !sec) return; let t = null;
     tr.addEventListener("scroll", () => {
       clearTimeout(t); t = setTimeout(() => {
-        const cs = heroCards(), pad = parseFloat(getComputedStyle(tr).scrollPaddingLeft) || 0;
-        let best = 0, bd = 1e9; cs.forEach((c, k) => { const dd = Math.abs(c.offsetLeft - pad - tr.scrollLeft); if (dd < bd) { bd = dd; best = k; } });
-        if (tr.scrollLeft >= tr.scrollWidth - tr.clientWidth - 2) best = cs.length - 1; // la última no llega a pegarse a la izquierda
+        const pad = heroPad(tr); let cerca = null, bd = 1e9;
+        tr.querySelectorAll(".hcard").forEach((c) => { const dd = Math.abs(c.offsetLeft - pad - tr.scrollLeft); if (dd < bd) { bd = dd; cerca = c; } });
+        if (!cerca) return;
+        const best = +cerca.dataset.hi;
+        if (cerca.dataset.clon) tr.scrollTo({ left: heroCards()[best].offsetLeft - pad, behavior: "auto" }); // salto invisible a la slide real
         if (best !== heroI) { heroI = best; heroMarcar(); heroEspera(); } // la cambió con el dedo
       }, 80);
     }, { passive: true });
