@@ -1019,3 +1019,27 @@ body[data-page="listo"] #stickers{scroll-margin-top:80px}
 /* acceso a la maquinita desde la tarjeta del Club */
 .maq-link{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding:10px 14px;border-radius:14px;background:var(--bg-2);color:var(--ink);font-weight:600;font-size:.9rem;text-decoration:none}
 .maq-link:hover{background:var(--coral-2)}
+
+/* ---- auditoría de compra (oct 2026) ---- */
+/* ficha: el botón Agregar queda siempre a la vista, abajo */
+.sheet .act{position:sticky;bottom:0;z-index:3;background:var(--bg);margin:0 -22px -22px;padding:12px 22px calc(14px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 18px -12px rgba(31,28,24,.25)}
+@media (max-width:640px){.sheet .sph{height:170px}.sheet .sph::before{width:140px}.sheet .sph img{max-height:150px}}
+@media (max-height:820px) and (min-width:641px){.sheet .sph{height:200px}.sheet .sph::before{width:150px}.sheet .sph img{max-height:180px}}
+/* entrega: campos que faltan */
+.f.inval input,.f.inval select{border-color:var(--coral);box-shadow:0 0 0 3px color-mix(in srgb,var(--coral) 30%,transparent)}
+.f.inval > span:first-child,.f.inval{color:inherit}
+.f#fPago.inval .chips{outline:2px solid var(--coral);outline-offset:4px;border-radius:14px}
+.df .err{margin:0}
+/* beneficios en una línea en Entrega */
+.clubline.corta{padding:7px 10px;font-size:.8rem}
+.clubline.corta img{width:24px}
+/* toda la tarjeta abre la ficha */
+article.set,article.item,article.prem{cursor:pointer}
+/* área táctil de 44px sin agrandar el dibujo */
+.hbtn,.qty button{position:relative}
+.hbtn::after{content:"";position:absolute;inset:-7px}
+.qty button{width:32px;height:32px}
+.qty button::after{content:"";position:absolute;inset:-6px}
+/* edición especial antes del lanzamiento sin tarjetas */
+#especial .esp-prev{background:var(--coral-2);color:var(--ink)!important;border-radius:12px;padding:8px 12px;font-size:.84rem;font-weight:600;margin:0 0 12px}
+.gb-dn{display:block;font-size:.72rem;font-weight:700;color:var(--ink-2);padding:4px 0 2px;text-align:center}
