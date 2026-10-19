@@ -1,4 +1,4 @@
--- 035 · Avisos del pedido por WhatsApp (automáticos).
+-- 036 · Avisos del pedido por WhatsApp (automáticos).
 --   Cuando el pedido pasa a "en preparación" o "listo/en camino", se entrega, se cancela o el equipo pide un cambio,
 --   el trigger orders_wa llama a la Edge Function whatsapp-pedido, que le escribe al cliente con los textos de
 --   Panel → Ajustes → Mensajes. El "Recibido" lo manda el webhook apenas llega el mensaje con el pedido.

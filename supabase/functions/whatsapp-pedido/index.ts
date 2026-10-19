@@ -1,4 +1,4 @@
-// Edge Function · whatsapp-pedido (la llama el trigger orders_wa de la migración 035, con la clave de Vault)
+// Edge Function · whatsapp-pedido (la llama el trigger orders_wa de la migración 036, con la clave de Vault)
 // Cuando el pedido cambia de etapa, se entrega, se cancela o falta algo, le avisa al cliente por WhatsApp.
 // Secretos: META_ACCESS_TOKEN, WA_PHONE_NUMBER_ID, SITE_URL.
 import { hookValido, json } from "../_shared/supa.ts";
