@@ -1473,7 +1473,7 @@
         t.textContent = "Enviando…";
         const tr = trackDe(f.dataset.rvcode), ig = f.querySelector("[data-rvig]").value, tx = f.querySelector("textarea").value;
         if (tr && API.createReviewTrack) await API.createReviewTrack(tr, r, tx, foto, ig); else await API.createReview(f.dataset.rvcode, telDe(f.dataset.rvcode), r, tx, foto, ig);
-        f.outerHTML = `<p style="margin-top:10px"><b>¡Gracias!</b> La publicamos cuando la revisemos.</p>`; setTimeout(verSeguimiento, 4000);
+        f.outerHTML = `<p style="margin-top:10px"><b>¡Gracias!</b> Ya quedó publicada.</p>`; setTimeout(verSeguimiento, 4000);
       } catch (ex) { err.hidden = false; err.textContent = ex.message; t.disabled = false; t.textContent = "Enviar reseña"; }
     }
   });
@@ -1517,7 +1517,7 @@
     const o = mios.find(puedeResenar) || mios[0];
     let body;
     if (puedeResenar(o)) body = `<div class="trk-acts" hidden><button class="btn solid" data-resena="${esc(o.code)}">Dejar reseña</button></div>${rvForm(o.code)}`;
-    else if (o.resena) body = `<p style="margin:6px 0 0"><b>¡Gracias por tu reseña!</b> La publicamos cuando la revisemos.</p><div class="trk-acts"><button class="btn" data-verresenas>Ver reseñas</button></div>`;
+    else if (o.resena) body = `<p style="margin:6px 0 0"><b>¡Gracias por tu reseña!</b> Ya quedó publicada.</p><div class="trk-acts"><button class="btn" data-verresenas>Ver reseñas</button></div>`;
     else body = `<p style="margin:6px 0 0">Tu pedido todavía está ${o.etapa === "preparando" ? "en preparación" : "en camino a estar listo"}. Cuando esté listo vas a poder dejar tu reseña acá.</p>`;
     box.innerHTML = `<div class="trk ls-trk"><div class="trk-h"><span class="eyebrow">Tu pedido</span><b class="num">${esc(o.code)}</b><span class="trk-r">${esc(o.retiro || "")}</span></div>${body}</div>${buscarHtml(false)}`;
   }
