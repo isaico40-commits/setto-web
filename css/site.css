@@ -555,33 +555,32 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .hcard.foto .lead{color:rgba(255,250,242,.9)}
 .hcard:not(.on) .h2txt{opacity:.55;transition:opacity .4s}
 .hcard.on .h2txt{opacity:1;transition:opacity .4s}
-/* barra debajo del carrusel: botones de la slide a la izquierda; abierto, contador y controles a la derecha */
-.hctl{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px 18px;padding-block:16px 30px}
-.hctas{display:grid}
-.hctas[hidden]{display:none}
-.hgrp{grid-area:1/1;display:flex;gap:10px;align-items:center;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s}
-.hgrp.on{opacity:1;visibility:visible;transition:opacity .3s}
-.hgrp .btn.ghost{border-style:solid}
-.hctl #abierto{justify-self:end}
-.hnav{display:flex;align-items:center;gap:14px}
+/* sin texto: la foto ocupa toda la slide y el botón flota abajo a la izquierda */
+.hcard.limpia{display:block}
+.hcard.limpia .hmedia{position:absolute;inset:0}
+.hcard.limpia .h2txt,.hcard.media .h2txt{position:absolute;inset:auto auto 0 0;padding:18px}
+.hcard.foto.limpia .hmedia::after{display:none}
+/* botón de la slide: uno solo y chico (como Crumbl) */
+.hcta.btn{padding:7px 16px;font-size:.82rem;border-width:1.5px;box-shadow:none}
+.hcta.btn.solid{box-shadow:none}
+.hcard:not(.on) .hcta{pointer-events:none}
+/* sobre la slide: "abierto" arriba a la izquierda y controles chiquitos abajo a la derecha */
+.hcar{--cw:min(.78 * (100% - 2 * var(--hpad)),1000px)}
+.hcar #abierto{position:absolute;z-index:3;top:18px;left:calc(var(--hpad) + 14px);max-width:calc(var(--cw) - 28px);padding:4px 10px;font-size:.72rem;background:rgba(255,253,248,.88);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hcar #abierto i{flex:none;width:7px;height:7px}
+.hnav{position:absolute;z-index:3;bottom:24px;left:calc(var(--hpad) + var(--cw) - 18px);translate:-100% 0;display:flex;gap:6px}
 .hnav[hidden]{display:none}
-.harr{display:flex;gap:6px}
-.hbtn{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--turquesa);background:var(--card);color:var(--turquesa);display:grid;place-items:center;cursor:pointer;padding:0}
-.hbtn:hover{background:var(--turquesa);color:#fff}
+.hbtn{width:30px;height:30px;border-radius:50%;border:0;background:rgba(255,253,248,.62);color:var(--ink);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:grid;place-items:center;cursor:pointer;padding:0;opacity:.85;transition:opacity .2s,background .2s}
+.hbtn:hover{opacity:1;background:rgba(255,253,248,.92)}
 .hbtn .pl{display:none}.hbtn[aria-pressed="true"] .pl{display:block}.hbtn[aria-pressed="true"] .pz{display:none}
-.h2dots{display:flex;gap:6px}
-.h2dots button{width:8px;height:8px;border-radius:99px;border:0;background:color-mix(in srgb,var(--turquesa) 25%,transparent);padding:0;cursor:pointer;transition:width .3s}
-.h2dots button[aria-selected="true"]{width:22px;background:var(--turquesa)}
+.hero2{padding-bottom:26px}
 @media (max-width:820px){
   /* mobile: tarjeta vertical 4:5 (como Crumbl), cartel de abierto arriba, contador y controles debajo a la derecha y los botones en filas */
-  .hero2{--hpad:16px;padding-top:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"abierto" "car" "nav" "ctas"}
-  .hero2 .hctl{display:contents}
-  .hero2 .hcar{grid-area:car}
-  .hero2 #abierto{grid-area:abierto;justify-self:stretch;display:flex;justify-content:center;border-radius:0;padding:6px 16px;margin-bottom:12px;font-size:.76rem;line-height:1.25;text-align:center}
-  .hero2 .hnav{grid-area:nav;justify-self:end;padding:10px 16px 0;gap:12px}
-  .hero2 .hctas{grid-area:ctas;padding:12px 16px 22px}
-  .hgrp{flex-direction:column;align-items:stretch;gap:8px}
-  .hgrp .btn{width:100%;padding:12px 18px;font-size:.95rem}
+  .hero2{--hpad:16px;padding-top:12px;padding-bottom:20px}
+  .hcar{--cw:calc(100% - 2 * var(--hpad) - 20px)}
+  .hcar #abierto{top:16px;left:calc(var(--hpad) + 12px);max-width:calc(var(--cw) - 24px)}
+  .hnav{bottom:22px;left:calc(var(--hpad) + var(--cw) - 16px)}
+  .hcard.limpia .h2txt,.hcard.media .h2txt{padding:16px}
   .htrack{gap:12px}
   .hcard{flex-basis:calc(100% - 20px);height:auto;aspect-ratio:4/5;grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto;border-radius:26px}
   .hmedia{order:0}
@@ -606,8 +605,6 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .mq-list b{font-weight:700}
 @media (max-width:820px){.mq{grid-template-columns:1fr}.mq-img{aspect-ratio:4/3}}
 /* ---------- Tema Halloween (se activa desde el panel) ---------- */
-.tema-aviso{display:flex;align-items:center;justify-content:center;gap:10px;background:#2b2035;color:#ffe9d6;font-weight:700;font-size:.88rem;padding:8px 16px;text-align:center}
-.tema-aviso svg{width:22px;height:22px;flex:none}
 .deco{position:absolute;pointer-events:none;z-index:2}
 .t-halloween .hcar{position:relative}
 .deco-web{top:0;right:0;width:clamp(90px,14vw,170px);color:rgba(43,32,53,.28);transform:scaleX(-1)}
@@ -714,7 +711,6 @@ body[data-page="listo"] #armar,body[data-page="listo"] #lsRes,body[data-page="li
 @media (max-width:560px){.ls-form{grid-template-columns:minmax(0,1fr)}.ls-tiles{gap:8px}.ls-tiles a{padding:12px 4px}.ls-tiles span{display:none}}
 body[data-page="gift-cards"] main > :not(#regalo):not(#seguimiento),body[data-page="armar"] main > :not(#armar):not(#seguimiento){display:none!important}
 body[data-page="gift-cards"] #regalo{display:block!important}
-body:not([data-page="home"]) .tema-aviso{display:none!important}
 .gc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:28px 24px}
 .gc-item{display:grid;gap:12px;align-content:start}
 .gc-item .gcard{transition:transform .2s,box-shadow .2s}
@@ -887,14 +883,17 @@ body[data-page="listo"] #stickers{scroll-margin-top:80px}
 .cal-m a,.cal-m button{display:block;padding:11px 14px;font:inherit;font-size:.9rem;color:var(--ink);text-decoration:none;background:none;border:0;text-align:left;cursor:pointer}
 .cal-m a:hover,.cal-m button:hover{background:var(--bg-2)}
 .cal-m > * + *{border-top:var(--line)}
-.drop-bar{position:relative;display:flex;align-items:center;justify-content:center;background:var(--ink);color:var(--bg);font-size:.88rem;padding:8px 40px;text-align:center}
-.drop-bar a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.drop-bar{position:relative;display:flex;align-items:center;justify-content:center;background:var(--ink);color:var(--bg);font-size:.8rem;line-height:1.2;padding:6px 34px;text-align:center}
+/* siempre una sola línea: si no entra, se corta el nombre, nunca la cuenta regresiva */
+.drop-bar a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:100%;white-space:nowrap}
+.db-t{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.db-cd{flex:none}
 .drop-bar b{font-weight:700}
 .drop-bar .num{font-variant-numeric:tabular-nums;font-weight:700;color:var(--coral)}
 .db-dot{width:8px;height:8px;border-radius:50%;background:var(--coral);flex:none;animation:dbpulse 1.6s ease-in-out infinite}
 .db-dot.on{background:#5fd38d}
 @keyframes dbpulse{50%{opacity:.35;transform:scale(.8)}}
-.db-x{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;color:inherit;opacity:.7;font-size:.9rem;cursor:pointer;padding:6px}
+.db-x{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;color:inherit;opacity:.7;font-size:.9rem;cursor:pointer;padding:6px}
 .drop-reveal .prem{animation:dropin .9s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 120ms)}
 @keyframes dropin{0%{opacity:.3;transform:scale(.94);filter:blur(10px)}60%{filter:blur(0)}100%{opacity:1;transform:none;filter:none}}
 .t-halloween #especial .drop-cd .cd span{background:rgba(255,233,214,.08);border-color:rgba(255,233,214,.18);box-shadow:none}

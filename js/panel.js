@@ -565,7 +565,7 @@
           <button class="btn solid">Guardar</button></form>
         <form class="pcard wide" data-set="hero"><b>Portada (slides del inicio)</b>
           <span class="hintp">Dos tipos de slide. <b>Foto + texto de la web</b>: subís la foto y escribís título y texto acá (el texto va siempre abajo). <b>Diseño propio</b>: imagen o video con el texto ya diseñado adentro. Medidas: <b>compu 2000 × 1000</b> (2:1) y <b>celular 1080 × 1350</b> (4:5); si no subís la de celular, se usa la de compu recortada. Video: corto (5–15 s), sin sonido, MP4, hasta 25 MB.</span>
-          <span class="hintp">Los botones van debajo de la portada y cambian con cada slide. Dejá el texto vacío para no mostrar ese botón. Recomendado: 1 o 2 por slide, uno solo "Principal".</span>
+          <span class="hintp">En la web se ve solo el primer botón de cada slide, chico y dentro de la foto. Dejá el texto vacío para no mostrarlo. El título y el texto son opcionales: sin ellos la foto ocupa toda la slide.</span>
           ${[0, 1, 2, 3, 4, 5].map((i) => { const x = ((S.hero || {}).slides || [])[i] || {}, tp = x.tipo === "media" ? "media" : "texto", bs = heroBotones(x);
             const prev = (n, v, vid) => `<span class="upprev ${vid ? "vid" : ""}" data-prevfor="${n}${i}">${v ? (vid ? `<video src="${esc(v)}" muted playsinline></video>` : `<img src="${esc(v)}" alt="">`) : "—"}</span>`;
             const up = (n, label, vid, max, cls = "") => `<div class="upbox ${cls}"><small>${label}</small>${prev(n, x[{ si: "img", sm: "img_m", sv: "video", sw: "video_m" }[n]], vid)}<input type="hidden" name="${n}${i}" value="${esc(x[{ si: "img", sm: "img_m", sv: "video", sw: "video_m" }[n]] || "")}">
@@ -630,7 +630,6 @@
           <div class="acts"><button class="btn solid">Guardar</button><button type="button" class="linkbtn warn" data-votnew>Empezar una votación nueva (borra los resultados de la web)</button></div></form>
         <form class="pcard" data-set="tema"><b>Decoración de temporada</b>
           <label>Tema<select class="inp" name="nombre"><option value="">Ninguno</option><option value="halloween" ${(S.tema || {}).nombre === "halloween" ? "selected" : ""}>Halloween 🎃</option></select></label>
-          <label>Aviso arriba de la web (opcional)<input class="inp" name="aviso" maxlength="70" value="${esc((S.tema || {}).aviso || "")}" placeholder="Ej: Edición Halloween · del 29/10 al 2/11"></label>
           <span class="hintp">Cambia colores y suma detalles de la temporada. Se saca eligiendo "Ninguno".</span>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard wide" data-set="faq"><b>Preguntas frecuentes</b>
@@ -685,7 +684,7 @@
     { k: "apps", g: "Web", t: "Apps de delivery", d: "Links y logos de PedidosYa, Rappi y Uber Eats.", s: (S) => `${(S.apps || []).length} apps` },
     { k: "ubicacion", g: "Web", t: "Ubicación", d: "El mapa público de la web.", s: (S) => ((S.ubicacion || {}).activo ? "Visible" : "Oculto") },
     { k: "stickers", g: "Web", t: "Stickers de WhatsApp", d: "El link al pack de Mochito.", s: (S) => ((S.stickers || {}).activo ? "Visibles" : "Ocultos") },
-    { k: "tema", g: "Web", t: "Decoración de temporada", d: "Colores y aviso especial, por ejemplo Halloween.", s: (S) => ((S.tema || {}).nombre ? (S.tema || {}).nombre : "Ninguna") },
+    { k: "tema", g: "Web", t: "Decoración de temporada", d: "Colores y detalles de temporada, por ejemplo Halloween.", s: (S) => ((S.tema || {}).nombre ? (S.tema || {}).nombre : "Ninguna") },
   ];
   const ajKey = (form) => JSON.stringify([...new FormData(form).entries()].filter(([, v]) => typeof v === "string")) + (form.dataset.newid || "");
   const ajForm = () => $(".ajbody form[data-set]");
@@ -760,7 +759,6 @@
           return x;
         }).filter((x) => x.img || x.img_m || x.video || x.video_m);
         if (!slides.length) throw new Error("Subí al menos una imagen o video");
-        if (slides.some((x) => x.tipo === "texto" && !x.titulo)) throw new Error("A las slides de foto + texto les falta el título");
         await API.saveSetting("hero", { slides, intervalo: Math.max(3, Math.min(15, +f.intervalo || 5)) });
       }
       if (k === "mensajes") { const out = {}; Object.keys(M.MSG).forEach((key) => { const v = (f["m_" + key] || "").replace(/\r/g, "").trim(); if (v && v !== M.MSG[key].texto) out[key] = v; }); await API.saveSetting("mensajes", out); }
@@ -782,7 +780,7 @@
         await API.saveSetting("stickers", { activo: !!f.activo, link, titulo: (f.titulo || "").trim() || "Stickers de Mochito", texto: (f.texto || "").trim() });
       }
       if (k === "ubicacion") await API.saveSetting("ubicacion", { activo: !!f.activo, mapa: (f.mapa || "").trim(), titulo: (f.titulo || "").trim() || "Dónde estamos", texto: (f.texto || "").trim(), zoom: +f.zoom || 15 });
-      if (k === "tema") await API.saveSetting("tema", { nombre: f.nombre || "", aviso: (f.aviso || "").trim() });
+      if (k === "tema") await API.saveSetting("tema", { nombre: f.nombre || "" });
       if (k === "faq") await API.saveSetting("faq", { items: Array.from({ length: 10 }, (_, i) => ({ p: (f["fp" + i] || "").trim(), r: (f["fr" + i] || "").trim() })).filter((x) => x.p && x.r) });
       if (false) await API.saveSetting("mochi_info", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "¿Qué es un mochi?", texto: (f.texto || "").trim(),
         puntos: (f.puntos || "").split("\n").map((s) => s.trim()).filter(Boolean), img: (f.img || "").trim(), ajuste: f.ajuste === "foto" ? "foto" : "recorte" });

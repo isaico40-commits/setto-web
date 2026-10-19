@@ -206,25 +206,25 @@
     const MOB = matchMedia("(max-width: 820px)").matches, todoMedia = HS.every((x) => x.tipo === "media");
     $("#heroSlides").classList.toggle("all-media", todoMedia);
     const pic = (x, i, alt, style = "") => `<picture>${x.img_m ? `<source media="(max-width: 820px)" srcset="${esc(x.img_m)}">` : ""}<img src="${esc(x.img || x.img_m || "img/mochito-lie.png")}" alt="${alt}" ${i ? 'loading="lazy"' : 'fetchpriority="high"'}${style}></picture>`;
+    // un solo botón, chico y dentro de la slide (el primero de los que se cargan en el panel)
+    const cta = (x) => { const b = heroBotones(x)[0]; return b ? `<a class="btn hcta ${b.estilo === "secundario" ? "ghost" : "solid"}" href="${esc(b.link || "#sets")}">${esc(b.texto)}</a>` : ""; };
     $("#heroSlides").innerHTML = HS.map((x, i) => {
       if (x.tipo === "media") {
         const vid = MOB ? x.video_m || x.video : x.video || x.video_m, poster = MOB ? x.img_m || x.img : x.img || x.img_m, alt = esc(x.alt || "Setto");
         const media = vid ? `<video muted loop playsinline preload="${i ? "none" : "metadata"}" ${poster ? `poster="${esc(poster)}"` : ""} data-src="${esc(vid)}" aria-label="${alt}"></video>` : pic(x, i, alt);
-        return `<article class="hcard media" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">${i === 0 ? `<h1 class="sr-only">${esc(x.alt || "Setto · Asian Inspired Home Cafe en Mar del Plata")}</h1>` : ""}<div class="hmedia">${media}</div></article>`;
+        return `<article class="hcard media" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">${i === 0 ? `<h1 class="sr-only">${esc(x.alt || "Setto · Asian Inspired Home Cafe en Mar del Plata")}</h1>` : ""}<div class="hmedia">${media}</div>${cta(x) ? `<div class="h2txt">${cta(x)}</div>` : ""}</article>`;
       }
-      const foto = x.ajuste === "foto", T = i === 0 ? "h1" : "h2";
-      return `<article class="hcard ${foto ? "foto" : "recorte"}" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">
-        <div class="hmedia">${pic(x, i, esc(x.alt || x.titulo || "Setto"), ` style="object-position:center ${esc({ arriba: "top", abajo: "bottom" }[x.pos] || "center")}"`)}</div>
+      // sin título ni texto (se borran desde el panel) la foto ocupa toda la slide y queda solo el botón
+      const foto = x.ajuste === "foto", T = i === 0 ? "h1" : "h2", tit = (x.titulo || "").trim(), txt = (x.texto || "").trim();
+      return `<article class="hcard ${foto ? "foto" : "recorte"}${tit || txt ? "" : " limpia"}" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">
+        ${!tit && i === 0 ? `<h1 class="sr-only">${esc(x.alt || "Setto · Asian Inspired Home Cafe en Mar del Plata")}</h1>` : ""}
+        <div class="hmedia">${pic(x, i, esc(x.alt || tit || "Setto"), ` style="object-position:center ${esc({ arriba: "top", abajo: "bottom" }[x.pos] || "center")}"`)}</div>
         <div class="h2txt">
-          <${T} class="ht">${esc(x.titulo || "Asian Inspired Home Cafe")}</${T}>
-          ${x.texto ? `<p class="lead">${esc(x.texto)}</p>` : ""}
+          ${tit ? `<${T} class="ht">${esc(tit)}</${T}>` : ""}
+          ${txt ? `<p class="lead">${esc(txt)}</p>` : ""}
+          ${cta(x)}
         </div></article>`;
     }).join("");
-    // los botones van debajo del carrusel: un grupo por slide, todos en la misma celda (así el alto no salta al cambiar)
-    $("#heroCtas").innerHTML = HS.map((x, i) => `<div class="hgrp" data-hg="${i}">${heroBotones(x).slice(0, 3).map((b) =>
-      `<a class="btn big ${b.estilo === "secundario" ? "ghost" : "solid"}" href="${esc(b.link || "#sets")}">${esc(b.texto)}</a>`).join("")}</div>`).join("");
-    $("#heroCtas").hidden = !HS.some((x) => heroBotones(x).length);
-    $("#heroDots").innerHTML = HS.length > 1 ? HS.map((_, i) => `<button role="tab" aria-selected="${i === 0}" aria-label="Slide ${i + 1}" data-hero="${i}"></button>`).join("") : "";
     document.querySelector(".hnav").hidden = HS.length < 2;
     heroI = 0; $("#heroSlides").scrollLeft = 0; heroMarcar(); heroAuto();
   }
@@ -237,10 +237,9 @@
     heroMarcar();
   }
   function heroMarcar() {
-    document.querySelectorAll("[data-hero]").forEach((d, k) => d.setAttribute("aria-selected", String(k === heroI)));
-    document.querySelectorAll("#heroCtas .hgrp").forEach((g, k) => { g.classList.toggle("on", k === heroI); g.inert = k !== heroI; });
     heroCards().forEach((c, k) => {
       c.classList.toggle("on", k === heroI);
+      const a = c.querySelector(".hcta"); if (a) a.tabIndex = k === heroI ? 0 : -1; // con Tab solo se llega al botón de la slide que se ve
       const v = c.querySelector("video"); if (!v) return;
       if (k === heroI && !heroPausa && !RMH) { if (!v.src) v.src = v.dataset.src; const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); }
       else v.pause();
@@ -257,7 +256,6 @@
   const heroEspera = () => heroAuto(Math.max(heroMs() * 2, 7000));  // después de tocar, le damos más tiempo
   document.addEventListener("visibilitychange", () => heroAuto());
   document.addEventListener("click", (e) => {
-    const d = e.target.closest("[data-hero]"); if (d) { heroIr(+d.dataset.hero); heroEspera(); return; }
     if (e.target.closest("#heroPrev")) { heroIr(heroI - 1); heroEspera(); }
     if (e.target.closest("#heroNext")) { heroIr(heroI + 1); heroEspera(); }
     const pz = e.target.closest("#heroPause");
@@ -275,10 +273,9 @@
     }, { passive: true });
     // tocar la portada (o los botones) reinicia la espera, así no cambia debajo del dedo
     sec.addEventListener("pointerdown", heroEspera, { passive: true });
-    // con el mouse sobre los botones o los controles se frena (sobre las fotos sigue, si no parecería trabado)
-    const ctl = sec.querySelector(".hctl");
-    if (ctl) { ctl.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") { heroQuieto |= 1; heroAuto(); } });
-      ctl.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") { heroQuieto &= ~1; heroAuto(); } }); }
+    // con el mouse sobre el botón o los controles se frena (sobre las fotos sigue, si no parecería trabado)
+    const quieto = (on) => (e) => { if (e.pointerType !== "mouse" || !e.target.closest(".hnav,.hcta")) return; if (on) heroQuieto |= 1; else heroQuieto &= ~1; heroAuto(); };
+    sec.addEventListener("pointerover", quieto(true)); sec.addEventListener("pointerout", quieto(false));
     sec.addEventListener("focusin", (e) => { if (e.target.matches(":focus-visible")) { heroQuieto |= 2; heroAuto(); } });
     sec.addEventListener("focusout", (e) => { if (!sec.contains(e.relatedTarget)) { heroQuieto &= ~2; heroAuto(); } });
   })();
@@ -343,7 +340,6 @@
   function renderTema() {
     const t = S.tema || {}, hw = t.nombre === "halloween";
     document.body.classList.toggle("t-halloween", hw);
-    const av = $("#temaAviso"); av.hidden = !(hw && t.aviso); if (!av.hidden) av.innerHTML = `${PUMPKIN}<span>${esc(t.aviso)}</span>${PUMPKIN}`;
     document.querySelectorAll(".deco").forEach((d) => d.remove());
     if (!hw) return;
     const box = $("#heroBox");
@@ -648,7 +644,7 @@
     if (!show) { if (bar) bar.remove(); return; }
     if (!bar) { document.body.insertAdjacentHTML("afterbegin", '<div class="drop-bar" id="dropBar" role="region" aria-label="Lanzamiento"></div>'); bar = $("#dropBar"); }
     const t = esc(E.titulo || "la edición especial");
-    bar.innerHTML = `<a href="/#especial">${f === "antes" ? `<i class="db-dot"></i><span><b>${t}</b> sale en <span class="num" data-cdtxt></span></span>` : `<i class="db-dot on"></i><span><b>¡Ya salió ${t}!</b> Pedilo →</span>`}</a><button type="button" class="db-x" data-dropx aria-label="Cerrar aviso">✕</button>`;
+    bar.innerHTML = `<a href="/#especial">${f === "antes" ? `<i class="db-dot"></i><b class="db-t">${t}</b><span class="db-cd">sale en <span class="num" data-cdtxt></span></span>` : `<i class="db-dot on"></i><b class="db-t">¡Ya salió ${t}!</b><span class="db-cd">Pedilo →</span>`}</a><button type="button" class="db-x" data-dropx aria-label="Cerrar aviso">✕</button>`;
     bar.dataset.k = f + lan;
   }
   /* agendar en el calendario */
