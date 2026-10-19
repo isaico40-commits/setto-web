@@ -355,6 +355,7 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .f input:focus,.f select:focus,.f textarea:focus{outline:none;border-color:var(--turquesa);box-shadow:0 0 0 3px color-mix(in srgb,var(--turquesa) 20%,transparent)}
 .f textarea{min-height:60px;resize:vertical}
 .hintf{font-weight:400;font-size:.78rem;color:var(--ink-2)}
+.hintf b{font-weight:700;color:var(--ink)} .hintf .tel-mal{color:#b4231a;font-weight:600}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chips button{border:1.5px solid var(--turquesa);background:var(--card);border-radius:var(--pill);padding:7px 14px;font-size:.85rem;font-weight:600;color:var(--turquesa)}
 .chips button[aria-pressed="true"]{background:var(--turquesa);color:#fff}

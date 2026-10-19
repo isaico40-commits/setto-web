@@ -979,6 +979,13 @@
     return `${ini}\n\n${lines.join("\n")}\n\nTotal: ${money(o.total)}${premio}\n\nNombre: ${o.nombre}\n${entrega}\nPago: ${o.pago}` + (o.nota ? `\nNota: ${o.nota}` : "")
       + (cierre ? `\n\n${cierre}` : "");
   }
+  // muestra el número como lo va a usar Setto, para que vea si lo tipeó mal antes de mandar el pedido
+  function telHint(v) {
+    const ph = API.normPhone(v);
+    if (ph) return `Te avisamos a <b class="num">${esc(API.prettyPhone(ph))}</b>. Con este número sumás sellos del Setto Club.`;
+    if (String(v || "").replace(/\D/g, "").length >= 6) return `<span class="tel-mal">Revisá el número: código de área + número, por ejemplo 223 347-1277.</span>`;
+    return "Con este número sumás sellos del Setto Club.";
+  }
   const envioOn = () => !!(S.envio && S.envio.activo);
   const envioCosto = () => (envioOn() && form.modo === "envio" ? Math.max(0, Number(S.envio.costo) || 0) : 0);
   const fullDir = () => [form.dir.trim(), form.dirExtra.trim()].filter(Boolean).join(" · ");
@@ -1035,7 +1042,7 @@
         ${isEnv ? `<label class="f" for="fDir">Dirección exacta<input id="fDir" autocomplete="street-address" value="${esc(form.dir)}" placeholder="Calle y número"><span class="hintf">${esc((S.envio || {}).aviso || "")}</span></label>
           <label class="f" for="fDir2">Piso, depto o referencia (opcional)<input id="fDir2" value="${esc(form.dirExtra)}" placeholder="Ej: 3° B, timbre 2, entre Colón y Moreno"></label>` : ""}
         <label class="f" for="fNombre">Nombre<input id="fNombre" autocomplete="given-name" value="${esc(form.nombre)}" placeholder="Cómo te llamamos"></label>
-        <label class="f" for="fTel">Tu celular (WhatsApp)<input id="fTel" type="tel" inputmode="tel" autocomplete="tel" value="${esc(form.tel)}" placeholder="223 347-1277"><span class="hintf">Con este número sumás sellos del Setto Club.</span></label>
+        <label class="f" for="fTel">Tu celular (WhatsApp)<input id="fTel" type="tel" inputmode="tel" autocomplete="tel" value="${esc(form.tel)}" placeholder="223 347-1277"><span class="hintf" id="fTelOk">${telHint(form.tel)}</span></label>
         <label class="f" for="fHora">${isEnv ? "Horario de entrega" : "Horario de retiro"}<select id="fHora"><option value="">Elegí un horario</option>${slots().map((o) => `<option ${o === form.hora ? "selected" : ""}>${esc(o)}</option>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>
         <div class="f" id="fPago"><span>Forma de pago</span><div class="chips">${pagosVer.map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">${form.modo === "envio" ? "Con envío, solo transferencia." : "El pago se coordina por WhatsApp."}</span></div>
         ${premioPicker()}
@@ -1045,6 +1052,7 @@
           <span class="hintf">Las dos son opcionales y te das de baja cuando quieras en <a href="/privacidad" target="_blank">Privacidad y bajas</a>.</span></div>
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>`;
       foot.innerHTML = `${clubLine(true)}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${maqOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Maquinita: ${esc(MAQ.titulo)}</span><span class="num">${money(-maqOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><div id="fErr" class="err" role="alert" hidden></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
+      $("#fTel")?.addEventListener("input", (e) => { const h = $("#fTelOk"); if (h) h.innerHTML = telHint(e.target.value); });
       [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; const f = e.target.closest(".f"); if (f) f.classList.remove("inval"); }); });
       $("#fHora").addEventListener("change", (e) => { form.hora = e.target.value; e.target.closest(".f").classList.remove("inval"); });
       [["fOkWa", "okWa"], ["fOkAds", "okAds"]].forEach(([id, k]) => $("#" + id).addEventListener("change", (e) => { form[k] = e.target.checked; }));
