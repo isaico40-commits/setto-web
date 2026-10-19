@@ -1,4 +1,4 @@
--- 037 · Número real de WhatsApp del pedido.
+-- 038 · Número real de WhatsApp del pedido.
 --   Si el cliente tipea mal su celular en la web, igual nos manda el pedido desde su WhatsApp. El mensaje trae el link
 --   de seguimiento (?seguir=<track>, secreto), así que el webhook encuentra el pedido aunque el número no coincida y guarda
 --   el número desde el que escribió en orders.wa_phone. Los avisos del pedido salen a ese número.
