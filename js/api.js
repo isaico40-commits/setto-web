@@ -83,6 +83,13 @@
     if (j.gratis_dia !== hoy) { j.gratis_dia = hoy; j.gratis_usadas = 0; }
     return j;
   }
+  function maqDev(db, dev) {
+    db.maq = db.maq || { jug: {}, premios: [] }; db.maq.jug = db.maq.jug || {}; db.maq.premios = db.maq.premios || []; db.maq.dev = db.maq.dev || {};
+    const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
+    const d = db.maq.dev[dev] || (db.maq.dev[dev] = { gratis_dia: hoy, gratis_usadas: 0 });
+    if (d.gratis_dia !== hoy) { d.gratis_dia = hoy; d.gratis_usadas = 0; }
+    return d;
+  }
   const demo = {
     async loadAll() { const db = dbLoad(); return { settings: db.settings, products: db.products }; },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio: elegido, gift, maq }) {
@@ -201,6 +208,38 @@
       }
       dbSave(db);
       return { resultado: p ? p.id : "nada", titulo: p ? p.titulo : null, code, gratis: Math.max(0, maqDia(db) - j.gratis_usadas), fichas: j.fichas };
+    },
+    // migración 036: la gratis del día va por dispositivo; las fichas de compra, por número; sin número el premio queda pendiente
+    async maqEstado2(dev, phone) {
+      const db = dbLoad(), ph = normPhone(phone), d = maqDev(db, dev); dbSave(db);
+      const pend = db.maq.premios.find((x) => x.dev === dev && x.estado === "pendiente");
+      return { gratis: Math.max(0, maqDia(db) - d.gratis_usadas), fichas: ph && db.maq.jug[ph] ? db.maq.jug[ph].fichas : 0,
+        premios: ph ? db.maq.premios.filter((x) => x.phone === ph && x.estado === "activo") : [], pendiente: pend ? { code: pend.code, titulo: pend.titulo } : null };
+    },
+    async maqTirar2(dev, phone, forzar) {
+      const db = dbLoad(), ph = normPhone(phone), cfg = db.settings.maquinita || {};
+      if (cfg.activo === false) throw new Error("La maquinita está apagada por ahora");
+      const d = maqDev(db, dev);
+      if (d.gratis_usadas < maqDia(db)) d.gratis_usadas++;
+      else if (ph && db.maq.jug[ph] && db.maq.jug[ph].fichas > 0) db.maq.jug[ph].fichas--;
+      else throw new Error("No te quedan fichas. Volvé mañana o sumá con tu próxima compra.");
+      let x = Math.random() * 100, p = null;
+      const prem = maqPremiosCfg(cfg).filter((q) => q.titulo && q.chance > 0);
+      if (forzar) p = prem.find((q) => q.id === forzar) || null;
+      else for (const q of prem) { if (x < q.chance) { p = q; break; } x -= q.chance; }
+      let code = null;
+      if (p) {
+        code = "MAQ-" + Math.random().toString(16).slice(2, 6).toUpperCase() + "-" + Math.random().toString(16).slice(2, 6).toUpperCase();
+        db.maq.premios.unshift({ code, phone: ph || null, dev, premio_id: p.id, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.tipo === "monto" ? p.valor : 0, estado: ph ? "activo" : "pendiente", created_at: new Date().toISOString() });
+      }
+      dbSave(db);
+      return { resultado: p ? p.id : "nada", titulo: p ? p.titulo : null, code: ph ? code : null, pendiente: !!p && !ph, gratis: Math.max(0, maqDia(db) - d.gratis_usadas), fichas: ph && db.maq.jug[ph] ? db.maq.jug[ph].fichas : 0 };
+    },
+    async maqReclamar(dev, phone) {
+      const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("Revisá tu celular");
+      const ms = ((db.maq || {}).premios || []).filter((x) => x.dev === dev && x.estado === "pendiente"), m = ms[0]; if (!m) throw new Error("No encontramos un premio para guardar");
+      ms.forEach((x) => Object.assign(x, { phone: ph, estado: "activo" })); maqJug(db, ph); dbSave(db);
+      return { code: m.code, titulo: m.titulo, tipo: m.tipo, valor: m.valor, saldo: m.saldo };
     },
     async maqPremioCheck(code, phone) {
       const ph = normPhone(phone), x = ((dbLoad().maq || {}).premios || []).find((q) => q.code === String(code).trim().toUpperCase() && q.phone === ph);
@@ -477,6 +516,9 @@
     async getCard(phone) { const { data, error } = await sb.rpc("get_card", { p_phone: phone }); fail(error); return data; },
     async maqEstado(phone) { const { data, error } = await sb.rpc("maq_estado", { p_phone: phone }); fail(error); return data; },
     async maqTirar(phone) { const { data, error } = await sb.rpc("maq_tirar", { p_phone: phone }); fail(error); return data; },
+    async maqEstado2(dev, phone) { const { data, error } = await sb.rpc("maq_estado_v2", { p_dev: dev, p_phone: phone || null }); fail(error); return data; },
+    async maqTirar2(dev, phone) { const { data, error } = await sb.rpc("maq_tirar_v2", { p_dev: dev, p_phone: phone || null }); fail(error); return data; },
+    async maqReclamar(dev, phone) { const { data, error } = await sb.rpc("maq_reclamar", { p_dev: dev, p_phone: phone }); fail(error); return data; },
     async maqPremioCheck(code, phone) { const { data, error } = await sb.rpc("maq_premio_check", { p_code: code, p_phone: phone }); fail(error); return data; },
     /* {producto: unidades en el Café} o null si el stock en la web está apagado */
     async getStock() { const { data, error } = await sb.rpc("stock_publico"); if (error) return null; return data; },

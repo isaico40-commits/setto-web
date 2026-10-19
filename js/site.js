@@ -85,7 +85,8 @@
   const espOpen = () => dropFase() === "abierto";
   const antesProg = () => prog() && dropFase() === "antes";
   // la foto va esmerilada (solo en la edición especial): en un drop programado, hasta el lanzamiento; en modo manual, según cada producto
-  const tapado = (p) => kind(p) === "premium" && (prog() ? antesProg() && (ESPC().esmerilar !== false || !!p.esmerilado) : !!p.esmerilado);
+  const VER_ESP = new URLSearchParams(location.search).has("ver-especial"); // vista previa desde el panel: tarjetas destapadas
+  const tapado = (p) => !VER_ESP && kind(p) === "premium" && (prog() ? antesProg() && (ESPC().esmerilar !== false || !!p.esmerilado) : !!p.esmerilado);
   const fechaDrop = (iso) => { const d = new Date(iso); if (isNaN(d)) return ""; const o = { timeZone: "America/Argentina/Buenos_Aires" };
     return d.toLocaleDateString("es-AR", { ...o, weekday: "long", day: "numeric", month: "numeric" }) + " a las " + d.toLocaleTimeString("es-AR", { ...o, hour: "2-digit", minute: "2-digit", hour12: false }) + " hs"; };
   const setParts = (s) => ({ b: DIRTY.find((x) => x.id === s.bebida), m: MOCHIS.find((x) => x.id === s.mochi) });
@@ -134,8 +135,8 @@
   }
   // fichas de la maquinita que suma este pedido (Panel → Maquinita → Fichas por cada compra)
   const fichasCompra = () => (maqOn() ? Math.max(0, Math.min(50, Math.round((S.maquinita || {}).fichas_compra ?? 5))) : 0);
-  function clubLine() {
-    const fc = fichasCompra(), fTxt = fc ? ` Y suma <b>${fc} fichas</b> para la maquinita.` : "";
+  function clubLine(corto) { // corto: en Entrega va en una línea para dejarle lugar al formulario
+    const fc = fichasCompra(), fTxt = fc ? (corto ? ` · <b>+${fc} fichas</b> maquinita` : ` Y suma <b>${fc} fichas</b> para la maquinita.`) : "";
     if (!clubOn()) return fc ? `<div class="clubline"><img src="img/mochito-run.png" alt=""><div>Este pedido suma <b>${fc} fichas</b> para la maquinita.</div></div>` : "";
     const min = Number(club().minimo) || 0;
     if (min > 0 && total() < min) return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div>Sumá <b>${money(min - total())}</b> más y sumás ${sellosTxt(spp())} del Club.${fTxt}</div></div>`;
@@ -148,10 +149,10 @@
       txt = after >= meta ? (form.premio ? `<b>¡Completás tu tarjeta!</b> Premio: ${esc(form.premio === "descuento" ? premioDesc() + "% off" : ((SETS.find((x) => "set:" + x.id === form.premio) || {}).nombre || "set") + " de regalo")}.` : `<b>¡Completás tu tarjeta!</b> Elegí tu premio al seguir.`)
         : `Con este pedido llegás a <b>${after} de ${meta}</b> sellos. Te ${meta - after === 1 ? "falta 1" : "faltan " + (meta - after)} para tu premio.`;
     } else {
-      txt = `Este pedido tiene beneficios: suma <b>${sellosTxt(n)}</b> del Setto Club. Con ${meta} sellos tenés premio.`;
+      txt = corto ? `Suma <b>+${sellosTxt(n)}</b> Setto Club` : `Este pedido tiene beneficios: suma <b>${sellosTxt(n)}</b> del Setto Club. Con ${meta} sellos tenés premio.`;
     }
     txt += fTxt;
-    return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div style="flex:1">${txt}${pct !== null ? `<div class="clubbar"><i style="width:${pct}%"></i></div>` : ""}</div></div>`;
+    return `<div class="clubline${corto ? " corta" : ""}"><img src="img/mochito-run.png" alt=""><div style="flex:1">${txt}${pct !== null ? `<div class="clubbar"><i style="width:${pct}%"></i></div>` : ""}</div></div>`;
   }
 
   /* ---------- carrito ---------- */
@@ -193,7 +194,7 @@
     return true;
   }
   let toastT;
-  function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 2000); }
+  function toast(msg) { const t = $("#toast"); t.textContent = msg; const dOn = $("#drawer").classList.contains("on"), df = $("#dFoot"); t.style.bottom = dOn && df && df.offsetHeight ? Math.round(innerHeight - df.getBoundingClientRect().top + 10) + "px" : ""; t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 2000); }
 
   /* ---------- render ---------- */
   /* ---------- hero con slides (se edita en Panel → Ajustes) ---------- */
@@ -426,7 +427,7 @@
     const montos = gcfg().montos || [10000, 15000, 20000, 30000];
     b.innerHTML = `<div class="gb-wrap"><div class="gb-prev">${gcardHtml(GB.dis, gbMonto())}<div class="gb-msg">${GB.para ? `<b>Para ${esc(GB.para)}</b>${GB.de ? ` · de ${esc(GB.de)}` : ""}<br>` : ""}<span class="muted">${esc(GB.msg) || "Tu mensaje aparece acá."}</span></div></div>
       <div class="gb-form">
-        <div class="f"><span>Diseño</span><div class="gb-dis">${gdis().map((k) => `<button data-gbdis="${k}" aria-pressed="${k === GB.dis}" aria-label="${esc(gnombre(k))}">${gitem(k).img ? `<span class="mini" style="background:url('${esc(gitem(k).img)}') center/cover"></span>` : `<span class="mini" style="--gbg:${GD[k].bg};--gfg:${GD[k].fg}">${esc(gnombre(k))}</span>`}</button>`).join("")}</div></div>
+        <div class="f"><span>Diseño</span><div class="gb-dis">${gdis().map((k) => `<button data-gbdis="${k}" aria-pressed="${k === GB.dis}" aria-label="${esc(gnombre(k))}">${gitem(k).img ? `<span class="mini" style="background:url('${esc(gitem(k).img)}') center/cover"></span><small class="gb-dn">${esc(gnombre(k))}</small>` : `<span class="mini" style="--gbg:${GD[k].bg};--gfg:${GD[k].fg}">${esc(gnombre(k))}</span>`}</button>`).join("")}</div></div>
         <div class="f"><span>Monto</span><div class="chips">${montos.map((m) => `<button data-gbm="${m}" aria-pressed="${GB.monto === m}">${money(m)}</button>`).join("")}<button data-gbm="otro" aria-pressed="${GB.monto === "otro"}">Otro</button></div>
           ${GB.monto === "otro" ? `<input id="gbOtro" inputmode="numeric" placeholder="Desde ${money(gcfg().minimo || 5000)}" value="${esc(GB.otro)}" style="margin-top:8px">` : ""}</div>
         <label class="f">Para<input id="gbPara" maxlength="40" value="${esc(GB.para)}" placeholder="Nombre de quien la recibe"></label>
@@ -434,9 +435,9 @@
         <label class="f">Mensaje (opcional)<textarea id="gbMsg" maxlength="160" placeholder="Ej: ¡Feliz cumple! Que lo disfrutes">${esc(GB.msg)}</textarea></label>
         <label class="f">Tu celular (WhatsApp)<input id="gbTel" type="tel" inputmode="tel" value="${esc(GB.tel)}" placeholder="223 347-1277"><span class="hintf">Pago por transferencia. Te mandamos el link para regalarla.</span></label>
         <div id="gbErr" class="err" hidden></div>
-        <button class="btn wa big" id="gbSend">${GB.sending ? "Reservando…" : `Comprar · ${money(gbMonto())}`}</button>
+        <button class="btn wa big" id="gbSend">${GB.sending ? "Reservando…" : `Reservar ${money(gbMonto())} y pagar por WhatsApp`}</button>
       </div></div>`;
-    [["gbPara", "para"], ["gbDe", "de"], ["gbMsg", "msg"], ["gbTel", "tel"], ["gbOtro", "otro"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { GB[k] = e.target.value; const pv = $(".gb-prev"); if (pv && k !== "tel") pv.innerHTML = `${gcardHtml(GB.dis, gbMonto())}<div class="gb-msg">${GB.para ? `<b>Para ${esc(GB.para)}</b>${GB.de ? ` · de ${esc(GB.de)}` : ""}<br>` : ""}<span class="muted">${esc(GB.msg) || "Tu mensaje aparece acá."}</span></div>`; if (k === "otro") $("#gbSend").textContent = `Comprar · ${money(gbMonto())}`; }); });
+    [["gbPara", "para"], ["gbDe", "de"], ["gbMsg", "msg"], ["gbTel", "tel"], ["gbOtro", "otro"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { GB[k] = e.target.value; const pv = $(".gb-prev"); if (pv && k !== "tel") pv.innerHTML = `${gcardHtml(GB.dis, gbMonto())}<div class="gb-msg">${GB.para ? `<b>Para ${esc(GB.para)}</b>${GB.de ? ` · de ${esc(GB.de)}` : ""}<br>` : ""}<span class="muted">${esc(GB.msg) || "Tu mensaje aparece acá."}</span></div>`; if (k === "otro") $("#gbSend").textContent = `Reservar ${money(gbMonto())} y pagar por WhatsApp`; }); });
   }
   async function comprarGift() {
     const err = $("#gbErr"), m = gbMonto(), mn = gcfg().minimo || 5000, mx = gcfg().maximo || 100000;
@@ -450,7 +451,7 @@
       const msg = window.SettoMSG.render("gift_compra", { codigo: r.code, diseno: gnombre(GB.dis), monto: money(m), para: GB.para.trim(), de: GB.de.trim() }, S);
       GB.done = { code: r.code, monto: m, msg }; GB.sending = false; dibujarGift();
       const link = waLink(msg); if (matchMedia("(pointer:coarse)").matches) location.href = link; else window.open(link, "_blank", "noopener");
-    } catch (e) { GB.sending = false; $("#gbSend").textContent = `Comprar · ${money(m)}`; fallo(e.message); }
+    } catch (e) { GB.sending = false; $("#gbSend").textContent = `Reservar ${money(m)} y pagar por WhatsApp`; fallo(e.message); }
   }
   document.addEventListener("click", (e) => {
     const t = e.target.closest("[data-gcpick],[data-gbdis],[data-gbm],#gbSend,[data-gbclose],[data-gvclose],[data-gvuse],[data-gvcopy]"); if (!t) { if (e.target.id === "gcBuy") cerrarGift(); if (e.target.id === "gcView") cerrarRegalo(); return; }
@@ -653,6 +654,12 @@
     $("#espSoon").innerHTML = fin ? `<div class="prem-soon"><img src="img/mochito-lie.png" alt=""><div><b>Este drop terminó</b><p>${E.avisame !== false && dropAvHtml("x") ? "Anotate y te avisamos cuando salga el próximo." : `Seguinos en Instagram ${ig} para enterarte del próximo.`}</p>${E.avisame !== false ? `<div class="cd-acts">${dropAvHtml("Avisame del próximo drop")}</div>` : ""}</div></div>`
       : antesProg() && E.lanzamiento ? dropCdHtml()
       : !open ? `<div class="prem-soon"><img src="img/mochito-run.png" alt=""><div><b>Todavía no salió</b><p>Avisamos en Instagram ${ig}.</p></div></div>` : "";
+    // antes del lanzamiento las tarjetas se ocultan (quedan cuenta regresiva y Avisame) salvo que el panel diga lo contrario
+    const sinCards = antesProg() && !E.tarjetas_antes && !VER_ESP;
+    $("#espGrid").hidden = sinCards; const dd = document.querySelector('.dots[data-for="espGrid"]'); if (dd) dd.closest(".hint").hidden = sinCards;
+    sec.classList.toggle("sin-cards", sinCards);
+    const pv = $("#espPrev"); if (pv) pv.remove();
+    if (VER_ESP && antesProg()) $("#espGrid").insertAdjacentHTML("beforebegin", '<p class="esp-prev" id="espPrev">Vista previa: así se ven las tarjetas. Los clientes las ven recién cuando sale el drop (o si las prendés en el panel).</p>');
     dots("espGrid"); tickDrop();
   }
   /* cuenta regresiva + avisame + agendar */
@@ -1005,17 +1012,17 @@
       <b>${esc(p.nombre)}</b><small class="num">${unit(p) ? "" : "Desde "}${money(unit(p) ? p.precio : p.precios["12 oz"])}</small></div>`).join("")}</div></div>`;
   }
   const giftCta = () => gcfg().activo === false ? "" : `<a class="gift-cta" href="/gift-cards" data-closedrawer><span class="gc-ico" aria-hidden="true">🎁</span><span><b>¿Es para regalar?</b><small>Mandá una gift card digital de Setto.</small></span><span class="go" aria-hidden="true">→</span></a>`;
-  const maqCta = () => !maqOn() ? "" : `<a class="gift-cta maq-cta" href="/?maquinita" data-maq data-closedrawer><span class="gc-ico" aria-hidden="true"><img src="img/mochito-cup.png" alt=""></span><span><b>¿Probás suerte?</b><small>Tirá en la maquinita de Mochito antes de pedir.</small></span><span class="go" aria-hidden="true">→</span></a>`;
   function drawDrawer() {
     const body = $("#dBody"), foot = $("#dFoot");
+    if (drawDrawer.v !== view) { body.scrollTop = 0; drawDrawer.v = view; } // cada paso arranca desde arriba
     $("#dBack").hidden = view !== "checkout" && view !== "buscar";
     if (view === "cart") {
       $("#dTitle").textContent = "Tu pedido";
       if (!cart.length) { body.innerHTML = `${trackHtml()}<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><div class="empty-acts"><a class="btn" href="#sets" data-closedrawer>Ver sets</a><button class="btn" id="toBuscar">Consultar mi pedido</button></div></div>`; foot.innerHTML = ""; return; }
       body.innerHTML = trackHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
-        <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("") + sugHtml() + `<div class="ctas">${giftCta()}${maqCta()}</div>`;
-      foot.innerHTML = `${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
+        <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("") + sugHtml() + `<div class="ctas">${giftCta()}</div>`;
+      foot.innerHTML = `${clubLine(true)}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
         <p class="muted" style="font-size:.78rem;text-align:center">${envioOn() ? "Retiro o envío: lo elegís después." : "¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats."}</p>`;
     }
     if (view === "buscar") { $("#dTitle").textContent = "Consultar pedido"; body.innerHTML = buscarDrawerHtml(); foot.innerHTML = ""; return; }
@@ -1024,7 +1031,7 @@
       if (!envioOn()) form.modo = "retiro";
       const pagoEnvio = (S.envio || {}).pago || "Transferencia / Mercado Pago";
       const pagosVer = form.modo === "envio" ? [pagoEnvio] : S.pagos || [];
-      if (!pagosVer.includes(form.pago)) form.pago = pagosVer[0] || "";
+      if (!pagosVer.includes(form.pago)) form.pago = pagosVer.length === 1 ? pagosVer[0] : ""; // con varias opciones no viene ninguna marcada
       const r = S.retiro || {}, isEnv = form.modo === "envio", costo = Math.max(0, Number((S.envio || {}).costo) || 0);
       body.innerHTML = `
         ${envioOn() ? `<div class="modo" role="radiogroup" aria-label="Forma de entrega">
@@ -1037,37 +1044,37 @@
         <label class="f" for="fNombre">Nombre<input id="fNombre" autocomplete="given-name" value="${esc(form.nombre)}" placeholder="Cómo te llamamos"></label>
         <label class="f" for="fTel">Tu celular (WhatsApp)<input id="fTel" type="tel" inputmode="tel" autocomplete="tel" value="${esc(form.tel)}" placeholder="223 347-1277"><span class="hintf" id="fTelOk">${telHint(form.tel)}</span></label>
         <label class="f" for="fHora">${isEnv ? "Horario de entrega" : "Horario de retiro"}<select id="fHora"><option value="">Elegí un horario</option>${slots().map((o) => `<option ${o === form.hora ? "selected" : ""}>${esc(o)}</option>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>
-        <div class="f"><span>Forma de pago</span><div class="chips">${pagosVer.map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">${form.modo === "envio" ? "Con envío, solo transferencia." : "El pago se coordina por WhatsApp."}</span></div>
+        <div class="f" id="fPago"><span>Forma de pago</span><div class="chips">${pagosVer.map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">${form.modo === "envio" ? "Con envío, solo transferencia." : "El pago se coordina por WhatsApp."}</span></div>
         ${premioPicker()}
         ${giftBox()}
         <div class="consent"><label><input type="checkbox" id="fOkWa" ${form.okWa ? "checked" : ""}> Avisame por WhatsApp cuando salgan sabores nuevos o limitados.</label>
           <label><input type="checkbox" id="fOkAds" ${form.okAds ? "checked" : ""}> Pueden usar mi número para mostrarme anuncios de Setto en Instagram y Facebook.</label>
           <span class="hintf">Las dos son opcionales y te das de baja cuando quieras en <a href="/privacidad" target="_blank">Privacidad y bajas</a>.</span></div>
-        <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>
-        <div id="fErr" class="err" hidden></div>`;
-      foot.innerHTML = `${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${maqOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Maquinita: ${esc(MAQ.titulo)}</span><span class="num">${money(-maqOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
+        <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>`;
+      foot.innerHTML = `${clubLine(true)}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${maqOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Maquinita: ${esc(MAQ.titulo)}</span><span class="num">${money(-maqOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><div id="fErr" class="err" role="alert" hidden></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
       $("#fTel")?.addEventListener("input", (e) => { const h = $("#fTelOk"); if (h) h.innerHTML = telHint(e.target.value); });
-      [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; }); });
+      [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; const f = e.target.closest(".f"); if (f) f.classList.remove("inval"); }); });
+      $("#fHora").addEventListener("change", (e) => { form.hora = e.target.value; e.target.closest(".f").classList.remove("inval"); });
       [["fOkWa", "okWa"], ["fOkAds", "okAds"]].forEach(([id, k]) => $("#" + id).addEventListener("change", (e) => { form[k] = e.target.checked; }));
       $("#fTel").addEventListener("change", async () => {
         if (!(await loadCard()) || view !== "checkout") return;
         if (completes() && !$(".premio-pick")) return drawDrawer(); // aparece el selector de premio
-        const cl = $("#dFoot .clubline"); if (cl) cl.outerHTML = clubLine(); // sin redibujar el botón de enviar
+        const cl = $("#dFoot .clubline"); if (cl) cl.outerHTML = clubLine(true); // sin redibujar el botón de enviar
       });
       $("#fTel").addEventListener("change", () => { if (MAQ && API.normPhone(MAQ.tel) !== API.normPhone(form.tel)) { quitarMaq(); drawDrawer(); } else cargarMaqSug(); });
       cargarMaqSug();
     }
     if (view === "sent" && lastOrder) {
-      $("#dTitle").textContent = "Último paso";
+      $("#dTitle").textContent = "¡Pedido registrado!";
       const est = trackVivos.find((x) => x.code === lastOrder.code) || { code: lastOrder.code, status: "pendiente", etapa: "recibido", modo: lastOrder.modo, retiro: "" };
       body.innerHTML = `<div class="ok"><img src="img/mochito-cup.png" alt=""><span class="eyebrow">Tu código de pedido</span><div class="coderow num">${esc(lastOrder.code)}</div>
         ${lastOrder.premio ? `<div class="clubline" style="width:100%;text-align:left"><img src="img/mochito-run.png" alt=""><div><b>¡Completaste tu tarjeta!</b> Tu premio: ${esc(lastOrder.premio_txt || "a confirmar")}.</div></div>` : ""}
-        <p class="muted" style="font-size:.9rem">${lastOrder.modo === "envio" ? "Mandanos el WhatsApp y te confirmamos envío y pago." : "Mandanos el WhatsApp y te confirmamos dirección y pago."}${clubOn() ? " Al recibirlo sumás tu sello." : ""}</p></div>
+        <p class="muted" style="font-size:.9rem">Fijate que el mensaje se haya enviado en WhatsApp: con eso te confirmamos ${lastOrder.modo === "envio" ? "envío" : "dirección"} y pago.${clubOn() ? " Al recibirlo sumás tu sello." : ""}</p></div>
         <div class="dtrk sent-trk">${trackCard(est)}</div>
         <p class="muted" style="font-size:.84rem;text-align:center">Te avisamos acá cuando esté listo. El link para volver va en tu WhatsApp.</p>
         <div class="msg" id="msgText" hidden>${esc(lastOrder.message)}</div>`;
-      foot.innerHTML = `<a class="btn wa big" href="${waLink(lastOrder.message)}" target="_blank" rel="noopener" data-resend>${lastOrder.enviado ? "Reenviar mensaje por WhatsApp" : "Enviar por WhatsApp"}</a>
-        <div style="display:flex;justify-content:center;gap:18px"><button class="back" id="copyMsg">Copiar mensaje</button><button class="back" id="newOrder">Hacer otro pedido</button></div>`;
+      foot.innerHTML = `<button class="btn solid big" id="newOrder">Hacer otro pedido</button>
+        <p class="muted" style="font-size:.84rem;text-align:center;margin:0">¿No se abrió WhatsApp? <a href="${waLink(lastOrder.message)}" target="_blank" rel="noopener" data-resend style="color:var(--turquesa);font-weight:700">Abrilo de nuevo</a> o <button class="back" id="copyMsg" style="display:inline;padding:0;font-size:inherit">copiá el mensaje</button>.</p>`;
     }
   }
 
@@ -1078,12 +1085,17 @@
     if (API.marcarContacto && phone) API.marcarContacto(code, phone).catch(() => {});
   }
   async function sendOrder() {
-    const err = []; const el = $("#fErr");
-    if (!form.nombre.trim()) err.push("tu nombre");
-    if (!API.normPhone(form.tel)) err.push("un celular válido");
-    if (!form.hora) err.push("un horario");
-    if (form.modo === "envio" && form.dir.trim().length < 5) err.push("la dirección de entrega");
-    if (err.length) { el.hidden = false; el.textContent = "Falta " + err.join(", ") + "."; return; }
+    const el = $("#fErr");
+    const faltan = [[form.modo === "envio" && form.dir.trim().length < 5, "fDir", "la dirección de entrega"], [!form.nombre.trim(), "fNombre", "tu nombre"],
+      [!API.normPhone(form.tel), "fTel", "un celular válido"], [!form.hora, "fHora", "un horario"], [!form.pago, "fPago", "la forma de pago"]].filter((x) => x[0]);
+    document.querySelectorAll("#dBody .f.inval").forEach((f) => f.classList.remove("inval"));
+    if (faltan.length) {
+      // se marca cada campo que falta y se lleva la pantalla al primero; el aviso queda arriba del botón
+      faltan.forEach(([, id]) => { const f = $("#" + id); const box = f && (f.classList.contains("f") ? f : f.closest(".f")); if (box) box.classList.add("inval"); });
+      el.hidden = false; el.textContent = "Falta " + faltan.map((x) => x[2]).join(", ") + ".";
+      const pri = $("#" + faltan[0][1]); if (pri) { pri.scrollIntoView({ behavior: "smooth", block: "center" }); if (pri.matches("input,select")) setTimeout(() => pri.focus({ preventScroll: true }), 300); }
+      return;
+    }
     if (sending) return;
     if (clubOn() && API.normPhone(form.tel)) await loadCard();
     if (completes() && !form.premio) { drawDrawer(); const e2 = $("#fErr"); e2.hidden = false; e2.textContent = "Completaste tu tarjeta: elegí tu premio antes de enviar."; $(".premio-pick")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
@@ -1148,7 +1160,8 @@
 
   /* ---------- eventos ---------- */
   document.addEventListener("click", (e) => {
-    const b = e.target.closest("button, a"); if (!b) return;
+    const b = e.target.closest("button, a");
+    if (!b) { const card = e.target.closest("article.set, article.item, article.prem"); const o = card && card.querySelector("[data-open]"); if (o) openSheet(o.dataset.open); return; } // toda la tarjeta abre la ficha
     if (b.dataset.open) openSheet(b.dataset.open);
     if (b.dataset.quick) { const p = find(b.dataset.quick); if (p && addItem(p) && view === "cart" && $("#drawer").classList.contains("on")) drawDrawer(); }
     if (b.dataset.close !== undefined) closeSheet();
@@ -1165,7 +1178,7 @@
     if (b.id === "dBack") { view = "cart"; drawDrawer(); }
     if (b.id === "toCheckout") { view = "checkout"; drawDrawer(); if (cart.length) px("InitiateCheckout", { ...pxCarrito(), value: total() }); }
     if (b.id === "toBuscar") { BQ.res = null; BQ.err = ""; BQ.tel = BQ.tel || form.tel; view = "buscar"; drawDrawer(); setTimeout(() => { const i = $("#bqTel"); if (i && !i.value) i.focus(); }, 30); }
-    if (b.dataset.pago) { form.pago = b.dataset.pago; document.querySelectorAll("[data-pago]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); }
+    if (b.dataset.pago) { form.pago = b.dataset.pago; document.querySelectorAll("[data-pago]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); const fp = $("#fPago"); if (fp) fp.classList.remove("inval"); }
     if (b.id === "toWA") sendOrder();
     if (b.dataset.resend !== undefined && lastOrder) abrioWhatsApp(lastOrder.code, telDe(lastOrder.code));
     if (b.dataset.premio) { form.premio = b.dataset.premio; drawDrawer(); }
@@ -1461,11 +1474,17 @@
       <span class="rv-err" hidden></span>
       <div class="trk-acts" style="margin:0"><button class="btn solid" data-rvsend>Enviar reseña</button><button class="back" data-rvcancel>Ahora no</button></div></div>`;
   }
+  function verSellos(tel) {
+    $("#club").scrollIntoView({ behavior: "smooth" });
+    if (API.normPhone(tel)) { $("#cardPhone").value = API.prettyPhone ? API.prettyPhone(tel) : tel; $("#cardForm").requestSubmit(); return; }
+    $("#cardMsg").textContent = "Poné el celular con el que pediste y te mostramos tus sellos."; setTimeout(() => $("#cardPhone").focus({ preventScroll: true }), 400);
+  }
   document.addEventListener("click", async (e) => {
     const t = e.target.closest("[data-resena],[data-star],[data-rvsend],[data-rvcancel],[data-vercard]"); if (!t) return;
     if (t.dataset.vercard) {
-      const tel = telDe(t.dataset.vercard); closeDrawer(); $("#cardPhone").value = API.prettyPhone ? API.prettyPhone(tel) : tel;
-      $("#club").scrollIntoView({ behavior: "smooth" }); $("#cardForm").requestSubmit(); return;
+      const tel = telDe(t.dataset.vercard) || form.tel; closeDrawer();
+      if (!$("#club").offsetParent) { try { sessionStorage.setItem("setto-vercard", tel || ""); } catch (_) {} location.href = "/#club"; return; } // en gift cards o armar el club no está: vamos al inicio
+      verSellos(tel); return;
     }
     if (t.dataset.resena) { const card = t.closest(".trk"); const acts = t.closest(".trk-acts"); if (!card.querySelector(".rv-form")) acts.insertAdjacentHTML("afterend", rvForm(t.dataset.resena)); acts.hidden = true; return; }
     const f = t.closest(".rv-form"); if (!f) return;
@@ -1600,6 +1619,8 @@
       S = settings; adapt(products); syncCart();
       renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); if (maqAlCargar && maqOn()) { maqAlCargar = false; abrirMaq(); } renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
+      let vc = null; try { vc = sessionStorage.getItem("setto-vercard"); sessionStorage.removeItem("setto-vercard"); } catch (_) {}
+      if (vc !== null && clubOn()) setTimeout(() => verSellos(vc), 300); // vino desde "Ver mis sellos" en otra página
       if (PAGE === "listo" && form.tel && clubOn()) setTimeout(() => { if (!lsTel) { lsTel = true; $("#cardForm").requestSubmit(); } }, 1500);
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
     } catch (e) {
