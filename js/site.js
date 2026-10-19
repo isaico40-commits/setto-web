@@ -419,7 +419,7 @@
     const b = $("#gbBody");
     if (GB.done) {
       b.innerHTML = `<div class="gb-ok">${gcardHtml(GB.dis, GB.done.monto)}<b style="font-size:1.2rem">¡Listo! Tu gift card quedó reservada</b>
-        <p class="muted" style="max-width:36ch">Pagala por transferencia en el WhatsApp. Cuando lo confirmemos te mandamos el link para regalarla.</p>
+        <p class="muted" style="max-width:38ch">Mandanos el mensaje por WhatsApp y coordinamos el pago por transferencia. Apenas lo confirmamos, te llega solo a ese número el link para compartirle el regalo${GB.para.trim() ? ` a ${esc(GB.para.trim())}` : ""}.</p>
         <a class="btn wa big" target="_blank" rel="noopener" href="${waLink(GB.done.msg)}">Abrir WhatsApp</a></div>`;
       return;
     }
@@ -432,7 +432,8 @@
         <label class="f">Para<input id="gbPara" maxlength="40" value="${esc(GB.para)}" placeholder="Nombre de quien la recibe"></label>
         <label class="f">De (opcional)<input id="gbDe" maxlength="40" value="${esc(GB.de)}" placeholder="Tu nombre"></label>
         <label class="f">Mensaje (opcional)<textarea id="gbMsg" maxlength="160" placeholder="Ej: ¡Feliz cumple! Que lo disfrutes">${esc(GB.msg)}</textarea></label>
-        <label class="f">Tu celular (WhatsApp)<input id="gbTel" type="tel" inputmode="tel" value="${esc(GB.tel)}" placeholder="223 347-1277"><span class="hintf">Pago por transferencia. Te mandamos el link para regalarla.</span></label>
+        <ol class="gb-pasos"><li><b>Primero, tu celular:</b> nos mandás un mensaje por WhatsApp y ahí coordinamos el pago por transferencia.</li><li><b>Confirmamos el pago</b> y te llega solo un link por WhatsApp.</li><li><b>Se lo compartís</b> a quien se lo regalás: con ese link ve su gift card y la usa.</li></ol>
+        <label class="f">Tu celular (WhatsApp)<input id="gbTel" type="tel" inputmode="tel" value="${esc(GB.tel)}" placeholder="223 347-1277"><span class="hintf">Es el tuyo, no el de quien la recibe. Ahí te llega el link.</span></label>
         <div id="gbErr" class="err" hidden></div>
         <button class="btn wa big" id="gbSend">${GB.sending ? "Reservando…" : `Comprar · ${money(gbMonto())}`}</button>
       </div></div>`;

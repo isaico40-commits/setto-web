@@ -726,6 +726,8 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .gb-prev .gcard{cursor:default}
 .gb-msg{background:var(--card);border-radius:16px;padding:12px 14px;font-size:.92rem;min-height:44px}
 .gb-form{display:grid;gap:12px}
+.gb-pasos{margin:0;padding:12px 14px 12px 32px;background:var(--card);border-radius:14px;display:grid;gap:6px;font-size:.84rem;line-height:1.4;color:var(--ink-2)}
+.gb-pasos b{color:var(--ink)}
 .gb-dis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .gb-dis button{border:2px solid transparent;border-radius:12px;padding:0;overflow:hidden;cursor:pointer;background:none}
 .gb-dis button[aria-pressed="true"]{border-color:var(--turquesa)}

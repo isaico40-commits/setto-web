@@ -113,7 +113,16 @@ export const AVISOS: Record<string, string> = {
   pedir_resena: "¡Gracias por tu pedido, {nombre}! 🙌 {sellos}\n\nAcá ves cómo armar tu bebida, tus sellos y, si te gustó, podés dejar tu reseña (con foto si querés):\n{link}",
   pedir_cambio: "¡Hola {nombre}! Perdón, nos quedamos sin {faltan} para tu pedido {codigo} 😕\n\nElegí acá con qué lo reemplazamos o si preferís sacarlo (el total se ajusta solo):\n{link}",
   aviso_cancelado: "Hola {nombre}, cancelamos tu pedido {codigo} de Setto. Si tenés alguna duda, respondé este mensaje.",
+  gift_activa: "¡Listo! 🎁 Tu gift card de Setto para {para} ya está activa ({monto}).\n\nMandale este link para que la vea y la use:\n{link}",
 };
+// gift card activada → texto para el comprador con el link de regalo (mismo link que arma el panel)
+export function textoGift(g: { para: string | null; monto: number; token: string }, mensajes: Record<string, string> | null, sitio: string) {
+  const propio = String(mensajes?.gift_activa ?? "").trim();
+  return rellenar(propio || AVISOS.gift_activa, {
+    para: String(g.para || "").trim(), monto: "$" + Number(g.monto || 0).toLocaleString("es-AR"),
+    link: `${String(sitio || "").replace(/\/$/, "")}/gift-cards?regalo=${g.token}`,
+  });
+}
 export type PedidoAviso = { code: string; nombre: string | null; track: string | null; modo: string | null; sellos?: number | null; cambio?: { faltan?: { qty: number; nombre: string; size?: string }[] } | null };
 // igual que render() de js/mensajes.js: rellena {variables}, borra líneas "Etiqueta: {var}" vacías y espacios de más
 export function rellenar(t: string, vars: Record<string, unknown>) {

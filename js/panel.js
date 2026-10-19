@@ -161,7 +161,7 @@
   const regaloTxt = (g) => M.render("gift_activa", { para: g.para, monto: money(g.monto), link: linkRegalo(g) }, P.settings);
   P.gsub = "pendiente";
   async function viewGift() {
-    $("#view").innerHTML = `<h1 class="ph1">Gift cards</h1><p class="muted">Cuando te paguen, tocá <b>Pago recibido</b>: se activa, entra a la caja y te da el link para mandarle al comprador.</p>
+    $("#view").innerHTML = `<h1 class="ph1">Gift cards</h1><p class="muted">Cuando te paguen, tocá <b>Pago recibido</b>: se activa, entra a la caja y el link le llega solo al comprador por WhatsApp. Si no le llega (pasaron más de 24 h desde que te escribió), mandáselo con el botón.</p>
       <div class="sub">${[["pendiente", "Por cobrar"], ["activa", "Activas"], ["usada", "Usadas"], ["anulada", "Anuladas"]].map(([k, l]) => `<button class="ptab" data-gsub="${k}" aria-selected="${P.gsub === k}">${l}</button>`).join("")}</div>
       <div class="pgrid" id="gcList" style="margin-top:14px"><p class="muted">Cargando…</p></div>`;
     try {
@@ -174,7 +174,7 @@
           ${g.mensaje ? `<p class="hintp">“${esc(g.mensaje)}”</p>` : ""}
           <div class="who2"><span class="num">${esc(pretty(g.phone))}</span><a class="chat" href="https://wa.me/${esc(g.phone)}" target="_blank" rel="noopener">Abrir chat</a></div>
           ${g.estado === "pendiente" ? `<div class="acts"><select class="inp" data-gcta style="width:auto"><option value="mp">Transferencia / MP</option><option value="efectivo">Efectivo</option></select><button class="btn solid" data-gact>Pago recibido</button><button class="linkbtn warn" data-gann>Anular</button></div>`
-            : g.estado === "activa" ? `<div class="acts"><a class="btn solid" target="_blank" rel="noopener" href="https://wa.me/${esc(g.phone)}?text=${encodeURIComponent(regaloTxt(g))}">Mandar link al comprador</a><button class="linkbtn" data-gcopy="${esc(linkRegalo(g))}">Copiar link</button>${g.saldo === g.monto ? '<button class="linkbtn warn" data-gann>Anular</button>' : ""}</div>` : ""}
+            : g.estado === "activa" ? `${g.link_wa_at ? `<p class="hintp">✓ Link enviado solo por WhatsApp ${ago(g.link_wa_at)}</p>` : ""}<div class="acts"><a class="btn ${g.link_wa_at ? "" : "solid"}" target="_blank" rel="noopener" href="https://wa.me/${esc(g.phone)}?text=${encodeURIComponent(regaloTxt(g))}">${g.link_wa_at ? "Reenviar a mano" : "Mandar link al comprador"}</a><button class="linkbtn" data-gcopy="${esc(linkRegalo(g))}">Copiar link</button>${g.saldo === g.monto ? '<button class="linkbtn warn" data-gann>Anular</button>' : ""}</div>` : ""}
         </article>`).join("") : '<p class="muted">Nada por acá.</p>';
     } catch (e) { $("#gcList").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
   }
@@ -185,7 +185,7 @@
     const b = e.target.closest("[data-gact],[data-gann]"); if (!b) return;
     const card = b.closest("[data-gid]"), id = card.dataset.gid; b.disabled = true;
     try {
-      if (b.dataset.gact !== undefined) { await API.activateGiftcard(id, card.querySelector("[data-gcta]").value); toast("Activada · cargada en la caja"); P.gsub = "activa"; }
+      if (b.dataset.gact !== undefined) { await API.activateGiftcard(id, card.querySelector("[data-gcta]").value); toast("Activada · le mandamos el link por WhatsApp"); P.gsub = "activa"; setTimeout(() => { if (P.view === "gift" && P.gsub === "activa") viewGift(); }, 5000); }
       else { if (!confirmar(b)) { b.disabled = false; return; } await API.annulGiftcard(id); toast("Anulada"); }
       viewGift();
     } catch (err) { toast(err.message); b.disabled = false; }
