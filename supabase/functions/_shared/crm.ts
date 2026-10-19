@@ -138,6 +138,8 @@ export function textoAviso(tipo: string, o: PedidoAviso, mensajes: Record<string
 }
 // el mensaje con el pedido que manda el cliente desde la web trae el código: "Te paso mi pedido STT-1234 …"
 export const codigoPedido = (texto: string) => (String(texto || "").toUpperCase().match(/\bSTT-\d{3,6}\b/) || [""])[0] || null;
+// …y el link de seguimiento (?seguir=<track>): es secreto, así que encuentra el pedido aunque haya tipeado mal su número
+export const trackPedido = (texto: string) => (String(texto || "").match(/[?&]seguir=([a-f0-9]{16,64})(?![a-z0-9])/i) || [])[1]?.toLowerCase() || null;
 
 /* ---------------- Audiencias ---------------- */
 export function diferencia(deseados: string[], actuales: string[]) {

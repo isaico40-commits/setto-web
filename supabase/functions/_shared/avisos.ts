@@ -13,25 +13,26 @@ export async function avisarPedido(order_id: string, tipo: string) {
   const { data: st } = await sb.from("settings").select("key,value").in("key", ["mensajes", "wa_avisos"]);
   const cfg = Object.fromEntries((st ?? []).map((r: any) => [r.key, r.value]));
   if (cfg.wa_avisos?.activo === false) return { omitido: "avisos apagados" };
-  const { data: o } = await sb.from("orders").select("id,code,nombre,phone,track,modo,sellos,cambio,avisos").eq("id", order_id).maybeSingle();
+  const { data: o } = await sb.from("orders").select("id,code,nombre,phone,wa_phone,track,modo,sellos,cambio,avisos").eq("id", order_id).maybeSingle();
   if (!o) return { omitido: "no existe" };
   const marca = MARCA[tipo];
   if (!marca) return { omitido: "sin aviso" };
   // el mismo aviso no se manda dos veces (salvo un cambio nuevo, que trae otra fecha)
   const ya = o.avisos?.[marca];
   if (ya && (tipo !== "cambio" || ya === o.cambio?.at)) return { omitido: "ya avisado" };
+  const tel = o.wa_phone || o.phone; // si tipeó mal su número, el que nos escribió (lo guarda el webhook)
   const desde = new Date(Date.now() - 23.5 * 3600e3).toISOString();
-  const { count } = await sb.from("message_logs").select("id", { count: "exact", head: true }).eq("phone", o.phone).eq("direccion", "entrante").gte("created_at", desde);
+  const { count } = await sb.from("message_logs").select("id", { count: "exact", head: true }).eq("phone", tel).eq("direccion", "entrante").gte("created_at", desde);
   if (!count) return { omitido: "fuera de las 24 h" };
   const texto = textoAviso(tipo, o, cfg.mensajes ?? null, env("SITE_URL"));
   if (!texto) return { omitido: "sin texto" };
   const r = await fetch(`https://graph.facebook.com/${VERSION}/${env("WA_PHONE_NUMBER_ID")}/messages`, {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${env("META_ACCESS_TOKEN")}` },
-    body: JSON.stringify({ messaging_product: "whatsapp", to: o.phone, type: "text", text: { body: texto, preview_url: false } }) });
+    body: JSON.stringify({ messaging_product: "whatsapp", to: tel, type: "text", text: { body: texto, preview_url: false } }) });
   const d = await r.json().catch(() => ({}));
   const wamid = d.messages?.[0]?.id ?? null;
   const error = wamid ? null : `${d.error?.code ?? r.status} ${d.error?.error_data?.details || d.error?.message || ""}`.trim();
-  await sb.from("message_logs").insert({ phone: o.phone, wamid, estado: wamid ? "enviado" : "fallo", error, texto: `[aviso ${tipo}] ${o.code}` });
+  await sb.from("message_logs").insert({ phone: tel, wamid, estado: wamid ? "enviado" : "fallo", error, texto: `[aviso ${tipo}] ${o.code}` });
   if (!wamid) return { error };
   await sb.from("orders").update({ avisos: { ...(o.avisos || {}), [marca]: tipo === "cambio" && o.cambio?.at ? o.cambio.at : new Date().toISOString() } }).eq("id", o.id);
   return { ok: true, wamid };
