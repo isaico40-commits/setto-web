@@ -2,7 +2,7 @@
 // GET: verificación del webhook en la app de Meta (hub.verify_token = WA_VERIFY_TOKEN).
 // POST: mensajes entrantes y estados de los enviados. Firma X-Hub-Signature-256 con WA_APP_SECRET.
 //   - Guarda respuestas y estados en message_logs.
-//   - "BAJA" (o "stop", "no quiero recibir…", o el botón "No quiero más novedades" de las plantillas) revoca el permiso de WhatsApp; "ALTA" lo vuelve a dar. Responde confirmando.
+//   - "BAJA" (o "stop", "no quiero recibir…", o los botones "No quiero más novedades" / "No quiero más avisos" de las plantillas) revoca el permiso de WhatsApp y saca de los avisos de drops; "ALTA" lo vuelve a dar. Responde confirmando.
 import { env, sb, VERSION } from "../_shared/supa.ts";
 import { firmaValida, leerWebhook, intencion } from "../_shared/crm.ts";
 
@@ -33,6 +33,7 @@ Deno.serve(async (req) => {
     await sb.from("message_logs").insert({ phone: m.phone, direccion: "entrante", wamid: m.wamid, estado: i === "baja" ? "baja" : i === "alta" ? "alta" : "recibido", texto: m.texto });
     if (!i) continue;
     const { data: tiene } = await sb.rpc("puede_contactar", { p_phone: m.phone, p_canal: "whatsapp" });
+    if (i === "baja") await sb.from("drop_wa").delete().eq("phone", m.phone); // también deja de recibir los avisos de drops
     if (i === "baja" && tiene) await sb.from("customer_consents").insert({ phone: m.phone, canal: "whatsapp", finalidad: "novedades", estado: "revocado", origen: "whatsapp" });
     if (i === "alta" && !tiene) await sb.from("customer_consents").insert({ phone: m.phone, canal: "whatsapp", finalidad: "novedades", estado: "otorgado", origen: "whatsapp", aviso_version: "whatsapp-alta" });
     await responder(m.wa, i === "baja" ? "Listo, no te vamos a mandar más novedades de Setto. Si algún día querés volver, escribí ALTA." : "¡Listo! Te vamos a avisar las novedades de Setto por acá. Para dejar de recibirlas, escribí BAJA.");

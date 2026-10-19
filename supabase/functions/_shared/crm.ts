@@ -79,7 +79,7 @@ const quitarTildes = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/
 export function intencion(texto: string): "baja" | "alta" | null {
   const t = quitarTildes(String(texto || "")).toLowerCase().trim();
   const cola = "[\\s!.,]*(por favor|porfa|gracias)?[\\s!.]*$"; // el mensaje es solo eso, no "bajá el precio?"
-  if (new RegExp("^(baja|stop|parar|unsubscribe|desuscrib\\w*|quiero darme de baja|darme de baja)" + cola).test(t) || /no (quiero|me) (recibir|manden|mandes|escriban)/.test(t) || /^no quiero (mas )?(novedades|mensajes|promos)[\s!.]*$/.test(t)) return "baja";
+  if (new RegExp("^(baja|stop|parar|unsubscribe|desuscrib\\w*|quiero darme de baja|darme de baja)" + cola).test(t) || /no (quiero|me) (recibir|manden|mandes|escriban)/.test(t) || /^no quiero (mas )?(novedades|mensajes|promos|avisos)[\s!.]*$/.test(t)) return "baja";
   if (new RegExp("^alta" + cola).test(t)) return "alta";
   return null;
 }
@@ -92,6 +92,15 @@ export function mensajePlantilla(to: string, plantilla: string, idioma: string, 
     messaging_product: "whatsapp", to: soloDigitos(to), type: "template",
     template: { name: plantilla, language: { code: idioma || "es_AR" }, ...(params.length ? { components: [{ type: "body", parameters: params }] } : {}) },
   };
+}
+
+// nombre del drop para el WhatsApp: el que se cargó en el panel o "la edición <título>" sin signos sueltos
+export function nombreDrop(E: { wa_nombre?: string; titulo?: string }) {
+  const propio = String(E?.wa_nombre || "").trim();
+  if (propio) return propio.slice(0, 60);
+  const t = String(E?.titulo || "").replace(/[¡!]+/g, "").trim();
+  if (!t) return "la edición especial";
+  return (/^(la |el |los |las )/i.test(t) ? t : /^edici[oó]n /i.test(t) ? t.replace(/^edici[oó]n /i, "la edición ") : "la edición " + t).slice(0, 60);
 }
 
 /* ---------------- Audiencias ---------------- */

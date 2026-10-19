@@ -262,8 +262,11 @@
     async pushSuscribir() { throw new Error("En modo demo no hay notificaciones"); },
     async pushDesuscribir() {},
     async dropSuscribir() { throw new Error("En modo demo no hay notificaciones"); },
+    async dropAnotarWa(tel, nombre) { const ph = normPhone(tel); if (!ph) throw new Error("Revisá el número: código de área + número, por ejemplo 223 347-1277."); if (!String(nombre || "").trim()) throw new Error("Poné tu nombre para el mensaje");
+      const db = dbLoad(); db.drop_wa = (db.drop_wa || []).filter((x) => x.phone !== ph).concat({ phone: ph, nombre: String(nombre).trim().slice(0, 40) }); dbSave(db); },
+    async dropDesanotarWa(tel) { const db = dbLoad(); db.drop_wa = (db.drop_wa || []).filter((x) => x.phone !== normPhone(tel)); dbSave(db); },
     async dropDesuscribir() {},
-    async dropAvisos() { return { suscriptos: 0, avisado: null }; },
+    async dropAvisos() { const n = (dbLoad().drop_wa || []).length; return { suscriptos: n, whatsapp: n, push: 0, avisado: null }; },
     async dropAvisar() { throw new Error("En modo demo no hay notificaciones"); },
     async equipoPushSuscribir() { throw new Error("En modo demo no hay notificaciones"); },
     async equipoPushDesuscribir() {},
@@ -452,6 +455,8 @@
     async pushDesuscribir(track, endpoint) { const { error } = await sb.rpc("push_desuscribir", { p_track: track, p_endpoint: endpoint }); fail(error); },
     /* avisos de drops: el cliente se anota una vez y le llega cada lanzamiento */
     async dropSuscribir(sub) { const k = sub.toJSON().keys || {}; const { error } = await sb.rpc("drop_suscribir", { p_endpoint: sub.endpoint, p_p256dh: k.p256dh, p_auth: k.auth }); fail(error); },
+    async dropAnotarWa(tel, nombre) { const { error } = await sb.rpc("drop_anotar_wa", { p_phone: tel, p_nombre: nombre }); fail(error); },
+    async dropDesanotarWa(tel) { if (!tel) return; const { error } = await sb.rpc("drop_desanotar_wa", { p_phone: tel }); fail(error); },
     async dropDesuscribir(endpoint) { const { error } = await sb.rpc("drop_desuscribir", { p_endpoint: endpoint }); fail(error); },
     async dropAvisos() { const { data, error } = await sb.rpc("drop_avisos_info"); fail(error); return data; },
     async dropAvisar() { const { data, error } = await sb.rpc("drop_avisar"); fail(error); return data; },
