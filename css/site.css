@@ -891,7 +891,7 @@ body>.mito.hide,body>.mito.bye{opacity:0;transform:translateY(30px) scale(.7)}
 .mito-a{font:inherit;font-size:.8rem;font-weight:700;background:var(--turquesa);color:#fff;border:0;border-radius:99px;padding:6px 12px;cursor:pointer}
 .mito-x{position:absolute;top:4px;right:4px;width:24px;height:24px;border:0;background:none;color:var(--ink-2);font-size:.8rem;cursor:pointer;border-radius:50%}
 @media (min-width:761px){body>.mito{right:22px;bottom:22px}.mito-btn{width:88px;height:88px}}
-/* Caminito de progreso: camino dibujado que serpentea encima de Mochito (máx. media pantalla en PC, un cuarto en celu); cada punto es una sección.
+/* Caminito de progreso: camino dibujado que serpentea encima de Mochito (máx. media pantalla en PC, 40% en celu); cada punto es una sección.
    El JS le copia right/bottom/ancho a Mochito para que lo recorra justo */
 .mito-path{position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));width:66px;z-index:33;pointer-events:none;transition:opacity .3s,bottom .25s ease}
 .mito-path.lift{bottom:calc(82px + env(safe-area-inset-bottom,0px))}

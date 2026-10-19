@@ -101,7 +101,7 @@
   let cur = "top", curT = null;
 
   // Caminito: un camino dibujado que serpentea en la esquina de abajo a la derecha (máximo media pantalla en PC
-  // y un cuarto en celu).
+  // y 40% en celu).
   // Mochito lo recorre con el scroll y llega al final del camino al final de la página. Cada sección es una
   // parada (menos la edición especial, que se ve apenas entrás); pasa por ella justo cuando aparece su tip.
   // En PC solo las paradas se tocan; en celu no se toca nada del camino (no frena el dedo ni tapa botones).
@@ -121,7 +121,7 @@
     path.classList.toggle("lift", el.classList.contains("lift"));
     const hb = Math.max(0, document.querySelector("header.top")?.getBoundingClientRect().bottom || 66);
     const piso = el.classList.contains("lift") ? 82 : innerWidth >= 761 ? 22 : 14;
-    const H = Math.round(Math.min(innerHeight * (PC.matches ? 0.5 : 0.25), innerHeight - hb - piso - 16)); // nunca más de media pantalla (un cuarto en celu)
+    const H = Math.round(Math.min(innerHeight * (PC.matches ? 0.5 : 0.4), innerHeight - hb - piso - 16)); // nunca más de media pantalla (40% en celu)
     path.style.height = `${H}px`; alto = H - 2 * M;
     // Dibujo: borde, tierra, raya del medio y piedritas a los costados, sobre la misma curva
     let d = "";
