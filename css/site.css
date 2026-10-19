@@ -112,6 +112,8 @@ section.blk{padding-block:72px}
 .hint{display:none;font-size:.8rem;color:var(--ink-2);margin-top:12px}
 @media (max-width:760px){
   .rail{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:var(--w,80%);overflow-x:auto;scroll-snap-type:x mandatory;margin-inline:-20px;padding:6px 20px 14px;scroll-padding-inline:20px;scrollbar-width:none;gap:14px}
+  /* solo scroll horizontal: si el carril también scrollea en vertical (por sombras o el zoom de la card), atrapa el dedo y la página no baja */
+  .rail{overflow-y:hidden;overscroll-behavior-x:contain;touch-action:pan-x pan-y}
   .rail::-webkit-scrollbar{display:none}
   .rail>*{scroll-snap-align:start}
   .hint{display:flex;align-items:center;gap:10px}
@@ -263,7 +265,7 @@ footer .fine{grid-column:1/-1;font-size:.78rem;background:var(--bg);justify-self
 .lp{font-weight:700}
 .sug{display:grid;gap:10px;padding-top:4px}
 .sug-t{font-family:var(--display);font-weight:400;font-size:1.15rem}
-.sug-r{display:grid;grid-auto-flow:column;grid-auto-columns:104px;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin-inline:-20px;padding:2px 20px 6px;scroll-padding-inline:20px}
+.sug-r{overflow-y:hidden;overscroll-behavior-x:contain;touch-action:pan-x pan-y;display:grid;grid-auto-flow:column;grid-auto-columns:104px;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin-inline:-20px;padding:2px 20px 6px;scroll-padding-inline:20px}
 .sug-r::-webkit-scrollbar{display:none}
 .sug-i{position:relative;scroll-snap-align:start;display:grid;gap:2px;align-content:start}
 .sug-ph{all:unset;cursor:pointer;width:104px;height:104px;border-radius:16px;background:var(--bg-2);display:grid;place-items:center;margin-bottom:6px}
@@ -281,10 +283,28 @@ footer .fine{grid-column:1/-1;font-size:.78rem;background:var(--bg);justify-self
 .ctas{display:grid;gap:8px}
 .maq-cta{background:var(--menta)}
 .maq-cta .gc-ico img{width:26px;height:26px;object-fit:contain}
-.regaloline{display:flex;align-items:center;gap:10px;background:var(--coral-2);border-radius:14px;padding:7px 12px;font-size:.82rem;line-height:1.35;color:var(--ink)}
 .rg-ico{flex:none;font-size:1.05rem}
-.clubregalo{display:flex;align-items:center;gap:10px;margin:18px 0 0;width:fit-content;max-width:100%;font-size:.9rem;font-weight:500;background:var(--coral-2);border-radius:999px;padding:8px 16px}
-.clubregalo[hidden]{display:none}
+.clubbenef{margin-top:20px;background:var(--card);border:2px solid var(--turquesa);border-radius:20px;padding:14px 16px;max-width:460px}
+.clubbenef[hidden]{display:none}
+.clubbenef > b{display:block;font-family:var(--display);font-weight:400;font-size:1.2rem;line-height:1.15;color:var(--turquesa)}
+.clubbenef ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.clubbenef li{display:flex;gap:10px;align-items:center}
+.clubbenef .bn-ico{flex:none;width:34px;height:34px;border-radius:50%;background:var(--coral-2);display:grid;place-items:center;font-size:1rem}
+.clubbenef li b{display:block;font-size:.92rem}
+.clubbenef li small{display:block;color:var(--ink-2);font-size:.8rem}
+/* gift cards en la landing: misma grilla que el Club, tarjetas en abanico */
+section.blk.gchome{padding-block:48px}
+.gchome h2{font-size:clamp(1.9rem,4vw,2.6rem);margin-top:8px}
+.gchome .club{grid-template-columns:1fr minmax(0,420px);justify-content:space-between}
+.gch-ctas{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.gch-cards{position:relative;width:100%;max-width:420px;justify-self:end;aspect-ratio:1.25}
+.gch-cards .gcard{position:absolute;left:0;width:82%;transform-origin:20% 100%;transition:transform .25s,box-shadow .25s}
+.gch-cards .gcard:nth-child(1){top:0;left:18%;transform:rotate(7deg);z-index:1}
+.gch-cards .gcard:nth-child(2){top:14%;left:9%;transform:rotate(1deg);z-index:2}
+.gch-cards .gcard:nth-child(3){top:28%;left:0;transform:rotate(-5deg);z-index:3}
+.gch-cards .gcard:hover{transform:translateY(-6px) rotate(0);z-index:4}
+.gch-cards .gcard:only-child{position:relative;top:0;left:0;width:100%;transform:none}
+@media (max-width:820px){.gchome .club{grid-template-columns:1fr}.gch-cards{justify-self:center;max-width:380px}}
 /* maquinita en la landing: misma grilla que el Club, más compacta */
 section.blk.maqsec{padding-block:48px}
 .maqsec h2{font-size:clamp(1.9rem,4vw,2.6rem);margin-top:8px}
@@ -577,7 +597,7 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 /* compu: la slide del medio ocupa casi todo el ancho y las de al lado asoman (como Crumbl) */
 .hero2{--hpad:max(20px,14vw,calc((100vw - 1500px)/2));--hh:clamp(380px,34vw,540px);padding-top:24px}
 .hcar{position:relative}
-.htrack{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:var(--hpad);padding:4px var(--hpad) 6px;scrollbar-width:none;overscroll-behavior-x:contain}
+.htrack{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:var(--hpad);padding:4px var(--hpad) 6px;scrollbar-width:none;overscroll-behavior-x:contain;overflow-y:hidden;touch-action:pan-x pan-y}
 .htrack::-webkit-scrollbar{display:none}
 .hcard{flex:0 0 100%;height:var(--hh);scroll-snap-align:start;position:relative;border-radius:32px;overflow:hidden;background:var(--bg-2);display:grid;grid-template-columns:1.1fr 1fr;isolation:isolate}
 .hmedia{position:relative;order:2;background-image:url(img/pattern.png);background-size:84px auto;overflow:hidden}

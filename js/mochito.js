@@ -64,6 +64,7 @@
     pedir:     { t: "Si pedís por acá, sumás sellos del Setto Club 😉", a: [] },
     resenas:   { t: "Esto dicen quienes ya probaron Setto 💬", a: [] },
     regalo:    { t: "¿Para regalar? Las gift cards llegan por link 🎁", a: [] },
+    giftcards: { t: "¿Para regalar? Las gift cards llegan por link 🎁", a: [["Regalar", () => document.getElementById("gchBuy")?.click()]] },
     club:      { t: "Cada pedido web suma un sello. ¡Con la tarjeta llena hay premio!", a: [] },
     stickers:  { t: "Llevame a tus chats: mis stickers son gratis 😄", a: [] },
     ubicacion: { t: "Si retirás, acá nos encontrás 📍", a: [] },
@@ -145,7 +146,7 @@
   function invitar() {
     if (items()) return; // está armando un pedido: no lo distraemos
     if (moving || !bub.hidden) { setTimeout(invitar, 2500); return; } // espera a que Mochito esté libre
-    say({ t: "🎰 ¿Probás suerte? Tenés una tirada gratis hoy.", a: [["Jugar", () => (location.href = "/maquinita")]] }, 9000);
+    say({ t: "🎰 ¿Probás suerte? Tenés una tirada gratis hoy.", a: [["Jugar", () => (window.SettoMaquinita ? window.SettoMaquinita() : (location.href = "/?maquinita"))]] }, 9000);
     try { localStorage.setItem(MQ, hoy); } catch (_) {}
   }
   if (!invitado) setTimeout(invitar, 6000);

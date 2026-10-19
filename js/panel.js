@@ -341,7 +341,7 @@
   }
   // permisos de marketing: vale el último registro de cada canal. El equipo solo puede dar de baja, nunca autorizar.
   const CANALES = [["whatsapp", "Novedades por WhatsApp"], ["meta_ads", "Anuncios de Meta"]];
-  const ORIGEN = { checkout_web: "al pedir en la web", preferencias_web: "desde la web", panel: "desde el panel", whatsapp: "por WhatsApp" };
+  const ORIGEN = { checkout_web: "al pedir en la web", preferencias_web: "desde la web", panel: "desde el panel", whatsapp: "por WhatsApp", maquinita: "desde la maquinita" };
   function consentHtml(l) {
     return `<b style="margin-top:6px">Permisos de marketing</b><div class="hist">${CANALES.map(([k, nom]) => {
       const u = l.find((x) => x.canal === k), si = u && u.estado === "otorgado";

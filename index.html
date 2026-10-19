@@ -53,7 +53,7 @@
   <section class="hero2" aria-roledescription="carrusel" aria-label="Destacados">
     <div class="hcar" id="heroBox">
       <div class="htrack" id="heroSlides" tabindex="-1"></div>
-      <span class="tagline" id="abierto"><i></i>Home cafe · Mar del Plata</span>
+      <span class="tagline" id="abierto"><i></i>Abierto ahora</span>
       <div class="hnav">
         <button class="hbtn" id="heroPause" aria-label="Pausar" aria-pressed="false"><svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path class="pz" d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor"/><path class="pl" d="M8 5l11 7-11 7z" fill="currentColor"/></svg></button>
         <button class="hbtn" id="heroPrev" aria-label="Anterior"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -108,7 +108,7 @@
             <span class="mq-reel"><span class="mq-strip"><img src="img/mochi-frutilla.webp" alt=""></span></span>
             <span class="mq-reel"><span class="mq-strip"><img src="img/dirty-caramel.webp" alt=""></span></span>
           </div>
-          <a class="mq-tirar" id="mqTirar" href="/maquinita" data-maq>Tirar</a>
+          <a class="mq-tirar" id="mqTirar" href="/?maquinita" data-maq>Tirar</a>
           <span class="sl-ranura" aria-hidden="true"></span>
         </div>
         <button class="sl-palanca" type="button" data-maq aria-label="Bajar la palanca y tirar"><span class="sl-brazo"><span class="sl-bola"></span></span><span class="sl-eje"></span></button>
@@ -204,7 +204,7 @@
           <div><span class="k">2</span><span><b>Recibilo y sumás el sello</b></span></div>
           <div><span class="k">3</span><span><b>Completá la tarjeta</b><small id="clubPremio">El pedido que la completa viene con premio.</small></span></div>
         </div>
-        <p class="clubregalo" id="clubRegalo" hidden><span class="rg-ico" aria-hidden="true">🎁</span><span>Además, cada pedido trae un regalo.</span></p>
+        <div class="clubbenef" id="clubBenef" hidden><b>Con tu compra tenés beneficios exclusivos del club</b><ul id="clubBenefList"></ul></div>
       </div>
       <div class="stampcard">
         <div class="row1"><img src="img/logo.svg" alt="Setto"><span class="eyebrow">Club</span></div>
@@ -214,8 +214,24 @@
         </form>
         <div class="stamps" id="stamps"></div>
         <p class="muted" id="cardMsg" style="font-size:.84rem;margin-top:14px">Con el celular de tus pedidos.</p>
-        <a class="maq-link" href="/maquinita">🎰 Tirada gratis de hoy <span aria-hidden="true">→</span></a>
+        <a class="maq-link" href="/?maquinita" data-maq>🎰 Tirada gratis de hoy <span aria-hidden="true">→</span></a>
       </div>
+    </div>
+  </section>
+  <section class="blk gchome" id="giftcards" aria-labelledby="t-gch" hidden>
+    <div class="wrap club">
+      <div>
+        <span class="eyebrow">Gift cards</span>
+        <h2 id="t-gch">Regalá Setto</h2>
+        <p class="muted" style="margin-top:12px;max-width:46ch">Una gift card digital para que elijan su set. Llega por link, al instante.</p>
+        <div class="next">
+          <div><span class="k">1</span><span><b>Elegí un diseño</b><small>Para un cumple, un gracias o porque sí.</small></span></div>
+          <div><span class="k">2</span><span><b>Monto y mensaje</b><small>Vos elegís cuánto y qué decirle.</small></span></div>
+          <div><span class="k">3</span><span><b>Te mandamos el link</b><small>La pagás por transferencia y se la reenviás.</small></span></div>
+        </div>
+        <div class="ctas gch-ctas"><button class="btn solid" type="button" id="gchBuy">Regalar una gift card</button><a class="btn" href="/gift-cards">Ver diseños</a></div>
+      </div>
+      <div class="gch-cards" id="gchCards"></div>
     </div>
   </section>
   <section class="blk listo" id="listo" aria-labelledby="t-listo">
@@ -233,8 +249,8 @@
       </nav>
       <div class="ls-more">
         <a class="btn" href="/#sets">Hacer otro pedido</a>
-        <a class="btn" id="lsGc" href="/gift-cards">🎁 Regalar una gift card</a>
-        <a class="btn" href="/maquinita">🎰 Probá suerte</a>
+        <a class="btn" id="lsGc" href="/gift-cards?desde=listo">🎁 Regalar una gift card</a>
+        <a class="btn" href="/?maquinita" data-maq>🎰 Probá suerte</a>
       </div>
       <a class="ls-gift" id="lsGift" href="#stickers" hidden>
         <img src="img/stickers/halloween/05_latte.webp" alt="" width="64" height="64">
