@@ -960,3 +960,6 @@ body[data-page="listo"] #stickers{scroll-margin-top:80px}
 .drop-wa{display:grid;gap:8px;width:100%;max-width:340px;text-align:left}
 .drop-wa small{font-size:.78rem;color:var(--ink-2)}
 .t-halloween #especial .drop-wa small{color:rgba(255,233,214,.78)}
+/* acceso a la maquinita desde la tarjeta del Club */
+.maq-link{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding:10px 14px;border-radius:14px;background:var(--bg-2);color:var(--ink);font-weight:600;font-size:.9rem;text-decoration:none}
+.maq-link:hover{background:var(--coral-2)}
