@@ -75,7 +75,7 @@
 
   let bubT = null, seen = {};
   function say(tip, ms = 4800) {
-    if (!tip) return;
+    if (!tip || !PC.matches) return; // en celu Mochito no habla: solo recorre el camino
     bubP.textContent = tip.t;
     bubA.innerHTML = ""; (tip.a || []).forEach(([l, fn]) => { const b = document.createElement("button"); b.className = "mito-a"; b.textContent = l; b.onclick = () => { if (recien()) return; fn(); hideBub(); }; bubA.appendChild(b); });
     bub.hidden = false; requestAnimationFrame(() => bub.classList.add("on"));
@@ -219,7 +219,6 @@
 
   addEventListener("scroll", onScroll, { passive: true });
   if (!RM) raf = requestAnimationFrame(tick);
-  // En celu no tapamos los botones del inicio: Mochito saluda con un saltito y habla recién al bajar
-  setTimeout(() => { el.classList.add("in"); hop(); if (scrollY < 200 && innerWidth > 760) { seen.top = 1; say(TIPS.top, 5200); } }, 1400);
+  setTimeout(() => { el.classList.add("in"); hop(); if (scrollY < 200) { seen.top = 1; say(TIPS.top, 5200); } }, 1400);
   onScroll();
 })();
