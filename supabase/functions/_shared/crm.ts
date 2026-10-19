@@ -103,6 +103,42 @@ export function nombreDrop(E: { wa_nombre?: string; titulo?: string }) {
   return (/^(la |el |los |las )/i.test(t) ? t : /^edici[oó]n /i.test(t) ? t.replace(/^edici[oó]n /i, "la edición ") : "la edición " + t).slice(0, 60);
 }
 
+/* ---------------- Avisos del pedido por WhatsApp ---------------- */
+// Mismos textos por defecto que js/mensajes.js (se editan en Panel → Ajustes → Mensajes y llegan en settings.mensajes).
+export const AVISOS: Record<string, string> = {
+  aviso_recibido: "¡Hola {nombre}! Recibimos tu pedido {codigo} de Setto. Te avisamos cuando esté listo.\n\nSeguí tu pedido acá: {link}",
+  aviso_preparando: "¡Hola {nombre}! Ya estamos preparando tu pedido {codigo} de Setto.\n\nSeguí tu pedido acá: {link}",
+  aviso_listo: "¡Hola {nombre}! Tu pedido {codigo} de Setto está listo. Ya podés pasar a buscarlo 🙌\n\nSeguí tu pedido acá: {link}",
+  aviso_camino: "¡Hola {nombre}! Tu pedido {codigo} de Setto ya salió y va en camino 🛵\n\nSeguí tu pedido acá: {link}",
+  pedir_resena: "¡Gracias por tu pedido, {nombre}! 🙌 {sellos}\n\nAcá ves cómo armar tu bebida, tus sellos y, si te gustó, podés dejar tu reseña (con foto si querés):\n{link}",
+  pedir_cambio: "¡Hola {nombre}! Perdón, nos quedamos sin {faltan} para tu pedido {codigo} 😕\n\nElegí acá con qué lo reemplazamos o si preferís sacarlo (el total se ajusta solo):\n{link}",
+  aviso_cancelado: "Hola {nombre}, cancelamos tu pedido {codigo} de Setto. Si tenés alguna duda, respondé este mensaje.",
+};
+export type PedidoAviso = { code: string; nombre: string | null; track: string | null; modo: string | null; sellos?: number | null; cambio?: { faltan?: { qty: number; nombre: string; size?: string }[] } | null };
+// igual que render() de js/mensajes.js: rellena {variables}, borra líneas "Etiqueta: {var}" vacías y espacios de más
+export function rellenar(t: string, vars: Record<string, unknown>) {
+  t = t.split("\n").filter((ln) => { const m = ln.match(/^[^{}]*:\s*\{(\w+)\}\s*$/); return !(m && !String(vars[m[1]] ?? "").trim()); }).join("\n");
+  t = t.replace(/\{(\w+)\}/g, (_, k) => (vars[k] === undefined || vars[k] === null ? "" : String(vars[k])));
+  return t.replace(/[ \t]+\n/g, "\n").replace(/ {2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+}
+// tipo: recibido | preparando | listo | entregado | cambio | cancelado → texto listo para mandar (o null si no hay aviso)
+export function textoAviso(tipo: string, o: PedidoAviso, mensajes: Record<string, string> | null, sitio: string) {
+  const key = ({ recibido: "aviso_recibido", preparando: "aviso_preparando", listo: o.modo === "envio" ? "aviso_camino" : "aviso_listo",
+    entregado: "pedir_resena", cambio: "pedir_cambio", cancelado: "aviso_cancelado" } as Record<string, string>)[tipo];
+  if (!key) return null;
+  const base = String(sitio || "").replace(/\/$/, ""), q = o.track ? `?seguir=${o.track}` : "";
+  const s = Number(o.sellos) || 0;
+  const faltan = (o.cambio?.faltan || []).map((f) => `${f.qty} ${String(f.nombre).replace(/^Mochi /, "mochi ")}${f.size ? ` (${f.size})` : ""}`).join(" y ");
+  const propio = String(mensajes?.[key] ?? "").trim();
+  return rellenar(propio || AVISOS[key], {
+    nombre: String(o.nombre || "").trim().split(/\s+/)[0] || "", codigo: o.code, faltan,
+    link: tipo === "entregado" ? `${base}/listo${q}` : `${base}/${q}`,
+    sellos: s > 0 ? `Sumaste ${s === 1 ? "1 sello" : s + " sellos"} al Setto Club.` : "",
+  });
+}
+// el mensaje con el pedido que manda el cliente desde la web trae el código: "Te paso mi pedido STT-1234 …"
+export const codigoPedido = (texto: string) => (String(texto || "").toUpperCase().match(/\bSTT-\d{3,6}\b/) || [""])[0] || null;
+
 /* ---------------- Audiencias ---------------- */
 export function diferencia(deseados: string[], actuales: string[]) {
   const d = new Set(deseados), a = new Set(actuales);
