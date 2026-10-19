@@ -284,6 +284,13 @@
       canales.filter((c) => ["whatsapp", "meta_ads"].includes(c) && !demoPuede(db, ph, c)).forEach((c) => db.consents.unshift({ phone: ph, canal: c, finalidad: c === "whatsapp" ? "novedades" : "publicidad", estado: "otorgado", origen: "checkout_web", aviso_version: version, order_id: o.id, created_at: new Date().toISOString() }));
       dbSave(db);
     },
+    // casilla opcional de la maquinita (migración 035): sin pedido, solo con el celular
+    async consentimientoMaquinita(phone, version) {
+      const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("Revisá tu celular");
+      db.consents = db.consents || [];
+      if (!demoPuede(db, ph, "whatsapp")) db.consents.unshift({ phone: ph, canal: "whatsapp", finalidad: "novedades", estado: "otorgado", origen: "maquinita", aviso_version: version, created_at: new Date().toISOString() });
+      dbSave(db);
+    },
     async bajaMarketing(phone, canal) {
       const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("Revisá el número: código de área + número, por ejemplo 223 347-1277.");
       db.consents = db.consents || [];
@@ -497,6 +504,7 @@
     async marcarContacto(code, phone) { await sb.rpc("marcar_contacto", { p_code: code, p_phone: phone }); },
     // consentimientos de marketing (migración 030)
     async registrarConsentimiento(code, phone, canales, version) { const { error } = await sb.rpc("registrar_consentimiento", { p_code: code, p_phone: phone, p_canales: canales, p_version: version }); fail(error); },
+    async consentimientoMaquinita(phone, version) { const { error } = await sb.rpc("consentimiento_maquinita", { p_phone: phone, p_version: version }); fail(error); },
     async bajaMarketing(phone, canal) { const { error } = await sb.rpc("baja_marketing", { p_phone: phone, p_canal: canal || null }); fail(error); },
     async registrarOrigen(code, phone, origen) { const { error } = await sb.rpc("registrar_origen", { p_code: code, p_phone: phone, p_origen: origen }); fail(error); },
     async crmCliente(phone) { const { data, error } = await sb.from("crm_clientes").select("*").eq("phone", normPhone(phone)).maybeSingle(); fail(error); return data; },
