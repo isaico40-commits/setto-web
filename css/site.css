@@ -84,6 +84,7 @@ section.blk{padding-block:72px}
 .head{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;margin-bottom:34px}
 .head h2{font-size:clamp(2.3rem,5vw,3.6rem)}
 .head p{max-width:52ch;color:var(--ink-2)}
+#especial .head p{max-width:62ch}
 .chip{display:inline-block;background:var(--coral-2);color:var(--ink);border-radius:10px;padding:5px 14px;font-size:.84rem;font-weight:600}
 
 /* cómo pedir */
@@ -666,13 +667,13 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .deco-bat.b2{top:22%;right:12%;width:clamp(24px,3vw,38px);animation-delay:-2s}
 .deco-bat.b3{top:6%;right:46%;width:clamp(20px,2.4vw,30px);animation-delay:-4s;opacity:.8}
 .deco-pk{bottom:14px;right:16px;width:clamp(48px,6vw,78px)}
-.deco-pk2{position:static;display:block;width:44px;margin:0 auto 6px}
 @keyframes batfly{0%,100%{transform:translate(0,0) rotate(-4deg)}50%{transform:translate(-14px,10px) rotate(6deg)}}
 @media (prefers-reduced-motion:reduce){.deco-bat{animation:none}}
 .t-halloween .band{background:#e8742a;border-color:#2b2035}
 .t-halloween .band span{color:#2b2035}
 .t-halloween #especial{background:#2b2035;color:#ffe9d6}
-.t-halloween #especial h2,.t-halloween #especial .head p{color:#ffe9d6}
+.t-halloween #especial .head p{color:#ffe9d6}
+.t-halloween #especial h2{color:#e8742a}
 .t-halloween #especial .chip{background:#e8742a;color:#2b2035}
 .t-halloween #especial .hint{color:#ffe9d6}
 .t-halloween #especial .prem-soon{background:rgba(255,233,214,.08);color:#ffe9d6}
@@ -682,7 +683,6 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .t-halloween #especial .desc,.t-halloween #especial .muted,.t-halloween #especial p{color:rgba(255,233,214,.78)}
 .t-halloween #especial .prem-soon b,.t-halloween #especial .prem-soon strong{color:#ffe9d6}
 .t-halloween #especial .dots i,.t-halloween #especial .dots span{background:rgba(255,233,214,.35)}
-.deco-pk2{margin-top:6px}
 
 /* ---------- Abierto / cerrado ---------- */
 .tagline.open i{background:#2f9e5b;box-shadow:0 0 0 0 rgba(47,158,91,.5);animation:pulso 2s infinite}
@@ -891,6 +891,8 @@ body[data-page="gift-cards"] #regalo{display:block!important}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){#especial .prem.soon .ph img{filter:blur(14px)}}
 .t-halloween #especial .prem{background:#fde3df;color:var(--ink)}
 .t-halloween #especial .prem h3{color:var(--ink)}
+.t-halloween #especial .prem .price{color:var(--ink)}
+.t-halloween #especial .prem .desc,.t-halloween #especial .prem .muted,.t-halloween #especial .prem p{color:var(--ink-2)}
 
 /* ---------- Stickers de WhatsApp ---------- */
 .stk-in{display:grid;grid-template-columns:1fr 1.15fr;gap:clamp(20px,4vw,56px);align-items:center}
