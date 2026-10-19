@@ -114,9 +114,9 @@ Al tocar **Entregado ✓** en el panel aparece **Pedir reseña por WhatsApp**: a
 
 ### Reseñas
 Cuando un pedido pasa a **Entregado**, el cliente ve en su seguimiento **Ver mis sellos** y **Dejar reseña** (estrellas + texto opcional). Solo puede dejar reseña quien recibió el pedido: una por pedido, dentro de los 14 días.
-En el panel, pestaña **Reseñas**: **Publicar** u **Ocultar**. En la web, en "Lo que dicen", solo se ven las publicadas que tienen texto, con nombre e inicial (nunca el teléfono). El promedio aparece desde 3 reseñas.
+Se publican solas apenas el cliente la deja, sin filtro previo (para no mostrar solo las buenas). En el panel, pestaña **Reseñas**, el número marca las que faltan revisar: **Revisada** u **Ocultar** (y **Volver a publicar** si te arrepentís). Para activarlo, correr una vez `supabase/migrations/037_resenas_sin_filtro.sql` en el SQL Editor. En la web, en "Lo que dicen", solo se ven las publicadas que tienen texto, con nombre e inicial (nunca el teléfono). El promedio aparece desde 3 reseñas.
 
-- **Foto e Instagram (opcionales):** el cliente puede sumar una foto de su pedido y su usuario de Instagram. Cada reseña publicada muestra "✓ Compra verificada · pidió …" con lo que pidió de verdad. Revisá la foto antes de publicar.
+- **Foto e Instagram (opcionales):** el cliente puede sumar una foto de su pedido y su usuario de Instagram. Cada reseña publicada muestra "✓ Compra verificada · pidió …" con lo que pidió de verdad. Revisá la foto apenas entra y ocultala si no corresponde.
 - **Estrellas en la carta:** cada producto muestra su promedio y cantidad de reseñas publicadas de pedidos que lo incluían.
 
 - **Todas las reseñas:** botón "Ver todas las reseñas" y link "Reseñas" en el menú: promedio, barras por estrellas, filtros (con foto, con comentario, por estrellas) e incluye las que son solo puntaje.
