@@ -84,8 +84,8 @@
   const dropFase = () => API.dropEstado(ESPC(), ahora()); // "antes" | "abierto" | "terminado"
   const espOpen = () => dropFase() === "abierto";
   const antesProg = () => prog() && dropFase() === "antes";
-  // la foto va esmerilada: en un drop programado, hasta el lanzamiento; en modo manual, según cada producto
-  const tapado = (p) => (prog() ? antesProg() && (ESPC().esmerilar !== false || !!p.esmerilado) : !!p.esmerilado);
+  // la foto va esmerilada (solo en la edición especial): en un drop programado, hasta el lanzamiento; en modo manual, según cada producto
+  const tapado = (p) => kind(p) === "premium" && (prog() ? antesProg() && (ESPC().esmerilar !== false || !!p.esmerilado) : !!p.esmerilado);
   const fechaDrop = (iso) => { const d = new Date(iso); if (isNaN(d)) return ""; const o = { timeZone: "America/Argentina/Buenos_Aires" };
     return d.toLocaleDateString("es-AR", { ...o, weekday: "long", day: "numeric", month: "numeric" }) + " a las " + d.toLocaleTimeString("es-AR", { ...o, hour: "2-digit", minute: "2-digit", hour12: false }) + " hs"; };
   const setParts = (s) => ({ b: DIRTY.find((x) => x.id === s.bebida), m: MOCHIS.find((x) => x.id === s.mochi) });
