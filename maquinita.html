@@ -93,6 +93,11 @@ details.test summary{cursor:pointer}
 .jugador .avisos{display:flex;gap:8px;align-items:flex-start;font-size:.82rem;line-height:1.35;cursor:pointer}
 .jugador .avisos input{flex:none;width:18px;height:18px;margin:1px 0 0;padding:0;border:0;border-radius:4px;accent-color:var(--turquesa)}
 .jugador .avisos a{color:var(--turquesa)}
+.jugador[hidden]{display:none}
+.reclamo{border-color:var(--turquesa);box-shadow:0 0 0 3px rgba(41,106,103,.15)}
+.reclamo p{margin:0}
+.reclamo .err{color:#B3261E}
+.reclamo .err:empty{display:none}
 .mios{display:grid;gap:6px}
 .mios h2{font-size:1.15rem;color:var(--turquesa)}
 .mio{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);border:var(--line);border-radius:14px;padding:8px 12px;font-size:.88rem}
@@ -132,7 +137,7 @@ body{margin:0}
     <button class="sonido" id="sonido" type="button" aria-pressed="false" aria-label="Activar sonido"></button>
   </header>
 
-  <section class="jugador" id="jugador" aria-label="Tu número"></section>
+  <section class="jugador" id="jugador" aria-label="Tu número" hidden></section>
 
   <section class="maq" aria-label="Maquinita">
     <div class="marquee">
@@ -152,6 +157,7 @@ body{margin:0}
     <button class="palanca" id="palanca" type="button" aria-label="Bajar la palanca y tirar"><span class="brazo"><span class="bola"></span></span><span class="eje"></span></button>
   </section>
 
+  <section class="jugador reclamo" id="reclamo" aria-label="Guardar tu premio" hidden></section>
   <section class="mios" id="mios" aria-label="Tus premios" hidden></section>
 
   <section class="premios" id="premios" aria-label="Premios"></section>
@@ -213,31 +219,47 @@ body{margin:0}
   /* ---------- tu número, fichas y premios (los guarda la base) ---------- */
   const COMPRA = Math.max(0, Math.min(50, Math.round(CFG.fichas_compra ?? 5)));
   $("#letra").textContent = `${FICHAS === 1 ? "Una tirada gratis" : FICHAS + " tiradas gratis"} por día${COMPRA ? ` y ${COMPRA} fichas por cada compra` : ""}. No apostás nada.`;
-  const TEL = "setto-maq-tel";
-  let tel = null;
-  try { tel = localStorage.getItem(TEL) || (JSON.parse(localStorage.getItem("setto-form") || "{}").tel || null); } catch (_) {}
-  if (tel && !API.normPhone(tel)) tel = null;
-  let est = null, forzado = null, girando = false, sonidoOn = true, editando = !tel; // el sonido arranca prendido (se puede silenciar)
+  // Para jugar no se pide el celular: la tirada gratis va por este dispositivo (y la base pone un tope por red).
+  // Las fichas de compra van con el celular de los pedidos hechos en este celu. Si gana sin celular, lo pide para guardar el premio.
+  const TEL = "setto-maq-tel", DEV = "setto-maq-dev";
+  const nuevoDev = () => (crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join(""));
+  let dev = null;
+  try { dev = localStorage.getItem(DEV); if (!/^[A-Za-z0-9-]{16,64}$/.test(dev || "")) { dev = nuevoDev(); localStorage.setItem(DEV, dev); } } catch (_) { dev = dev || nuevoDev(); }
+  function telConocido() {
+    const l = [];
+    try { l.push(localStorage.getItem(TEL)); } catch (_) {}
+    try { l.push(...JSON.parse(localStorage.getItem("setto-mis-pedidos") || "[]").map((x) => x.phone)); } catch (_) {}
+    try { l.push(JSON.parse(localStorage.getItem("setto-form") || "{}").tel); } catch (_) {}
+    return l.find((x) => x && API.normPhone(x)) || null;
+  }
+  let tel = telConocido();
+  let est = null, forzado = null, girando = false, sonidoOn = true; // el sonido arranca prendido (se puede silenciar)
   const quedan = () => (est ? est.gratis + est.fichas : 0);
   const pesos = (n) => "$" + Math.round(n).toLocaleString("es-AR");
 
   function pintarJugador() {
     const j = $("#jugador");
-    if (editando) {
-      j.innerHTML = `<label for="tel"><b>Tu celular</b> <small>Tus fichas y premios quedan guardados en tu número.</small></label>
-        <form id="telForm"><input id="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 555-1234" value="${esc(tel || "")}" required><button class="btn" type="submit">Listo</button></form>
-        <label class="avisos"><input type="checkbox" id="avisos" form="telForm"> <span>Avisame por WhatsApp de novedades y sabores nuevos. <small>Opcional. Te das de baja cuando quieras en <a href="/privacidad" target="_blank" rel="noopener">Privacidad y bajas</a>.</small></span></label>`;
-      $("#telForm").addEventListener("submit", async (e) => {
-        e.preventDefault(); const v = $("#tel").value;
-        if (!API.normPhone(v)) { $("#msg").textContent = "Revisá tu celular"; $("#tel").focus(); return; }
+    j.hidden = !tel; if (!tel) { j.innerHTML = ""; return; }
+    j.innerHTML = `<div class="linea"><span>Tus fichas de compra van con <b>${esc(API.prettyPhone(tel))}</b></span><button class="link" id="cambiar" type="button">No soy yo</button></div>`;
+    $("#cambiar").addEventListener("click", async () => { tel = null; try { localStorage.removeItem(TEL); } catch (_) {} pintarJugador(); await cargarEstado(); });
+  }
+  // ganó sin celular: el premio queda guardado en este dispositivo hasta que deje su número
+  function pintarReclamo() {
+    const r = $("#reclamo"), p = est && est.pendiente;
+    r.hidden = !p; if (!p) { r.innerHTML = ""; return; }
+    r.innerHTML = `<p><b>¡Ganaste ${esc(p.titulo)}!</b> Dejanos tu celular para guardarlo. Se descuenta solo cuando pidas en la web con ese número.</p>
+      <form id="telForm"><input id="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 555-1234" aria-label="Tu celular" required><button class="btn" type="submit">Guardar premio</button></form>
+      <label class="avisos"><input type="checkbox" id="avisos"> <span>Avisame por WhatsApp de novedades y sabores nuevos. <small>Opcional. Te das de baja cuando quieras en <a href="/privacidad" target="_blank" rel="noopener">Privacidad y bajas</a>.</small></span></label>
+      <small class="err" id="telErr" aria-live="polite"></small>`;
+    $("#telForm").addEventListener("submit", async (e) => {
+      e.preventDefault(); const v = $("#tel").value, b = $("#telForm .btn");
+      if (!API.normPhone(v)) { $("#telErr").textContent = "Revisá tu celular: código de área + número."; $("#tel").focus(); return; }
+      b.disabled = true;
+      try { const g = await API.maqReclamar(dev, v); tel = v; try { localStorage.setItem(TEL, v); } catch (_) {}
         if ($("#avisos").checked && API.consentimientoMaquinita) API.consentimientoMaquinita(v, "2026-10-maquinita").catch(() => {});
-        tel = v; try { localStorage.setItem(TEL, v); } catch (_) {}
-        editando = false; pintarJugador(); await cargarEstado();
-      });
-      return;
-    }
-    j.innerHTML = `<div class="linea"><span>Jugás con <b>${esc(API.prettyPhone(tel))}</b></span><button class="link" id="cambiar" type="button">Cambiar</button></div>`;
-    $("#cambiar").addEventListener("click", () => { editando = true; est = null; pintarJugador(); pintarFichas(); pintarMios(); $("#tel").focus(); });
+        pintarJugador(); await cargarEstado(); $("#msg").innerHTML = `<span><b>¡Guardado!</b>Tu código: <code>${esc(g.code)}</code></span>`; $("#mios").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } catch (err) { b.disabled = false; $("#telErr").textContent = err.message; }
+    });
   }
   function pintarMios() {
     const ps = (est && est.premios) || [], m = $("#mios");
@@ -247,16 +269,16 @@ body{margin:0}
     try { localStorage.setItem("setto-maq", JSON.stringify({ tel, premios: ps })); } catch (_) {}
   }
   async function cargarEstado() {
-    if (!tel) { est = null; pintarFichas(); return; }
-    try { est = await API.maqEstado(tel); } catch (e) { est = null; pintarFichas(); pintarMios(); $("#msg").textContent = e.message; return; }
-    pintarFichas(); pintarMios();
+    try { est = await API.maqEstado2(dev, tel); } catch (e) { est = null; pintarFichas(); pintarMios(); pintarReclamo(); $("#msg").textContent = e.message; return; }
+    pintarFichas(); pintarMios(); pintarReclamo();
   }
   function pintarFichas() {
     const n = quedan(), MAXV = 10;
-    if (!est) { $("#fichas").innerHTML = ""; $("#tirar").disabled = $("#palanca").disabled = true; if (!girando) $("#msg").textContent = tel && !editando ? "Cargando tus fichas…" : "Poné tu celular para tirar"; return; }
+    if (!est) { $("#fichas").innerHTML = ""; $("#tirar").disabled = $("#palanca").disabled = true; if (!girando) $("#msg").textContent = "Cargando tus fichas…"; return; }
     $("#fichas").innerHTML = Array.from({ length: Math.min(Math.max(n, FICHAS), MAXV) }, (_, i) => `<span class="ficha ${i < n ? "" : "vacia"}"></span>`).join("") +
       `<span>${n === 1 ? "1 ficha" : n + " fichas"}${est.fichas && est.gratis ? ` (${est.gratis} gratis hoy)` : ""}</span>`;
     $("#tirar").disabled = $("#palanca").disabled = n === 0 || girando;
+    if (n > 0 && !girando && $("#msg").textContent === "Cargando tus fichas…") $("#msg").textContent = "¡Probá suerte!";
     if (n === 0 && !girando) $("#msg").textContent = COMPRA ? `Volvé mañana o sumá ${COMPRA} fichas con tu próxima compra` : "Volvé mañana por otra tirada";
   }
 
@@ -279,14 +301,13 @@ body{margin:0}
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   async function girar() {
     if (girando) return;
-    if (!tel || editando) { if (!editando) { editando = true; pintarJugador(); } $("#msg").textContent = "Poné tu celular para tirar"; $("#tel").focus(); return; }
     if (quedan() === 0) return;
     if (sonidoOn) { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); ac.resume && ac.resume(); } catch (_) {} } // el toque en Tirar habilita el audio
     const maq = $(".maq"); maq.classList.remove("tirando"); void maq.offsetWidth; maq.classList.add("tirando"); setTimeout(() => maq.classList.remove("tirando"), 600);
     girando = true; pintarFichas(); reels.forEach((r) => r.classList.remove("win"));
     $("#msg").textContent = "…"; luces(true); beep(330, .05);
     let r0;
-    try { const f = forzado; forzado = null; marcar(); r0 = await API.maqTirar(tel, API.DEMO ? f : undefined); }
+    try { const f = forzado; forzado = null; marcar(); r0 = await API.maqTirar2(dev, tel, API.DEMO ? f : undefined); }
     catch (e) { girando = false; luces(false); $("#msg").textContent = e.message; await cargarEstado(); return; }
     est = Object.assign(est || { premios: [] }, { gratis: r0.gratis, fichas: r0.fichas });
     const res = r0.resultado, fin = finales(res), h = reels[0].getBoundingClientRect().height;
@@ -307,12 +328,13 @@ body{margin:0}
 
   function resultado(r0, fin) {
     const res = r0.resultado;
-    if (res === "nada" || !r0.code) { pintarFichas(); if (quedan() > 0) $("#msg").textContent = "¡Casi! Tirá de nuevo"; else if (!COMPRA) $("#msg").textContent = "¡Casi! Volvé mañana"; return; }
+    if (res === "nada" || (!r0.code && !r0.pendiente)) { pintarFichas(); if (quedan() > 0) $("#msg").textContent = "¡Casi! Tirá de nuevo"; else if (!COMPRA) $("#msg").textContent = "¡Casi! Volvé mañana"; return; }
     const top = SIMBOLOS.find((s) => fin.filter((x) => x === s).length >= 4);
     reels.forEach((r, i) => { if (fin[i] === top) r.classList.add("win"); });
-    const html = `<span><b>¡${esc(r0.titulo)}!</b>Tu código: <code>${esc(r0.code)}</code><small>Se descuenta solo en tu próximo pedido con este número.</small></span>`;
+    const html = r0.pendiente ? `<span><b>¡${esc(r0.titulo)}!</b><small>Dejá tu celular acá abajo para guardarlo.</small></span>`
+      : `<span><b>¡${esc(r0.titulo)}!</b>Tu código: <code>${esc(r0.code)}</code><small>Se descuenta solo en tu próximo pedido con este número.</small></span>`;
     fanfarria(res === "gift"); confeti(res === "gift" ? 220 : res === "mochi" ? 140 : 70);
-    cargarEstado().then(() => { $("#msg").innerHTML = html; }); // el premio queda a la vista aunque no queden fichas
+    cargarEstado().then(() => { $("#msg").innerHTML = html; if (r0.pendiente) setTimeout(() => { $("#reclamo").scrollIntoView({ behavior: "smooth", block: "center" }); $("#tel").focus({ preventScroll: true }); }, 900); }); // el premio queda a la vista aunque no queden fichas
   }
 
   $("#tirar").addEventListener("click", girar);
@@ -368,7 +390,8 @@ body{margin:0}
   $("#forzar").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (!b) return; forzado = forzado === b.dataset.f ? null : b.dataset.f; marcar(); });
   // solo demo: simula que un pedido con este número se marcó entregado
   $("#reponer").addEventListener("click", async () => {
-    if (!API.DEMO || !tel) return;
+    if (!API.DEMO) return;
+    if (!tel) { $("#msg").textContent = "En la demo: ganá un premio y guardalo con tu celular primero"; return; }
     await API.maqEstado(tel); // crea el jugador si no existía
     const db = JSON.parse(localStorage.getItem("setto-demo-db")), ph = API.normPhone(tel);
     db.maq.jug[ph].fichas += COMPRA || 5; localStorage.setItem("setto-demo-db", JSON.stringify(db));
