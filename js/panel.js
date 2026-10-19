@@ -447,7 +447,8 @@
           <label>Termina el (opcional)<input type="datetime-local" data-esp="fin" value="${aLocal(E.fin)}"></label></div>
         <label>Cuando termina<select data-esp="al_terminar"><option value="ocultar" ${E.al_terminar !== "mostrar" ? "selected" : ""}>Ocultar la sección</option><option value="mostrar" ${E.al_terminar === "mostrar" ? "selected" : ""}>Mostrarla como "terminó" (sin poder pedir) para invitar al próximo</option></select></label>
         <b class="dsub">Antes del lanzamiento</b>
-        <div class="checks">${si("cuenta", "Cuenta regresiva")}${si("esmerilar", "Esmerilar todas las fotos")}${si("ocultar_nombres", "Ocultar nombres (\"Sabor sorpresa\")", false)}${si("ocultar_precios", "Ocultar precios", false)}${si("barra", "Barra con cuenta regresiva arriba de toda la web")}${si("calendario", "Botón Agendar en el calendario")}${si("avisame", "Botón Avisame por WhatsApp")}</div>
+        <div class="checks">${si("cuenta", "Cuenta regresiva")}${si("esmerilar", "Esmerilar todas las fotos")}${si("ocultar_nombres", "Ocultar nombres (\"Sabor sorpresa\")", false)}${si("ocultar_precios", "Ocultar precios", false)}${si("tarjetas_antes", "Mostrar las tarjetas de los productos", false)}${si("barra", "Barra con cuenta regresiva arriba de toda la web")}${si("calendario", "Botón Agendar en el calendario")}${si("avisame", "Botón Avisame por WhatsApp")}</div>
+        <span class="hintp">Con las tarjetas apagadas, la web muestra solo título, cuenta regresiva y Avisame. <a href="/?ver-especial#especial" target="_blank" rel="noopener">Ver cómo quedan las tarjetas ↗</a> (vista previa, solo con este link).</span>
         <span class="hintp">Al llegar la hora, la web destapa las fotos y habilita los pedidos sola, sin tocar nada. La barra de arriba muestra "¡Ya salió!" durante 48 hs.</span>
         <b class="dsub">Aviso de lanzamiento por WhatsApp</b>
         ${t("wa_nombre", "Nombre del drop en el mensaje", "Ej: la edición Halloween", 60)}
@@ -975,7 +976,7 @@
       if (prog && fin && fin <= lan) return toast("La fecha de fin tiene que ser después del lanzamiento");
       const E = { titulo: v("titulo"), modo: prog ? "programado" : "manual", estado: modo === "disponible" ? "disponible" : "proximamente",
         lanzamiento: lan, fin, al_terminar: v("al_terminar"),
-        cuenta: on("cuenta"), esmerilar: on("esmerilar"), ocultar_nombres: on("ocultar_nombres"), ocultar_precios: on("ocultar_precios"), barra: on("barra"), calendario: on("calendario"), avisame: on("avisame"),
+        cuenta: on("cuenta"), esmerilar: on("esmerilar"), ocultar_nombres: on("ocultar_nombres"), ocultar_precios: on("ocultar_precios"), tarjetas_antes: on("tarjetas_antes"), barra: on("barra"), calendario: on("calendario"), avisame: on("avisame"),
         avisar_auto: on("avisar_auto"), push_titulo: v("push_titulo"), push_texto: v("push_texto"), wa_nombre: v("wa_nombre"),
         chip: v("chip"), chip_post: v("chip_post"), intro: v("intro"), intro_post: v("intro_post") };
       try { await API.saveSetting("especial", E); await loadBase(); toast(prog && API.dropEstado(E) === "antes" ? "Drop programado" : "Lanzamiento guardado"); $("#dropState").innerHTML = dropStateTxt(E); } catch (err) { toast(err.message); }
