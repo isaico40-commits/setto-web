@@ -22,6 +22,8 @@
       texto: "¡Gracias por tu pedido, {nombre}! 🙌 {sellos}\n\nAcá ves cómo armar tu bebida, tus sellos y, si te gustó, podés dejar tu reseña (con foto si querés):\n{link}" },
     pedir_cambio: { grupo: "Lo que mandan ustedes", titulo: "Falta algo del pedido (pedir cambio)", vars: ["nombre", "codigo", "faltan", "link"],
       texto: "¡Hola {nombre}! Perdón, nos quedamos sin {faltan} para tu pedido {codigo} 😕\n\nElegí acá con qué lo reemplazamos o si preferís sacarlo (el total se ajusta solo):\n{link}" },
+    aviso_cancelado: { grupo: "Lo que mandan ustedes", titulo: "Aviso · Pedido cancelado", vars: ["nombre", "codigo"],
+      texto: "Hola {nombre}, cancelamos tu pedido {codigo} de Setto. Si tenés alguna duda, respondé este mensaje." },
     gift_activa: { grupo: "Lo que mandan ustedes", titulo: "Gift card activada (al comprador)", vars: ["para", "monto", "link"],
       texto: "¡Listo! 🎁 Tu gift card de Setto para {para} ya está activa ({monto}).\n\nMandale este link para que la vea y la use:\n{link}" },
   };

@@ -2,9 +2,11 @@
 // GET: verificación del webhook en la app de Meta (hub.verify_token = WA_VERIFY_TOKEN).
 // POST: mensajes entrantes y estados de los enviados. Firma X-Hub-Signature-256 con WA_APP_SECRET.
 //   - Guarda respuestas y estados en message_logs.
+//   - Si el mensaje es un pedido de la web ("Te paso mi pedido STT-1234…"), le responde el aviso de "Recibido".
 //   - "BAJA" (o "stop", "no quiero recibir…", o los botones "No quiero más novedades" / "No quiero más avisos" de las plantillas) revoca el permiso de WhatsApp y saca de los avisos de drops; "ALTA" lo vuelve a dar. Responde confirmando.
 import { env, sb, VERSION } from "../_shared/supa.ts";
-import { firmaValida, leerWebhook, intencion } from "../_shared/crm.ts";
+import { firmaValida, leerWebhook, intencion, codigoPedido } from "../_shared/crm.ts";
+import { avisarPedido } from "../_shared/avisos.ts";
 
 async function responder(to: string, texto: string) { // dentro de las 24 h desde que nos escribió: texto libre, sin plantilla
   const id = env("WA_PHONE_NUMBER_ID"), token = env("META_ACCESS_TOKEN"); if (!id || !token) return;
@@ -31,6 +33,11 @@ Deno.serve(async (req) => {
     const { data: norm } = await sb.rpc("norm_phone", { p: m.phone }); // mismo formato que pedidos y permisos
     m.phone = norm || m.phone;
     await sb.from("message_logs").insert({ phone: m.phone, direccion: "entrante", wamid: m.wamid, estado: i === "baja" ? "baja" : i === "alta" ? "alta" : "recibido", texto: m.texto });
+    const cod = !i && codigoPedido(m.texto);
+    if (cod) {
+      const { data: o } = await sb.from("orders").select("id").eq("code", cod).eq("phone", m.phone).eq("status", "pendiente").maybeSingle();
+      if (o) await avisarPedido(o.id, "recibido");
+    }
     if (!i) continue;
     const { data: tiene } = await sb.rpc("puede_contactar", { p_phone: m.phone, p_canal: "whatsapp" });
     if (i === "baja") await sb.from("drop_wa").delete().eq("phone", m.phone); // también deja de recibir los avisos de drops
