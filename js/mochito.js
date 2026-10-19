@@ -104,25 +104,35 @@
   // Mochito lo recorre con el scroll y llega al final del camino al final de la página. Cada sección es una
   // parada (menos la edición especial, que se ve apenas entrás); pasa por ella justo cuando aparece su tip.
   // Solo las paradas se tocan.
+  // En celu es una versión mini pegada al borde derecho, encima de Mochito: aparece solo mientras scrolleás,
+  // la recorre una carita de Mochito y no se toca nada (no tapa botones ni frena el dedo).
   const PC = matchMedia("(min-width: 1024px)");
-  const SVGNS = "http://www.w3.org/2000/svg", ONDA = 16, VUELTAS = 1.5, M = 44; // M = mitad de Mochito en PC (88px)
+  const VUELTAS = 1.5;
+  let ONDA = 16, M = 44, W = 88; // M = mitad de lo que camina (Mochito en PC mide 88px; la carita en celu, 20px)
   const path = document.createElement("div");
   path.className = "mito-path"; path.setAttribute("aria-label", "Secciones de la página");
-  path.innerHTML = `<svg class="mp-svg" aria-hidden="true"><g class="mp-piedras"></g><path class="mp-borde"/><path class="mp-tierra"/><path class="mp-raya"/><path class="mp-hecho" pathLength="1"/></svg><span class="mp-stops"></span>`;
+  path.innerHTML = `<svg class="mp-svg" aria-hidden="true"><g class="mp-piedras"></g><path class="mp-borde"/><path class="mp-tierra"/><path class="mp-raya"/><path class="mp-hecho" pathLength="1"/></svg><img class="mp-mini" src="img/mochito-run.png" alt=""><span class="mp-stops"></span>`;
   document.body.appendChild(path);
-  const pSvg = path.querySelector("svg"), pHecho = path.querySelector(".mp-hecho"), pStops = path.querySelector(".mp-stops");
+  const pMini = path.querySelector(".mp-mini"), pSvg = path.querySelector("svg"), pHecho = path.querySelector(".mp-hecho"), pStops = path.querySelector(".mp-stops");
   let paradas = [], alto = 0;
   const curva = (t) => ONDA * Math.sin(t * Math.PI * 2 * VUELTAS); // corrimiento horizontal en el punto t (0 arriba, 1 abajo)
   const progreso = () => { const max = document.documentElement.scrollHeight - innerHeight; return max > 0 ? Math.min(1, Math.max(0, scrollY / max)) : 0; };
   function armarCamino() {
-    if (!PC.matches) { el.style.removeProperty("--py"); el.style.removeProperty("--px"); return; }
+    const pc = PC.matches; path.classList.toggle("mini", !pc);
+    [ONDA, M, W] = pc ? [16, 44, 88] : [3, 10, 20];
     const hb = Math.max(0, document.querySelector("header.top")?.getBoundingClientRect().bottom || 66);
-    const H = Math.round(Math.min(innerHeight * 0.5, innerHeight - hb - 38)); // nunca más de media pantalla
+    let H;
+    if (pc) { H = Math.round(Math.min(innerHeight * 0.5, innerHeight - hb - 38)); path.style.bottom = ""; } // nunca más de media pantalla
+    else { // celu: termina justo arriba de Mochito
+      el.style.removeProperty("--py"); el.style.removeProperty("--px");
+      const piso = (el.classList.contains("lift") ? 82 : 14) + 66 + 6; // mismo lugar que el CSS de Mochito en celu
+      H = Math.round(Math.min(innerHeight * 0.4, innerHeight - hb - piso - 12)); path.style.bottom = `${Math.round(piso)}px`;
+    }
     path.style.height = `${H}px`; alto = H - 2 * M;
     // Dibujo: borde, tierra, raya del medio y piedritas a los costados, sobre la misma curva
     let d = "";
     for (let i = 0; i <= 48; i++) { const t = i / 48; d += `${i ? "L" : "M"}${(M + curva(t)).toFixed(1)} ${(M + t * alto).toFixed(1)} `; }
-    pSvg.setAttribute("viewBox", `0 0 88 ${H}`);
+    pSvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     pSvg.querySelectorAll("path").forEach((p) => p.setAttribute("d", d));
     pSvg.querySelector(".mp-piedras").innerHTML = Array.from({ length: Math.floor(alto / 34) }, (_, i) => {
       const t = (i + 0.5) / Math.floor(alto / 34), lado = i % 2 ? 1 : -1;
@@ -137,10 +147,12 @@
     moverCamino();
   }
   function moverCamino() {
-    if (!PC.matches || !path.isConnected) { el.style.removeProperty("--py"); el.style.removeProperty("--px"); return; }
+    if (!path.isConnected) return;
     const p = progreso();
-    el.style.setProperty("--py", `${(-(1 - p) * alto).toFixed(1)}px`);
-    el.style.setProperty("--px", `${curva(p).toFixed(1)}px`);
+    if (PC.matches) {
+      el.style.setProperty("--py", `${(-(1 - p) * alto).toFixed(1)}px`);
+      el.style.setProperty("--px", `${curva(p).toFixed(1)}px`);
+    } else pMini.style.transform = `translate(${(M + curva(p) - 10).toFixed(1)}px, ${(M + p * alto - 10).toFixed(1)}px)`;
     pHecho.style.strokeDasharray = `${p.toFixed(4)} 1`;
     pStops.querySelectorAll(".mp-stop").forEach((b, i) => b.classList.toggle("ok", paradas[i] && p >= paradas[i].p - 0.002));
   }
@@ -175,19 +187,21 @@
     el.style.setProperty("--sh", (1 + bob / 30).toFixed(2));
     raf = requestAnimationFrame(tick);
   }
-  let dir = 1;
+  let dir = 1, vivoT = null;
   function onScroll() {
     const y = scrollY, dy = y - lastY; lastY = y;
     if (!auto) lastMove = performance.now();
     vel += dy * 0.25; if (Math.abs(dy) > 1) dir = dy > 0 ? 1 : -1;
     const max = document.documentElement.scrollHeight - innerHeight;
     ring.style.strokeDasharray = `${max > 0 ? Math.min(100, (y / max) * 100) : 0} 100`;
-    moverCamino();
-    el.classList.toggle("lift", document.getElementById("mbar")?.classList.contains("on"));
+    moverCamino(); path.classList.add("vivo");
+    const lift = el.classList.contains("lift");
+    if (lift !== el.classList.toggle("lift", !!document.getElementById("mbar")?.classList.contains("on"))) reCamino();
     if (!moving && Math.abs(dy) > 2) { moving = true; pose("run"); }
     entrar(seccion());
     clearTimeout(stopT);
     stopT = setTimeout(() => { moving = false; pose("idle"); }, 260);
+    clearTimeout(vivoT); vivoT = setTimeout(() => path.classList.remove("vivo"), 1400);
   }
   body.addEventListener("animationend", (e) => { if (e.animationName === "mitohop") body.classList.remove("hop"); });
   function hop() { if (RM) return; body.classList.remove("hop"); void body.offsetWidth; body.classList.add("hop"); }
