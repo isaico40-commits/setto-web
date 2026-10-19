@@ -56,12 +56,18 @@
   // Tips por sección: texto corto + una acción
   const TIPS = {
     top:      { t: "¡Hola! Soy Mochito 👋 ¿Te llevo a los sets?", a: [["Ver sets", () => go("#sets")]] },
-    especial: { t: "Esto sale por tiempo limitado 👀", a: [] },
-    sets:     { t: "Un set es bebida + mochi, y sale menos que por separado.", a: [] },
-    carta:    { t: "¿Algo suelto? Tocá cualquier producto para elegir.", a: [] },
-    pedir:    { t: "Si pedís por acá, sumás sellos del Setto Club 😉", a: [] },
-    club:     { t: "Cada pedido web suma un sello. ¡Con la tarjeta llena hay premio!", a: [] },
-    faq:      { t: "¿Te quedó alguna duda? Escribinos.", a: [["WhatsApp", wa]] },
+    especial:  { t: "Esto sale por tiempo limitado 👀", a: [] },
+    sets:      { t: "Un set es bebida + mochi, y sale menos que por separado.", a: [] },
+    maquinita: { t: "🎰 Esta es mi maquinita. ¡Probá suerte!", a: [["Tirar", () => document.getElementById("mqTirar")?.click()]] },
+    votar:     { t: "¿Qué sabor querés probar? Dejá tu voto 🗳️", a: [] },
+    carta:     { t: "¿Algo suelto? Tocá cualquier producto para elegir.", a: [] },
+    pedir:     { t: "Si pedís por acá, sumás sellos del Setto Club 😉", a: [] },
+    resenas:   { t: "Esto dicen quienes ya probaron Setto 💬", a: [] },
+    regalo:    { t: "¿Para regalar? Las gift cards llegan por link 🎁", a: [] },
+    club:      { t: "Cada pedido web suma un sello. ¡Con la tarjeta llena hay premio!", a: [] },
+    stickers:  { t: "Llevame a tus chats: mis stickers son gratis 😄", a: [] },
+    ubicacion: { t: "Si retirás, acá nos encontrás 📍", a: [] },
+    faq:       { t: "¿Te quedó alguna duda? Escribinos.", a: [["WhatsApp", wa]] },
   };
   const cartTip = () => { const n = items(); return n ? { t: `Tenés ${n} ${n === 1 ? "cosa" : "cosas"} en tu pedido. ¿Lo terminamos?`, a: [["Ver mi pedido", abrirPedido]] } : null; };
 
@@ -87,13 +93,23 @@
     setTimeout(() => el.remove(), 400);
   });
 
-  // Sección actual → pose + tip (una vez por sección)
-  const SECS = ["especial", "sets", "carta", "pedir", "club", "faq"].map((id) => document.getElementById(id)).filter(Boolean);
-  let cur = "top";
+  // Sección actual → tip apenas entrás (una vez por sección), aunque sigas scrolleando
+  const SECS = Object.keys(TIPS).filter((k) => k !== "top").map((id) => document.getElementById(id)).filter(Boolean);
+  let cur = "top", curT = null;
   function seccion() {
-    const y = innerHeight * 0.45; let s = "top";
+    const y = innerHeight * 0.6; let s = "top";
     SECS.forEach((sec) => { if (sec.hidden || !sec.offsetParent) return; const r = sec.getBoundingClientRect(); if (r.top < y && r.bottom > y) s = sec.id; });
     return s;
+  }
+  function entrar(s) {
+    if (s === cur) return;
+    cur = s; clearTimeout(curT);
+    // Un ratito en la sección antes de hablar, así un scroll muy rápido no hace parpadear el globo
+    curT = setTimeout(() => {
+      if (s === "top" || seccion() !== s) return; // arriba de todo o en el pie no hay tip
+      if (!seen[s]) { seen[s] = 1; say(s === "pedir" || s === "club" ? (cartTip() || TIPS[s]) : TIPS[s]); }
+      else if (s === "faq" && items()) say(cartTip());
+    }, 250);
   }
 
   // Física: mientras scrolleás corre (y se inclina con la velocidad); al frenar, pose según la sección
@@ -115,18 +131,10 @@
     const max = document.documentElement.scrollHeight - innerHeight;
     ring.style.strokeDasharray = `${max > 0 ? Math.min(100, (y / max) * 100) : 0} 100`;
     el.classList.toggle("lift", document.getElementById("mbar")?.classList.contains("on"));
-    if (!moving && Math.abs(dy) > 2) { moving = true; pose("run"); if (!bub.hidden) hideBub(); }
+    if (!moving && Math.abs(dy) > 2) { moving = true; pose("run"); }
+    entrar(seccion());
     clearTimeout(stopT);
-    stopT = setTimeout(() => {
-      moving = false;
-      const s = seccion();
-      pose("idle");
-      if (s !== cur) {
-        cur = s;
-        if (!seen[s]) { seen[s] = 1; say(s === "pedir" || s === "club" ? (cartTip() || TIPS[s]) : TIPS[s]); }
-        else if (s === "faq" && items()) say(cartTip());
-      }
-    }, 260);
+    stopT = setTimeout(() => { moving = false; pose("idle"); }, 260);
   }
   body.addEventListener("animationend", (e) => { if (e.animationName === "mitohop") body.classList.remove("hop"); });
   function hop() { if (RM) return; body.classList.remove("hop"); void body.offsetWidth; body.classList.add("hop"); }
