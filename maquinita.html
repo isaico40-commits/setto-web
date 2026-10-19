@@ -90,6 +90,9 @@ details.test summary{cursor:pointer}
 .jugador .linea{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .jugador .link{all:unset;cursor:pointer;color:var(--turquesa);font-weight:600;text-decoration:underline}
 .jugador small{color:var(--ink-2);display:block}
+.jugador .avisos{display:flex;gap:8px;align-items:flex-start;font-size:.82rem;line-height:1.35;cursor:pointer}
+.jugador .avisos input{flex:none;width:18px;height:18px;margin:1px 0 0;padding:0;border:0;border-radius:4px;accent-color:var(--turquesa)}
+.jugador .avisos a{color:var(--turquesa)}
 .mios{display:grid;gap:6px}
 .mios h2{font-size:1.15rem;color:var(--turquesa)}
 .mio{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);border:var(--line);border-radius:14px;padding:8px 12px;font-size:.88rem}
@@ -222,10 +225,12 @@ body{margin:0}
     const j = $("#jugador");
     if (editando) {
       j.innerHTML = `<label for="tel"><b>Tu celular</b> <small>Tus fichas y premios quedan guardados en tu número.</small></label>
-        <form id="telForm"><input id="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 555-1234" value="${esc(tel || "")}" required><button class="btn" type="submit">Listo</button></form>`;
+        <form id="telForm"><input id="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 555-1234" value="${esc(tel || "")}" required><button class="btn" type="submit">Listo</button></form>
+        <label class="avisos"><input type="checkbox" id="avisos" form="telForm"> <span>Avisame por WhatsApp de novedades y sabores nuevos. <small>Opcional. Te das de baja cuando quieras en <a href="/privacidad" target="_blank" rel="noopener">Privacidad y bajas</a>.</small></span></label>`;
       $("#telForm").addEventListener("submit", async (e) => {
         e.preventDefault(); const v = $("#tel").value;
         if (!API.normPhone(v)) { $("#msg").textContent = "Revisá tu celular"; $("#tel").focus(); return; }
+        if ($("#avisos").checked && API.consentimientoMaquinita) API.consentimientoMaquinita(v, "2026-10-maquinita").catch(() => {});
         tel = v; try { localStorage.setItem(TEL, v); } catch (_) {}
         editando = false; pintarJugador(); await cargarEstado();
       });
