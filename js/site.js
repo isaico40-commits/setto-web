@@ -357,7 +357,6 @@
     if (!hw) return;
     const box = $("#heroBox");
     if (box) box.insertAdjacentHTML("beforeend", `<span class="deco deco-web">${WEB}</span><span class="deco deco-bat b1">${BAT}</span><span class="deco deco-bat b2">${BAT}</span><span class="deco deco-bat b3">${BAT}</span><span class="deco deco-pk">${PUMPKIN}</span>`);
-    const esp = $("#especial .head"); if (esp) esp.insertAdjacentHTML("afterbegin", `<span class="deco deco-pk2">${PUMPKIN}</span>`);
   }
 
 
@@ -591,6 +590,8 @@
     const sec = $("#especial"); renderDropBar();
     if (items.length === 0 || (fin && E.al_terminar !== "mostrar")) { sec.hidden = true; return; }
     sec.hidden = false; sec.classList.toggle("drop-antes", antesProg());
+    // con la cuenta regresiva abajo, el cartel de arriba repite la fecha: se saca para que los sabores queden más cerca
+    $("#espChip").hidden = antesProg() && !!E.lanzamiento;
     $("#espChip").textContent = fin ? "Este drop terminó" : (open ? E.chip_post || (P ? "¡Ya salió!" : E.chip) : E.chip) || (open ? "Disponible ahora" : P && E.lanzamiento ? "Sale el " + fechaDrop(E.lanzamiento) : "Próxima edición");
     $("#t-esp").textContent = E.titulo || "Edición especial";
     document.querySelectorAll('a[href="#especial"]').forEach((a) => (a.textContent = E.titulo || "Edición especial"));
