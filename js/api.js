@@ -362,7 +362,7 @@
       const o = db.orders.find((x) => x.code === code && x.phone === ph && (x.status === "entregado" || (x.status === "pendiente" && x.etapa === "listo")));
       if (!o) throw new Error("Vas a poder dejar tu reseña cuando tu pedido esté listo");
       if (db.reviews.some((r) => r.order_id === o.id)) throw new Error("Ya dejaste una reseña de este pedido. ¡Gracias!");
-      db.reviews.unshift({ id: uid(), order_id: o.id, phone: ph, nombre: o.nombre, rating, texto: String(texto || "").trim() || null, foto: foto || null, instagram: ig.toLowerCase() || null, estado: "pendiente", created_at: new Date().toISOString() }); dbSave(db);
+      db.reviews.unshift({ id: uid(), order_id: o.id, phone: ph, nombre: o.nombre, rating, texto: String(texto || "").trim() || null, foto: foto || null, instagram: ig.toLowerCase() || null, estado: "aprobada", revisada: false, created_at: new Date().toISOString() }); dbSave(db);
     },
     async publicReviews() {
       const ok = (dbLoad().reviews || []).filter((r) => r.estado === "aprobada");
@@ -410,7 +410,7 @@
       const all = await this.publicReviewsAll(0), keep = new Set(ok.map((r) => r.created_at));
       return { cantidad: ok.length, promedio: ok.length ? Math.round((ok.reduce((s, r) => s + r.rating, 0) / ok.length) * 10) / 10 : null, por_estrella: por, items: all.items.filter((x) => keep.has(x.fecha)).slice(0, 30) };
     },
-    async setReviewEstado(id, estado) { const db = dbLoad(), r = (db.reviews || []).find((x) => x.id === id); if (r) { r.estado = estado; dbSave(db); } },
+    async setReviewEstado(id, estado) { const db = dbLoad(), r = (db.reviews || []).find((x) => x.id === id); if (r) { r.estado = estado; r.revisada = true; dbSave(db); } },
     async addStamps(phone, nombre, delta, motivo) {
       const db = dbLoad(), ph = normPhone(phone);
       if (!ph) throw new Error("Número de celular inválido");
@@ -565,7 +565,7 @@
     async pollResults(poll) { const { data, error } = await sb.rpc("poll_results", { p_poll: poll }); fail(error); return data; },
     async castVote(poll, opcion, phone) { const { data, error } = await sb.rpc("cast_vote", { p_poll: poll, p_opcion: opcion, p_phone: phone }); fail(error); return data; },
     async listReviews() { const { data, error } = await sb.from("reviews").select("*").order("created_at", { ascending: false }).limit(100); fail(error); return data; },
-    async setReviewEstado(id, estado) { const { error } = await sb.from("reviews").update({ estado }).eq("id", id); fail(error); },
+    async setReviewEstado(id, estado) { const { error } = await sb.from("reviews").update({ estado, revisada: true }).eq("id", id); fail(error); },
     async addStamps(phone, nombre, delta, motivo) { const { data, error } = await sb.rpc("add_stamps", { p_phone: phone, p_nombre: nombre || null, p_delta: delta, p_motivo: motivo || null }); fail(error); return data; },
     async redeem(phone) { const { data, error } = await sb.rpc("redeem_reward", { p_phone: phone }); fail(error); return data; },
     async findCustomer(phone) {

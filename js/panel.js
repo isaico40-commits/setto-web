@@ -194,23 +194,23 @@
 
   /* =================== RESEÑAS =================== */
   async function viewResenas() {
-    $("#view").innerHTML = `<h1 class="ph1">Reseñas</h1><p class="muted">Solo las publicadas se ven en la web (las que tienen texto o foto). Revisá la foto antes de publicar. Las deja quien recibió su pedido.</p><div id="rvList" class="pgrid" style="margin-top:18px"><p class="muted">Cargando…</p></div>`;
+    $("#view").innerHTML = `<h1 class="ph1">Reseñas</h1><p class="muted">Se publican solas apenas las deja quien recibió su pedido (en la lista de la web aparecen las que tienen texto o foto). Revisalas después: marcalas como revisadas u ocultá las que no correspondan.</p><div id="rvList" class="pgrid" style="margin-top:18px"><p class="muted">Cargando…</p></div>`;
     try {
       const l = await API.listReviews(); P.reviews = l; contarResenas();
       $("#rvList").innerHTML = l.length ? l.map((r) => `<article class="pcard rvc ${r.estado}" data-rid="${r.id}">
-          <div class="ohead"><span style="color:#f8a29a;letter-spacing:2px">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</span><span class="ago">${ago(r.created_at)}</span><span class="st ${r.estado === "aprobada" ? "entregado" : r.estado === "oculta" ? "cancelado" : "pendiente"}">${r.estado}</span></div>
+          <div class="ohead"><span style="color:#f8a29a;letter-spacing:2px">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</span><span class="ago">${ago(r.created_at)}</span><span class="st ${r.estado === "oculta" ? "cancelado" : r.revisada ? "entregado" : "pendiente"}">${r.estado === "oculta" ? "oculta" : r.revisada ? "publicada" : "sin revisar"}</span></div>
           ${r.foto ? `<a href="${esc(r.foto)}" target="_blank" rel="noopener"><img src="${esc(r.foto)}" alt="Foto de la reseña" style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-top:6px"></a>` : ""}
           <p style="margin:6px 0">${r.texto ? esc(r.texto) : '<i class="muted">Sin texto (solo puntaje)</i>'}</p>
           ${r.instagram ? `<a class="linkbtn" href="https://instagram.com/${encodeURIComponent(r.instagram)}" target="_blank" rel="noopener">@${esc(r.instagram)}</a>` : ""}
           <div class="who2"><b>${esc(r.nombre)}</b><span class="num">${esc(pretty(r.phone))}</span></div>
-          <div class="acts">${r.estado !== "aprobada" ? '<button class="btn solid" data-rv="aprobada">Publicar</button>' : ""}${r.estado !== "oculta" ? '<button class="linkbtn warn" data-rv="oculta">Ocultar</button>' : ""}</div></article>`).join("") : '<p class="muted">Todavía no hay reseñas.</p>';
+          <div class="acts">${r.estado === "oculta" ? '<button class="btn" data-rv="aprobada">Volver a publicar</button>' : !r.revisada ? '<button class="btn solid" data-rv="aprobada">Revisada</button>' : ""}${r.estado !== "oculta" ? '<button class="linkbtn warn" data-rv="oculta">Ocultar</button>' : ""}</div></article>`).join("") : '<p class="muted">Todavía no hay reseñas.</p>';
     } catch (e) { $("#rvList").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
   }
-  function contarResenas() { const n = (P.reviews || []).filter((r) => r.estado === "pendiente").length, el = $("#resN"); if (el) { el.textContent = n; el.hidden = !n; } }
+  function contarResenas() { const n = (P.reviews || []).filter((r) => !r.revisada).length, el = $("#resN"); if (el) { el.textContent = n; el.hidden = !n; } }
   document.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-rv]"); if (!b) return;
     const id = b.closest("[data-rid]").dataset.rid; b.disabled = true;
-    try { await API.setReviewEstado(id, b.dataset.rv); toast(b.dataset.rv === "aprobada" ? "Publicada en la web" : "Oculta"); viewResenas(); } catch (err) { toast(err.message); b.disabled = false; }
+    try { await API.setReviewEstado(id, b.dataset.rv); toast(b.dataset.rv === "oculta" ? "Oculta" : b.textContent === "Revisada" ? "Marcada como revisada" : "Publicada de nuevo"); viewResenas(); } catch (err) { toast(err.message); b.disabled = false; }
   });
   async function refreshOrders(notify) {
     try {

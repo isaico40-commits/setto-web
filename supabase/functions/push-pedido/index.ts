@@ -78,7 +78,7 @@ async function avisarEquipo(evento: string, id: string) {
     if (g) n = { title: `🎁 Gift card nueva · ${plata(g.monto)}`, body: `${g.de || "Alguien"} para ${g.para || "alguien"}. Falta confirmar el pago y activarla.`, url: "/panel#gift", tag: `gift-${g.code}` };
   } else if (evento === "resena") {
     const { data: r } = await sb.from("reviews").select("nombre,rating").eq("id", id).maybeSingle();
-    if (r) n = { title: `⭐ Reseña para aprobar`, body: `${r.nombre} dejó ${r.rating} ${r.rating === 1 ? "estrella" : "estrellas"}.`, url: "/panel#resenas", tag: `resena-${id}` };
+    if (r) n = { title: `⭐ Reseña nueva publicada`, body: `${r.nombre} dejó ${r.rating} ${r.rating === 1 ? "estrella" : "estrellas"}.`, url: "/panel#resenas", tag: `resena-${id}` };
   } else if (evento === "tarea") {
     const { data: t } = await sb.from("caja_tareas").select("titulo,asignada,prioridad,creada_por").eq("id", id).maybeSingle();
     if (t) n = { title: `${t.prioridad === "alta" ? "🔴" : "📝"} Tarea nueva de ${t.creada_por}`, body: `${t.titulo}${t.asignada && t.asignada !== "Cualquiera" ? ` · para ${t.asignada}` : ""}`, url: "/caja#tareas", tag: `tarea-${id}` };
