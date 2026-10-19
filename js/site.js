@@ -489,16 +489,53 @@
   let GIFT = null; try { GIFT = JSON.parse(localStorage.getItem("setto-gift") || "null"); } catch (_) {}
   function usarGift(code, saldo) { GIFT = { code, saldo }; try { localStorage.setItem("setto-gift", JSON.stringify(GIFT)); } catch (_) {} }
   function quitarGift() { GIFT = null; try { localStorage.removeItem("setto-gift"); } catch (_) {} }
-  const antesGift = () => total() + envioCosto() - (completes() ? premioOff() : 0);
+  /* premio de la maquinita: se calcula igual que create_order_v6 (antes de la gift card) */
+  let MAQ = null; try { MAQ = JSON.parse(localStorage.getItem("setto-maq-usar") || "null"); } catch (_) {}
+  function usarMaq(p) { MAQ = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.saldo, tel: form.tel }; try { localStorage.setItem("setto-maq-usar", JSON.stringify(MAQ)); } catch (_) {} }
+  function quitarMaq() { MAQ = null; try { localStorage.removeItem("setto-maq-usar"); } catch (_) {} }
+  const antesMaq = () => total() + envioCosto() - (completes() ? premioOff() : 0);
+  const mochiMin = () => { const ms = cart.filter((c) => ["mochi", "especial"].includes((find(c.id) || {}).categoria)).map((c) => c.precio); return ms.length ? Math.min(...ms) : 0; };
+  function maqOff() {
+    if (!MAQ) return 0; const t = Math.max(antesMaq(), 0);
+    if (MAQ.tipo === "monto") return Math.min(MAQ.saldo, t);
+    if (MAQ.tipo === "porcentaje") return Math.min(Math.round((total() * MAQ.valor) / 100 / 10) * 10, t);
+    return Math.min(mochiMin(), t);
+  }
+  const antesGift = () => antesMaq() - maqOff();
   const giftOff = () => (GIFT ? Math.min(GIFT.saldo, Math.max(antesGift(), 0)) : 0);
+  let maqSug = { tel: null, premios: [] }; // premios activos del celular del formulario
+  async function cargarMaqSug() {
+    const ph = API.normPhone(form.tel); if (!ph || !API.maqEstado || ph === maqSug.tel) return pintarMaqSug();
+    maqSug = { tel: ph, premios: [] };
+    try { maqSug.premios = (await API.maqEstado(ph)).premios || []; } catch (_) {}
+    pintarMaqSug();
+  }
+  function pintarMaqSug() {
+    const el = $("#maqSug"); if (!el) return;
+    const ps = MAQ ? [] : maqSug.tel === API.normPhone(form.tel) ? maqSug.premios : [];
+    el.innerHTML = ps.length ? `<span>Tenés ${ps.length === 1 ? "un premio" : "premios"} de la maquinita:</span>${ps.map((p) => `<button class="back" data-maquse="${esc(p.code)}">Usar ${esc(p.titulo)}</button>`).join("")}` : "";
+  }
   function giftBox() {
-    return `<div class="f gcbox">${GIFT ? `<div class="gcon"><span>🎁 Gift card <b>${esc(GIFT.code)}</b> · saldo ${money(GIFT.saldo)}</span><button class="back" data-gcx>Quitar</button></div>`
-      : `<details><summary>¿Tenés una gift card?</summary><div class="gcin"><input id="gcCode" placeholder="GIFT-XXXX-XXXX" autocapitalize="characters"><button class="btn" data-gcok>Aplicar</button></div><span class="hintf" id="gcMsg"></span></details>`}</div>`;
+    const maqLine = MAQ ? `<div class="gcon"><span>🎰 ${esc(MAQ.titulo)} <b>${esc(MAQ.code)}</b>${MAQ.tipo === "mochi" && !mochiMin() ? " · agregá un mochi para usarlo" : ""}</span><button class="back" data-maqx>Quitar</button></div>` : `<div class="maqsug" id="maqSug"></div>`;
+    return `<div class="f gcbox">${maqLine}${GIFT ? `<div class="gcon"><span>🎁 Gift card <b>${esc(GIFT.code)}</b> · saldo ${money(GIFT.saldo)}</span><button class="back" data-gcx>Quitar</button></div>`
+      : `<details><summary>¿Tenés una gift card o un código de la maquinita?</summary><div class="gcin"><input id="gcCode" placeholder="GIFT-XXXX-XXXX o MAQ-XXXX-XXXX" autocapitalize="characters"><button class="btn" data-gcok>Aplicar</button></div><span class="hintf" id="gcMsg"></span></details>`}</div>`;
+  }
+  async function aplicarMaq(code, msg) {
+    if (!API.normPhone(form.tel)) { if (msg) msg.textContent = "Completá tu celular: el premio es del número que tiró."; return; }
+    if (msg) msg.textContent = "Revisando…";
+    try { const p = await API.maqPremioCheck(code, form.tel);
+      if (!p) { if (msg) msg.textContent = "Ese código no es de este celular."; return; }
+      if (p.estado !== "activo") { if (msg) msg.textContent = "Ese premio de la maquinita ya se usó."; return; }
+      usarMaq(p); drawDrawer();
+    } catch (ex) { if (msg) msg.textContent = ex.message; }
   }
   document.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-maqx]")) { quitarMaq(); drawDrawer(); return; }
+    const mu = e.target.closest("[data-maquse]"); if (mu) { aplicarMaq(mu.dataset.maquse, null); return; }
     if (e.target.closest("[data-gcx]")) { quitarGift(); drawDrawer(); return; }
     if (!e.target.closest("[data-gcok]")) return;
     const code = ($("#gcCode").value || "").trim().toUpperCase(), msg = $("#gcMsg"); if (!code) return;
+    if (code.startsWith("MAQ-")) { if (MAQ) { msg.textContent = "Ya tenés un premio de la maquinita en este pedido."; return; } return aplicarMaq(code, msg); }
     msg.textContent = "Revisando…";
     try { const g = await API.giftcardCheck(code);
       if (!g) msg.textContent = "No encontramos ese código.";
@@ -743,6 +780,8 @@
     const sec = $("#maquinita"); if (!sec) return; sec.hidden = !maqOn();
     const n = Math.max(1, Math.min(5, Math.round(+(S.maquinita || {}).fichas_dia || 1)));
     $("#mqTiradas").textContent = `${n === 1 ? "Una tirada gratis" : n + " tiradas gratis"} por día`;
+    const fc = Math.max(0, Math.min(50, Math.round((S.maquinita || {}).fichas_compra ?? 5)));
+    $("#mqCompra").textContent = `Cada compra suma ${fc} fichas`; $("#mqCompra").closest(".next > div").hidden = !fc;
     const sim = (S.maquinita || {}).simbolos || [];
     MQ_IMG = MAQ_BASE.map((d, i) => (sim[i] && sim[i].img) || d); // Panel → Maquinita → símbolos
     sec.querySelectorAll(".mq-strip").forEach((st, i) => { st.innerHTML = `<img src="${esc(MQ_IMG[i])}" alt="">`; });
@@ -751,7 +790,7 @@
     const f = $("#mqFrame"); if (!f.getAttribute("src")) f.src = "maquinita.html?embed";
     $("#mqView").hidden = false; document.body.style.overflow = "hidden"; $("[data-mqclose]").focus();
   }
-  function cerrarMaq() { $("#mqView").hidden = true; document.body.style.overflow = ""; }
+  function cerrarMaq() { $("#mqView").hidden = true; document.body.style.overflow = ""; maqSug = { tel: null, premios: [] }; } // si ganó, el carrito vuelve a mirar sus premios
   function girarMini(done) {
     const reels = [...document.querySelectorAll("#maquinita .mq-reel")];
     if (!reels.length || matchMedia("(prefers-reduced-motion: reduce)").matches) return done();
@@ -970,7 +1009,7 @@
           <span class="hintf">Las dos son opcionales y te das de baja cuando quieras en <a href="/privacidad" target="_blank">Privacidad y bajas</a>.</span></div>
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>
         <div id="fErr" class="err" hidden></div>`;
-      foot.innerHTML = `${regaloLine()}${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
+      foot.innerHTML = `${regaloLine()}${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${maqOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Maquinita: ${esc(MAQ.titulo)}</span><span class="num">${money(-maqOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
       [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; }); });
       [["fOkWa", "okWa"], ["fOkAds", "okAds"]].forEach(([id, k]) => $("#" + id).addEventListener("change", (e) => { form[k] = e.target.checked; }));
       $("#fTel").addEventListener("change", async () => {
@@ -978,6 +1017,8 @@
         if (completes() && !$(".premio-pick")) return drawDrawer(); // aparece el selector de premio
         const cl = $("#dFoot .clubline"); if (cl) cl.outerHTML = clubLine(); // sin redibujar el botón de enviar
       });
+      $("#fTel").addEventListener("change", () => { if (MAQ && API.normPhone(MAQ.tel) !== API.normPhone(form.tel)) { quitarMaq(); drawDrawer(); } else cargarMaqSug(); });
+      cargarMaqSug();
     }
     if (view === "sent" && lastOrder) {
       $("#dTitle").textContent = "Último paso";
@@ -1012,7 +1053,7 @@
     sending = true; drawFootOnly();
     try {
       const isEnv = form.modo === "envio";
-      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [] })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null, gift: GIFT ? GIFT.code : null });
+      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [] })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null, gift: GIFT ? GIFT.code : null, maq: MAQ && maqOff() > 0 ? MAQ.code : null });
       const pxPed = pxCarrito(); // para mandar Purchase con los mismos productos cuando el pedido se entregue
       if (window.SettoPixel) window.SettoPixel.once("order_created:" + o.code, () => window.SettoPixel.custom("order_created", { ...pxPed, value: Number(o.total) || 0 }, "creado-" + o.code));
       const ph = o.phone || API.normPhone(form.tel);
@@ -1030,6 +1071,8 @@
       refrescarStock();
       try { sessionStorage.setItem("setto-last-order", JSON.stringify(lastOrder)); localStorage.setItem("setto-form", JSON.stringify({ nombre: form.nombre, tel: form.tel, dir: form.dir, dirExtra: form.dirExtra })); } catch (_) {}
       if (GIFT && o.gift) { const rest = GIFT.saldo - o.gift; if (rest > 0) usarGift(GIFT.code, rest); else quitarGift(); }
+      if (MAQ && o.maquinita) { const rest = MAQ.tipo === "monto" ? MAQ.saldo - o.maquinita : 0; if (rest > 0) usarMaq({ ...MAQ, saldo: rest }); else quitarMaq(); }
+      maqSug = { tel: null, premios: [] };
       cart = []; save(); form.hora = ""; form.nota = ""; form.premio = ""; form.okWa = true; form.okAds = true; renderBadge();
       view = "sent"; sending = false; drawDrawer();
       const link = waLink(lastOrder.message);
@@ -1040,6 +1083,7 @@
       sending = false;
       if (/premio/i.test(e.message || "")) { await loadCard(true); drawDrawer(); }
       if (/gift card/i.test(e.message || "")) { quitarGift(); drawDrawer(); }
+      if (/maquinita|otro número/i.test(e.message || "")) { quitarMaq(); maqSug = { tel: null, premios: [] }; drawDrawer(); }
       if (/nos qued/i.test(e.message || "") && API.getStock) { try { STOCK = await API.getStock(); renderEspecial(); renderSets(); renderCarta(); } catch (_) {} }
       drawFootOnly();
       const el2 = $("#fErr"); if (el2) { el2.hidden = false; el2.textContent = e.message || "No pudimos registrar el pedido. Probá de nuevo."; }

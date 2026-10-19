@@ -102,7 +102,7 @@
   function cambioBox(o) {
     const c = o.cambio, F = P.falta[o.id];
     if (o.status === "pendiente" && F) {
-      const prods = (o.items || []).map((i, idx) => ({ i, idx })).filter(({ i }) => !["envio", "premio", "gift"].includes(i.id));
+      const prods = (o.items || []).map((i, idx) => ({ i, idx })).filter(({ i }) => !["envio", "premio", "gift", "maquinita"].includes(i.id));
       return `<div class="faltabox"><b>¿Qué falta?</b><span class="hintp">Marcá lo que no tenés. Si te queda algo, bajá la cantidad que falta.</span>
         ${prods.map(({ i, idx }) => { const q = F.sel[idx]; return `<div class="frow"><label><input type="checkbox" data-fsel="${idx}" ${q ? "checked" : ""}> ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""} <small>×${i.qty}</small></label>
           ${q && i.qty > 1 ? `<span class="stepper sm"><button data-fq="${idx}:-1" aria-label="Menos">−</button><span>faltan ${q}</span><button data-fq="${idx}:1" aria-label="Más">+</button></span>` : ""}</div>`; }).join("")}
@@ -591,12 +591,15 @@
             const sim = MQ_SIM.map(([n, img], i) => { const c = (m.simbolos || [])[i] || {}, v = c.img || "", ver = v || img; return `<div class="slrow"><span class="upprev" data-prevfor="mi${i}">${ver ? `<img src="${esc(ver)}" alt="" style="object-fit:contain">` : "Estrella<br>(dibujada)"}</span><div class="slf"><input type="hidden" name="mi${i}" value="${esc(v)}">
               <label>${i ? `Símbolo ${i + 1}` : "Símbolo especial (5 iguales = premio mayor)"}<input class="inp" name="mn${i}" maxlength="30" value="${esc(c.nombre || n)}"></label>
               <span class="acts" style="gap:6px"><label class="btn">Subir imagen<input type="file" accept="image/*" data-upimg="mi${i}" data-upmax="400" hidden></label>${v ? `<button type="button" class="linkbtn warn" data-upx="mi${i}">Volver a la original</button>` : ""}</span></div></div>`; }).join("");
-            const prem = MQ_PREM.map(([id, cuando, t, ch]) => { const c = (m.premios || []).find((x) => x.id === id); return `<div class="row2"><label>${cuando}: premio (vacío = sin premio)<input class="inp" name="pt_${id}" maxlength="40" value="${esc(c ? c.titulo || "" : t)}"></label><label>Probabilidad (%)<input class="inp" name="pc_${id}" type="number" min="0" max="100" step="0.1" value="${c ? +c.chance || 0 : ch}"></label></div>`; }).join("");
+            const prem = MQ_PREM.map(([id, cuando, t, ch, tipo, valor]) => { const c = (m.premios || []).find((x) => x.id === id), tp = (c && c.tipo) || tipo, vl = c && c.valor != null ? +c.valor || 0 : valor;
+              return `<div class="row2"><label>${cuando}: premio (vacío = sin premio)<input class="inp" name="pt_${id}" maxlength="40" value="${esc(c ? c.titulo || "" : t)}"></label><label>Probabilidad (%)<input class="inp" name="pc_${id}" type="number" min="0" max="100" step="0.1" value="${c ? +c.chance || 0 : ch}"></label></div>
+              <div class="row2"><label>Qué se descuenta<select class="inp" name="pk_${id}">${MQ_TIPO.map(([v, l]) => `<option value="${v}" ${tp === v ? "selected" : ""}>${l}</option>`).join("")}</select></label><label>Valor ($ o %, no aplica al mochi)<input class="inp" name="pv_${id}" type="number" min="0" step="1" value="${vl}"></label></div>`; }).join("");
             return `<label class="chk"><input type="checkbox" name="activo" ${m.activo !== false ? "checked" : ""}> Mostrar la maquinita en la web (sección entre Sets y Carta y botón del carrito)</label>
-          <label class="chk"><input type="checkbox" name="aviso" ${m.aviso !== false ? "checked" : ""}> Mostrar el aviso “Prueba: los premios no son reales”</label>
-          <label>Tiradas gratis por día<input class="inp" name="fichas" type="number" min="1" max="5" value="${Math.max(1, +m.fichas_dia || 1)}" style="width:120px"></label>
+          <div class="row2"><label>Tiradas gratis por día<input class="inp" name="fichas" type="number" min="1" max="5" value="${Math.max(1, +m.fichas_dia || 1)}"></label>
+          <label>Fichas por cada compra<input class="inp" name="fcompra" type="number" min="0" max="50" value="${m.fichas_compra ?? 5}"></label></div>
+          <span class="hintp">Las fichas de compra se cargan solas al celular del pedido cuando lo marcás entregado. Si lo cancelás, el premio usado vuelve al cliente.</span>
           <b style="margin-top:6px">Premios</b>
-          <span class="hintp">La probabilidad es por tirada: 2 = sale 2 de cada 100 tiradas. Los premios todavía no se cobran solos: definí cómo se canjean antes de sacar el aviso de prueba.</span>
+          <span class="hintp">La probabilidad es por tirada: 2 = sale 2 de cada 100 tiradas. Son reales: el cliente recibe un código MAQ- atado a su celular y se descuenta solo en su próximo pedido web. El mochi gratis descuenta el mochi más barato del pedido. Si el descuento en $ no se usa entero, le queda el saldo.</span>
           ${prem}
           <b style="margin-top:6px">Símbolos de los rodillos</b>
           <span class="hintp">Imágenes cuadradas con fondo transparente (PNG o WebP). Los primeros 3 también se ven en la tarjeta de la landing.</span>
@@ -686,7 +689,8 @@
      a la derecha, con una sola barra de Guardar que avisa cuando hay cambios sin guardar. */
   /* maquinita: símbolos y premios por defecto (los mismos que usa maquinita.html si no hay ajustes) */
   const MQ_SIM = [["Mochito", "img/mochito-cup.png"], ["Mochi frutilla", "img/mochi-frutilla.webp"], ["Mochi oreo", "img/mochi-oreo.webp"], ["Dirty caramel", "img/dirty-caramel.webp"], ["Strawberry matcha", "img/dirty-strawberry.webp"], ["Estrella", ""]];
-  const MQ_PREM = [["gift", "5 especiales", "Gift card $10.000", 0.1], ["mochi", "5 iguales", "Mochi gratis", 0.5], ["off", "4 iguales", "10% off", 2]];
+  const MQ_PREM = [["gift", "5 especiales", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "5 iguales", "Mochi gratis", 0.5, "mochi", 0], ["off", "4 iguales", "10% off", 2, "porcentaje", 10]];
+  const MQ_TIPO = [["monto", "Descuento en $"], ["porcentaje", "Descuento en %"], ["mochi", "Un mochi gratis"]];
   const AJ_SEC = [
     { k: "contacto", g: "Pedidos", t: "Contacto", d: "El WhatsApp que recibe los pedidos, Instagram y tu link de links.", s: (S) => pretty(S.whatsapp) || "Sin WhatsApp" },
     { k: "retiro", g: "Pedidos", t: "Horarios de retiro", d: "Qué días y en qué franjas pueden elegir retirar.", s: (S) => { const r = S.retiro || {}; return (r.dias || []).length ? `${r.dias.length} días · ${(r.rangos || []).map((x) => x.join("–")).join(", ")}` : "Sin días"; } },
@@ -767,9 +771,12 @@
       if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: Math.max(0, Math.min(10, +f.spp)), premio: (f.premio || "").trim(), minimo: Math.max(0, +f.minimo || 0),
         premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0), regalo: !!f.regalo });
       if (k === "maquinita") {
-        const premios = MQ_PREM.map(([id]) => ({ id, titulo: (f["pt_" + id] || "").trim(), chance: Math.max(0, Math.min(100, +String(f["pc_" + id] || "0").replace(",", ".") || 0)) }));
+        const premios = MQ_PREM.map(([id, , , , tipo]) => { const tp = MQ_TIPO.some(([k]) => k === f["pk_" + id]) ? f["pk_" + id] : tipo;
+          return { id, titulo: (f["pt_" + id] || "").trim(), chance: Math.max(0, Math.min(100, +String(f["pc_" + id] || "0").replace(",", ".") || 0)), tipo: tp, valor: tp === "mochi" ? 0 : Math.max(0, Math.round(+f["pv_" + id] || 0)) }; });
         if (premios.reduce((a, p) => a + (p.titulo ? p.chance : 0), 0) > 100) throw new Error("Las probabilidades suman más de 100%");
-        await API.saveSetting("maquinita", { activo: !!f.activo, aviso: !!f.aviso, fichas_dia: Math.max(1, Math.min(5, Math.round(+f.fichas || 1))), premios,
+        const malo = premios.find((p) => p.titulo && p.tipo !== "mochi" && (!p.valor || (p.tipo === "porcentaje" && p.valor > 100)));
+        if (malo) throw new Error(`Revisá el valor de “${malo.titulo}”`);
+        await API.saveSetting("maquinita", { activo: !!f.activo, fichas_dia: Math.max(1, Math.min(5, Math.round(+f.fichas || 1))), fichas_compra: Math.max(0, Math.min(50, Math.round(+f.fcompra || 0))), premios,
           simbolos: MQ_SIM.map(([n], i) => ({ nombre: (f["mn" + i] || "").trim() || n, img: (f["mi" + i] || "").trim() })) });
       }
       if (k === "personalizacion") {
