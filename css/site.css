@@ -657,6 +657,7 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
   .hcard.limpia .h2txt,.hcard.media .h2txt{padding:16px}
   .htrack{gap:12px}
   .hcard{flex-basis:calc(100% - 20px);height:auto;aspect-ratio:4/5;grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto;border-radius:26px}
+  .htrack.all-media .hcard{aspect-ratio:4/5}
   .hmedia{order:0}
   .hcard.recorte .hmedia::before{width:auto;height:84%}
   .h2txt{padding:16px 18px 22px;gap:8px;align-content:end}
