@@ -131,6 +131,17 @@
   body.addEventListener("animationend", (e) => { if (e.animationName === "mitohop") body.classList.remove("hop"); });
   function hop() { if (RM) return; body.classList.remove("hop"); void body.offsetWidth; body.classList.add("hop"); }
 
+  // Maquinita: una vez por día Mochito invita a tirar (solo si no hay nada en el pedido)
+  const MQ = "setto-maq-invito", hoy = new Date().toISOString().slice(0, 10);
+  let invitado = false; try { invitado = localStorage.getItem(MQ) === hoy; } catch (_) {}
+  function invitar() {
+    if (items()) return; // está armando un pedido: no lo distraemos
+    if (moving || !bub.hidden) { setTimeout(invitar, 2500); return; } // espera a que Mochito esté libre
+    say({ t: "🎰 ¿Probás suerte? Tenés una tirada gratis hoy.", a: [["Jugar", () => (location.href = "/maquinita")]] }, 9000);
+    try { localStorage.setItem(MQ, hoy); } catch (_) {}
+  }
+  if (!invitado) setTimeout(invitar, 6000);
+
   // No molesta cuando hay un panel abierto
   const watchOpen = () => el.classList.toggle("hide", ["drawer", "sheet"].some((id) => document.getElementById(id)?.classList.contains("on")) || !!document.querySelector(".allrev:not([hidden])"));
   new MutationObserver(watchOpen).observe(document.body, { attributes: true, subtree: true, attributeFilter: ["class", "hidden"] });
