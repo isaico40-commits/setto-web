@@ -88,6 +88,35 @@
     </div>
   </section>
 
+  <section class="blk maqsec" id="maquinita" aria-labelledby="t-maq" hidden>
+    <div class="wrap club">
+      <div>
+        <span class="eyebrow">Probá suerte</span>
+        <h2 id="t-maq">La maquinita de Mochito</h2>
+        <p class="muted" style="margin-top:12px;max-width:46ch">Tirá gratis y mirá qué sale. Si juntás iguales, te llevás un premio.</p>
+        <div class="next">
+          <div><span class="k">1</span><span><b>Juntá 4 o 5 iguales</b><small>Mirá los premios en la maquinita.</small></span></div>
+          <div><span class="k">2</span><span><b id="mqTiradas">Una tirada gratis por día</b><small>No apostás nada.</small></span></div>
+          <div><span class="k">3</span><span><b>Tu compra trae fichas</b><small>Más fichas, más tiradas.</small></span></div>
+        </div>
+      </div>
+      <div class="maqcard" id="mqCard">
+        <div class="sl-cab">
+          <div class="sl-top"><span class="sl-luces" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><b>Maquinita</b></div>
+          <div class="mq-ventana" aria-hidden="true">
+            <span class="mq-reel"><span class="mq-strip"><img src="img/mochito-cup.png" alt=""></span></span>
+            <span class="mq-reel"><span class="mq-strip"><img src="img/mochi-frutilla.webp" alt=""></span></span>
+            <span class="mq-reel"><span class="mq-strip"><img src="img/dirty-caramel.webp" alt=""></span></span>
+          </div>
+          <a class="mq-tirar" id="mqTirar" href="/maquinita" data-maq>Tirar</a>
+          <span class="sl-ranura" aria-hidden="true"></span>
+        </div>
+        <button class="sl-palanca" type="button" data-maq aria-label="Bajar la palanca y tirar"><span class="sl-brazo"><span class="sl-bola"></span></span><span class="sl-eje"></span></button>
+        <span class="sl-pie" aria-hidden="true"></span>
+      </div>
+    </div>
+  </section>
+
   <section class="blk votar" id="votar" aria-labelledby="t-vot" hidden>
     <div class="wrap">
       <div class="head"><span class="eyebrow">Votá</span><h2 id="t-vot">¿Qué sabor querés?</h2><p id="votSub">Un voto por celular. Podés cambiarlo.</p></div>
@@ -175,6 +204,7 @@
           <div><span class="k">2</span><span><b>Recibilo y sumás el sello</b></span></div>
           <div><span class="k">3</span><span><b>Completá la tarjeta</b><small id="clubPremio">El pedido que la completa viene con premio.</small></span></div>
         </div>
+        <p class="clubregalo" id="clubRegalo" hidden><span class="rg-ico" aria-hidden="true">🎁</span><span>Además, cada pedido trae un regalo.</span></p>
       </div>
       <div class="stampcard">
         <div class="row1"><img src="img/logo.svg" alt="Setto"><span class="eyebrow">Club</span></div>
@@ -285,6 +315,12 @@
   </section>
 </main>
 
+<div class="allrev mqover" id="mqView" role="dialog" aria-modal="true" aria-label="La maquinita de Mochito" hidden>
+  <div class="mq-in">
+    <button class="x mq-x" data-mqclose aria-label="Cerrar">✕</button>
+    <iframe id="mqFrame" title="La maquinita de Mochito"></iframe>
+  </div>
+</div>
 <div class="allrev gcover" id="gcBuy" role="dialog" aria-modal="true" aria-labelledby="gbTitle" hidden>
   <div class="ar-in">
     <div class="ar-h"><h2 id="gbTitle">Tu gift card</h2><button class="x" data-gbclose aria-label="Cerrar">✕</button></div>

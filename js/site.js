@@ -97,6 +97,10 @@
   const clubOn = () => club().activo !== false && (club().sellos_por_pedido ?? 1) > 0;
   const spp = () => club().sellos_por_pedido ?? 1;
   const sellosTxt = (n) => n + (n === 1 ? " sello" : " sellos");
+  /* regalo de cada pedido (Panel → Setto Club) y maquinita (Panel → Maquinita) */
+  const regaloOn = () => club().regalo !== false && club().regalo !== "";
+  const maqOn = () => (S.maquinita || {}).activo !== false;
+  const regaloLine = () => regaloOn() ? `<div class="regaloline"><span class="rg-ico" aria-hidden="true">🎁</span><span>Tu pedido trae un regalo.</span></div>` : "";
   let cardCache = null; // {tel, data}
   async function loadCard(force) {
     const tel = API.normPhone(form.tel); if (!tel || !clubOn()) return null;
@@ -132,17 +136,17 @@
   function clubLine() {
     if (!clubOn()) return "";
     const min = Number(club().minimo) || 0;
-    if (min > 0 && total() < min) return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div>Sumá <b>${money(min - total())}</b> más y este pedido suma ${sellosTxt(spp())} del Setto Club.</div></div>`;
-    const n = spp(), meta = club().meta || 8, premio = club().premio && club().premio !== "Premio a definir" ? club().premio : "tu premio";
+    if (min > 0 && total() < min) return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div>Sumá <b>${money(min - total())}</b> más y sumás ${sellosTxt(spp())} del Club.</div></div>`;
+    const n = spp(), meta = club().meta || 8;
     const c = cardCache && cardCache.tel === API.normPhone(form.tel) ? cardCache.data : null;
     let txt, pct = null;
     if (c && c.existe) {
       const after = c.sellos + n;
       pct = Math.min(100, Math.round((after / meta) * 100));
-      txt = after >= meta ? (form.premio ? `<b>¡Este pedido completa tu tarjeta!</b> Tu premio: ${esc(form.premio === "descuento" ? premioDesc() + "% off en este pedido" : ((SETS.find((x) => "set:" + x.id === form.premio) || {}).nombre || "set") + " (12 oz) de regalo")}.` : `<b>¡Este pedido completa tu tarjeta!</b> Elegí tu premio: ${esc(premioTxt())}.`)
-        : `Tenés <b>${c.sellos} de ${meta}</b> sellos. Con este pedido llegás a <b>${after}</b>.`;
+      txt = after >= meta ? (form.premio ? `<b>¡Completás tu tarjeta!</b> Premio: ${esc(form.premio === "descuento" ? premioDesc() + "% off" : ((SETS.find((x) => "set:" + x.id === form.premio) || {}).nombre || "set") + " de regalo")}.` : `<b>¡Completás tu tarjeta!</b> Elegí tu premio al seguir.`)
+        : `Con este pedido llegás a <b>${after} de ${meta}</b> sellos. Te ${meta - after === 1 ? "falta 1" : "faltan " + (meta - after)} para tu premio.`;
     } else {
-      txt = `Este pedido suma <b>${sellosTxt(n)}</b> del Setto Club. El pedido que completa los ${meta} sellos viene con ${esc(premioTxt())}.`;
+      txt = `Este pedido suma <b>${sellosTxt(n)}</b> del Setto Club. Con ${meta} sellos tenés premio.`;
     }
     return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div style="flex:1">${txt}${pct !== null ? `<div class="clubbar"><i style="width:${pct}%"></i></div>` : ""}</div></div>`;
   }
@@ -719,6 +723,7 @@
     $("#club").hidden = c.activo === false;
     $("#clubPremio").textContent = `El pedido que completa los ${c.meta || 8} sellos viene con ${premioTxt()}.` + (c.minimo > 0 ? ` Suman sello los pedidos desde ${money(c.minimo)}.` : "");
 
+    $("#clubRegalo").hidden = !regaloOn();
     $("#mnavClub").hidden = !clubOn();
     drawStamps(0, c.meta || 8, true);
   }
@@ -731,6 +736,47 @@
     }).join("");
     $("#stamps").style.opacity = ejemplo ? ".55" : "1";
   }
+  /* ---------- maquinita en la landing: los rodillos giran un toque y se abre en un pop up ---------- */
+  const MAQ_BASE = ["img/mochito-cup.png", "img/mochi-frutilla.webp", "img/mochi-oreo.webp", "img/dirty-caramel.webp", "img/dirty-strawberry.webp"];
+  let MQ_IMG = MAQ_BASE;
+  function renderMaquinita() {
+    const sec = $("#maquinita"); if (!sec) return; sec.hidden = !maqOn();
+    const n = Math.max(1, Math.min(5, Math.round(+(S.maquinita || {}).fichas_dia || 1)));
+    $("#mqTiradas").textContent = `${n === 1 ? "Una tirada gratis" : n + " tiradas gratis"} por día`;
+    const sim = (S.maquinita || {}).simbolos || [];
+    MQ_IMG = MAQ_BASE.map((d, i) => (sim[i] && sim[i].img) || d); // Panel → Maquinita → símbolos
+    sec.querySelectorAll(".mq-strip").forEach((st, i) => { st.innerHTML = `<img src="${esc(MQ_IMG[i])}" alt="">`; });
+  }
+  function abrirMaq() {
+    const f = $("#mqFrame"); if (!f.getAttribute("src")) f.src = "maquinita.html?embed";
+    $("#mqView").hidden = false; document.body.style.overflow = "hidden"; $("[data-mqclose]").focus();
+  }
+  function cerrarMaq() { $("#mqView").hidden = true; document.body.style.overflow = ""; }
+  function girarMini(done) {
+    const reels = [...document.querySelectorAll("#maquinita .mq-reel")];
+    if (!reels.length || matchMedia("(prefers-reduced-motion: reduce)").matches) return done();
+    const h = reels[0].getBoundingClientRect().height;
+    reels.forEach((r, i) => {
+      const st = r.querySelector(".mq-strip"), imgs = [st.lastElementChild.getAttribute("src")];
+      for (let k = 0; k < 8 + i * 3; k++) imgs.push(MQ_IMG[Math.floor(Math.random() * MQ_IMG.length)]);
+      st.style.transition = "none"; st.style.transform = "translateY(0)";
+      st.innerHTML = imgs.map((x) => `<img src="${x}" alt="">`).join(""); void st.offsetHeight;
+      st.style.transition = `transform ${450 + i * 150}ms cubic-bezier(.3,.1,.3,1)`; st.style.transform = `translateY(${-(imgs.length - 1) * h}px)`;
+    });
+    setTimeout(done, 800);
+  }
+  let mqGirando = false;
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-mqclose]") || e.target.id === "mqView") return cerrarMaq();
+    const a = e.target.closest("[data-maq]"); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    e.preventDefault();
+    const card = a.closest("#mqCard"); if (!card) return abrirMaq(); // botón del carrito: directo
+    abrirMaq(); // se abre al instante; la palanca y los rodillos se mueven detrás
+    if (mqGirando) return; mqGirando = true;
+    card.classList.add("tirando");
+    setTimeout(() => girarMini(() => { mqGirando = false; card.classList.remove("tirando"); }), 380);
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#mqView").hidden) cerrarMaq(); });
   function renderFooter() {
     const r = S.retiro || { rangos: [] };
     HORARIO = "De " + r.rangos.map(([a, b]) => a.replace(":00", "") + " a " + b.replace(":00", "")).join(" y de ") + " hs.";
@@ -884,6 +930,7 @@
       <b>${esc(p.nombre)}</b><small class="num">${unit(p) ? "" : "Desde "}${money(unit(p) ? p.precio : p.precios["12 oz"])}</small></div>`).join("")}</div></div>`;
   }
   const giftCta = () => gcfg().activo === false ? "" : `<a class="gift-cta" href="/gift-cards" data-closedrawer><span class="gc-ico" aria-hidden="true">🎁</span><span><b>¿Es para regalar?</b><small>Mandá una gift card digital de Setto.</small></span><span class="go" aria-hidden="true">→</span></a>`;
+  const maqCta = () => !maqOn() ? "" : `<a class="gift-cta maq-cta" href="/maquinita" data-maq data-closedrawer><span class="gc-ico" aria-hidden="true"><img src="img/mochito-cup.png" alt=""></span><span><b>¿Probás suerte?</b><small>Tirá en la maquinita de Mochito antes de pedir.</small></span><span class="go" aria-hidden="true">→</span></a>`;
   function drawDrawer() {
     const body = $("#dBody"), foot = $("#dFoot");
     $("#dBack").hidden = view !== "checkout" && view !== "buscar";
@@ -892,8 +939,8 @@
       if (!cart.length) { body.innerHTML = `${trackHtml()}<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><div class="empty-acts"><a class="btn" href="#sets" data-closedrawer>Ver sets</a><button class="btn" id="toBuscar">Consultar mi pedido</button></div></div>`; foot.innerHTML = ""; return; }
       body.innerHTML = trackHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
-        <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("") + sugHtml() + giftCta();
-      foot.innerHTML = `${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
+        <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("") + sugHtml() + `<div class="ctas">${giftCta()}${maqCta()}</div>`;
+      foot.innerHTML = `${regaloLine()}${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
         <p class="muted" style="font-size:.78rem;text-align:center">${envioOn() ? "Retiro o envío: lo elegís después." : "¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats."}</p>`;
     }
     if (view === "buscar") { $("#dTitle").textContent = "Consultar pedido"; body.innerHTML = buscarDrawerHtml(); foot.innerHTML = ""; return; }
@@ -923,7 +970,7 @@
           <span class="hintf">Las dos son opcionales y te das de baja cuando quieras en <a href="/privacidad" target="_blank">Privacidad y bajas</a>.</span></div>
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>
         <div id="fErr" class="err" hidden></div>`;
-      foot.innerHTML = `${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
+      foot.innerHTML = `${regaloLine()}${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
       [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; }); });
       [["fOkWa", "okWa"], ["fOkAds", "okAds"]].forEach(([id, k]) => $("#" + id).addEventListener("change", (e) => { form[k] = e.target.checked; }));
       $("#fTel").addEventListener("change", async () => {
@@ -1470,7 +1517,7 @@
       verSeguimiento(); renderResenas();
       API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
       S = settings; adapt(products); syncCart();
-      renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderFooter(); renderBadge();
+      renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
       if (PAGE === "listo" && form.tel && clubOn()) setTimeout(() => { if (!lsTel) { lsTel = true; $("#cardForm").requestSubmit(); } }, 1500);
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }

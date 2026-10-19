@@ -555,6 +555,7 @@
           <div class="row2"><label>Opción: % de descuento (0 = no ofrecer)<input class="inp" name="pdesc" type="number" min="0" max="100" value="${club.premio_descuento ?? 35}"></label>
           <label>Tope del descuento en $ (0 = sin tope)<input class="inp" name="ptope" type="number" min="0" step="500" value="${club.premio_tope || 0}"></label></div>
           <label>Pedido mínimo para sumar sello (0 = sin mínimo)<input class="inp" name="minimo" type="number" min="0" step="500" value="${club.minimo || 0}"></label>
+          <div class="checks"><label><input type="checkbox" name="regalo" ${club.regalo !== false && club.regalo !== "" ? "checked" : ""}> Avisar que cada pedido trae un regalo (en el Club y en el carrito)</label></div>
           <span class="hintp">El premio se entrega en el mismo pedido que completa la tarjeta.</span>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="personalizacion"><b>Personalización de bebidas</b>
@@ -585,6 +586,22 @@
                 <select class="inp" name="be${i}_${j}" aria-label="Estilo del botón ${j + 1}">${opt([["principal", "Principal (lleno)"], ["secundario", "Secundario (borde)"]], b.estilo === "secundario" ? "secundario" : (j ? "secundario" : "principal"))}</select></div>`; }).join("")}</div></div>`; }).join("")}
           <label>Cambia cada (segundos)<input class="inp" name="intervalo" type="number" min="3" max="15" value="${(S.hero || {}).intervalo || 5}" style="width:120px"></label>
           <button class="btn solid">Guardar portada</button></form>
+        <form class="pcard" data-set="maquinita"><b>Maquinita</b>
+          ${(() => { const m = S.maquinita || {};
+            const sim = MQ_SIM.map(([n, img], i) => { const c = (m.simbolos || [])[i] || {}, v = c.img || "", ver = v || img; return `<div class="slrow"><span class="upprev" data-prevfor="mi${i}">${ver ? `<img src="${esc(ver)}" alt="" style="object-fit:contain">` : "Estrella<br>(dibujada)"}</span><div class="slf"><input type="hidden" name="mi${i}" value="${esc(v)}">
+              <label>${i ? `Símbolo ${i + 1}` : "Símbolo especial (5 iguales = premio mayor)"}<input class="inp" name="mn${i}" maxlength="30" value="${esc(c.nombre || n)}"></label>
+              <span class="acts" style="gap:6px"><label class="btn">Subir imagen<input type="file" accept="image/*" data-upimg="mi${i}" data-upmax="400" hidden></label>${v ? `<button type="button" class="linkbtn warn" data-upx="mi${i}">Volver a la original</button>` : ""}</span></div></div>`; }).join("");
+            const prem = MQ_PREM.map(([id, cuando, t, ch]) => { const c = (m.premios || []).find((x) => x.id === id); return `<div class="row2"><label>${cuando}: premio (vacío = sin premio)<input class="inp" name="pt_${id}" maxlength="40" value="${esc(c ? c.titulo || "" : t)}"></label><label>Probabilidad (%)<input class="inp" name="pc_${id}" type="number" min="0" max="100" step="0.1" value="${c ? +c.chance || 0 : ch}"></label></div>`; }).join("");
+            return `<label class="chk"><input type="checkbox" name="activo" ${m.activo !== false ? "checked" : ""}> Mostrar la maquinita en la web (sección entre Sets y Carta y botón del carrito)</label>
+          <label class="chk"><input type="checkbox" name="aviso" ${m.aviso !== false ? "checked" : ""}> Mostrar el aviso “Prueba: los premios no son reales”</label>
+          <label>Tiradas gratis por día<input class="inp" name="fichas" type="number" min="1" max="5" value="${Math.max(1, +m.fichas_dia || 1)}" style="width:120px"></label>
+          <b style="margin-top:6px">Premios</b>
+          <span class="hintp">La probabilidad es por tirada: 2 = sale 2 de cada 100 tiradas. Los premios todavía no se cobran solos: definí cómo se canjean antes de sacar el aviso de prueba.</span>
+          ${prem}
+          <b style="margin-top:6px">Símbolos de los rodillos</b>
+          <span class="hintp">Imágenes cuadradas con fondo transparente (PNG o WebP). Los primeros 3 también se ven en la tarjeta de la landing.</span>
+          ${sim}`; })()}
+          <button class="btn solid">Guardar maquinita</button></form>
         <form class="pcard" data-set="stickers"><b>Stickers de WhatsApp</b>
           <span class="hintp">Subí el pack a Sticker.ly desde el celu, tocá Compartir y pegá acá el link. Sin link la sección no se muestra.</span>
           <label class="chk"><input type="checkbox" name="activo" ${(S.stickers || {}).activo ? "checked" : ""}> Mostrar los stickers en la web</label>
@@ -667,6 +684,9 @@
   }
   /* Ajustes por secciones: una lista a la izquierda (en el celu, una pantalla con la lista) y la sección abierta
      a la derecha, con una sola barra de Guardar que avisa cuando hay cambios sin guardar. */
+  /* maquinita: símbolos y premios por defecto (los mismos que usa maquinita.html si no hay ajustes) */
+  const MQ_SIM = [["Mochito", "img/mochito-cup.png"], ["Mochi frutilla", "img/mochi-frutilla.webp"], ["Mochi oreo", "img/mochi-oreo.webp"], ["Dirty caramel", "img/dirty-caramel.webp"], ["Strawberry matcha", "img/dirty-strawberry.webp"], ["Estrella", ""]];
+  const MQ_PREM = [["gift", "5 especiales", "Gift card $10.000", 0.1], ["mochi", "5 iguales", "Mochi gratis", 0.5], ["off", "4 iguales", "10% off", 2]];
   const AJ_SEC = [
     { k: "contacto", g: "Pedidos", t: "Contacto", d: "El WhatsApp que recibe los pedidos, Instagram y tu link de links.", s: (S) => pretty(S.whatsapp) || "Sin WhatsApp" },
     { k: "retiro", g: "Pedidos", t: "Horarios de retiro", d: "Qué días y en qué franjas pueden elegir retirar.", s: (S) => { const r = S.retiro || {}; return (r.dias || []).length ? `${r.dias.length} días · ${(r.rangos || []).map((x) => x.join("–")).join(", ")}` : "Sin días"; } },
@@ -675,8 +695,9 @@
     { k: "personalizacion", g: "Pedidos", t: "Personalizar bebidas", d: "Leches con recargo y lo que se puede sacar.", s: (S) => ((S.personalizacion || {}).activo !== false ? `Activo · ${((S.personalizacion || {}).leches || []).length} leches` : "Apagado") },
     { k: "stock_web", g: "Pedidos", t: "Stock en la web", d: "Cuántos mochis se ven disponibles y si se frena al llegar a 0.", s: (S) => ((S.stock_web || {}).activo !== false ? ((S.stock_web || {}).bloquear !== false ? "Visible · frena en 0" : "Visible · no frena") : "Oculto") },
     { k: "mensajes", g: "Pedidos", t: "Mensajes de WhatsApp", d: "Los textos que se arman solos para el cliente y para ustedes.", s: (S) => { const n = Object.keys(S.mensajes || {}).length; return n ? `${n} cambiados` : "Los originales"; } },
-    { k: "club", g: "Clientes", t: "Setto Club", d: "Sellos, premio y pedido mínimo.", s: (S) => ((S.club || {}).activo !== false ? `${(S.club || {}).meta || 8} sellos` : "Apagado") },
+    { k: "club", g: "Clientes", t: "Setto Club", d: "Sellos, premio, pedido mínimo y regalo de cada pedido.", s: (S) => ((S.club || {}).activo !== false ? `${(S.club || {}).meta || 8} sellos` : "Apagado") },
     { k: "giftcards", g: "Clientes", t: "Gift cards", d: "Montos y diseños de las tarjetas de regalo.", s: (S) => ((S.giftcards || {}).activo !== false ? "A la venta" : "Apagado") },
+    { k: "maquinita", g: "Clientes", t: "Maquinita", d: "Premios, tiradas por día, imágenes de los rodillos y si se muestra en la web.", s: (S) => { const m = S.maquinita || {}, n = Math.max(1, +m.fichas_dia || 1); return (m.activo !== false ? "Visible" : "Oculta") + ` · ${n} ${n === 1 ? "tirada" : "tiradas"} por día`; } },
     { k: "votacion", g: "Clientes", t: "Votación", d: "Una pregunta con opciones para que voten en la web.", s: (S) => ((S.votacion || {}).activo ? "Abierta" : "Apagada") },
     { k: "hero", g: "Web", t: "Portada", d: "Las slides del inicio y sus botones.", s: (S) => `${((S.hero || {}).slides || []).length} slides` },
     { k: "ventajas", g: "Web", t: "Pedir acá te conviene", d: "Los motivos para pedir por la web.", s: (S) => ((S.ventajas || {}).activo !== false ? `${((S.ventajas || {}).items || []).length} motivos` : "Oculto") },
@@ -744,7 +765,13 @@
         await API.saveSetting("retiro", { dias, rangos: rangos.map(([a, b]) => [a.padStart(5, "0"), b.padStart(5, "0")]), cadaMin: Math.max(5, +f.cada || 30), anticipacionMin: Math.max(0, +f.antic || 0) });
       }
       if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: Math.max(0, Math.min(10, +f.spp)), premio: (f.premio || "").trim(), minimo: Math.max(0, +f.minimo || 0),
-        premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0) });
+        premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0), regalo: !!f.regalo });
+      if (k === "maquinita") {
+        const premios = MQ_PREM.map(([id]) => ({ id, titulo: (f["pt_" + id] || "").trim(), chance: Math.max(0, Math.min(100, +String(f["pc_" + id] || "0").replace(",", ".") || 0)) }));
+        if (premios.reduce((a, p) => a + (p.titulo ? p.chance : 0), 0) > 100) throw new Error("Las probabilidades suman más de 100%");
+        await API.saveSetting("maquinita", { activo: !!f.activo, aviso: !!f.aviso, fichas_dia: Math.max(1, Math.min(5, Math.round(+f.fichas || 1))), premios,
+          simbolos: MQ_SIM.map(([n], i) => ({ nombre: (f["mn" + i] || "").trim() || n, img: (f["mi" + i] || "").trim() })) });
+      }
       if (k === "personalizacion") {
         const leches = (f.leches || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const [n, pr] = s.split("|").map((x) => x.trim()); return { nombre: n, precio: Math.max(0, Math.round(+String(pr || "0").replace(/[^0-9.,]/g, "").replace(/\.(?=\d{3})/g, "").replace(",", ".")) || 0) }; }).filter((l) => l.nombre);
         await API.saveSetting("personalizacion", { activo: !!f.activo, leches, sin: (f.sin || "").split("\n").map((s) => s.trim()).filter(Boolean) });

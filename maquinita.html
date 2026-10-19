@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <title>Maquinita de Mochito · Setto</title>
+<script>if (new URLSearchParams(location.search).has("embed")) document.documentElement.classList.add("embed");</script>
 <link rel="icon" href="img/mochito-cup.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Poppins:wght@400;500;600;700&display=swap">
@@ -82,6 +83,25 @@ details.test summary{cursor:pointer}
 canvas#confeti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30}
 .aviso-prueba{max-width:560px;margin:0 auto 14px;background:var(--coral-2);border-radius:999px;padding:6px 14px;text-align:center;font-size:.8rem;font-weight:600}
 body{margin:0}
+/* dentro del pop up de la landing: sin logo (la X del pop up queda arriba a la derecha) */
+.embed body{padding-block:12px 28px}
+.embed .top{justify-content:flex-start}
+.embed .top > a{display:none}
+.embed .aviso-prueba{margin-right:56px}
+.embed details.test{display:none}
+/* palanca al costado de la máquina */
+.maq{position:relative;margin-right:34px}
+.palanca{all:unset;cursor:pointer;position:absolute;right:-37px;top:96px;width:34px;height:150px}
+.palanca:focus-visible{outline:3px solid var(--coral);outline-offset:3px;border-radius:8px}
+.palanca:disabled{cursor:not-allowed}
+.eje{position:absolute;left:0;bottom:22px;width:22px;height:30px;border-radius:0 10px 10px 0;background:var(--turquesa-2)}
+.brazo{position:absolute;left:14px;bottom:34px;width:7px;height:104px;border-radius:4px;background:linear-gradient(90deg,#c9c3b6,#f3efe6 45%,#a9a296);transform-origin:50% 100%;transition:transform .12s}
+.bola{position:absolute;left:50%;top:-14px;width:26px;height:26px;margin-left:-13px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffd4cf,var(--coral) 55%,#e07e74);border:2.5px solid var(--turquesa-2)}
+.palanca:hover:not(:disabled) .brazo{transform:rotate(6deg)}
+.maq.tirando .brazo{animation:tirar-palanca .55s cubic-bezier(.4,0,.3,1)}
+@keyframes tirar-palanca{0%{transform:perspective(260px) rotateX(0)}45%,62%{transform:perspective(260px) rotateX(165deg)}100%{transform:perspective(260px) rotateX(0)}}
+@media (prefers-reduced-motion:reduce){.maq.tirando .brazo{animation:none}}
+@media (max-width:420px){.maq{margin-right:30px}.palanca{right:-33px;top:80px;transform:scale(.88);transform-origin:0 50%}}
 </style>
 </head>
 <body>
@@ -108,6 +128,7 @@ body{margin:0}
     <p class="msg" id="msg" aria-live="polite">¡Probá suerte!</p>
     <button class="tirar" id="tirar" type="button">Tirar</button>
     <div class="fichas" id="fichas" aria-live="polite"></div>
+    <button class="palanca" id="palanca" type="button" aria-label="Bajar la palanca y tirar"><span class="brazo"><span class="bola"></span></span><span class="eje"></span></button>
   </section>
 
   <section class="premios" id="premios" aria-label="Premios"></section>
@@ -122,37 +143,57 @@ body{margin:0}
 
 <canvas id="confeti" aria-hidden="true"></canvas>
 
+<script src="js/config.js"></script>
 <script>
-(function () {
+(async function () {
   const $ = (s) => document.querySelector(s);
-  const IMG = { mochito: "img/mochito-cup.png", frutilla: "img/mochi-frutilla.webp", oreo: "img/mochi-oreo.webp", dirty: "img/dirty-caramel.webp", matcha: "img/dirty-strawberry.webp" };
+  const EMBED = document.documentElement.classList.contains("embed");
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  /* ajustes: Panel → Ajustes → Maquinita (tabla settings, lectura pública). Sin claves = modo demo del navegador. */
+  async function cargarCfg() {
+    const c = window.SETTO_CONFIG || {};
+    try {
+      if (c.supabaseUrl && c.supabaseAnonKey) {
+        const r = await fetch(`${c.supabaseUrl}/rest/v1/settings?key=eq.maquinita&select=value`, { headers: { apikey: c.supabaseAnonKey, Authorization: "Bearer " + c.supabaseAnonKey } });
+        const d = await r.json(); return (d && d[0] && d[0].value) || {};
+      }
+      const db = JSON.parse(localStorage.getItem("setto-demo-db") || "null"); return (db && db.settings && db.settings.maquinita) || {};
+    } catch (_) { return {}; }
+  }
+  const CFG = await cargarCfg();
+  const DEF_SIM = [["mochito", "Mochito", "img/mochito-cup.png"], ["frutilla", "Mochi frutilla", "img/mochi-frutilla.webp"], ["oreo", "Mochi oreo", "img/mochi-oreo.webp"], ["dirty", "Dirty caramel", "img/dirty-caramel.webp"], ["matcha", "Strawberry matcha", "img/dirty-strawberry.webp"], ["estrella", "Estrella", ""]];
+  const IMG = {}, NOMBRE = {};
+  DEF_SIM.forEach(([k, n, img], i) => { const c = (CFG.simbolos || [])[i] || {}; IMG[k] = c.img || img; NOMBRE[k] = c.nombre || n; });
+  const FICHAS = Math.max(1, Math.min(5, Math.round(+CFG.fichas_dia || 1)));
+  if (CFG.aviso === false) $(".aviso-prueba").hidden = true;
+  $(".letra").textContent = `${FICHAS === 1 ? "Una tirada gratis" : FICHAS + " tiradas gratis"} por día. No apostás nada.`;
   const ESTRELLA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1 6.1 20.3l1.3-6.5L2.5 9.3l6.6-.8z" fill="#F2C14E" stroke="#1F5452" stroke-width="1.4" stroke-linejoin="round"/></svg>';
   const SIMBOLOS = ["mochito", "frutilla", "oreo", "dirty", "matcha", "estrella"];
-  const NOMBRE = { mochito: "Mochito", frutilla: "Mochi frutilla", oreo: "Mochi oreo", dirty: "Dirty caramel", matcha: "Strawberry matcha", estrella: "Estrella" };
-  const symHtml = (k) => k === "estrella" ? ESTRELLA : `<img src="${IMG[k]}" alt="${NOMBRE[k]}" draggable="false">`;
+  const symHtml = (k) => !IMG[k] ? ESTRELLA : `<img src="${esc(IMG[k])}" alt="${esc(NOMBRE[k])}" draggable="false">`;
   const N = 5; // rodillos
 
   // En la versión real esta tabla se edita desde el panel y el resultado lo decide la base
-  const PREMIOS = [
-    { id: "gift", titulo: "Gift card $10.000", chance: 0.1, combo: () => symHtml("mochito").repeat(5) },
-    { id: "mochi", titulo: "Mochi gratis", chance: 0.5, combo: () => `<span>5 iguales</span>` },
-    { id: "off", titulo: "10% off", chance: 2, combo: () => `<span>4 iguales</span>` },
-  ];
+  const DEF_PREM = { gift: ["Gift card $10.000", 0.1], mochi: ["Mochi gratis", 0.5], off: ["10% off", 2] };
+  const COMBO = { gift: () => symHtml("mochito").repeat(5), mochi: () => `<span>5 iguales</span>`, off: () => `<span>4 iguales</span>` };
+  const PREMIOS = ["gift", "mochi", "off"].map((id) => {
+    const c = (CFG.premios || []).find((x) => x.id === id), d = DEF_PREM[id];
+    return { id, titulo: c ? String(c.titulo || "").trim() : d[0], chance: c ? Math.max(0, +c.chance || 0) : d[1], combo: COMBO[id] };
+  }).filter((p) => p.titulo && p.chance > 0);
   const fmt = (n) => n.toLocaleString("es-AR") + "%";
-  $("#premios").innerHTML = PREMIOS.map((p) => `<div class="fila"><span class="combo">${p.combo()}</span><b>${p.titulo}</b><span class="pct">${fmt(p.chance)}</span></div>`).join("");
+  $("#premios").innerHTML = PREMIOS.map((p) => `<div class="fila"><span class="combo">${p.combo()}</span><b>${esc(p.titulo)}</b><span class="pct">${fmt(p.chance)}</span></div>`).join("");
 
   /* ---------- fichas (solo este navegador) ---------- */
   const KEY = "setto-maquinita-demo";
   const hoy = () => new Date().toISOString().slice(0, 10);
-  let st = { dia: hoy(), fichas: 2 };
-  try { const g = JSON.parse(localStorage.getItem(KEY) || "null"); if (g && g.dia === hoy() && typeof g.fichas === "number") st = g; } catch (_) {}
+  let st = { dia: hoy(), fichas: FICHAS };
+  try { const g = JSON.parse(localStorage.getItem(KEY) || "null"); if (g && g.dia === hoy() && typeof g.fichas === "number") st = { dia: g.dia, fichas: Math.min(g.fichas, FICHAS) }; } catch (_) {}
   const guardar = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (_) {} };
-  let infinitas = false, forzado = null, girando = false, sonidoOn = false;
+  let infinitas = false, forzado = null, girando = false, sonidoOn = EMBED; // en el pop up de la landing arranca con sonido
   const quedan = () => (infinitas ? Infinity : st.fichas);
   function pintarFichas() {
     const n = quedan();
-    $("#fichas").innerHTML = infinitas ? "∞ fichas" : [0, 1].map((i) => `<span class="ficha ${i < n ? "" : "vacia"}"></span>`).join("") + `<span>${n === 1 ? "1 ficha" : n + " fichas"}</span>`;
-    $("#tirar").disabled = n === 0 || girando;
+    $("#fichas").innerHTML = infinitas ? "∞ fichas" : Array.from({ length: FICHAS }, (_, i) => `<span class="ficha ${i < n ? "" : "vacia"}"></span>`).join("") + `<span>${n === 1 ? "1 ficha" : n + " fichas"}</span>`;
+    $("#tirar").disabled = $("#palanca").disabled = n === 0 || girando;
     if (n === 0 && !girando) $("#msg").textContent = "Volvé mañana por otra tirada";
   }
 
@@ -181,6 +222,8 @@ body{margin:0}
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   function girar() {
     if (girando || quedan() === 0) return;
+    if (sonidoOn) { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); ac.resume && ac.resume(); } catch (_) {} } // el toque en Tirar habilita el audio
+    const maq = $(".maq"); maq.classList.remove("tirando"); void maq.offsetWidth; maq.classList.add("tirando"); setTimeout(() => maq.classList.remove("tirando"), 600);
     girando = true; if (!infinitas) { st.fichas--; guardar(); }
     pintarFichas(); reels.forEach((r) => r.classList.remove("win"));
     $("#msg").textContent = "…"; luces(true); beep(330, .05);
@@ -205,12 +248,13 @@ body{margin:0}
     if (!p) { $("#msg").textContent = "¡Casi! Volvé mañana"; pintarFichas(); return; }
     const top = SIMBOLOS.find((s) => fin.filter((x) => x === s).length >= 4);
     reels.forEach((r, i) => { if (fin[i] === top) r.classList.add("win"); });
-    $("#msg").innerHTML = `<span><b>¡${p.titulo}!</b>Premio de prueba</span>`;
+    $("#msg").innerHTML = `<span><b>¡${esc(p.titulo)}!</b>${CFG.aviso === false ? "" : "Premio de prueba"}</span>`;
     fanfarria(res === "gift"); confeti(res === "gift" ? 220 : res === "mochi" ? 140 : 70);
     pintarFichas();
   }
 
   $("#tirar").addEventListener("click", girar);
+  $("#palanca").addEventListener("click", girar);
 
   /* ---------- luces ---------- */
   const lucesEl = $("#luces"); lucesEl.innerHTML = "<i></i>".repeat(12);
@@ -225,7 +269,7 @@ body{margin:0}
   /* ---------- sonido (opcional, arranca apagado) ---------- */
   const OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>';
   const ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>';
-  let ac = null; $("#sonido").innerHTML = OFF;
+  let ac = null; $("#sonido").innerHTML = sonidoOn ? ON : OFF; $("#sonido").setAttribute("aria-pressed", sonidoOn); if (sonidoOn) $("#sonido").setAttribute("aria-label", "Silenciar");
   $("#sonido").addEventListener("click", () => {
     sonidoOn = !sonidoOn; $("#sonido").innerHTML = sonidoOn ? ON : OFF;
     $("#sonido").setAttribute("aria-pressed", sonidoOn); $("#sonido").setAttribute("aria-label", sonidoOn ? "Silenciar" : "Activar sonido");
@@ -260,7 +304,7 @@ body{margin:0}
   $("#forzar").innerHTML = OPC.map(([k, l]) => `<button class="chip" type="button" data-f="${k}" aria-pressed="false">Próxima: ${l}</button>`).join("");
   function marcar() { document.querySelectorAll("[data-f]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === forzado)); }
   $("#forzar").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (!b) return; forzado = forzado === b.dataset.f ? null : b.dataset.f; marcar(); });
-  $("#reponer").addEventListener("click", () => { st.fichas = 2; guardar(); $("#msg").textContent = "¡Probá suerte!"; pintarFichas(); });
+  $("#reponer").addEventListener("click", () => { st.fichas = FICHAS; guardar(); $("#msg").textContent = "¡Probá suerte!"; pintarFichas(); });
   $("#infinitas").addEventListener("click", () => { infinitas = !infinitas; $("#infinitas").setAttribute("aria-pressed", infinitas); if (infinitas) $("#msg").textContent = "¡Probá suerte!"; pintarFichas(); });
   pintarFichas();
 })();
