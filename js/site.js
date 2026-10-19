@@ -100,7 +100,6 @@
   /* regalo de cada pedido (Panel → Setto Club) y maquinita (Panel → Maquinita) */
   const regaloOn = () => club().regalo !== false && club().regalo !== "";
   const maqOn = () => (S.maquinita || {}).activo !== false;
-  const regaloLine = () => regaloOn() ? `<div class="regaloline"><span class="rg-ico" aria-hidden="true">🎁</span><span>Tu pedido trae un regalo.</span></div>` : "";
   let cardCache = null; // {tel, data}
   async function loadCard(force) {
     const tel = API.normPhone(form.tel); if (!tel || !clubOn()) return null;
@@ -133,10 +132,13 @@
     if (premioDesc() > 0) opts.push(`<button data-premio="descuento" aria-pressed="${form.premio === "descuento"}">${premioDesc()}% off en este pedido${Number(club().premio_tope) > 0 ? ` (hasta ${money(club().premio_tope)})` : ""}</button>`);
     return `<div class="f premio-pick"><span>🎁 ¡Este pedido completa tu tarjeta! Elegí tu premio</span><div class="chips">${opts.join("")}</div>${sets.length ? '<span class="hintf">El set de regalo va en 12 oz.</span>' : ""}</div>`;
   }
+  // fichas de la maquinita que suma este pedido (Panel → Maquinita → Fichas por cada compra)
+  const fichasCompra = () => (maqOn() ? Math.max(0, Math.min(50, Math.round((S.maquinita || {}).fichas_compra ?? 5))) : 0);
   function clubLine() {
-    if (!clubOn()) return "";
+    const fc = fichasCompra(), fTxt = fc ? ` Y suma <b>${fc} fichas</b> para la maquinita.` : "";
+    if (!clubOn()) return fc ? `<div class="clubline"><img src="img/mochito-run.png" alt=""><div>Este pedido suma <b>${fc} fichas</b> para la maquinita.</div></div>` : "";
     const min = Number(club().minimo) || 0;
-    if (min > 0 && total() < min) return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div>Sumá <b>${money(min - total())}</b> más y sumás ${sellosTxt(spp())} del Club.</div></div>`;
+    if (min > 0 && total() < min) return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div>Sumá <b>${money(min - total())}</b> más y sumás ${sellosTxt(spp())} del Club.${fTxt}</div></div>`;
     const n = spp(), meta = club().meta || 8;
     const c = cardCache && cardCache.tel === API.normPhone(form.tel) ? cardCache.data : null;
     let txt, pct = null;
@@ -146,8 +148,9 @@
       txt = after >= meta ? (form.premio ? `<b>¡Completás tu tarjeta!</b> Premio: ${esc(form.premio === "descuento" ? premioDesc() + "% off" : ((SETS.find((x) => "set:" + x.id === form.premio) || {}).nombre || "set") + " de regalo")}.` : `<b>¡Completás tu tarjeta!</b> Elegí tu premio al seguir.`)
         : `Con este pedido llegás a <b>${after} de ${meta}</b> sellos. Te ${meta - after === 1 ? "falta 1" : "faltan " + (meta - after)} para tu premio.`;
     } else {
-      txt = `Este pedido suma <b>${sellosTxt(n)}</b> del Setto Club. Con ${meta} sellos tenés premio.`;
+      txt = `Este pedido tiene beneficios: suma <b>${sellosTxt(n)}</b> del Setto Club. Con ${meta} sellos tenés premio.`;
     }
+    txt += fTxt;
     return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div style="flex:1">${txt}${pct !== null ? `<div class="clubbar"><i style="width:${pct}%"></i></div>` : ""}</div></div>`;
   }
 
@@ -366,10 +369,8 @@
     const r = S.retiro || {}, now = new Date(), toMin = (s) => { const [h, m] = s.split(":").map(Number); return h * 60 + m; };
     const mins = now.getHours() * 60 + now.getMinutes();
     const abierto = (r.dias || []).includes(now.getDay()) && (r.rangos || []).some(([a, b]) => mins >= toMin(a) && mins < toMin(b));
-    const prox = slots()[0];
     el.classList.toggle("open", abierto); el.classList.toggle("closed", !abierto);
-    el.innerHTML = abierto ? `<i></i>Abierto ahora${prox && prox.startsWith("Hoy") ? ` · retirás desde las ${esc(prox.split("· ")[1].replace(" hs", ""))}` : ""}`
-      : `<i></i>Cerrado${prox ? ` · abrimos ${esc(prox.split(" · ")[0].toLowerCase())} ${esc(prox.split("· ")[1].replace(" hs", ""))}` : ""}`;
+    el.innerHTML = abierto ? "<i></i>Abierto ahora" : "<i></i>Cerrado ahora";
   }
   setInterval(() => { try { renderAbierto(); } catch (_) {} }, 60000);
 
@@ -756,12 +757,33 @@
     $("#panel").setAttribute("aria-labelledby", "tab-" + tab);
     $("#grid").scrollLeft = 0; dots("grid");
   }
+  // lo que trae cada compra web, según lo que está prendido en el panel
+  function beneficios() {
+    const c = club(), m = S.maquinita || {}, k = S.stickers || {}, out = [];
+    const spp = c.sellos_por_pedido ?? 1, meta = c.meta || 8, fc = Math.max(0, Math.min(50, Math.round(m.fichas_compra ?? 5)));
+    if (clubOn()) out.push({ ico: "⭐", t: `${spp === 1 ? "1 sello" : spp + " sellos"} del Setto Club`, s: `Con ${meta} sellos tenés premio` });
+    if (m.activo !== false && fc) out.push({ ico: "🎰", t: `${fc} fichas para la maquinita`, s: "Más tiradas, más chances de premio" });
+    if (k.activo && /^https:\/\//.test(k.link || "")) out.push({ ico: "💬", t: "Stickers de Mochito", s: "Para tus chats de WhatsApp" });
+    if (regaloOn()) out.push({ ico: "🎁", t: "Un regalo en tu pedido", s: "Sorpresa, viene con lo que pediste" });
+    return out;
+  }
+  function renderBeneficios() {
+    const b = beneficios(), box = $("#clubBenef"); if (!box) return;
+    box.hidden = !b.length;
+    $("#clubBenefList").innerHTML = b.map((x) => `<li><span class="bn-ico" aria-hidden="true">${x.ico}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></li>`).join("");
+  }
+  function renderGiftHome() {
+    const sec = $("#giftcards"); if (!sec) return;
+    const ds = gdis(); sec.hidden = gcfg().activo === false || !ds.length; if (sec.hidden) return;
+    $("#gchBuy").dataset.gcpick = ds[0];
+    $("#gchCards").innerHTML = ds.slice(0, 3).map((k, i) => gcardHtml(k, 0, "button", `data-gcpick="${k}" style="--i:${i}" aria-label="Gift card ${esc(gnombre(k))}"`)).join("");
+  }
   function renderClubInfo() {
     const c = S.club || {};
     $("#club").hidden = c.activo === false;
     $("#clubPremio").textContent = `El pedido que completa los ${c.meta || 8} sellos viene con ${premioTxt()}.` + (c.minimo > 0 ? ` Suman sello los pedidos desde ${money(c.minimo)}.` : "");
 
-    $("#clubRegalo").hidden = !regaloOn();
+    renderBeneficios();
     $("#mnavClub").hidden = !clubOn();
     drawStamps(0, c.meta || 8, true);
   }
@@ -790,6 +812,14 @@
   function abrirMaq() {
     const f = $("#mqFrame"); if (!f.getAttribute("src")) f.src = "maquinita.html?embed";
     $("#mqView").hidden = false; document.body.style.overflow = "hidden"; $("[data-mqclose]").focus();
+  }
+  window.SettoMaquinita = abrirMaq; // Mochito la abre desde su globo
+  // la maquinita ya no tiene página propia: /maquinita y /?maquinita abren el pop up
+  let maqAlCargar = new URLSearchParams(location.search).has("maquinita"); // se abre cuando llegan los ajustes
+  if (maqAlCargar) { try { history.replaceState(null, "", location.pathname + (PAGE !== "home" ? "?p=" + PAGE : "") + location.hash); } catch (_) {} }
+  // gift cards abiertas desde /listo: el "volver" vuelve a /listo
+  if (PAGE === "gift-cards" && new URLSearchParams(location.search).get("desde") === "listo") {
+    const v = document.querySelector("#regalo .volver"); if (v) { v.href = "/?p=listo"; v.textContent = "← Volver"; }
   }
   function cerrarMaq() { $("#mqView").hidden = true; document.body.style.overflow = ""; maqSug = { tel: null, premios: [] }; } // si ganó, el carrito vuelve a mirar sus premios
   function girarMini(done) {
@@ -954,13 +984,11 @@
     if (API.normPhone(form.tel) && !(cardCache && cardCache.tel === API.normPhone(form.tel))) loadCard().then(() => { if (view === "cart" && $("#drawer").classList.contains("on")) drawDrawer(); });
   }
   function closeDrawer() { $("#drawer").classList.remove("on"); $("#scrim").classList.remove("on"); if (view === "sent") { view = "cart"; } renderBadge(); }
-  function sugeridos() { // "¿Le sumás algo?": lo que hay hoy y no está en el pedido; primero lo que falta (mochi o bebida)
+  function sugeridos() { // "¿Le sumás algo?": lo que hay hoy y no está en el pedido
     const ya = new Set(cart.map((c) => c.id));
     const ok = (p) => p.activo !== false && !p.agotado && !sinStock(p) && !ya.has(p.id) && (unit(p) ? Number(p.precio) : Number((p.precios || {})["12 oz"])) > 0;
-    const hayMochi = cart.some((c) => { const p = find(c.id); return p && unit(p); }), hayBebida = cart.some((c) => { const p = find(c.id); return p && bebida(p); });
     const esp = espOpen() ? on(ESP) : [], m = [...esp.filter(unit), ...MOCHIS], d = [...esp.filter((p) => fmt(p) === "dirty"), ...DIRTY], st = [...esp.filter((p) => fmt(p) === "set"), ...SETS];
-    const orden = hayBebida && !hayMochi ? [m, st, d] : hayMochi && !hayBebida ? [d, st, m] : [m, d, st];
-    return orden.flat().filter(ok).slice(0, 6);
+    return [st, m, d].map((l) => l.find(ok)).filter(Boolean); // 3 nomás: un set, un mochi y un dirty
   }
   function sugHtml() {
     const l = sugeridos(); if (!l.length) return "";
@@ -970,7 +998,7 @@
       <b>${esc(p.nombre)}</b><small class="num">${unit(p) ? "" : "Desde "}${money(unit(p) ? p.precio : p.precios["12 oz"])}</small></div>`).join("")}</div></div>`;
   }
   const giftCta = () => gcfg().activo === false ? "" : `<a class="gift-cta" href="/gift-cards" data-closedrawer><span class="gc-ico" aria-hidden="true">🎁</span><span><b>¿Es para regalar?</b><small>Mandá una gift card digital de Setto.</small></span><span class="go" aria-hidden="true">→</span></a>`;
-  const maqCta = () => !maqOn() ? "" : `<a class="gift-cta maq-cta" href="/maquinita" data-maq data-closedrawer><span class="gc-ico" aria-hidden="true"><img src="img/mochito-cup.png" alt=""></span><span><b>¿Probás suerte?</b><small>Tirá en la maquinita de Mochito antes de pedir.</small></span><span class="go" aria-hidden="true">→</span></a>`;
+  const maqCta = () => !maqOn() ? "" : `<a class="gift-cta maq-cta" href="/?maquinita" data-maq data-closedrawer><span class="gc-ico" aria-hidden="true"><img src="img/mochito-cup.png" alt=""></span><span><b>¿Probás suerte?</b><small>Tirá en la maquinita de Mochito antes de pedir.</small></span><span class="go" aria-hidden="true">→</span></a>`;
   function drawDrawer() {
     const body = $("#dBody"), foot = $("#dFoot");
     $("#dBack").hidden = view !== "checkout" && view !== "buscar";
@@ -980,7 +1008,7 @@
       body.innerHTML = trackHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
         <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("") + sugHtml() + `<div class="ctas">${giftCta()}${maqCta()}</div>`;
-      foot.innerHTML = `${regaloLine()}${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
+      foot.innerHTML = `${clubLine()}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
         <p class="muted" style="font-size:.78rem;text-align:center">${envioOn() ? "Retiro o envío: lo elegís después." : "¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats."}</p>`;
     }
     if (view === "buscar") { $("#dTitle").textContent = "Consultar pedido"; body.innerHTML = buscarDrawerHtml(); foot.innerHTML = ""; return; }
@@ -1010,7 +1038,7 @@
           <span class="hintf">Las dos son opcionales y te das de baja cuando quieras en <a href="/privacidad" target="_blank">Privacidad y bajas</a>.</span></div>
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>
         <div id="fErr" class="err" hidden></div>`;
-      foot.innerHTML = `${regaloLine()}${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${maqOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Maquinita: ${esc(MAQ.titulo)}</span><span class="num">${money(-maqOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
+      foot.innerHTML = `${clubLine()}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${maqOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Maquinita: ${esc(MAQ.titulo)}</span><span class="num">${money(-maqOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
       [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; }); });
       [["fOkWa", "okWa"], ["fOkAds", "okAds"]].forEach(([id, k]) => $("#" + id).addEventListener("change", (e) => { form[k] = e.target.checked; }));
       $("#fTel").addEventListener("change", async () => {
@@ -1562,7 +1590,7 @@
       verSeguimiento(); renderResenas();
       API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
       S = settings; adapt(products); syncCart();
-      renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); renderFooter(); renderBadge();
+      renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); if (maqAlCargar && maqOn()) { maqAlCargar = false; abrirMaq(); } renderFooter(); renderBadge();
       if (form.tel) $("#cardPhone").value = form.tel;
       if (PAGE === "listo" && form.tel && clubOn()) setTimeout(() => { if (!lsTel) { lsTel = true; $("#cardForm").requestSubmit(); } }, 1500);
       if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
