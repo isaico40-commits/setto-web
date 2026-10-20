@@ -6,7 +6,16 @@
 */
 (function () {
   const cfg = window.SETTO_CONFIG || {};
-  const DEMO = !cfg.supabaseUrl || !cfg.supabaseAnonKey || !window.supabase;
+  // ?prueba en una vista previa de Vercel (o en la compu): modo demo para probar sin tocar la base real. Queda prendido en esa pestaña.
+  const PRUEBA = (() => {
+    try {
+      const h = location.hostname; if (!/-git-.+\.vercel\.app$/.test(h) && h !== "localhost" && h !== "127.0.0.1") return false;
+      const q = new URLSearchParams(location.search);
+      if (q.has("prueba")) sessionStorage.setItem("setto-prueba", q.get("prueba") === "no" ? "" : "1");
+      return sessionStorage.getItem("setto-prueba") === "1";
+    } catch (_) { return false; }
+  })();
+  const DEMO = PRUEBA || !cfg.supabaseUrl || !cfg.supabaseAnonKey || !window.supabase;
   const sb = DEMO ? null : window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
 
   /* Celulares argentinos → 549 + 10 dígitos (igual que norm_phone en la base) */

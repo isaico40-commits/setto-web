@@ -98,8 +98,8 @@ html,body{overflow-x:hidden}
 .reglas li b{color:var(--ink);font-weight:600}
 .letra{font-size:.78rem;color:var(--ink-2);text-align:center}
 
-details.test{font-size:.82rem;color:var(--ink-2);text-align:center}
-details.test summary{cursor:pointer}
+details.test{font-size:.82rem;color:var(--ink-2);text-align:center;background:var(--card);border:2px dashed var(--turquesa);border-radius:16px;padding:10px 12px}
+details.test summary{cursor:pointer;font-weight:700;color:var(--turquesa)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}
 .chip{border:2px solid var(--turquesa);background:var(--card);border-radius:999px;padding:4px 11px;font-size:.78rem;font-weight:600;color:var(--ink)}
 .chip[aria-pressed="true"]{background:var(--turquesa);color:var(--card)}
@@ -138,7 +138,6 @@ body{margin:0}
 .embed .top{justify-content:flex-start}
 .embed .top > a{display:none}
 .embed .aviso-prueba{margin-right:56px}
-.embed details.test{display:none}
 /* palanca al costado de la máquina */
 .maq{position:relative;margin-right:34px}
 .palanca{all:unset;cursor:pointer;position:absolute;right:-37px;top:118px;width:34px;height:150px}
@@ -183,17 +182,17 @@ body{margin:0}
     <button class="palanca" id="palanca" type="button" aria-label="Bajar la palanca y tirar"><span class="brazo"><span class="bola"></span></span><span class="eje"></span></button>
   </section>
 
+  <details class="test" hidden>
+    <summary>Modo prueba: elegí qué sale en la próxima tirada</summary>
+    <div class="chips" id="forzar"></div>
+    <div class="chips"><button class="chip" id="reponer" type="button">Sumar fichas de una compra</button></div>
+  </details>
   <section class="jugador reclamo" id="reclamo" aria-label="Guardar tu premio" hidden></section>
   <section class="mios" id="mios" aria-label="Tus premios" hidden></section>
 
   <section class="premios" id="premios" aria-label="Premios"></section>
   <ul class="reglas" id="letra"></ul>
 
-  <details class="test" hidden>
-    <summary>Prueba</summary>
-    <div class="chips" id="forzar"></div>
-    <div class="chips"><button class="chip" id="reponer" type="button">Sumar fichas de una compra</button></div>
-  </details>
 </div>
 
 <canvas id="confeti" aria-hidden="true"></canvas>
@@ -211,7 +210,7 @@ body{margin:0}
   async function cargarCfg() {
     const c = window.SETTO_CONFIG || {};
     try {
-      if (c.supabaseUrl && c.supabaseAnonKey) {
+      if (c.supabaseUrl && c.supabaseAnonKey && !(window.SettoAPI || {}).DEMO) {
         const r = await fetch(`${c.supabaseUrl}/rest/v1/settings?key=eq.maquinita&select=value`, { headers: { apikey: c.supabaseAnonKey, Authorization: "Bearer " + c.supabaseAnonKey } });
         const d = await r.json(); return (d && d[0] && d[0].value) || {};
       }
@@ -220,7 +219,7 @@ body{margin:0}
   }
   const CFG = await cargarCfg();
   const API = window.SettoAPI;
-  if (API.DEMO) { $(".aviso-prueba").hidden = false; $("details.test").hidden = false; }
+  if (API.DEMO) { $(".aviso-prueba").hidden = false; $("details.test").hidden = false; $("details.test").open = true; }
   const DEF_SIM = [["mochito", "Mochito", "img/mochito-cup.png"], ["frutilla", "Mochi frutilla", "img/mochi-frutilla.webp"], ["oreo", "Mochi oreo", "img/mochi-oreo.webp"], ["dirty", "Dirty caramel", "img/dirty-caramel.webp"], ["matcha", "Strawberry matcha", "img/dirty-strawberry.webp"], ["estrella", "Estrella", ""]];
   const IMG = {}, NOMBRE = {};
   DEF_SIM.forEach(([k, n, img], i) => { const c = (CFG.simbolos || [])[i] || {}; IMG[k] = c.img || img; NOMBRE[k] = c.nombre || n; });
