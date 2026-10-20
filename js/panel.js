@@ -754,7 +754,7 @@
      a la derecha, con una sola barra de Guardar que avisa cuando hay cambios sin guardar. */
   /* maquinita: símbolos y premios por defecto (los mismos que usa maquinita.html si no hay ajustes) */
   const MQ_SIM = [["Mochito", "img/mochito-cup.png"], ["Mochi frutilla", "img/mochi-frutilla.webp"], ["Mochi oreo", "img/mochi-oreo.webp"], ["Dirty caramel", "img/dirty-caramel.webp"], ["Strawberry matcha", "img/dirty-strawberry.webp"], ["Estrella", ""]];
-  const MQ_PREM = [["gift", "5 especiales", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "5 iguales", "Mochi gratis", 0.5, "mochi", 0], ["off", "4 iguales", "10% off", 2, "porcentaje", 10]];
+  const MQ_PREM = [["gift", "5 especiales", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "5 iguales", "Mochi gratis", 0.5, "mochi", 0], ["off", "4 iguales", "10% off", 2, "porcentaje", 10], ["off5", "3 iguales", "5% off", 5, "porcentaje", 5]];
   const MQ_TIPO = [["monto", "Descuento en $"], ["porcentaje", "Descuento en %"], ["mochi", "Un mochi gratis"]];
   const AJ_SEC = [
     { k: "contacto", g: "Pedidos", t: "Contacto", d: "El WhatsApp que recibe los pedidos, Instagram y tu link de links.", s: (S) => pretty(S.whatsapp) || "Sin WhatsApp" },

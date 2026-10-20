@@ -76,7 +76,7 @@
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
 
   /* maquinita en modo demo */
-  const MAQ_DEF = [["gift", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "Mochi gratis", 0.5, "mochi", 0], ["off", "10% off", 2, "porcentaje", 10]];
+  const MAQ_DEF = [["gift", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "Mochi gratis", 0.5, "mochi", 0], ["off", "10% off", 2, "porcentaje", 10], ["off5", "5% off", 5, "porcentaje", 5]];
   function maqPremiosCfg(cfg) {
     return MAQ_DEF.map(([id, titulo, chance, tipo, valor]) => {
       const c = Array.isArray(cfg.premios) ? cfg.premios.find((x) => x.id === id) : null;
