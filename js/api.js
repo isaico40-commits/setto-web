@@ -6,7 +6,16 @@
 */
 (function () {
   const cfg = window.SETTO_CONFIG || {};
-  const DEMO = !cfg.supabaseUrl || !cfg.supabaseAnonKey || !window.supabase;
+  // ?prueba en una vista previa de Vercel (o en la compu): modo demo para probar sin tocar la base real. Queda prendido en esa pestaña.
+  const PRUEBA = (() => {
+    try {
+      const h = location.hostname; if (!/-git-.+\.vercel\.app$/.test(h) && h !== "localhost" && h !== "127.0.0.1") return false;
+      const q = new URLSearchParams(location.search);
+      if (q.has("prueba")) sessionStorage.setItem("setto-prueba", q.get("prueba") === "no" ? "" : "1");
+      return sessionStorage.getItem("setto-prueba") === "1";
+    } catch (_) { return false; }
+  })();
+  const DEMO = PRUEBA || !cfg.supabaseUrl || !cfg.supabaseAnonKey || !window.supabase;
   const sb = DEMO ? null : window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
 
   /* Celulares argentinos → 549 + 10 dígitos (igual que norm_phone en la base) */
@@ -75,6 +84,9 @@
       return { id, titulo: String(c.titulo || "").trim() || null, chance: Math.max(0, +c.chance || 0), tipo: c.tipo || tipo, valor: c.valor != null ? Math.max(0, +c.valor || 0) : valor };
     });
   }
+  const MAQ_VENCE = 48 * 3600e3; // el premio dura 48 hs (migración 040)
+  const maqVigente = (x) => !x.vence_at || new Date(x.vence_at) > new Date();
+  const maqPub = (x) => ({ code: x.code, titulo: x.titulo, tipo: x.tipo, valor: x.valor, saldo: x.saldo, vence_at: x.vence_at || null });
   const maqDia = (db) => Math.max(1, Math.min(5, Math.round(+(db.settings.maquinita || {}).fichas_dia || 1)));
   function maqJug(db, ph) {
     db.maq = db.maq || { jug: {}, premios: [] }; db.maq.jug = db.maq.jug || {}; db.maq.premios = db.maq.premios || [];
@@ -148,6 +160,7 @@
         if (!mp) throw new Error("No encontramos ese premio de la maquinita. Revisá el código.");
         if (mp.phone !== ph) throw new Error("Ese premio es de otro número: pedí con el celular que tiró en la maquinita");
         if (mp.estado !== "activo") throw new Error("Ese premio de la maquinita ya se usó");
+        if (!maqVigente(mp)) throw new Error("Ese premio de la maquinita venció: duraba 48 hs");
         if (mp.tipo === "monto") maqOff = Math.min(mp.saldo, Math.max(total, 0));
         else if (mp.tipo === "porcentaje") maqOff = Math.min(Math.round((sub * mp.valor) / 100 / 10) * 10, Math.max(total, 0));
         else {
@@ -187,7 +200,7 @@
     async maqEstado(phone) {
       const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("Revisá tu celular");
       const j = maqJug(db, ph); dbSave(db);
-      return { gratis: Math.max(0, maqDia(db) - j.gratis_usadas), fichas: j.fichas, premios: (db.maq.premios || []).filter((x) => x.phone === ph && x.estado === "activo") };
+      return { gratis: Math.max(0, maqDia(db) - j.gratis_usadas), fichas: j.fichas, premios: (db.maq.premios || []).filter((x) => x.phone === ph && x.estado === "activo" && maqVigente(x)).map(maqPub) };
     },
     async maqTirar(phone, forzar) {
       const db = dbLoad(), ph = normPhone(phone), cfg = db.settings.maquinita || {};
@@ -212,9 +225,9 @@
     // migración 036: la gratis del día va por dispositivo; las fichas de compra, por número; sin número el premio queda pendiente
     async maqEstado2(dev, phone) {
       const db = dbLoad(), ph = normPhone(phone), d = maqDev(db, dev); dbSave(db);
-      const pend = db.maq.premios.find((x) => x.dev === dev && x.estado === "pendiente");
+      const pend = db.maq.premios.find((x) => x.dev === dev && x.estado === "pendiente" && maqVigente(x));
       return { gratis: Math.max(0, maqDia(db) - d.gratis_usadas), fichas: ph && db.maq.jug[ph] ? db.maq.jug[ph].fichas : 0,
-        premios: ph ? db.maq.premios.filter((x) => x.phone === ph && x.estado === "activo") : [], pendiente: pend ? { code: pend.code, titulo: pend.titulo } : null };
+        premios: ph ? db.maq.premios.filter((x) => x.phone === ph && x.estado === "activo" && maqVigente(x)).map(maqPub) : [], pendiente: pend ? maqPub(pend) : null };
     },
     async maqTirar2(dev, phone, forzar) {
       const db = dbLoad(), ph = normPhone(phone), cfg = db.settings.maquinita || {};
@@ -230,20 +243,20 @@
       let code = null;
       if (p) {
         code = "MAQ-" + Math.random().toString(16).slice(2, 6).toUpperCase() + "-" + Math.random().toString(16).slice(2, 6).toUpperCase();
-        db.maq.premios.unshift({ code, phone: ph || null, dev, premio_id: p.id, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.tipo === "monto" ? p.valor : 0, estado: ph ? "activo" : "pendiente", created_at: new Date().toISOString() });
+        db.maq.premios.unshift({ code, phone: ph || null, dev, premio_id: p.id, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.tipo === "monto" ? p.valor : 0, estado: ph ? "activo" : "pendiente", created_at: new Date().toISOString(), vence_at: new Date(Date.now() + MAQ_VENCE).toISOString() });
       }
       dbSave(db);
       return { resultado: p ? p.id : "nada", titulo: p ? p.titulo : null, code: ph ? code : null, pendiente: !!p && !ph, gratis: Math.max(0, maqDia(db) - d.gratis_usadas), fichas: ph && db.maq.jug[ph] ? db.maq.jug[ph].fichas : 0 };
     },
     async maqReclamar(dev, phone) {
       const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("Revisá tu celular");
-      const ms = ((db.maq || {}).premios || []).filter((x) => x.dev === dev && x.estado === "pendiente"), m = ms[0]; if (!m) throw new Error("No encontramos un premio para guardar");
+      const ms = ((db.maq || {}).premios || []).filter((x) => x.dev === dev && x.estado === "pendiente" && maqVigente(x)), m = ms[0]; if (!m) throw new Error("No encontramos un premio para guardar (duran 48 hs)");
       ms.forEach((x) => Object.assign(x, { phone: ph, estado: "activo" })); maqJug(db, ph); dbSave(db);
-      return { code: m.code, titulo: m.titulo, tipo: m.tipo, valor: m.valor, saldo: m.saldo };
+      return maqPub(m);
     },
     async maqPremioCheck(code, phone) {
       const ph = normPhone(phone), x = ((dbLoad().maq || {}).premios || []).find((q) => q.code === String(code).trim().toUpperCase() && q.phone === ph);
-      return x ? { code: x.code, titulo: x.titulo, tipo: x.tipo, valor: x.valor, saldo: x.saldo, estado: x.estado } : null;
+      return x ? { ...maqPub(x), estado: x.estado === "activo" && !maqVigente(x) ? "vencido" : x.estado } : null;
     },
     async session() { return sessionStorage.getItem("setto-demo-staff") ? { email: "demo@setto" } : null; },
     async signIn() { sessionStorage.setItem("setto-demo-staff", "1"); return { email: "demo@setto" }; },
@@ -331,6 +344,16 @@
       if (!demoPuede(db, ph, "whatsapp")) db.consents.unshift({ phone: ph, canal: "whatsapp", finalidad: "novedades", estado: "otorgado", origen: "maquinita", aviso_version: version, created_at: new Date().toISOString() });
       dbSave(db);
     },
+    // casillas del canje de la maquinita (migración 040): solo para el número que guardó un premio de este dispositivo
+    async consentimientoMaquinita2(dev, phone, canales, version) {
+      const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("Revisá tu celular");
+      if (!((db.maq || {}).premios || []).some((x) => x.dev === dev && x.phone === ph)) return;
+      db.consents = db.consents || [];
+      canales.filter((c) => ["whatsapp", "meta_ads"].includes(c) && !demoPuede(db, ph, c)).forEach((c) => db.consents.unshift({ phone: ph, canal: c, finalidad: c === "whatsapp" ? "novedades" : "publicidad", estado: "otorgado", origen: "maquinita", aviso_version: version, created_at: new Date().toISOString() }));
+      dbSave(db);
+    },
+    // solo demo: fichas de prueba para este dispositivo
+    async maqSumarDemo(dev, n) { const db = dbLoad(), d = maqDev(db, dev); d.gratis_usadas -= n; dbSave(db); },
     async bajaMarketing(phone, canal) {
       const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("Revisá el número: código de área + número, por ejemplo 223 347-1277.");
       db.consents = db.consents || [];
@@ -549,6 +572,7 @@
     // consentimientos de marketing (migración 030)
     async registrarConsentimiento(code, phone, canales, version) { const { error } = await sb.rpc("registrar_consentimiento", { p_code: code, p_phone: phone, p_canales: canales, p_version: version }); fail(error); },
     async consentimientoMaquinita(phone, version) { const { error } = await sb.rpc("consentimiento_maquinita", { p_phone: phone, p_version: version }); fail(error); },
+    async consentimientoMaquinita2(dev, phone, canales, version) { const { error } = await sb.rpc("consentimiento_maquinita_v2", { p_dev: dev, p_phone: phone, p_canales: canales, p_version: version }); fail(error); },
     async bajaMarketing(phone, canal) { const { error } = await sb.rpc("baja_marketing", { p_phone: phone, p_canal: canal || null }); fail(error); },
     async registrarOrigen(code, phone, origen) { const { error } = await sb.rpc("registrar_origen", { p_code: code, p_phone: phone, p_origen: origen }); fail(error); },
     async crmCliente(phone) { const { data, error } = await sb.from("crm_clientes").select("*").eq("phone", normPhone(phone)).maybeSingle(); fail(error); return data; },

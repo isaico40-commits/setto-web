@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<title>Maquinita de Mochito · Setto</title>
+<title>Setto Luckyslot</title>
 <script>if (new URLSearchParams(location.search).has("embed")) document.documentElement.classList.add("embed"); else if (window.top === window.self) location.replace("/?maquinita"); // sin página propia: se juega en el pop up</script>
 <link rel="icon" href="img/mochito-cup.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,47 +37,69 @@ html,body{overflow-x:hidden}
 .sonido{width:36px;height:36px;border-radius:50%;border:var(--line);background:var(--card);color:var(--turquesa);display:grid;place-items:center}
 .sonido svg{width:16px;height:16px}
 
-/* ---------- la máquina ---------- */
-.maq{display:grid;gap:14px;justify-items:center;padding:18px 14px 20px;background:var(--turquesa);border-radius:32px 32px 26px 26px;border:3px solid var(--turquesa-2);box-shadow:6px 6px 0 var(--turquesa-2);color:var(--card)}
-.marquee{width:100%;display:grid;justify-items:center;background:var(--turquesa-2);border-radius:18px;padding:16px 12px 12px;position:relative}
-.marquee h1{font-size:clamp(1.6rem,6.4vw,2.2rem);color:var(--card);text-align:center}
-.luces{position:absolute;top:5px;left:12px;right:12px;display:flex;justify-content:space-between;pointer-events:none}
-.luces i{width:7px;height:7px;border-radius:50%;background:var(--oro);opacity:.3;transition:opacity .15s}
-.luces i.on{opacity:1;box-shadow:0 0 8px var(--oro)}
+/* ---------- la máquina: gabinete de tragamonedas (cartel arriba, rodillos, pantalla y tablero) ---------- */
+.maq{--oro:#F2C14E;--lcd:#0F2F2E;position:relative;display:grid;gap:12px;justify-items:center;padding:30px 14px 18px;margin-top:16px;
+  background:linear-gradient(180deg,#2F7A76,var(--turquesa) 38%,var(--turquesa-2));border-radius:30px 30px 22px 22px;border:3px solid var(--turquesa-2);
+  box-shadow:inset 0 0 0 3px rgba(242,193,78,.55),6px 6px 0 var(--turquesa-2);color:var(--card)}
+.tope{position:absolute;top:-24px;left:50%;width:46px;height:46px;margin-left:-23px;display:grid;place-items:center;border-radius:50%;background:var(--turquesa-2);border:3px solid var(--oro);z-index:1}
+.tope svg{width:26px;height:26px}
+.cartel{width:100%;display:grid;justify-items:center;gap:0;padding:12px 12px 10px;border-radius:50% 50% 16px 16px / 44px 44px 16px 16px;
+  background:radial-gradient(120% 140% at 50% 0,#2D7471,#123E3C 70%);border:3px solid var(--oro);box-shadow:inset 0 0 0 2px var(--turquesa-2),0 3px 0 var(--turquesa-2)}
+.cartel span{font-size:.72rem;font-weight:700;letter-spacing:.38em;text-transform:uppercase;color:var(--oro);padding-left:.38em}
+.cartel h1{font-size:clamp(2rem,9vw,2.7rem);color:var(--coral);text-shadow:0 0 14px rgba(248,162,154,.55),0 3px 0 var(--turquesa-2);letter-spacing:.01em}
+.maq.girando .cartel h1{animation:neon .5s ease-in-out infinite alternate}
+@keyframes neon{to{text-shadow:0 0 22px rgba(248,162,154,.95),0 0 4px #fff,0 3px 0 var(--turquesa-2)}}
 
-.ventana{--h:96px;width:100%;background:var(--card);border-radius:18px;padding:8px;border:3px solid var(--turquesa-2);display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
-.reel{height:var(--h);overflow:hidden;border-radius:12px;background:linear-gradient(var(--bg-2),var(--card) 30%,var(--card) 70%,var(--bg-2));position:relative;transition:box-shadow .2s}
-.reel::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(rgba(31,84,82,.2),transparent 22%,transparent 78%,rgba(31,84,82,.2))}
+.ventana{--h:96px;position:relative;width:100%;background:var(--turquesa-2);border-radius:18px;padding:7px;border:3px solid var(--oro);box-shadow:inset 0 4px 8px rgba(0,0,0,.35);display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.ventana::before,.ventana::after{content:"";position:absolute;top:50%;width:0;height:0;margin-top:-7px;border-block:7px solid transparent;z-index:2}
+.ventana::before{left:-3px;border-left:9px solid var(--coral)}
+.ventana::after{right:-3px;border-right:9px solid var(--coral)}
+.reel{height:var(--h);overflow:hidden;border-radius:10px;background:linear-gradient(90deg,#E9DCC2,var(--card) 22%,var(--card) 78%,#E9DCC2);position:relative;transition:box-shadow .2s}
+.reel::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(rgba(15,47,46,.45),transparent 26%,transparent 74%,rgba(15,47,46,.45))}
 .strip{display:grid;will-change:transform}
 .sym{height:var(--h);display:grid;place-items:center;padding:8px}
-.sym img{max-width:100%;max-height:100%;object-fit:contain;filter:drop-shadow(0 3px 3px rgba(31,28,24,.15))}
+.sym img{max-width:100%;max-height:100%;object-fit:contain;filter:drop-shadow(0 3px 3px rgba(31,28,24,.18))}
 .sym svg{width:80%;height:80%}
-.reel.win{box-shadow:inset 0 0 0 3px var(--oro)}
-@media (max-width:420px){.ventana{--h:72px;gap:4px;padding:6px}.sym{padding:5px}}
+.reel.win{box-shadow:inset 0 0 0 3px var(--oro),0 0 14px rgba(242,193,78,.8)}
+@media (max-width:420px){.ventana{--h:70px;gap:3px;padding:5px}.sym{padding:4px}}
 
-.msg{min-height:2.8em;display:grid;place-items:center;text-align:center;font-weight:600}
-.msg b{font-family:var(--display);font-weight:400;font-size:1.5rem;color:var(--oro);display:block}
+/* pantalla: el mensaje como el display de una máquina real */
+.msg{width:100%;min-height:3.4em;display:grid;place-items:center;text-align:center;font-weight:600;font-size:.92rem;padding:8px 12px;border-radius:12px;
+  background:var(--lcd);border:2px solid #0B2524;box-shadow:inset 0 2px 8px rgba(0,0,0,.55);color:var(--card)}
+.msg b{font-family:var(--display);font-weight:400;font-size:1.45rem;color:var(--oro);display:block;text-shadow:0 0 10px rgba(242,193,78,.45)}
 
-.tirar{font-family:var(--display);font-size:1.5rem;border:3px solid var(--turquesa-2);background:var(--coral);color:var(--ink);border-radius:999px;padding:11px 40px;box-shadow:0 5px 0 var(--turquesa-2);transition:transform .08s,box-shadow .08s}
-.tirar:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0 var(--turquesa-2)}
+/* tablero: fichas a la izquierda, botón a la derecha */
+.tablero{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(11,37,36,.35);border-radius:18px;padding:10px 10px 10px 14px}
+.tirar{font-family:var(--display);font-size:1.45rem;border:3px solid var(--turquesa-2);background:radial-gradient(circle at 40% 30%,#FFD4CF,var(--coral) 60%);color:var(--ink);border-radius:999px;padding:10px 32px;box-shadow:0 5px 0 #0B2524;transition:transform .08s,box-shadow .08s}
+.tirar:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0 #0B2524}
 .tirar:disabled{opacity:.5;cursor:not-allowed}
-.fichas{display:flex;gap:6px;align-items:center;font-size:.85rem;font-weight:600;color:var(--coral-2)}
-.ficha{width:20px;height:20px;border-radius:50%;background:radial-gradient(circle,var(--oro) 38%,#e2ab33 40%,#e2ab33 52%,var(--oro) 54%);border:2px solid var(--turquesa-2)}
-.ficha.vacia{background:transparent;border:2px dashed var(--coral-2);opacity:.6}
+.fichas{display:flex;gap:8px;align-items:center;font-size:.82rem;color:var(--coral-2);line-height:1.2;min-width:0}
+.fichas b{display:block;font-family:var(--display);font-weight:400;font-size:1.35rem;color:var(--card)}
+.ficha{flex:none;width:30px;height:30px;border-radius:50%;background:radial-gradient(circle,var(--oro) 38%,#e2ab33 40%,#e2ab33 52%,var(--oro) 54%);border:2px solid #0B2524;box-shadow:0 2px 0 #0B2524}
+.ficha.vacia{background:transparent;border:2px dashed var(--coral-2);box-shadow:none;opacity:.6}
 
-/* ---------- premios ---------- */
-.premios{display:grid;gap:4px;font-size:.9rem}
-.fila{display:flex;align-items:center;gap:10px;padding:8px 2px;border-top:1px solid var(--bg-2)}
-.fila:first-child{border-top:0}
-.fila .combo{display:flex;flex:none;width:118px}
-.fila .combo img,.fila .combo svg{width:24px;height:24px;object-fit:contain;margin-right:-2px}
-.fila .combo span{font-size:.78rem;color:var(--ink-2)}
-.fila b{flex:1;min-width:0}
-.fila .pct{color:var(--ink-2);font-variant-numeric:tabular-nums}
+/* ---------- premios: tarjetas con la combinación, el premio y la chance ---------- */
+.premios{display:grid;gap:8px}
+.pz-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding-inline:2px}
+.pz-h h2{font-size:1.3rem;color:var(--turquesa)}
+.pz-h span{font-size:.76rem;color:var(--ink-2)}
+.pz{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;background:var(--card);border:var(--line);border-radius:16px;padding:10px 12px}
+.pz.top{background:linear-gradient(90deg,#FFF6DD,var(--card) 60%);border-color:var(--turquesa-2);box-shadow:3px 3px 0 var(--turquesa)}
+.pz-combo{display:flex;align-items:center;background:var(--bg-2);border-radius:999px;padding:5px 8px}
+.pz-combo img,.pz-combo svg{width:20px;height:20px;object-fit:contain;margin-right:-3px}
+.pz-combo i{width:12px;height:12px;border-radius:50%;background:var(--coral);border:2px solid var(--turquesa);margin-right:3px}
+.pz-combo i.no{background:transparent;border-style:dashed;opacity:.6}
+.pz-combo i:last-child{margin-right:0}
+.pz-t b{display:block;font-weight:700;font-size:.92rem;line-height:1.2}
+.pz-t small{display:block;font-size:.76rem;color:var(--ink-2)}
+.pz-pct{font-weight:700;font-size:.82rem;color:var(--card);background:var(--turquesa);border-radius:999px;padding:4px 10px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.reglas{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.reglas li{display:flex;align-items:center;gap:6px;background:var(--bg-2);border-radius:999px;padding:5px 12px;font-size:.78rem;color:var(--ink-2)}
+.reglas li b{color:var(--ink);font-weight:600}
 .letra{font-size:.78rem;color:var(--ink-2);text-align:center}
 
-details.test{font-size:.82rem;color:var(--ink-2);text-align:center}
-details.test summary{cursor:pointer}
+details.test{font-size:.82rem;color:var(--ink-2);text-align:center;background:var(--card);border:2px dashed var(--turquesa);border-radius:16px;padding:10px 12px}
+details.test summary{cursor:pointer;font-weight:700;color:var(--turquesa)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}
 .chip{border:2px solid var(--turquesa);background:var(--card);border-radius:999px;padding:4px 11px;font-size:.78rem;font-weight:600;color:var(--ink)}
 .chip[aria-pressed="true"]{background:var(--turquesa);color:var(--card)}
@@ -87,8 +109,12 @@ details.test summary{cursor:pointer}
 .jugador form{display:flex;gap:8px}
 .jugador input{flex:1;min-width:0;width:100%;font:inherit;border:var(--line);border-radius:999px;padding:8px 14px;background:var(--bg)}
 .jugador .btn{border:var(--line);background:var(--turquesa);color:var(--card);border-radius:999px;padding:8px 16px;font-weight:600}
-.jugador .linea{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.jugador .link{all:unset;cursor:pointer;color:var(--turquesa);font-weight:600;text-decoration:underline}
+.jugador .linea{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.jug-info{display:grid;min-width:0;line-height:1.3}
+.jug-info small{font-size:.78rem}
+.jug-info b{font-size:1.02rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+.btn-sec{flex:none;border:var(--line);background:transparent;color:var(--turquesa);border-radius:999px;padding:7px 14px;font-weight:600;font-size:.82rem;white-space:nowrap}
+.btn-sec:hover{background:var(--bg-2)}
 .jugador small{color:var(--ink-2);display:block}
 .jugador .avisos{display:flex;gap:8px;align-items:flex-start;font-size:.82rem;line-height:1.35;cursor:pointer}
 .jugador .avisos input{flex:none;width:18px;height:18px;margin:1px 0 0;padding:0;border:0;border-radius:4px;accent-color:var(--turquesa)}
@@ -96,14 +122,24 @@ details.test summary{cursor:pointer}
 .jugador[hidden]{display:none}
 .reclamo{border-color:var(--turquesa);box-shadow:0 0 0 3px rgba(41,106,103,.15)}
 .reclamo p{margin:0}
+.reclamo .vence{display:inline-block;margin-top:4px;font-size:.78rem;font-weight:700;color:#9A3A32;background:rgba(248,162,154,.22);border-radius:999px;padding:2px 9px}
+.reclamo label.f{display:grid;gap:4px;font-size:.82rem;font-weight:600}
+.reclamo input#tel{flex:none}
+.reclamo input#tel:disabled{opacity:.75}
+.reclamo .canjear{width:100%;padding:11px 16px;font-size:1rem}
+.reclamo .chk{display:grid;gap:8px}
+.reclamo .chk small{font-size:.74rem}
+.mio .usar{flex:none;border:var(--line);background:var(--turquesa);color:var(--card);border-radius:999px;padding:5px 12px;font-weight:600;font-size:.8rem}
+.mio .dato{display:grid;min-width:0}
+.mio .dato small{font-size:.74rem;color:var(--ink-2)}
 .reclamo .err{color:#B3261E}
 .reclamo .err:empty{display:none}
 .mios{display:grid;gap:6px}
 .mios h2{font-size:1.15rem;color:var(--turquesa)}
 .mio{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);border:var(--line);border-radius:14px;padding:8px 12px;font-size:.88rem}
 .mio code{font-weight:700;letter-spacing:.04em;color:var(--turquesa-2)}
-.msg small{display:block;font-weight:500;font-size:.82rem;color:var(--coral-2)}
-.msg code{font-weight:700;letter-spacing:.05em;color:var(--card);background:var(--turquesa-2);border-radius:8px;padding:1px 7px}
+.msg small{display:block;font-weight:500;font-size:.8rem;color:var(--coral-2)}
+.msg code{font-weight:700;letter-spacing:.05em;color:var(--lcd);background:var(--oro);border-radius:8px;padding:1px 7px}
 canvas#confeti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30}
 .aviso-prueba{max-width:560px;margin:0 auto 14px;background:var(--coral-2);border-radius:999px;padding:6px 14px;text-align:center;font-size:.8rem;font-weight:600}
 body{margin:0}
@@ -112,10 +148,9 @@ body{margin:0}
 .embed .top{justify-content:flex-start}
 .embed .top > a{display:none}
 .embed .aviso-prueba{margin-right:56px}
-.embed details.test{display:none}
 /* palanca al costado de la máquina */
 .maq{position:relative;margin-right:34px}
-.palanca{all:unset;cursor:pointer;position:absolute;right:-37px;top:96px;width:34px;height:150px}
+.palanca{all:unset;cursor:pointer;position:absolute;right:-37px;top:118px;width:34px;height:150px}
 .palanca:focus-visible{outline:3px solid var(--coral);outline-offset:3px;border-radius:8px}
 .palanca:disabled{cursor:not-allowed}
 .eje{position:absolute;left:0;bottom:22px;width:22px;height:30px;border-radius:0 10px 10px 0;background:var(--turquesa-2)}
@@ -125,7 +160,7 @@ body{margin:0}
 .maq.tirando .brazo{animation:tirar-palanca .55s cubic-bezier(.4,0,.3,1)}
 @keyframes tirar-palanca{0%{transform:perspective(260px) rotateX(0)}45%,62%{transform:perspective(260px) rotateX(165deg)}100%{transform:perspective(260px) rotateX(0)}}
 @media (prefers-reduced-motion:reduce){.maq.tirando .brazo{animation:none}}
-@media (max-width:420px){.maq{margin-right:30px}.palanca{right:-33px;top:80px;transform:scale(.88);transform-origin:0 50%}}
+@media (max-width:420px){.maq{margin-right:30px}.palanca{right:-33px;top:104px;transform:scale(.88);transform-origin:0 50%}}
 </style>
 </head>
 <body>
@@ -139,11 +174,9 @@ body{margin:0}
 
   <section class="jugador" id="jugador" aria-label="Tu número" hidden></section>
 
-  <section class="maq" aria-label="Maquinita">
-    <div class="marquee">
-      <div class="luces" id="luces" aria-hidden="true"></div>
-      <h1>La maquinita de Mochito</h1>
-    </div>
+  <section class="maq" aria-label="Setto Luckyslot">
+    <span class="tope" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1 6.1 20.3l1.3-6.5L2.5 9.3l6.6-.8z" fill="#F2C14E" stroke="#1F5452" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
+    <div class="cartel"><span>Setto</span><h1>Luckyslot</h1></div>
     <div class="ventana" id="ventana">
       <div class="reel"><div class="strip"></div></div>
       <div class="reel"><div class="strip"></div></div>
@@ -152,22 +185,24 @@ body{margin:0}
       <div class="reel"><div class="strip"></div></div>
     </div>
     <p class="msg" id="msg" aria-live="polite">¡Probá suerte!</p>
-    <button class="tirar" id="tirar" type="button">Tirar</button>
-    <div class="fichas" id="fichas" aria-live="polite"></div>
+    <div class="tablero">
+      <div class="fichas" id="fichas" aria-live="polite"></div>
+      <button class="tirar" id="tirar" type="button">Tirar</button>
+    </div>
     <button class="palanca" id="palanca" type="button" aria-label="Bajar la palanca y tirar"><span class="brazo"><span class="bola"></span></span><span class="eje"></span></button>
   </section>
 
-  <section class="jugador reclamo" id="reclamo" aria-label="Guardar tu premio" hidden></section>
+  <section class="jugador reclamo" id="reclamo" aria-label="Canjear tu premio" hidden></section>
   <section class="mios" id="mios" aria-label="Tus premios" hidden></section>
+  <details class="test" hidden>
+    <summary>Modo prueba: elegí qué sale en la próxima tirada</summary>
+    <div class="chips" id="forzar"></div>
+    <div class="chips"><button class="chip" id="reponer" type="button">Sumar 5 fichas</button></div>
+  </details>
 
   <section class="premios" id="premios" aria-label="Premios"></section>
-  <p class="letra" id="letra"></p>
+  <ul class="reglas" id="letra"></ul>
 
-  <details class="test" hidden>
-    <summary>Prueba</summary>
-    <div class="chips" id="forzar"></div>
-    <div class="chips"><button class="chip" id="reponer" type="button">Sumar fichas de una compra</button></div>
-  </details>
 </div>
 
 <canvas id="confeti" aria-hidden="true"></canvas>
@@ -185,7 +220,7 @@ body{margin:0}
   async function cargarCfg() {
     const c = window.SETTO_CONFIG || {};
     try {
-      if (c.supabaseUrl && c.supabaseAnonKey) {
+      if (c.supabaseUrl && c.supabaseAnonKey && !(window.SettoAPI || {}).DEMO) {
         const r = await fetch(`${c.supabaseUrl}/rest/v1/settings?key=eq.maquinita&select=value`, { headers: { apikey: c.supabaseAnonKey, Authorization: "Bearer " + c.supabaseAnonKey } });
         const d = await r.json(); return (d && d[0] && d[0].value) || {};
       }
@@ -194,13 +229,12 @@ body{margin:0}
   }
   const CFG = await cargarCfg();
   const API = window.SettoAPI;
-  if (API.DEMO) { $(".aviso-prueba").hidden = false; $("details.test").hidden = false; }
+  if (API.DEMO) { $(".aviso-prueba").hidden = false; $("details.test").hidden = false; $("details.test").open = true; }
   const DEF_SIM = [["mochito", "Mochito", "img/mochito-cup.png"], ["frutilla", "Mochi frutilla", "img/mochi-frutilla.webp"], ["oreo", "Mochi oreo", "img/mochi-oreo.webp"], ["dirty", "Dirty caramel", "img/dirty-caramel.webp"], ["matcha", "Strawberry matcha", "img/dirty-strawberry.webp"], ["estrella", "Estrella", ""]];
   const IMG = {}, NOMBRE = {};
   DEF_SIM.forEach(([k, n, img], i) => { const c = (CFG.simbolos || [])[i] || {}; IMG[k] = c.img || img; NOMBRE[k] = c.nombre || n; });
   const FICHAS = Math.max(1, Math.min(5, Math.round(+CFG.fichas_dia || 1)));
   if (CFG.aviso === false) $(".aviso-prueba").hidden = true;
-  $(".letra").textContent = `${FICHAS === 1 ? "Una tirada gratis" : FICHAS + " tiradas gratis"} por día. No apostás nada.`;
   const ESTRELLA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1 6.1 20.3l1.3-6.5L2.5 9.3l6.6-.8z" fill="#F2C14E" stroke="#1F5452" stroke-width="1.4" stroke-linejoin="round"/></svg>';
   const SIMBOLOS = ["mochito", "frutilla", "oreo", "dirty", "matcha", "estrella"];
   const symHtml = (k) => !IMG[k] ? ESTRELLA : `<img src="${esc(IMG[k])}" alt="${esc(NOMBRE[k])}" draggable="false">`;
@@ -208,17 +242,18 @@ body{margin:0}
 
   // La tabla se edita desde el panel; el resultado de cada tirada lo decide la base (maq_tirar)
   const DEF_PREM = { gift: ["Gift card $10.000", 0.1], mochi: ["Mochi gratis", 0.5], off: ["10% off", 2] };
-  const COMBO = { gift: () => symHtml("mochito").repeat(5), mochi: () => `<span>5 iguales</span>`, off: () => `<span>4 iguales</span>` };
+  const puntos = (n) => "<i></i>".repeat(n) + '<i class="no"></i>'.repeat(5 - n);
+  const COMBO = { gift: [() => symHtml("mochito").repeat(5), "5 Mochitos"], mochi: [() => puntos(5), "5 iguales"], off: [() => puntos(4), "4 iguales"] };
   const PREMIOS = ["gift", "mochi", "off"].map((id) => {
     const c = (CFG.premios || []).find((x) => x.id === id), d = DEF_PREM[id];
     return { id, titulo: c ? String(c.titulo || "").trim() : d[0], chance: c ? Math.max(0, +c.chance || 0) : d[1], combo: COMBO[id] };
   }).filter((p) => p.titulo && p.chance > 0);
   const fmt = (n) => n.toLocaleString("es-AR") + "%";
-  $("#premios").innerHTML = PREMIOS.map((p) => `<div class="fila"><span class="combo">${p.combo()}</span><b>${esc(p.titulo)}</b><span class="pct">${fmt(p.chance)}</span></div>`).join("");
+  $("#premios").innerHTML = `<div class="pz-h"><h2>Premios</h2><span>Chance por tirada</span></div>` + PREMIOS.map((p, i) => `<div class="pz ${i === 0 ? "top" : ""}"><span class="pz-combo" aria-hidden="true">${p.combo[0]()}</span><span class="pz-t"><b>${esc(p.titulo)}</b><small>${p.combo[1]}</small></span><span class="pz-pct">${fmt(p.chance)}</span></div>`).join("");
 
   /* ---------- tu número, fichas y premios (los guarda la base) ---------- */
   const COMPRA = Math.max(0, Math.min(50, Math.round(CFG.fichas_compra ?? 5)));
-  $("#letra").textContent = `${FICHAS === 1 ? "Una tirada gratis" : FICHAS + " tiradas gratis"} por día${COMPRA ? ` y ${COMPRA} fichas por cada compra` : ""}. No apostás nada.`;
+  $("#letra").innerHTML = `<li>🎟️ <span><b>${FICHAS === 1 ? "1 tirada gratis" : FICHAS + " tiradas gratis"}</b> por día</span></li>${COMPRA ? `<li>🛍️ <span><b>+${COMPRA} fichas</b> por compra</span></li>` : ""}<li>✨ <span>No apostás nada</span></li>`;
   // Para jugar no se pide el celular: la tirada gratis va por este dispositivo (y la base pone un tope por red).
   // Las fichas de compra van con el celular de los pedidos hechos en este celu. Si gana sin celular, lo pide para guardar el premio.
   const TEL = "setto-maq-tel", DEV = "setto-maq-dev";
@@ -240,32 +275,60 @@ body{margin:0}
   function pintarJugador() {
     const j = $("#jugador");
     j.hidden = !tel; if (!tel) { j.innerHTML = ""; return; }
-    j.innerHTML = `<div class="linea"><span>Tus fichas de compra van con <b>${esc(API.prettyPhone(tel))}</b></span><button class="link" id="cambiar" type="button">No soy yo</button></div>`;
-    $("#cambiar").addEventListener("click", async () => { tel = null; try { localStorage.removeItem(TEL); } catch (_) {} pintarJugador(); await cargarEstado(); });
+    j.innerHTML = `<div class="linea"><span class="jug-info"><small>Tus fichas van con</small><b>${esc(API.prettyPhone(tel))}</b></span><button class="btn-sec" id="cambiar" type="button">No soy yo</button></div>`;
+    $("#cambiar").addEventListener("click", async () => { tel = null; canje = null; try { localStorage.removeItem(TEL); } catch (_) {} pintarJugador(); await cargarEstado(); });
   }
-  // ganó sin celular: el premio queda guardado en este dispositivo hasta que deje su número
+  // Ganó: se canjea en la misma visita. Pide el celular (si no lo sabemos), ofrece las casillas y lo deja aplicado en el carrito.
+  let canje = null; // premio recién ganado con un número conocido (ya activo)
+  const VERSION = "2026-10-pretildada"; // mismas casillas que el checkout, tildadas (decisión de Isa)
+  function venceTxt(v) {
+    if (!v) return ""; const m = Math.max(0, Math.round((new Date(v) - Date.now()) / 60000));
+    return m >= 60 ? `Vence en ${Math.floor(m / 60)} h` : `Vence en ${m} min`;
+  }
+  // lo deja aplicado en el carrito de la web (misma pestaña)
+  function aplicarEnCarrito(p, numero) {
+    const m = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.saldo, vence_at: p.vence_at || null, tel: numero };
+    try { localStorage.setItem("setto-maq-usar", JSON.stringify(m)); const f = JSON.parse(localStorage.getItem("setto-form") || "{}") || {}; if (API.normPhone(f.tel) !== API.normPhone(numero)) localStorage.setItem("setto-form", JSON.stringify({ ...f, tel: numero })); } catch (_) {}
+    try { if (window.parent !== window && window.parent.SettoCanjeMaq) { window.parent.SettoCanjeMaq(m); return true; } } catch (_) {}
+    return false;
+  }
   function pintarReclamo() {
-    const r = $("#reclamo"), p = est && est.pendiente;
+    const r = $("#reclamo"), p = (est && est.pendiente) || canje;
     r.hidden = !p; if (!p) { r.innerHTML = ""; return; }
-    r.innerHTML = `<p><b>¡Ganaste ${esc(p.titulo)}!</b> Dejanos tu celular para guardarlo. Se descuenta solo cuando pidas en la web con ese número.</p>
-      <form id="telForm"><input id="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 555-1234" aria-label="Tu celular" required><button class="btn" type="submit">Guardar premio</button></form>
-      <label class="avisos"><input type="checkbox" id="avisos"> <span>Avisame por WhatsApp de novedades y sabores nuevos. <small>Opcional. Te das de baja cuando quieras en <a href="/privacidad" target="_blank" rel="noopener">Privacidad y bajas</a>.</small></span></label>
+    const pend = !!(est && est.pendiente), v = pend ? tel || "" : tel;
+    r.innerHTML = `<p><b>¡Ganaste ${esc(p.titulo)}!</b> Canjealo ahora y queda aplicado en tu pedido.<br><span class="vence">${esc(venceTxt(p.vence_at) || "Vence en 48 h")}</span></p>
+      <form id="telForm" class="chk" novalidate>
+        <label class="f" for="tel">Tu celular (WhatsApp)<input id="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 555-1234" value="${esc(v ? API.prettyPhone(v) : "")}" ${pend ? "" : "disabled"} required></label>
+        <label class="avisos"><input type="checkbox" id="okWa" checked> <span>Avisame por WhatsApp cuando salgan sabores nuevos o limitados.</span></label>
+        <label class="avisos"><input type="checkbox" id="okAds" checked> <span>Pueden usar mi número para mostrarme anuncios de Setto en Instagram y Facebook.</span></label>
+        <small>Las dos son opcionales y te das de baja cuando quieras en <a href="/privacidad" target="_blank" rel="noopener">Privacidad y bajas</a>.</small>
+        <button class="btn canjear" type="submit">Canjear premio</button>
+      </form>
       <small class="err" id="telErr" aria-live="polite"></small>`;
     $("#telForm").addEventListener("submit", async (e) => {
-      e.preventDefault(); const v = $("#tel").value, b = $("#telForm .btn");
-      if (!API.normPhone(v)) { $("#telErr").textContent = "Revisá tu celular: código de área + número."; $("#tel").focus(); return; }
-      b.disabled = true;
-      try { const g = await API.maqReclamar(dev, v); tel = v; try { localStorage.setItem(TEL, v); } catch (_) {}
-        if ($("#avisos").checked && API.consentimientoMaquinita) API.consentimientoMaquinita(v, "2026-10-maquinita").catch(() => {});
-        pintarJugador(); await cargarEstado(); $("#msg").innerHTML = `<span><b>¡Guardado!</b>Tu código: <code>${esc(g.code)}</code></span>`; $("#mios").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      e.preventDefault(); const n = pend ? $("#tel").value : tel, b = $("#telForm .canjear");
+      if (!API.normPhone(n)) { $("#telErr").textContent = "Revisá tu celular: código de área + número."; $("#tel").focus(); return; }
+      b.disabled = true; $("#telErr").textContent = "";
+      try {
+        const g = pend ? await API.maqReclamar(dev, n) : p;
+        tel = n; try { localStorage.setItem(TEL, n); } catch (_) {}
+        const canales = [$("#okWa").checked && "whatsapp", $("#okAds").checked && "meta_ads"].filter(Boolean);
+        if (canales.length && API.consentimientoMaquinita2) API.consentimientoMaquinita2(dev, n, canales, VERSION).catch(() => {});
+        canje = null; pintarJugador(); await cargarEstado();
+        const ok = aplicarEnCarrito(g, n);
+        $("#msg").innerHTML = `<span><b>¡Listo!</b>${ok ? "Ya está aplicado en tu pedido." : `Ya está aplicado en tu pedido. Tu código: <code>${esc(g.code)}</code>`}</span>`;
       } catch (err) { b.disabled = false; $("#telErr").textContent = err.message; }
     });
   }
   function pintarMios() {
     const ps = (est && est.premios) || [], m = $("#mios");
     m.hidden = !ps.length; if (!ps.length) { m.innerHTML = ""; return; }
-    m.innerHTML = `<h2>Tus premios</h2>` + ps.map((p) => `<div class="mio"><span><b>${esc(p.titulo)}</b>${p.tipo === "monto" && p.saldo !== p.valor ? ` · te quedan ${pesos(p.saldo)}` : ""}</span><code>${esc(p.code)}</code></div>`).join("") +
-      `<p class="letra">Se descuentan solos en tu próximo pedido en la web, pidiendo con este mismo número.</p>`;
+    m.innerHTML = `<h2>Tus premios</h2>` + ps.map((p) => `<div class="mio"><span class="dato"><span><b>${esc(p.titulo)}</b>${p.tipo === "monto" && p.saldo !== p.valor ? ` · te quedan ${pesos(p.saldo)}` : ""}</span><small><code>${esc(p.code)}</code>${p.vence_at ? " · " + esc(venceTxt(p.vence_at).toLowerCase()) : ""}</small></span><button class="usar" type="button" data-usar="${esc(p.code)}">Usar ahora</button></div>`).join("") +
+      `<p class="letra">Se usan pidiendo en la web con este mismo número.</p>`;
+    m.querySelectorAll("[data-usar]").forEach((b) => b.addEventListener("click", () => {
+      const p = ps.find((x) => x.code === b.dataset.usar); if (!p) return;
+      const ok = aplicarEnCarrito(p, tel); $("#msg").innerHTML = `<span><b>¡Listo!</b>${ok ? "Ya está aplicado en tu pedido." : `Usalo con tu código <code>${esc(p.code)}</code>`}</span>`;
+    }));
     try { localStorage.setItem("setto-maq", JSON.stringify({ tel, premios: ps })); } catch (_) {}
   }
   async function cargarEstado() {
@@ -273,10 +336,9 @@ body{margin:0}
     pintarFichas(); pintarMios(); pintarReclamo();
   }
   function pintarFichas() {
-    const n = quedan(), MAXV = 10;
+    const n = quedan();
     if (!est) { $("#fichas").innerHTML = ""; $("#tirar").disabled = $("#palanca").disabled = true; if (!girando) $("#msg").textContent = "Cargando tus fichas…"; return; }
-    $("#fichas").innerHTML = Array.from({ length: Math.min(Math.max(n, FICHAS), MAXV) }, (_, i) => `<span class="ficha ${i < n ? "" : "vacia"}"></span>`).join("") +
-      `<span>${n === 1 ? "1 ficha" : n + " fichas"}${est.fichas && est.gratis ? ` (${est.gratis} gratis hoy)` : ""}</span>`;
+    $("#fichas").innerHTML = `<span class="ficha ${n ? "" : "vacia"}"></span><span><b class="num">${n}</b>${n === 1 ? "ficha" : "fichas"}${est.fichas && est.gratis ? ` · ${est.gratis} gratis` : ""}</span>`;
     $("#tirar").disabled = $("#palanca").disabled = n === 0 || girando;
     if (n > 0 && !girando && $("#msg").textContent === "Cargando tus fichas…") $("#msg").textContent = "¡Probá suerte!";
     if (n === 0 && !girando) $("#msg").textContent = COMPRA ? `Volvé mañana o sumá ${COMPRA} fichas con tu próxima compra` : "Volvé mañana por otra tirada";
@@ -331,24 +393,20 @@ body{margin:0}
     if (res === "nada" || (!r0.code && !r0.pendiente)) { pintarFichas(); if (quedan() > 0) $("#msg").textContent = "¡Casi! Tirá de nuevo"; else if (!COMPRA) $("#msg").textContent = "¡Casi! Volvé mañana"; return; }
     const top = SIMBOLOS.find((s) => fin.filter((x) => x === s).length >= 4);
     reels.forEach((r, i) => { if (fin[i] === top) r.classList.add("win"); });
-    const html = r0.pendiente ? `<span><b>¡${esc(r0.titulo)}!</b><small>Dejá tu celular acá abajo para guardarlo.</small></span>`
-      : `<span><b>¡${esc(r0.titulo)}!</b>Tu código: <code>${esc(r0.code)}</code><small>Se descuenta solo en tu próximo pedido con este número.</small></span>`;
+    const html = `<span><b>¡${esc(r0.titulo)}!</b><small>Canjealo acá abajo: queda aplicado en tu pedido.</small></span>`;
     fanfarria(res === "gift"); confeti(res === "gift" ? 220 : res === "mochi" ? 140 : 70);
-    cargarEstado().then(() => { $("#msg").innerHTML = html; if (r0.pendiente) setTimeout(() => { $("#reclamo").scrollIntoView({ behavior: "smooth", block: "center" }); $("#tel").focus({ preventScroll: true }); }, 900); }); // el premio queda a la vista aunque no queden fichas
+    cargarEstado().then(() => {
+      if (!r0.pendiente) canje = ((est && est.premios) || []).find((x) => x.code === r0.code) || null;
+      pintarReclamo(); $("#msg").innerHTML = html;
+      setTimeout(() => { $("#reclamo").scrollIntoView({ behavior: "smooth", block: "center" }); const t = $("#tel"); if (t && !t.disabled) t.focus({ preventScroll: true }); }, 900);
+    }); // el premio queda a la vista aunque no queden fichas
   }
 
   $("#tirar").addEventListener("click", girar);
   $("#palanca").addEventListener("click", girar);
 
-  /* ---------- luces ---------- */
-  const lucesEl = $("#luces"); lucesEl.innerHTML = "<i></i>".repeat(12);
-  let lt = null, paso = 0;
-  function luces(on) {
-    clearInterval(lt); const is = [...lucesEl.children];
-    if (!on) { is.forEach((x, i) => x.classList.toggle("on", i % 2 === 0)); return; }
-    lt = setInterval(() => { paso++; is.forEach((x, i) => x.classList.toggle("on", (i + paso) % 3 === 0)); }, 90);
-  }
-  luces(false);
+  /* ---------- cartel: brilla mientras gira ---------- */
+  const luces = (on) => $(".maq").classList.toggle("girando", on);
 
   /* ---------- sonido (opcional, arranca apagado) ---------- */
   const OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>';
@@ -388,13 +446,10 @@ body{margin:0}
   $("#forzar").innerHTML = OPC.map(([k, l]) => `<button class="chip" type="button" data-f="${k}" aria-pressed="false">Próxima: ${l}</button>`).join("");
   function marcar() { document.querySelectorAll("[data-f]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === forzado)); }
   $("#forzar").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (!b) return; forzado = forzado === b.dataset.f ? null : b.dataset.f; marcar(); });
-  // solo demo: simula que un pedido con este número se marcó entregado
+  // solo demo: suma fichas a este dispositivo para seguir probando
   $("#reponer").addEventListener("click", async () => {
     if (!API.DEMO) return;
-    if (!tel) { $("#msg").textContent = "En la demo: ganá un premio y guardalo con tu celular primero"; return; }
-    await API.maqEstado(tel); // crea el jugador si no existía
-    const db = JSON.parse(localStorage.getItem("setto-demo-db")), ph = API.normPhone(tel);
-    db.maq.jug[ph].fichas += COMPRA || 5; localStorage.setItem("setto-demo-db", JSON.stringify(db));
+    await API.maqSumarDemo(dev, 5); // fichas de prueba para este dispositivo, con o sin número
     await cargarEstado(); $("#msg").textContent = "¡Probá suerte!";
   });
   pintarJugador(); pintarFichas(); cargarEstado();

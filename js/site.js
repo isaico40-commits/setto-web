@@ -465,7 +465,7 @@
     if (t.dataset.gvcopy) { try { navigator.clipboard.writeText(t.dataset.gvcopy); toast("Código copiado"); } catch (_) {} return; }
     if (t.dataset.gvuse) { usarGift(t.dataset.gvuse, +t.dataset.saldo); cerrarRegalo(); irA("#sets"); toast("Gift card guardada: se aplica al pedir"); }
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (!$("#gcBuy").hidden) cerrarGift(); if (!$("#gcView").hidden) cerrarRegalo(); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (!$("#gcBuy").hidden) { e.preventDefault(); cerrarGift(); } if (!$("#gcView").hidden) { e.preventDefault(); cerrarRegalo(); } } });
 
   /* link de regalo: ?regalo=TOKEN */
   function cerrarRegalo() { $("#gcView").hidden = true; document.body.style.overflow = ""; }
@@ -493,7 +493,9 @@
   function quitarGift() { GIFT = null; try { localStorage.removeItem("setto-gift"); } catch (_) {} }
   /* premio de la maquinita: se calcula igual que create_order_v6 (antes de la gift card) */
   let MAQ = null; try { MAQ = JSON.parse(localStorage.getItem("setto-maq-usar") || "null"); } catch (_) {}
-  function usarMaq(p) { MAQ = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.saldo, tel: form.tel }; try { localStorage.setItem("setto-maq-usar", JSON.stringify(MAQ)); } catch (_) {} }
+  const maqVencido = () => MAQ && MAQ.vence_at && new Date(MAQ.vence_at) <= new Date(); // dura 48 hs (migración 040)
+  if (maqVencido()) { MAQ = null; try { localStorage.removeItem("setto-maq-usar"); } catch (_) {} }
+  function usarMaq(p) { MAQ = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.saldo, vence_at: p.vence_at || null, tel: form.tel }; try { localStorage.setItem("setto-maq-usar", JSON.stringify(MAQ)); } catch (_) {} }
   function quitarMaq() { MAQ = null; try { localStorage.removeItem("setto-maq-usar"); } catch (_) {} }
   const antesMaq = () => total() + envioCosto() - (completes() ? premioOff() : 0);
   const mochiMin = () => { const ms = cart.filter((c) => ["mochi", "especial"].includes((find(c.id) || {}).categoria)).map((c) => c.precio); return ms.length ? Math.min(...ms) : 0; };
@@ -517,6 +519,22 @@
     const ps = MAQ ? [] : maqSug.tel === API.normPhone(form.tel) ? maqSug.premios : [];
     el.innerHTML = ps.length ? `<span>Tenés ${ps.length === 1 ? "un premio" : "premios"} de la maquinita:</span>${ps.map((p) => `<button class="back" data-maquse="${esc(p.code)}">Usar ${esc(p.titulo)}</button>`).join("")}` : "";
   }
+  // premio de la maquinita en el carrito: a la vista desde que lo canjea
+  function maqCartHtml() {
+    if (maqVencido()) quitarMaq();
+    if (!MAQ) return "";
+    const m = Math.max(0, Math.round((new Date(MAQ.vence_at) - Date.now()) / 60000)), vence = MAQ.vence_at ? ` · vence en ${m >= 60 ? Math.floor(m / 60) + " h" : m + " min"}` : "";
+    const det = MAQ.tipo === "mochi" ? (mochiMin() ? "Tu mochi más barato sale gratis." : "Sumá un mochi y te sale gratis.")
+      : MAQ.tipo === "porcentaje" ? `${MAQ.valor}% off en tus productos.` : `${money(MAQ.saldo)} de descuento.`;
+    return `<div class="maqon"><span class="maqon-i" aria-hidden="true">🎰</span><div><b>Premio aplicado: ${esc(MAQ.titulo)}</b><small>${det}${vence}</small></div><button class="back" data-maqx>Quitar</button></div>`;
+  }
+  window.SettoCanjeMaq = (p) => { // la maquinita lo canjea y vuelve al carrito con el descuento a la vista
+    if (p.tel) form.tel = p.tel;
+    usarMaq(p); maqSug = { tel: null, premios: [] };
+    $("#mqView").hidden = true; document.body.style.overflow = "";
+    if (!(lastOrder && view === "sent")) view = "cart";
+    if ($("#drawer").classList.contains("on")) drawDrawer(); else openDrawer();
+  };
   function giftBox() {
     const maqLine = MAQ ? `<div class="gcon"><span>🎰 ${esc(MAQ.titulo)} <b>${esc(MAQ.code)}</b>${MAQ.tipo === "mochi" && !mochiMin() ? " · agregá un mochi para usarlo" : ""}</span><button class="back" data-maqx>Quitar</button></div>` : `<div class="maqsug" id="maqSug"></div>`;
     return `<div class="f gcbox">${maqLine}${GIFT ? `<div class="gcon"><span>🎁 Gift card <b>${esc(GIFT.code)}</b> · saldo ${money(GIFT.saldo)}</span><button class="back" data-gcx>Quitar</button></div>`
@@ -829,7 +847,7 @@
   if (PAGE === "gift-cards" && new URLSearchParams(location.search).get("desde") === "listo") {
     const v = document.querySelector("#regalo .volver"); if (v) { v.href = "/?p=listo"; v.textContent = "← Volver"; }
   }
-  function cerrarMaq() { $("#mqView").hidden = true; document.body.style.overflow = ""; maqSug = { tel: null, premios: [] }; } // si ganó, el carrito vuelve a mirar sus premios
+  function cerrarMaq() { $("#mqView").hidden = true; document.body.style.overflow = ""; maqSug = { tel: null, premios: [] }; if (view === "cart" && $("#drawer").classList.contains("on")) { drawDrawer(); const t = $("[data-cxmaq]"); if (t) t.focus(); } } // si ganó, el carrito vuelve a mirar sus premios
   function girarMini(done) {
     const reels = [...document.querySelectorAll("#maquinita .mq-reel")];
     if (!reels.length || matchMedia("(prefers-reduced-motion: reduce)").matches) return done();
@@ -854,7 +872,7 @@
     card.classList.add("tirando");
     setTimeout(() => girarMini(() => { mqGirando = false; card.classList.remove("tirando"); }), 380);
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#mqView").hidden) cerrarMaq(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#mqView").hidden) { e.preventDefault(); cerrarMaq(); } });
   function renderFooter() {
     const r = S.retiro || { rangos: [] };
     HORARIO = "De " + r.rangos.map(([a, b]) => a.replace(":00", "") + " a " + b.replace(":00", "")).join(" y de ") + " hs.";
@@ -1013,17 +1031,45 @@
       <b>${esc(p.nombre)}</b><small class="num">${unit(p) ? "" : "Desde "}${money(unit(p) ? p.precio : p.precios["12 oz"])}</small></div>`).join("")}</div></div>`;
   }
   const giftCta = () => gcfg().activo === false ? "" : `<a class="gift-cta" href="/gift-cards" data-closedrawer><span class="gc-ico" aria-hidden="true">🎁</span><span><b>¿Es para regalar?</b><small>Mandá una gift card digital de Setto.</small></span><span class="go" aria-hidden="true">→</span></a>`;
+  // debajo de Continuar: maquinita y club en pop up, sin cerrar el carrito
+  const extrasCart = () => { const b = [maqOn() ? `<button class="cx-b" type="button" data-cxmaq>🎰 Probá suerte</button>` : "", clubOn() ? `<button class="cx-b" type="button" data-cxclub>⭐ Setto Club</button>` : ""].filter(Boolean);
+    return b.length ? `<div class="cx">${b.join("")}</div>` : ""; };
+  function abrirClubPop() { // igual que la sección del club, pero sin buscador: la tarjeta es solo para mirar
+    const c = club(), meta = Math.max(2, Math.min(12, c.meta || 8)), d = cardCache && cardCache.tel === API.normPhone(form.tel) ? cardCache.data : null, n = d ? Math.min(d.sellos, meta) : 0, b = beneficios();
+    const st = Array.from({ length: meta }, (_, i) => i === meta - 1 ? `<div class="stamp gift ${i < n ? "on" : ""}">${i < n ? "¡Listo!" : "Premio"}</div>` : `<div class="stamp ${i < n ? "on" : ""}">${i < n ? '<img src="img/mochito-run.png" alt="">' : i + 1}</div>`).join("");
+    $("#cpBody").innerHTML = `<div class="cp-grid">
+      <div class="next cp-next">
+        <div><span class="k">1</span><span><b>Pedí desde la web</b></span></div>
+        <div><span class="k">2</span><span><b>Recibilo y sumás ${sellosTxt(spp())}</b>${c.minimo > 0 ? `<small>En pedidos desde ${money(c.minimo)}.</small>` : ""}</span></div>
+        <div><span class="k">3</span><span><b>Completá la tarjeta</b><small>El pedido que completa los ${meta} sellos viene con ${esc(premioTxt())}.</small></span></div>
+      </div>
+      <div class="stampcard cp-card" aria-label="Tarjeta de sellos">
+        <div class="row1"><img src="img/logo.svg" alt="Setto"><span class="eyebrow">Club</span></div>
+        <div class="stamps" style="--n:${meta}">${st}</div>
+        <p class="muted">${d ? `Tenés ${n} de ${meta} sellos.` : "Cada pedido de la web suma un sello."}</p>
+      </div>
+      ${b.length ? `<div class="clubbenef cp-benef"><b>Con tu compra tenés beneficios exclusivos del club</b><ul>${b.map((x) => `<li><span class="bn-ico" aria-hidden="true">${x.ico}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></li>`).join("")}</ul></div>` : ""}
+    </div>`;
+    $("#clubPop").hidden = false; $("[data-cpclose]").focus();
+  }
+  function cerrarClubPop() { $("#clubPop").hidden = true; if ($("#drawer").classList.contains("on")) { const t = $("[data-cxclub]"); if (t) t.focus(); } }
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-cxmaq]")) return abrirMaq();
+    if (e.target.closest("[data-cxclub]")) return abrirClubPop();
+    if (e.target.closest("[data-cpclose]") || e.target.id === "clubPop") return cerrarClubPop();
+  });
   function drawDrawer() {
     const body = $("#dBody"), foot = $("#dFoot");
     if (drawDrawer.v !== view) { body.scrollTop = 0; drawDrawer.v = view; } // cada paso arranca desde arriba
     $("#dBack").hidden = view !== "checkout" && view !== "buscar";
     if (view === "cart") {
       $("#dTitle").textContent = "Tu pedido";
-      if (!cart.length) { body.innerHTML = `${trackHtml()}<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><div class="empty-acts"><a class="btn" href="#sets" data-closedrawer>Ver sets</a><button class="btn" id="toBuscar">Consultar mi pedido</button></div></div>`; foot.innerHTML = ""; return; }
-      body.innerHTML = trackHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
+      if (!cart.length) { body.innerHTML = `${trackHtml()}${maqCartHtml()}<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><div class="empty-acts"><a class="btn" href="#sets" data-closedrawer>Ver sets</a><button class="btn" id="toBuscar">Consultar mi pedido</button></div></div>`; foot.innerHTML = ""; return; }
+      body.innerHTML = trackHtml() + maqCartHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
         <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("") + sugHtml() + `<div class="ctas">${giftCta()}</div>`;
-      foot.innerHTML = `${clubLine(true)}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
+      const mOff = Math.min(maqOff(), total());
+      foot.innerHTML = `${clubLine(true)}${mOff > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Subtotal</span><span class="num">${money(total())}</span></div><div class="tot maqoff" style="font-weight:500;font-size:.9rem"><span>🎰 ${esc(MAQ.titulo)}</span><span class="num">${money(-mOff)}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(total() - mOff)}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>${extrasCart()}
         <p class="muted" style="font-size:.78rem;text-align:center">${envioOn() ? "Retiro o envío: lo elegís después." : "¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats."}</p>`;
     }
     if (view === "buscar") { $("#dTitle").textContent = "Consultar pedido"; body.innerHTML = buscarDrawerHtml(); foot.innerHTML = ""; return; }
@@ -1246,7 +1292,12 @@
   $("#mnav").addEventListener("click", (e) => { if (e.target.closest("a")) closeMenu(); });
 
   $("#scrim").addEventListener("click", () => { closeSheet(); closeDrawer(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeSheet(); closeDrawer(); closeMenu(); } });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || e.defaultPrevented) return; // ya cerró un pop up de arriba
+    if (!$("#clubPop").hidden) return cerrarClubPop();
+    if ([...document.querySelectorAll(".allrev")].some((x) => !x.hidden)) return; // primero se cierra el pop up de arriba
+    closeSheet(); closeDrawer(); closeMenu();
+  });
 
   /* ---------- stock en vivo ---------- */
   async function refrescarStock() { if (!API.getStock) return; try { STOCK = await API.getStock(); renderEspecial(); renderSets(); renderCarta(); renderBadge(); } catch (_) {} }
