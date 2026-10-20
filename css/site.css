@@ -402,8 +402,9 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .stamp.on{border:2px solid var(--turquesa);background:var(--menta)}
 .loading{grid-column:1/-1;text-align:center;color:var(--ink-2);padding:30px 0}
 .coderow{display:flex;align-items:center;justify-content:center;gap:10px;font-family:var(--display);font-size:2rem;color:var(--ink)}
-.set .ph.foto::before{display:none}
-.set .ph.foto img{width:100%;height:100%;max-height:none;object-fit:cover}
+/* foto subida desde el panel: se ve entera (vaso y mochi), sin recortar ni deformar.
+   Si es un recorte sin fondo queda sobre el círculo coral, igual que los demás sets. */
+.set .ph.foto img{width:100%;height:210px;max-height:none;object-fit:contain}
 
 /* menú hamburguesa (mobile) */
 .burger{display:none;width:42px;height:42px;border-radius:50%;border:var(--line);background:var(--card);box-shadow:var(--sombra-chica);flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0;flex:none}
