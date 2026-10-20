@@ -493,7 +493,9 @@
   function quitarGift() { GIFT = null; try { localStorage.removeItem("setto-gift"); } catch (_) {} }
   /* premio de la maquinita: se calcula igual que create_order_v6 (antes de la gift card) */
   let MAQ = null; try { MAQ = JSON.parse(localStorage.getItem("setto-maq-usar") || "null"); } catch (_) {}
-  function usarMaq(p) { MAQ = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.saldo, tel: form.tel }; try { localStorage.setItem("setto-maq-usar", JSON.stringify(MAQ)); } catch (_) {} }
+  const maqVencido = () => MAQ && MAQ.vence_at && new Date(MAQ.vence_at) <= new Date(); // dura 48 hs (migración 040)
+  if (maqVencido()) { MAQ = null; try { localStorage.removeItem("setto-maq-usar"); } catch (_) {} }
+  function usarMaq(p) { MAQ = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.saldo, vence_at: p.vence_at || null, tel: form.tel }; try { localStorage.setItem("setto-maq-usar", JSON.stringify(MAQ)); } catch (_) {} }
   function quitarMaq() { MAQ = null; try { localStorage.removeItem("setto-maq-usar"); } catch (_) {} }
   const antesMaq = () => total() + envioCosto() - (completes() ? premioOff() : 0);
   const mochiMin = () => { const ms = cart.filter((c) => ["mochi", "especial"].includes((find(c.id) || {}).categoria)).map((c) => c.precio); return ms.length ? Math.min(...ms) : 0; };
@@ -517,6 +519,22 @@
     const ps = MAQ ? [] : maqSug.tel === API.normPhone(form.tel) ? maqSug.premios : [];
     el.innerHTML = ps.length ? `<span>Tenés ${ps.length === 1 ? "un premio" : "premios"} de la maquinita:</span>${ps.map((p) => `<button class="back" data-maquse="${esc(p.code)}">Usar ${esc(p.titulo)}</button>`).join("")}` : "";
   }
+  // premio de la maquinita en el carrito: a la vista desde que lo canjea
+  function maqCartHtml() {
+    if (maqVencido()) quitarMaq();
+    if (!MAQ) return "";
+    const m = Math.max(0, Math.round((new Date(MAQ.vence_at) - Date.now()) / 60000)), vence = MAQ.vence_at ? ` · vence en ${m >= 60 ? Math.floor(m / 60) + " h" : m + " min"}` : "";
+    const det = MAQ.tipo === "mochi" ? (mochiMin() ? "Tu mochi más barato sale gratis." : "Sumá un mochi y te sale gratis.")
+      : MAQ.tipo === "porcentaje" ? `${MAQ.valor}% off en tus productos.` : `${money(MAQ.saldo)} de descuento.`;
+    return `<div class="maqon"><span class="maqon-i" aria-hidden="true">🎰</span><div><b>Premio aplicado: ${esc(MAQ.titulo)}</b><small>${det}${vence}</small></div><button class="back" data-maqx>Quitar</button></div>`;
+  }
+  window.SettoCanjeMaq = (p) => { // la maquinita lo canjea y vuelve al carrito con el descuento a la vista
+    if (p.tel) form.tel = p.tel;
+    usarMaq(p); maqSug = { tel: null, premios: [] };
+    $("#mqView").hidden = true; document.body.style.overflow = "";
+    if (!(lastOrder && view === "sent")) view = "cart";
+    if ($("#drawer").classList.contains("on")) drawDrawer(); else openDrawer();
+  };
   function giftBox() {
     const maqLine = MAQ ? `<div class="gcon"><span>🎰 ${esc(MAQ.titulo)} <b>${esc(MAQ.code)}</b>${MAQ.tipo === "mochi" && !mochiMin() ? " · agregá un mochi para usarlo" : ""}</span><button class="back" data-maqx>Quitar</button></div>` : `<div class="maqsug" id="maqSug"></div>`;
     return `<div class="f gcbox">${maqLine}${GIFT ? `<div class="gcon"><span>🎁 Gift card <b>${esc(GIFT.code)}</b> · saldo ${money(GIFT.saldo)}</span><button class="back" data-gcx>Quitar</button></div>`
@@ -1046,11 +1064,12 @@
     $("#dBack").hidden = view !== "checkout" && view !== "buscar";
     if (view === "cart") {
       $("#dTitle").textContent = "Tu pedido";
-      if (!cart.length) { body.innerHTML = `${trackHtml()}<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><div class="empty-acts"><a class="btn" href="#sets" data-closedrawer>Ver sets</a><button class="btn" id="toBuscar">Consultar mi pedido</button></div></div>`; foot.innerHTML = ""; return; }
-      body.innerHTML = trackHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
+      if (!cart.length) { body.innerHTML = `${trackHtml()}${maqCartHtml()}<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><div class="empty-acts"><a class="btn" href="#sets" data-closedrawer>Ver sets</a><button class="btn" id="toBuscar">Consultar mi pedido</button></div></div>`; foot.innerHTML = ""; return; }
+      body.innerHTML = trackHtml() + maqCartHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
         <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("") + sugHtml() + `<div class="ctas">${giftCta()}</div>`;
-      foot.innerHTML = `${clubLine(true)}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>${extrasCart()}
+      const mOff = Math.min(maqOff(), total());
+      foot.innerHTML = `${clubLine(true)}${mOff > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Subtotal</span><span class="num">${money(total())}</span></div><div class="tot maqoff" style="font-weight:500;font-size:.9rem"><span>🎰 ${esc(MAQ.titulo)}</span><span class="num">${money(-mOff)}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(total() - mOff)}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>${extrasCart()}
         <p class="muted" style="font-size:.78rem;text-align:center">${envioOn() ? "Retiro o envío: lo elegís después." : "¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats."}</p>`;
     }
     if (view === "buscar") { $("#dTitle").textContent = "Consultar pedido"; body.innerHTML = buscarDrawerHtml(); foot.innerHTML = ""; return; }

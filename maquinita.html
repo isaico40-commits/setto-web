@@ -122,6 +122,16 @@ details.test summary{cursor:pointer;font-weight:700;color:var(--turquesa)}
 .jugador[hidden]{display:none}
 .reclamo{border-color:var(--turquesa);box-shadow:0 0 0 3px rgba(41,106,103,.15)}
 .reclamo p{margin:0}
+.reclamo .vence{display:inline-block;margin-top:4px;font-size:.78rem;font-weight:700;color:#9A3A32;background:rgba(248,162,154,.22);border-radius:999px;padding:2px 9px}
+.reclamo label.f{display:grid;gap:4px;font-size:.82rem;font-weight:600}
+.reclamo input#tel{flex:none}
+.reclamo input#tel:disabled{opacity:.75}
+.reclamo .canjear{width:100%;padding:11px 16px;font-size:1rem}
+.reclamo .chk{display:grid;gap:8px}
+.reclamo .chk small{font-size:.74rem}
+.mio .usar{flex:none;border:var(--line);background:var(--turquesa);color:var(--card);border-radius:999px;padding:5px 12px;font-weight:600;font-size:.8rem}
+.mio .dato{display:grid;min-width:0}
+.mio .dato small{font-size:.74rem;color:var(--ink-2)}
 .reclamo .err{color:#B3261E}
 .reclamo .err:empty{display:none}
 .mios{display:grid;gap:6px}
@@ -182,13 +192,13 @@ body{margin:0}
     <button class="palanca" id="palanca" type="button" aria-label="Bajar la palanca y tirar"><span class="brazo"><span class="bola"></span></span><span class="eje"></span></button>
   </section>
 
+  <section class="jugador reclamo" id="reclamo" aria-label="Canjear tu premio" hidden></section>
+  <section class="mios" id="mios" aria-label="Tus premios" hidden></section>
   <details class="test" hidden>
     <summary>Modo prueba: elegí qué sale en la próxima tirada</summary>
     <div class="chips" id="forzar"></div>
-    <div class="chips"><button class="chip" id="reponer" type="button">Sumar fichas de una compra</button></div>
+    <div class="chips"><button class="chip" id="reponer" type="button">Sumar 5 fichas</button></div>
   </details>
-  <section class="jugador reclamo" id="reclamo" aria-label="Guardar tu premio" hidden></section>
-  <section class="mios" id="mios" aria-label="Tus premios" hidden></section>
 
   <section class="premios" id="premios" aria-label="Premios"></section>
   <ul class="reglas" id="letra"></ul>
@@ -266,31 +276,59 @@ body{margin:0}
     const j = $("#jugador");
     j.hidden = !tel; if (!tel) { j.innerHTML = ""; return; }
     j.innerHTML = `<div class="linea"><span class="jug-info"><small>Tus fichas van con</small><b>${esc(API.prettyPhone(tel))}</b></span><button class="btn-sec" id="cambiar" type="button">No soy yo</button></div>`;
-    $("#cambiar").addEventListener("click", async () => { tel = null; try { localStorage.removeItem(TEL); } catch (_) {} pintarJugador(); await cargarEstado(); });
+    $("#cambiar").addEventListener("click", async () => { tel = null; canje = null; try { localStorage.removeItem(TEL); } catch (_) {} pintarJugador(); await cargarEstado(); });
   }
-  // ganó sin celular: el premio queda guardado en este dispositivo hasta que deje su número
+  // Ganó: se canjea en la misma visita. Pide el celular (si no lo sabemos), ofrece las casillas y lo deja aplicado en el carrito.
+  let canje = null; // premio recién ganado con un número conocido (ya activo)
+  const VERSION = "2026-10-pretildada"; // mismas casillas que el checkout, tildadas (decisión de Isa)
+  function venceTxt(v) {
+    if (!v) return ""; const m = Math.max(0, Math.round((new Date(v) - Date.now()) / 60000));
+    return m >= 60 ? `Vence en ${Math.floor(m / 60)} h` : `Vence en ${m} min`;
+  }
+  // lo deja aplicado en el carrito de la web (misma pestaña)
+  function aplicarEnCarrito(p, numero) {
+    const m = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.saldo, vence_at: p.vence_at || null, tel: numero };
+    try { localStorage.setItem("setto-maq-usar", JSON.stringify(m)); const f = JSON.parse(localStorage.getItem("setto-form") || "{}") || {}; if (API.normPhone(f.tel) !== API.normPhone(numero)) localStorage.setItem("setto-form", JSON.stringify({ ...f, tel: numero })); } catch (_) {}
+    try { if (window.parent !== window && window.parent.SettoCanjeMaq) { window.parent.SettoCanjeMaq(m); return true; } } catch (_) {}
+    return false;
+  }
   function pintarReclamo() {
-    const r = $("#reclamo"), p = est && est.pendiente;
+    const r = $("#reclamo"), p = (est && est.pendiente) || canje;
     r.hidden = !p; if (!p) { r.innerHTML = ""; return; }
-    r.innerHTML = `<p><b>¡Ganaste ${esc(p.titulo)}!</b> Dejanos tu celular para guardarlo. Se descuenta solo cuando pidas en la web con ese número.</p>
-      <form id="telForm"><input id="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 555-1234" aria-label="Tu celular" required><button class="btn" type="submit">Guardar premio</button></form>
-      <label class="avisos"><input type="checkbox" id="avisos"> <span>Avisame por WhatsApp de novedades y sabores nuevos. <small>Opcional. Te das de baja cuando quieras en <a href="/privacidad" target="_blank" rel="noopener">Privacidad y bajas</a>.</small></span></label>
+    const pend = !!(est && est.pendiente), v = pend ? tel || "" : tel;
+    r.innerHTML = `<p><b>¡Ganaste ${esc(p.titulo)}!</b> Canjealo ahora y queda aplicado en tu pedido.<br><span class="vence">${esc(venceTxt(p.vence_at) || "Vence en 48 h")}</span></p>
+      <form id="telForm" class="chk" novalidate>
+        <label class="f" for="tel">Tu celular (WhatsApp)<input id="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 555-1234" value="${esc(v ? API.prettyPhone(v) : "")}" ${pend ? "" : "disabled"} required></label>
+        <label class="avisos"><input type="checkbox" id="okWa" checked> <span>Avisame por WhatsApp cuando salgan sabores nuevos o limitados.</span></label>
+        <label class="avisos"><input type="checkbox" id="okAds" checked> <span>Pueden usar mi número para mostrarme anuncios de Setto en Instagram y Facebook.</span></label>
+        <small>Las dos son opcionales y te das de baja cuando quieras en <a href="/privacidad" target="_blank" rel="noopener">Privacidad y bajas</a>.</small>
+        <button class="btn canjear" type="submit">Canjear premio</button>
+      </form>
       <small class="err" id="telErr" aria-live="polite"></small>`;
     $("#telForm").addEventListener("submit", async (e) => {
-      e.preventDefault(); const v = $("#tel").value, b = $("#telForm .btn");
-      if (!API.normPhone(v)) { $("#telErr").textContent = "Revisá tu celular: código de área + número."; $("#tel").focus(); return; }
-      b.disabled = true;
-      try { const g = await API.maqReclamar(dev, v); tel = v; try { localStorage.setItem(TEL, v); } catch (_) {}
-        if ($("#avisos").checked && API.consentimientoMaquinita) API.consentimientoMaquinita(v, "2026-10-maquinita").catch(() => {});
-        pintarJugador(); await cargarEstado(); $("#msg").innerHTML = `<span><b>¡Guardado!</b>Tu código: <code>${esc(g.code)}</code></span>`; $("#mios").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      e.preventDefault(); const n = pend ? $("#tel").value : tel, b = $("#telForm .canjear");
+      if (!API.normPhone(n)) { $("#telErr").textContent = "Revisá tu celular: código de área + número."; $("#tel").focus(); return; }
+      b.disabled = true; $("#telErr").textContent = "";
+      try {
+        const g = pend ? await API.maqReclamar(dev, n) : p;
+        tel = n; try { localStorage.setItem(TEL, n); } catch (_) {}
+        const canales = [$("#okWa").checked && "whatsapp", $("#okAds").checked && "meta_ads"].filter(Boolean);
+        if (canales.length && API.consentimientoMaquinita2) API.consentimientoMaquinita2(dev, n, canales, VERSION).catch(() => {});
+        canje = null; pintarJugador(); await cargarEstado();
+        const ok = aplicarEnCarrito(g, n);
+        $("#msg").innerHTML = `<span><b>¡Listo!</b>${ok ? "Ya está aplicado en tu pedido." : `Ya está aplicado en tu pedido. Tu código: <code>${esc(g.code)}</code>`}</span>`;
       } catch (err) { b.disabled = false; $("#telErr").textContent = err.message; }
     });
   }
   function pintarMios() {
     const ps = (est && est.premios) || [], m = $("#mios");
     m.hidden = !ps.length; if (!ps.length) { m.innerHTML = ""; return; }
-    m.innerHTML = `<h2>Tus premios</h2>` + ps.map((p) => `<div class="mio"><span><b>${esc(p.titulo)}</b>${p.tipo === "monto" && p.saldo !== p.valor ? ` · te quedan ${pesos(p.saldo)}` : ""}</span><code>${esc(p.code)}</code></div>`).join("") +
-      `<p class="letra">Se descuentan solos en tu próximo pedido en la web, pidiendo con este mismo número.</p>`;
+    m.innerHTML = `<h2>Tus premios</h2>` + ps.map((p) => `<div class="mio"><span class="dato"><span><b>${esc(p.titulo)}</b>${p.tipo === "monto" && p.saldo !== p.valor ? ` · te quedan ${pesos(p.saldo)}` : ""}</span><small><code>${esc(p.code)}</code>${p.vence_at ? " · " + esc(venceTxt(p.vence_at).toLowerCase()) : ""}</small></span><button class="usar" type="button" data-usar="${esc(p.code)}">Usar ahora</button></div>`).join("") +
+      `<p class="letra">Se usan pidiendo en la web con este mismo número.</p>`;
+    m.querySelectorAll("[data-usar]").forEach((b) => b.addEventListener("click", () => {
+      const p = ps.find((x) => x.code === b.dataset.usar); if (!p) return;
+      const ok = aplicarEnCarrito(p, tel); $("#msg").innerHTML = `<span><b>¡Listo!</b>${ok ? "Ya está aplicado en tu pedido." : `Usalo con tu código <code>${esc(p.code)}</code>`}</span>`;
+    }));
     try { localStorage.setItem("setto-maq", JSON.stringify({ tel, premios: ps })); } catch (_) {}
   }
   async function cargarEstado() {
@@ -355,10 +393,13 @@ body{margin:0}
     if (res === "nada" || (!r0.code && !r0.pendiente)) { pintarFichas(); if (quedan() > 0) $("#msg").textContent = "¡Casi! Tirá de nuevo"; else if (!COMPRA) $("#msg").textContent = "¡Casi! Volvé mañana"; return; }
     const top = SIMBOLOS.find((s) => fin.filter((x) => x === s).length >= 4);
     reels.forEach((r, i) => { if (fin[i] === top) r.classList.add("win"); });
-    const html = r0.pendiente ? `<span><b>¡${esc(r0.titulo)}!</b><small>Dejá tu celular acá abajo para guardarlo.</small></span>`
-      : `<span><b>¡${esc(r0.titulo)}!</b>Tu código: <code>${esc(r0.code)}</code><small>Se descuenta solo en tu próximo pedido con este número.</small></span>`;
+    const html = `<span><b>¡${esc(r0.titulo)}!</b><small>Canjealo acá abajo: queda aplicado en tu pedido.</small></span>`;
     fanfarria(res === "gift"); confeti(res === "gift" ? 220 : res === "mochi" ? 140 : 70);
-    cargarEstado().then(() => { $("#msg").innerHTML = html; if (r0.pendiente) setTimeout(() => { $("#reclamo").scrollIntoView({ behavior: "smooth", block: "center" }); $("#tel").focus({ preventScroll: true }); }, 900); }); // el premio queda a la vista aunque no queden fichas
+    cargarEstado().then(() => {
+      if (!r0.pendiente) canje = ((est && est.premios) || []).find((x) => x.code === r0.code) || null;
+      pintarReclamo(); $("#msg").innerHTML = html;
+      setTimeout(() => { $("#reclamo").scrollIntoView({ behavior: "smooth", block: "center" }); const t = $("#tel"); if (t && !t.disabled) t.focus({ preventScroll: true }); }, 900);
+    }); // el premio queda a la vista aunque no queden fichas
   }
 
   $("#tirar").addEventListener("click", girar);
@@ -405,13 +446,10 @@ body{margin:0}
   $("#forzar").innerHTML = OPC.map(([k, l]) => `<button class="chip" type="button" data-f="${k}" aria-pressed="false">Próxima: ${l}</button>`).join("");
   function marcar() { document.querySelectorAll("[data-f]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === forzado)); }
   $("#forzar").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (!b) return; forzado = forzado === b.dataset.f ? null : b.dataset.f; marcar(); });
-  // solo demo: simula que un pedido con este número se marcó entregado
+  // solo demo: suma fichas a este dispositivo para seguir probando
   $("#reponer").addEventListener("click", async () => {
     if (!API.DEMO) return;
-    if (!tel) { $("#msg").textContent = "En la demo: ganá un premio y guardalo con tu celular primero"; return; }
-    await API.maqEstado(tel); // crea el jugador si no existía
-    const db = JSON.parse(localStorage.getItem("setto-demo-db")), ph = API.normPhone(tel);
-    db.maq.jug[ph].fichas += COMPRA || 5; localStorage.setItem("setto-demo-db", JSON.stringify(db));
+    await API.maqSumarDemo(dev, 5); // fichas de prueba para este dispositivo, con o sin número
     await cargarEstado(); $("#msg").textContent = "¡Probá suerte!";
   });
   pintarJugador(); pintarFichas(); cargarEstado();
