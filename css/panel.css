@@ -212,3 +212,6 @@ a.ptab{text-decoration:none}
   .ajbar{margin:6px -16px 0;padding-inline:16px;bottom:0;border-radius:0 0 20px 20px}
 }
 .dsub-mas{font-size:.85rem;margin:4px 0}.dsub-mas summary{cursor:pointer;color:var(--ink-2)}
+.machete details{margin-bottom:10px}.machete summary{cursor:pointer;font-weight:700;font-size:1.02rem}.machete details[open] summary{margin-bottom:8px}
+.machete p,.machete li{font-size:.9rem;line-height:1.5;margin:6px 0}.machete ol,.machete ul{padding-left:20px}
+.machete .mach-tab{max-height:none}.machete .mach-tab div{flex-wrap:wrap}.machete .mach-tab div>span{flex:1 1 240px}.machete .mach-tab div>span+span{color:var(--ink-2)}

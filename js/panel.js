@@ -357,6 +357,68 @@
     ["inactivos", "Inactivos", "Sin compras hace más de 45 días: campaña de regreso"], ["todos", "Todos", "Cualquiera con permiso"]];
   const segNom = (k) => (SEGS.find((x) => x[0] === k) || [k, k])[1];
   const EST_C = { borrador: "pendiente", enviando: "pendiente", enviada: "entregado", error: "cancelado" };
+  // Machete fijo al pie de Campañas: qué hace cada herramienta, qué estrategia conviene y qué mirar cuando haya datos
+  const MACHETE = `<section class="sec machete"><h2>Machete de campañas</h2>
+    <p class="muted">Para tener a mano. Los números marcados con ≈ son referencias para arrancar: ajustalos con tus propios datos.</p>
+    <details class="pcard" open><summary>Cómo encaja todo</summary>
+      <ol>
+        <li>El cliente arma el pedido en la web y lo manda por WhatsApp. Si dejó las casillas tildadas, queda con permiso para <b>novedades por WhatsApp</b> y/o <b>anuncios de Meta</b>.</li>
+        <li>Al tocar <b>Entregado</b>, la compra viaja a Meta (aparece como "Compra STT-…" en Envíos a Meta). Así Meta aprende quién compra de verdad.</li>
+        <li>Con cada compra entregada el cliente cae en un <b>segmento</b> (nuevos, recurrentes, fans de los mochis…). Los números de la tabla de arriba son "con permiso de WhatsApp · con permiso de anuncios".</li>
+        <li>Con esos segmentos hacés dos cosas: <b>campañas de WhatsApp</b> (le escribís directo) y <b>públicos de Meta</b> (para anuncios en Instagram/Facebook).</li>
+      </ol>
+    </details>
+    <details class="pcard"><summary>Qué hace cada herramienta</summary>
+      <p><b>Campaña de WhatsApp.</b> Manda una plantilla aprobada por Meta a todo un segmento. Cada mensaje de marketing se paga (≈ US$0,06 por persona en Argentina; el valor exacto está en WhatsApp Manager → Facturación). Siempre lleva el botón "No quiero más novedades" y quien lo toca sale solo.</p>
+      <p><b>Avisos del pedido.</b> "Recibido", "En preparación", "Listo" y la reseña salen solos y gratis porque el cliente te escribió hace menos de 24 h. No son campañas: no hace falta permiso de novedades.</p>
+      <p><b>Público de Meta ("Setto · segmento").</b> Una lista de celulares cifrados que Meta cruza con sus cuentas. Sirve para tres cosas: mostrarle anuncios solo a ese grupo, <b>excluirlo</b> (no pagar por mostrarle "conocé Setto" a quien ya compra) o crear un <b>público similar</b> (gente parecida a tus clientes). Meta pide ≈100 personas reconocidas para usarlo: antes de eso, solo juntá.</p>
+      <p><b>Envíos a Meta.</b> El registro de lo que viajó: compras y públicos. Si ves <b>error</b>, el detalle dice qué falta (permisos, condiciones, token).</p>
+    </details>
+    <details class="pcard"><summary>Estrategia por segmento</summary>
+      <div class="hist mach-tab">
+        <div><span><b>Clientes nuevos</b> · que vuelva una segunda vez</span><span>3 a 7 días después de la 1ª compra · <code>segunda_compra_v2</code> con un motivo concreto (sello doble, mochi de regalo en el próximo set)</span></div>
+        <div><span><b>Recurrentes</b> · que se sientan parte</span><span>Acceso 24 h antes a cada drop o set nuevo · <code>lanzamiento_sabor_v2</code></span></div>
+        <div><span><b>Fans de los mochis</b> · sabores nuevos</span><span>El día que sale un mochi nuevo · <code>lanzamiento_sabor_v2</code> con el sabor</span></div>
+        <div><span><b>Compran bebidas</b> · lattes y matcha</span><span>Cuando sale un dirty nuevo o arranca el calor · <code>lanzamiento_sabor_v2</code></span></div>
+        <div><span><b>Inactivos</b> · que vuelvan</span><span>A los 45 días sin comprar, una sola vez · <code>te_extranamos_v2</code> con una razón para volver (algo nuevo, no solo descuento)</span></div>
+        <div><span><b>Todos</b> · lo grande</span><span>Solo para lo que le importa a cualquiera: apertura del local, drop especial. Máximo 1 por mes</span></div>
+      </div>
+      <p class="hintp">El aviso de drops ("Avisame por WhatsApp" de la edición especial) es aparte: le llega a los anotados y no cuenta como campaña.</p>
+    </details>
+    <details class="pcard"><summary>Anuncios de Meta: qué hacer según cuántos haya</summary>
+      <p><b>Menos de 100 en "Todos".</b> Los públicos todavía no sirven. Anunciá por ubicación (Mar del Plata, radio chico) e intereses (café, postres, cultura japonesa), con destino a la web para que el pixel aprenda. Tocá "Actualizar públicos" una vez por semana para que se vayan llenando.</p>
+      <p><b>Más de 100.</b> Creá en el Administrador de anuncios un <b>público similar al 1%</b> de "Setto · todos" y combinalo con ubicación Mar del Plata. En las campañas para conseguir clientes nuevos, <b>excluí</b> "Setto · todos".</p>
+      <p><b>Recuperar carritos.</b> Público del pixel: gente que agregó al carrito en los últimos 7 días y no compró. Anuncio con el producto y un empujón ("el set te espera").</p>
+    </details>
+    <details class="pcard"><summary>Reglas para no quemar el número</summary>
+      <ul>
+        <li>Máximo <b>1 campaña por semana</b> a la misma persona (2 a 4 por mes en total).</li>
+        <li>Siempre <b>Mandar prueba</b> a tu número antes de mandar al segmento.</li>
+        <li>Mandá en horario de antojo: ≈ 11–12 h o 16–18 h, nunca de noche.</li>
+        <li>Las casillas de permiso vienen tildadas: si las bajas suben, frená y espaciá. Mirá la <b>calidad del número</b> en WhatsApp Manager (verde = bien, amarillo = bajar el ritmo, rojo = parar).</li>
+        <li>Plantillas nuevas: Meta las revisa (puede tardar de minutos a 1 día). No pongas variables al principio ni al final del texto.</li>
+      </ul>
+    </details>
+    <details class="pcard"><summary>Cuando haya datos: qué mirar y qué hacer</summary>
+      <div class="hist mach-tab">
+        <div><span><b>Bajas por campaña</b> (bajas ÷ enviados, en "Respuestas y bajas")</span><span>Menos de 1%: bien · más de 2%: ese mensaje o ese segmento no va, cambiá el texto o mandá menos seguido</span></div>
+        <div><span><b>Pedidos en las 48 h siguientes</b> (Pedidos y Clientes, origen whatsapp)</span><span>Compará campañas entre sí: repetí el tipo de mensaje que más pedidos trajo, dejá de mandar el que no trae</span></div>
+        <div><span><b>Segunda compra</b> (de "Clientes nuevos" cuántos pasan a 2 compras en 30 días)</span><span>Menos de ≈20%: el incentivo de la 2ª compra es flojo, probá uno más tentador</span></div>
+        <div><span><b>Con error</b> en una campaña</span><span>Unos pocos es normal (números sin WhatsApp o que Meta frenó por saturación). Si son muchos, revisá la plantilla</span></div>
+        <div><span><b>Costo por compra</b> en Meta (Administrador de anuncios)</span><span>Si pasa ≈30% del ticket promedio, pausá ese anuncio y probá otra foto o video</span></div>
+        <div><span><b>Inactivos que vuelven</b> después de <code>te_extranamos_v2</code></span><span>Si casi nadie vuelve, el problema no es el mensaje: preguntales por WhatsApp qué pasó</span></div>
+      </div>
+    </details>
+    <details class="pcard"><summary>Glosario rápido</summary>
+      <ul>
+        <li><b>Plantilla:</b> texto aprobado por Meta. Es lo único que se puede mandar a alguien que no te escribió en las últimas 24 h.</li>
+        <li><b>Ventana de 24 h:</b> desde el último mensaje del cliente podés escribirle libre y gratis.</li>
+        <li><b>Compra a Meta (CAPI):</b> el aviso de que un pedido se entregó, con el mismo código que el pixel, para que Meta no la cuente doble.</li>
+        <li><b>Público personalizado:</b> tu lista de clientes adentro de Meta. <b>Similar:</b> gente que se parece a esa lista.</li>
+        <li><b>UTM:</b> la etiqueta en los links (por ejemplo utm_source=whatsapp) que te dice de dónde llegó cada pedido.</li>
+      </ul>
+    </details>
+  </section>`;
   async function viewCampanas() {
     $("#view").innerHTML = `<h1 class="ph1">Campañas</h1>
       <p class="muted">Solo le llega a quien aceptó en la web o escribió ALTA. Quien toca "No quiero más novedades" (o escribe BAJA) sale solo de todo. Los mensajes usan plantillas aprobadas en WhatsApp Manager.</p>
@@ -372,7 +434,7 @@
           <button class="btn solid" type="submit">Guardar borrador</button></form></section>
       <section class="sec"><h2>Campañas</h2><div class="pgrid" id="campList"><p class="muted">Cargando…</p></div></section>
       <section class="sec"><h2>Respuestas y bajas por WhatsApp</h2><div class="pcard"><div class="hist" id="msgList"><span class="muted">Cargando…</span></div></div></section>
-      <section class="sec"><h2>Envíos a Meta</h2><div class="pcard"><div class="hist" id="syncList"><span class="muted">Cargando…</span></div></div></section>`;
+      <section class="sec"><h2>Envíos a Meta</h2><div class="pcard"><div class="hist" id="syncList"><span class="muted">Cargando…</span></div></div></section>${MACHETE}`;
     $("#campForm").addEventListener("submit", async (e) => {
       e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
       try { await API.createCampaign({ nombre: f.nombre.trim(), segmento: f.segmento, plantilla: f.plantilla.trim(), idioma: (f.idioma || "es_AR").trim(), variables: (f.variables || "").split("\n").map((x) => x.trim()).filter(Boolean) });
