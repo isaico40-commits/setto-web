@@ -465,7 +465,7 @@
     if (t.dataset.gvcopy) { try { navigator.clipboard.writeText(t.dataset.gvcopy); toast("Código copiado"); } catch (_) {} return; }
     if (t.dataset.gvuse) { usarGift(t.dataset.gvuse, +t.dataset.saldo); cerrarRegalo(); irA("#sets"); toast("Gift card guardada: se aplica al pedir"); }
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (!$("#gcBuy").hidden) cerrarGift(); if (!$("#gcView").hidden) cerrarRegalo(); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (!$("#gcBuy").hidden) { e.preventDefault(); cerrarGift(); } if (!$("#gcView").hidden) { e.preventDefault(); cerrarRegalo(); } } });
 
   /* link de regalo: ?regalo=TOKEN */
   function cerrarRegalo() { $("#gcView").hidden = true; document.body.style.overflow = ""; }
@@ -829,7 +829,7 @@
   if (PAGE === "gift-cards" && new URLSearchParams(location.search).get("desde") === "listo") {
     const v = document.querySelector("#regalo .volver"); if (v) { v.href = "/?p=listo"; v.textContent = "← Volver"; }
   }
-  function cerrarMaq() { $("#mqView").hidden = true; document.body.style.overflow = ""; maqSug = { tel: null, premios: [] }; } // si ganó, el carrito vuelve a mirar sus premios
+  function cerrarMaq() { $("#mqView").hidden = true; document.body.style.overflow = ""; maqSug = { tel: null, premios: [] }; if (view === "cart" && $("#drawer").classList.contains("on")) { drawDrawer(); const t = $("[data-cxmaq]"); if (t) t.focus(); } } // si ganó, el carrito vuelve a mirar sus premios
   function girarMini(done) {
     const reels = [...document.querySelectorAll("#maquinita .mq-reel")];
     if (!reels.length || matchMedia("(prefers-reduced-motion: reduce)").matches) return done();
@@ -854,7 +854,7 @@
     card.classList.add("tirando");
     setTimeout(() => girarMini(() => { mqGirando = false; card.classList.remove("tirando"); }), 380);
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#mqView").hidden) cerrarMaq(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#mqView").hidden) { e.preventDefault(); cerrarMaq(); } });
   function renderFooter() {
     const r = S.retiro || { rangos: [] };
     HORARIO = "De " + r.rangos.map(([a, b]) => a.replace(":00", "") + " a " + b.replace(":00", "")).join(" y de ") + " hs.";
@@ -1013,6 +1013,22 @@
       <b>${esc(p.nombre)}</b><small class="num">${unit(p) ? "" : "Desde "}${money(unit(p) ? p.precio : p.precios["12 oz"])}</small></div>`).join("")}</div></div>`;
   }
   const giftCta = () => gcfg().activo === false ? "" : `<a class="gift-cta" href="/gift-cards" data-closedrawer><span class="gc-ico" aria-hidden="true">🎁</span><span><b>¿Es para regalar?</b><small>Mandá una gift card digital de Setto.</small></span><span class="go" aria-hidden="true">→</span></a>`;
+  // debajo de Continuar: maquinita y club en pop up, sin cerrar el carrito
+  const extrasCart = () => { const b = [maqOn() ? `<button class="cx-b" type="button" data-cxmaq>🎰 Probá suerte</button>` : "", clubOn() ? `<button class="cx-b" type="button" data-cxclub>⭐ Setto Club</button>` : ""].filter(Boolean);
+    return b.length ? `<div class="cx">${b.join("")}</div>` : ""; };
+  function abrirClubPop() {
+    const c = club(), meta = c.meta || 8, d = cardCache && cardCache.tel === API.normPhone(form.tel) ? cardCache.data : null, b = beneficios();
+    const tarjeta = d ? `<div class="cp-card"><b>Tenés ${d.sellos} de ${meta} sellos</b><div class="stamps cp-st">${Array.from({ length: meta }, (_, i) => i === meta - 1 ? `<div class="stamp gift ${i < d.sellos ? "on" : ""}">${i < d.sellos ? "¡Listo!" : "Premio"}</div>` : `<div class="stamp ${i < d.sellos ? "on" : ""}">${i < d.sellos ? '<img src="img/mochito-run.png" alt="">' : i + 1}</div>`).join("")}</div></div>` : "";
+    $("#cpBody").innerHTML = `${tarjeta}<p class="muted">Cada pedido desde la web suma ${sellosTxt(spp())}. El pedido que completa los ${meta} sellos viene con ${esc(premioTxt())}.${c.minimo > 0 ? ` Suman sello los pedidos desde ${money(c.minimo)}.` : ""}</p>
+      ${b.length ? `<div class="clubbenef"><b>Con tu compra tenés beneficios exclusivos del club</b><ul>${b.map((x) => `<li><span class="bn-ico" aria-hidden="true">${x.ico}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></li>`).join("")}</ul></div>` : ""}`;
+    $("#clubPop").hidden = false; $("[data-cpclose]").focus();
+  }
+  function cerrarClubPop() { $("#clubPop").hidden = true; if ($("#drawer").classList.contains("on")) { const t = $("[data-cxclub]"); if (t) t.focus(); } }
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-cxmaq]")) return abrirMaq();
+    if (e.target.closest("[data-cxclub]")) return abrirClubPop();
+    if (e.target.closest("[data-cpclose]") || e.target.id === "clubPop") return cerrarClubPop();
+  });
   function drawDrawer() {
     const body = $("#dBody"), foot = $("#dFoot");
     if (drawDrawer.v !== view) { body.scrollTop = 0; drawDrawer.v = view; } // cada paso arranca desde arriba
@@ -1023,7 +1039,7 @@
       body.innerHTML = trackHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
         <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("") + sugHtml() + `<div class="ctas">${giftCta()}</div>`;
-      foot.innerHTML = `${clubLine(true)}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>
+      foot.innerHTML = `${clubLine(true)}<div class="tot"><span>Total</span><span class="num">${money(total())}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>${extrasCart()}
         <p class="muted" style="font-size:.78rem;text-align:center">${envioOn() ? "Retiro o envío: lo elegís después." : "¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats."}</p>`;
     }
     if (view === "buscar") { $("#dTitle").textContent = "Consultar pedido"; body.innerHTML = buscarDrawerHtml(); foot.innerHTML = ""; return; }
@@ -1246,7 +1262,12 @@
   $("#mnav").addEventListener("click", (e) => { if (e.target.closest("a")) closeMenu(); });
 
   $("#scrim").addEventListener("click", () => { closeSheet(); closeDrawer(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeSheet(); closeDrawer(); closeMenu(); } });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || e.defaultPrevented) return; // ya cerró un pop up de arriba
+    if (!$("#clubPop").hidden) return cerrarClubPop();
+    if ([...document.querySelectorAll(".allrev")].some((x) => !x.hidden)) return; // primero se cierra el pop up de arriba
+    closeSheet(); closeDrawer(); closeMenu();
+  });
 
   /* ---------- stock en vivo ---------- */
   async function refrescarStock() { if (!API.getStock) return; try { STOCK = await API.getStock(); renderEspecial(); renderSets(); renderCarta(); renderBadge(); } catch (_) {} }
