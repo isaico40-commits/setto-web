@@ -278,13 +278,36 @@ footer .fine{grid-column:1/-1;font-size:.78rem;background:var(--bg);justify-self
 .cx-b{all:unset;cursor:pointer;flex:1;max-width:180px;text-align:center;font-size:.82rem;font-weight:600;color:var(--turquesa);padding:7px 10px;border-radius:999px;border:1.5px solid color-mix(in srgb,var(--turquesa) 30%,transparent);white-space:nowrap}
 .cx-b:hover{background:var(--bg-2)}
 .cx-b:focus-visible{outline:3px solid var(--turquesa);outline-offset:2px}
-.cp-in{width:min(460px,100%);padding-bottom:20px;display:grid;gap:14px}
-.cp-in .ar-h{margin:0}
-.cp-in p{margin:0;font-size:.92rem}
-.cp-card{background:var(--card);border:var(--line);border-radius:18px;padding:14px}
-.cp-card .stamps{gap:8px;margin-top:10px}
-.cp-card .stamp.gift{font-size:.8rem}
-.cp-in .clubbenef{margin:0}
+.ar-in.cp-in{width:min(760px,100%);padding-bottom:20px}
+.cp-in .ar-h{align-items:flex-start;margin-bottom:4px}
+.cp-in .ar-h h2{font-size:clamp(1.9rem,6vw,2.5rem);margin-top:4px}
+.cp-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,300px);grid-template-areas:"pasos tarjeta" "benef tarjeta";gap:6px 24px;align-items:start}
+.cp-next{grid-area:pasos;margin-top:0}
+.cp-next div{padding-block:9px;gap:12px}
+.cp-next .k{width:26px;height:26px;font-size:.85rem}
+.cp-next b{font-size:.94rem}
+.cp-next small{font-size:.8rem;line-height:1.35;display:block}
+.cp-card{grid-area:tarjeta;padding:14px;box-shadow:4px 4px 0 var(--turquesa)}
+.cp-card .row1 img{height:20px}
+.cp-card .stamps{gap:8px;margin-top:12px}
+.cp-card .stamp{font-size:.7rem}
+.cp-card .stamp.gift{font-size:.78rem}
+.cp-card p{margin:10px 0 0;font-size:.8rem}
+.cp-benef{grid-area:benef;margin:8px 0 0;padding:12px 14px;max-width:none}
+.cp-benef > b{font-size:1.05rem}
+.cp-benef ul{gap:6px;margin-top:8px}
+.cp-benef .bn-ico{width:30px;height:30px;font-size:.9rem}
+.cp-benef li b{font-size:.86rem}
+.cp-benef li small{font-size:.76rem}
+@media (max-width:640px){
+  .cp-grid{grid-template-columns:1fr;grid-template-areas:"tarjeta" "pasos" "benef";gap:10px}
+  .cp-card{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:center}
+  .cp-card .row1{grid-column:1/-1}
+  .cp-card .stamps{grid-column:1/-1;grid-template-columns:repeat(var(--n,8),1fr);gap:5px;margin-top:8px}
+  .cp-card .stamp{border-width:1.5px;font-size:.6rem}
+  .cp-card .stamp.gift{font-size:.5rem}
+  .cp-card p{grid-column:1/-1;margin-top:6px}
+}
 .gift-cta{display:flex;align-items:center;gap:12px;border-radius:16px;background:var(--coral-2);padding:12px 14px;text-decoration:none;color:var(--ink);border:1.5px solid transparent;transition:border-color .15s}
 .gift-cta:hover{border-color:var(--turquesa)}
 .gift-cta .gc-ico{width:38px;height:38px;flex:none;border-radius:50%;background:var(--card);display:grid;place-items:center;font-size:1.15rem}
@@ -321,19 +344,21 @@ section.blk.maqsec{padding-block:48px}
 .maqsec h2{font-size:clamp(1.9rem,4vw,2.6rem);margin-top:8px}
 .maqsec .club{grid-template-columns:1fr minmax(0,380px);justify-content:space-between}
 /* tarjeta tragamonedas: gabinete turquesa, rodillos, palanca a la derecha */
-.maqcard{--oro:#F2C14E;position:relative;width:100%;max-width:380px;justify-self:end;padding-right:34px;padding-bottom:10px}
-.sl-cab{position:relative;display:grid;gap:12px;background:var(--turquesa);border:3px solid var(--turquesa-2);border-radius:34px 34px 20px 20px;box-shadow:6px 6px 0 var(--turquesa-2);padding:12px 14px 16px}
-.sl-top{position:relative;display:grid;justify-items:center;gap:4px;background:var(--turquesa-2);border-radius:20px 20px 12px 12px;padding:8px 10px 9px}
-.sl-top b{font-family:var(--display);font-weight:400;font-size:1.5rem;line-height:1;color:var(--card);letter-spacing:.02em}
-.sl-luces{display:flex;gap:10px}
-.sl-luces i{width:7px;height:7px;border-radius:50%;background:var(--oro);opacity:.35}
-.sl-luces i:nth-child(odd){opacity:1;box-shadow:0 0 6px var(--oro)}
-.maqcard.tirando .sl-luces i{animation:sl-luz .24s steps(1) infinite}
-.maqcard.tirando .sl-luces i:nth-child(odd){animation-delay:.12s}
-@keyframes sl-luz{0%{opacity:1;box-shadow:0 0 6px var(--oro)}50%{opacity:.3;box-shadow:none}}
-.mq-ventana{width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--card);border:3px solid var(--turquesa-2);border-radius:16px;padding:6px;box-shadow:inset 0 3px 0 rgba(31,84,82,.12)}
-.mq-reel{height:86px;border-radius:10px;background:linear-gradient(var(--bg-2),var(--card) 30%,var(--card) 70%,var(--bg-2));overflow:hidden;display:block;position:relative}
-.mq-reel::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(rgba(31,84,82,.18),transparent 24%,transparent 76%,rgba(31,84,82,.18))}
+.maqcard{--oro:#F2C14E;position:relative;width:100%;max-width:380px;justify-self:end;padding-right:34px;padding-bottom:10px;padding-top:20px}
+.sl-cab{position:relative;display:grid;gap:12px;background:linear-gradient(180deg,#2F7A76,var(--turquesa) 38%,var(--turquesa-2));border:3px solid var(--turquesa-2);border-radius:30px 30px 20px 20px;box-shadow:inset 0 0 0 3px rgba(242,193,78,.55),6px 6px 0 var(--turquesa-2);padding:26px 14px 16px}
+.sl-tope{position:absolute;top:-22px;left:50%;width:42px;height:42px;margin-left:-21px;display:grid;place-items:center;border-radius:50%;background:var(--turquesa-2);border:3px solid var(--oro);z-index:1}
+.sl-tope svg{width:24px;height:24px}
+.sl-top{position:relative;display:grid;justify-items:center;padding:9px 10px 8px;border-radius:50% 50% 14px 14px / 36px 36px 14px 14px;background:radial-gradient(120% 140% at 50% 0,#2D7471,#123E3C 70%);border:3px solid var(--oro);box-shadow:inset 0 0 0 2px var(--turquesa-2)}
+.sl-top span{font-size:.62rem;font-weight:700;letter-spacing:.38em;padding-left:.38em;text-transform:uppercase;color:var(--oro)}
+.sl-top b{font-family:var(--display);font-weight:400;font-size:1.8rem;line-height:1;color:var(--coral);text-shadow:0 0 12px rgba(248,162,154,.55),0 3px 0 var(--turquesa-2)}
+.maqcard.tirando .sl-top b{animation:sl-neon .45s ease-in-out infinite alternate}
+@keyframes sl-neon{to{text-shadow:0 0 20px rgba(248,162,154,.95),0 0 4px #fff,0 3px 0 var(--turquesa-2)}}
+.mq-ventana{position:relative;width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:5px;background:var(--turquesa-2);border:3px solid var(--oro);border-radius:16px;padding:6px;box-shadow:inset 0 4px 8px rgba(0,0,0,.35)}
+.mq-ventana::before,.mq-ventana::after{content:"";position:absolute;top:50%;margin-top:-7px;border-block:7px solid transparent;z-index:2}
+.mq-ventana::before{left:-3px;border-left:9px solid var(--coral)}
+.mq-ventana::after{right:-3px;border-right:9px solid var(--coral)}
+.mq-reel{height:86px;border-radius:10px;background:linear-gradient(90deg,#E9DCC2,var(--card) 22%,var(--card) 78%,#E9DCC2);overflow:hidden;display:block;position:relative}
+.mq-reel::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(rgba(15,47,46,.4),transparent 26%,transparent 74%,rgba(15,47,46,.4))}
 .mq-strip{display:grid;will-change:transform}
 .mq-strip img{height:86px;width:100%;object-fit:contain;padding:10px;box-sizing:border-box;display:block}
 .mq-tirar{justify-self:center;font-family:var(--display);font-size:1.3rem;line-height:1;color:var(--ink);text-decoration:none;background:var(--coral);border:3px solid var(--turquesa-2);border-radius:999px;padding:10px 38px;box-shadow:0 5px 0 var(--turquesa-2);transition:transform .08s,box-shadow .08s}
@@ -341,7 +366,7 @@ section.blk.maqsec{padding-block:48px}
 .sl-ranura{justify-self:center;width:46px;height:7px;border-radius:999px;background:var(--turquesa-2)}
 .sl-pie{position:absolute;left:10px;right:44px;bottom:0;height:14px;border-radius:0 0 14px 14px;background:var(--turquesa-2)}
 /* palanca: el brazo gira desde el eje y la bola baja */
-.sl-palanca{all:unset;cursor:pointer;position:absolute;right:0;top:64px;width:34px;height:150px}
+.sl-palanca{all:unset;cursor:pointer;position:absolute;right:0;top:96px;width:34px;height:150px}
 .sl-palanca:focus-visible{outline:3px solid var(--coral);outline-offset:3px;border-radius:8px}
 .sl-eje{position:absolute;left:0;bottom:22px;width:22px;height:30px;border-radius:0 10px 10px 0;background:var(--turquesa-2)}
 .sl-brazo{position:absolute;left:14px;bottom:34px;width:7px;height:104px;border-radius:4px;background:linear-gradient(90deg,#c9c3b6,#f3efe6 45%,#a9a296);transform-origin:50% 100%;transition:transform .12s}
@@ -349,7 +374,7 @@ section.blk.maqsec{padding-block:48px}
 .sl-palanca:hover .sl-brazo{transform:rotate(6deg)}
 .maqcard.tirando .sl-brazo{animation:sl-tirar .55s cubic-bezier(.4,0,.3,1)}
 @keyframes sl-tirar{0%{transform:perspective(260px) rotateX(0)}45%,62%{transform:perspective(260px) rotateX(165deg)}100%{transform:perspective(260px) rotateX(0)}}
-@media (prefers-reduced-motion:reduce){.maqcard.tirando .sl-brazo,.maqcard.tirando .sl-luces i{animation:none}}
+@media (prefers-reduced-motion:reduce){.maqcard.tirando .sl-brazo,.maqcard.tirando .sl-top b{animation:none}}
 @media (max-width:820px){.maqsec .club{grid-template-columns:1fr}.maqcard{justify-self:center;max-width:400px}}
 .mq-in{position:relative;width:min(560px,100%);height:min(92vh,880px);background:#FAF4E8;border-radius:24px 24px 0 0;overflow:hidden}
 .mq-in iframe{width:100%;height:100%;border:0;display:block}

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<title>Maquinita de Mochito · Setto</title>
+<title>Setto Luckyslot</title>
 <script>if (new URLSearchParams(location.search).has("embed")) document.documentElement.classList.add("embed"); else if (window.top === window.self) location.replace("/?maquinita"); // sin página propia: se juega en el pop up</script>
 <link rel="icon" href="img/mochito-cup.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,43 +37,65 @@ html,body{overflow-x:hidden}
 .sonido{width:36px;height:36px;border-radius:50%;border:var(--line);background:var(--card);color:var(--turquesa);display:grid;place-items:center}
 .sonido svg{width:16px;height:16px}
 
-/* ---------- la máquina ---------- */
-.maq{display:grid;gap:14px;justify-items:center;padding:18px 14px 20px;background:var(--turquesa);border-radius:32px 32px 26px 26px;border:3px solid var(--turquesa-2);box-shadow:6px 6px 0 var(--turquesa-2);color:var(--card)}
-.marquee{width:100%;display:grid;justify-items:center;background:var(--turquesa-2);border-radius:18px;padding:16px 12px 12px;position:relative}
-.marquee h1{font-size:clamp(1.6rem,6.4vw,2.2rem);color:var(--card);text-align:center}
-.luces{position:absolute;top:5px;left:12px;right:12px;display:flex;justify-content:space-between;pointer-events:none}
-.luces i{width:7px;height:7px;border-radius:50%;background:var(--oro);opacity:.3;transition:opacity .15s}
-.luces i.on{opacity:1;box-shadow:0 0 8px var(--oro)}
+/* ---------- la máquina: gabinete de tragamonedas (cartel arriba, rodillos, pantalla y tablero) ---------- */
+.maq{--oro:#F2C14E;--lcd:#0F2F2E;position:relative;display:grid;gap:12px;justify-items:center;padding:30px 14px 18px;margin-top:16px;
+  background:linear-gradient(180deg,#2F7A76,var(--turquesa) 38%,var(--turquesa-2));border-radius:30px 30px 22px 22px;border:3px solid var(--turquesa-2);
+  box-shadow:inset 0 0 0 3px rgba(242,193,78,.55),6px 6px 0 var(--turquesa-2);color:var(--card)}
+.tope{position:absolute;top:-24px;left:50%;width:46px;height:46px;margin-left:-23px;display:grid;place-items:center;border-radius:50%;background:var(--turquesa-2);border:3px solid var(--oro);z-index:1}
+.tope svg{width:26px;height:26px}
+.cartel{width:100%;display:grid;justify-items:center;gap:0;padding:12px 12px 10px;border-radius:50% 50% 16px 16px / 44px 44px 16px 16px;
+  background:radial-gradient(120% 140% at 50% 0,#2D7471,#123E3C 70%);border:3px solid var(--oro);box-shadow:inset 0 0 0 2px var(--turquesa-2),0 3px 0 var(--turquesa-2)}
+.cartel span{font-size:.72rem;font-weight:700;letter-spacing:.38em;text-transform:uppercase;color:var(--oro);padding-left:.38em}
+.cartel h1{font-size:clamp(2rem,9vw,2.7rem);color:var(--coral);text-shadow:0 0 14px rgba(248,162,154,.55),0 3px 0 var(--turquesa-2);letter-spacing:.01em}
+.maq.girando .cartel h1{animation:neon .5s ease-in-out infinite alternate}
+@keyframes neon{to{text-shadow:0 0 22px rgba(248,162,154,.95),0 0 4px #fff,0 3px 0 var(--turquesa-2)}}
 
-.ventana{--h:96px;width:100%;background:var(--card);border-radius:18px;padding:8px;border:3px solid var(--turquesa-2);display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
-.reel{height:var(--h);overflow:hidden;border-radius:12px;background:linear-gradient(var(--bg-2),var(--card) 30%,var(--card) 70%,var(--bg-2));position:relative;transition:box-shadow .2s}
-.reel::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(rgba(31,84,82,.2),transparent 22%,transparent 78%,rgba(31,84,82,.2))}
+.ventana{--h:96px;position:relative;width:100%;background:var(--turquesa-2);border-radius:18px;padding:7px;border:3px solid var(--oro);box-shadow:inset 0 4px 8px rgba(0,0,0,.35);display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.ventana::before,.ventana::after{content:"";position:absolute;top:50%;width:0;height:0;margin-top:-7px;border-block:7px solid transparent;z-index:2}
+.ventana::before{left:-3px;border-left:9px solid var(--coral)}
+.ventana::after{right:-3px;border-right:9px solid var(--coral)}
+.reel{height:var(--h);overflow:hidden;border-radius:10px;background:linear-gradient(90deg,#E9DCC2,var(--card) 22%,var(--card) 78%,#E9DCC2);position:relative;transition:box-shadow .2s}
+.reel::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(rgba(15,47,46,.45),transparent 26%,transparent 74%,rgba(15,47,46,.45))}
 .strip{display:grid;will-change:transform}
 .sym{height:var(--h);display:grid;place-items:center;padding:8px}
-.sym img{max-width:100%;max-height:100%;object-fit:contain;filter:drop-shadow(0 3px 3px rgba(31,28,24,.15))}
+.sym img{max-width:100%;max-height:100%;object-fit:contain;filter:drop-shadow(0 3px 3px rgba(31,28,24,.18))}
 .sym svg{width:80%;height:80%}
-.reel.win{box-shadow:inset 0 0 0 3px var(--oro)}
-@media (max-width:420px){.ventana{--h:72px;gap:4px;padding:6px}.sym{padding:5px}}
+.reel.win{box-shadow:inset 0 0 0 3px var(--oro),0 0 14px rgba(242,193,78,.8)}
+@media (max-width:420px){.ventana{--h:70px;gap:3px;padding:5px}.sym{padding:4px}}
 
-.msg{min-height:2.8em;display:grid;place-items:center;text-align:center;font-weight:600}
-.msg b{font-family:var(--display);font-weight:400;font-size:1.5rem;color:var(--oro);display:block}
+/* pantalla: el mensaje como el display de una máquina real */
+.msg{width:100%;min-height:3.4em;display:grid;place-items:center;text-align:center;font-weight:600;font-size:.92rem;padding:8px 12px;border-radius:12px;
+  background:var(--lcd);border:2px solid #0B2524;box-shadow:inset 0 2px 8px rgba(0,0,0,.55);color:var(--card)}
+.msg b{font-family:var(--display);font-weight:400;font-size:1.45rem;color:var(--oro);display:block;text-shadow:0 0 10px rgba(242,193,78,.45)}
 
-.tirar{font-family:var(--display);font-size:1.5rem;border:3px solid var(--turquesa-2);background:var(--coral);color:var(--ink);border-radius:999px;padding:11px 40px;box-shadow:0 5px 0 var(--turquesa-2);transition:transform .08s,box-shadow .08s}
-.tirar:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0 var(--turquesa-2)}
+/* tablero: fichas a la izquierda, botón a la derecha */
+.tablero{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(11,37,36,.35);border-radius:18px;padding:10px 10px 10px 14px}
+.tirar{font-family:var(--display);font-size:1.45rem;border:3px solid var(--turquesa-2);background:radial-gradient(circle at 40% 30%,#FFD4CF,var(--coral) 60%);color:var(--ink);border-radius:999px;padding:10px 32px;box-shadow:0 5px 0 #0B2524;transition:transform .08s,box-shadow .08s}
+.tirar:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0 #0B2524}
 .tirar:disabled{opacity:.5;cursor:not-allowed}
-.fichas{display:flex;gap:6px;align-items:center;font-size:.85rem;font-weight:600;color:var(--coral-2)}
-.ficha{width:20px;height:20px;border-radius:50%;background:radial-gradient(circle,var(--oro) 38%,#e2ab33 40%,#e2ab33 52%,var(--oro) 54%);border:2px solid var(--turquesa-2)}
-.ficha.vacia{background:transparent;border:2px dashed var(--coral-2);opacity:.6}
+.fichas{display:flex;gap:8px;align-items:center;font-size:.82rem;color:var(--coral-2);line-height:1.2;min-width:0}
+.fichas b{display:block;font-family:var(--display);font-weight:400;font-size:1.35rem;color:var(--card)}
+.ficha{flex:none;width:30px;height:30px;border-radius:50%;background:radial-gradient(circle,var(--oro) 38%,#e2ab33 40%,#e2ab33 52%,var(--oro) 54%);border:2px solid #0B2524;box-shadow:0 2px 0 #0B2524}
+.ficha.vacia{background:transparent;border:2px dashed var(--coral-2);box-shadow:none;opacity:.6}
 
-/* ---------- premios ---------- */
-.premios{display:grid;gap:4px;font-size:.9rem}
-.fila{display:flex;align-items:center;gap:10px;padding:8px 2px;border-top:1px solid var(--bg-2)}
-.fila:first-child{border-top:0}
-.fila .combo{display:flex;flex:none;width:118px}
-.fila .combo img,.fila .combo svg{width:24px;height:24px;object-fit:contain;margin-right:-2px}
-.fila .combo span{font-size:.78rem;color:var(--ink-2)}
-.fila b{flex:1;min-width:0}
-.fila .pct{color:var(--ink-2);font-variant-numeric:tabular-nums}
+/* ---------- premios: tarjetas con la combinación, el premio y la chance ---------- */
+.premios{display:grid;gap:8px}
+.pz-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding-inline:2px}
+.pz-h h2{font-size:1.3rem;color:var(--turquesa)}
+.pz-h span{font-size:.76rem;color:var(--ink-2)}
+.pz{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;background:var(--card);border:var(--line);border-radius:16px;padding:10px 12px}
+.pz.top{background:linear-gradient(90deg,#FFF6DD,var(--card) 60%);border-color:var(--turquesa-2);box-shadow:3px 3px 0 var(--turquesa)}
+.pz-combo{display:flex;align-items:center;background:var(--bg-2);border-radius:999px;padding:5px 8px}
+.pz-combo img,.pz-combo svg{width:20px;height:20px;object-fit:contain;margin-right:-3px}
+.pz-combo i{width:12px;height:12px;border-radius:50%;background:var(--coral);border:2px solid var(--turquesa);margin-right:3px}
+.pz-combo i.no{background:transparent;border-style:dashed;opacity:.6}
+.pz-combo i:last-child{margin-right:0}
+.pz-t b{display:block;font-weight:700;font-size:.92rem;line-height:1.2}
+.pz-t small{display:block;font-size:.76rem;color:var(--ink-2)}
+.pz-pct{font-weight:700;font-size:.82rem;color:var(--card);background:var(--turquesa);border-radius:999px;padding:4px 10px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.reglas{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.reglas li{display:flex;align-items:center;gap:6px;background:var(--bg-2);border-radius:999px;padding:5px 12px;font-size:.78rem;color:var(--ink-2)}
+.reglas li b{color:var(--ink);font-weight:600}
 .letra{font-size:.78rem;color:var(--ink-2);text-align:center}
 
 details.test{font-size:.82rem;color:var(--ink-2);text-align:center}
@@ -87,8 +109,12 @@ details.test summary{cursor:pointer}
 .jugador form{display:flex;gap:8px}
 .jugador input{flex:1;min-width:0;width:100%;font:inherit;border:var(--line);border-radius:999px;padding:8px 14px;background:var(--bg)}
 .jugador .btn{border:var(--line);background:var(--turquesa);color:var(--card);border-radius:999px;padding:8px 16px;font-weight:600}
-.jugador .linea{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.jugador .link{all:unset;cursor:pointer;color:var(--turquesa);font-weight:600;text-decoration:underline}
+.jugador .linea{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.jug-info{display:grid;min-width:0;line-height:1.3}
+.jug-info small{font-size:.78rem}
+.jug-info b{font-size:1.02rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+.btn-sec{flex:none;border:var(--line);background:transparent;color:var(--turquesa);border-radius:999px;padding:7px 14px;font-weight:600;font-size:.82rem;white-space:nowrap}
+.btn-sec:hover{background:var(--bg-2)}
 .jugador small{color:var(--ink-2);display:block}
 .jugador .avisos{display:flex;gap:8px;align-items:flex-start;font-size:.82rem;line-height:1.35;cursor:pointer}
 .jugador .avisos input{flex:none;width:18px;height:18px;margin:1px 0 0;padding:0;border:0;border-radius:4px;accent-color:var(--turquesa)}
@@ -102,8 +128,8 @@ details.test summary{cursor:pointer}
 .mios h2{font-size:1.15rem;color:var(--turquesa)}
 .mio{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);border:var(--line);border-radius:14px;padding:8px 12px;font-size:.88rem}
 .mio code{font-weight:700;letter-spacing:.04em;color:var(--turquesa-2)}
-.msg small{display:block;font-weight:500;font-size:.82rem;color:var(--coral-2)}
-.msg code{font-weight:700;letter-spacing:.05em;color:var(--card);background:var(--turquesa-2);border-radius:8px;padding:1px 7px}
+.msg small{display:block;font-weight:500;font-size:.8rem;color:var(--coral-2)}
+.msg code{font-weight:700;letter-spacing:.05em;color:var(--lcd);background:var(--oro);border-radius:8px;padding:1px 7px}
 canvas#confeti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30}
 .aviso-prueba{max-width:560px;margin:0 auto 14px;background:var(--coral-2);border-radius:999px;padding:6px 14px;text-align:center;font-size:.8rem;font-weight:600}
 body{margin:0}
@@ -115,7 +141,7 @@ body{margin:0}
 .embed details.test{display:none}
 /* palanca al costado de la máquina */
 .maq{position:relative;margin-right:34px}
-.palanca{all:unset;cursor:pointer;position:absolute;right:-37px;top:96px;width:34px;height:150px}
+.palanca{all:unset;cursor:pointer;position:absolute;right:-37px;top:118px;width:34px;height:150px}
 .palanca:focus-visible{outline:3px solid var(--coral);outline-offset:3px;border-radius:8px}
 .palanca:disabled{cursor:not-allowed}
 .eje{position:absolute;left:0;bottom:22px;width:22px;height:30px;border-radius:0 10px 10px 0;background:var(--turquesa-2)}
@@ -125,7 +151,7 @@ body{margin:0}
 .maq.tirando .brazo{animation:tirar-palanca .55s cubic-bezier(.4,0,.3,1)}
 @keyframes tirar-palanca{0%{transform:perspective(260px) rotateX(0)}45%,62%{transform:perspective(260px) rotateX(165deg)}100%{transform:perspective(260px) rotateX(0)}}
 @media (prefers-reduced-motion:reduce){.maq.tirando .brazo{animation:none}}
-@media (max-width:420px){.maq{margin-right:30px}.palanca{right:-33px;top:80px;transform:scale(.88);transform-origin:0 50%}}
+@media (max-width:420px){.maq{margin-right:30px}.palanca{right:-33px;top:104px;transform:scale(.88);transform-origin:0 50%}}
 </style>
 </head>
 <body>
@@ -139,11 +165,9 @@ body{margin:0}
 
   <section class="jugador" id="jugador" aria-label="Tu número" hidden></section>
 
-  <section class="maq" aria-label="Maquinita">
-    <div class="marquee">
-      <div class="luces" id="luces" aria-hidden="true"></div>
-      <h1>La maquinita de Mochito</h1>
-    </div>
+  <section class="maq" aria-label="Setto Luckyslot">
+    <span class="tope" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1 6.1 20.3l1.3-6.5L2.5 9.3l6.6-.8z" fill="#F2C14E" stroke="#1F5452" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
+    <div class="cartel"><span>Setto</span><h1>Luckyslot</h1></div>
     <div class="ventana" id="ventana">
       <div class="reel"><div class="strip"></div></div>
       <div class="reel"><div class="strip"></div></div>
@@ -152,8 +176,10 @@ body{margin:0}
       <div class="reel"><div class="strip"></div></div>
     </div>
     <p class="msg" id="msg" aria-live="polite">¡Probá suerte!</p>
-    <button class="tirar" id="tirar" type="button">Tirar</button>
-    <div class="fichas" id="fichas" aria-live="polite"></div>
+    <div class="tablero">
+      <div class="fichas" id="fichas" aria-live="polite"></div>
+      <button class="tirar" id="tirar" type="button">Tirar</button>
+    </div>
     <button class="palanca" id="palanca" type="button" aria-label="Bajar la palanca y tirar"><span class="brazo"><span class="bola"></span></span><span class="eje"></span></button>
   </section>
 
@@ -161,7 +187,7 @@ body{margin:0}
   <section class="mios" id="mios" aria-label="Tus premios" hidden></section>
 
   <section class="premios" id="premios" aria-label="Premios"></section>
-  <p class="letra" id="letra"></p>
+  <ul class="reglas" id="letra"></ul>
 
   <details class="test" hidden>
     <summary>Prueba</summary>
@@ -200,7 +226,6 @@ body{margin:0}
   DEF_SIM.forEach(([k, n, img], i) => { const c = (CFG.simbolos || [])[i] || {}; IMG[k] = c.img || img; NOMBRE[k] = c.nombre || n; });
   const FICHAS = Math.max(1, Math.min(5, Math.round(+CFG.fichas_dia || 1)));
   if (CFG.aviso === false) $(".aviso-prueba").hidden = true;
-  $(".letra").textContent = `${FICHAS === 1 ? "Una tirada gratis" : FICHAS + " tiradas gratis"} por día. No apostás nada.`;
   const ESTRELLA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1 6.1 20.3l1.3-6.5L2.5 9.3l6.6-.8z" fill="#F2C14E" stroke="#1F5452" stroke-width="1.4" stroke-linejoin="round"/></svg>';
   const SIMBOLOS = ["mochito", "frutilla", "oreo", "dirty", "matcha", "estrella"];
   const symHtml = (k) => !IMG[k] ? ESTRELLA : `<img src="${esc(IMG[k])}" alt="${esc(NOMBRE[k])}" draggable="false">`;
@@ -208,17 +233,18 @@ body{margin:0}
 
   // La tabla se edita desde el panel; el resultado de cada tirada lo decide la base (maq_tirar)
   const DEF_PREM = { gift: ["Gift card $10.000", 0.1], mochi: ["Mochi gratis", 0.5], off: ["10% off", 2] };
-  const COMBO = { gift: () => symHtml("mochito").repeat(5), mochi: () => `<span>5 iguales</span>`, off: () => `<span>4 iguales</span>` };
+  const puntos = (n) => "<i></i>".repeat(n) + '<i class="no"></i>'.repeat(5 - n);
+  const COMBO = { gift: [() => symHtml("mochito").repeat(5), "5 Mochitos"], mochi: [() => puntos(5), "5 iguales"], off: [() => puntos(4), "4 iguales"] };
   const PREMIOS = ["gift", "mochi", "off"].map((id) => {
     const c = (CFG.premios || []).find((x) => x.id === id), d = DEF_PREM[id];
     return { id, titulo: c ? String(c.titulo || "").trim() : d[0], chance: c ? Math.max(0, +c.chance || 0) : d[1], combo: COMBO[id] };
   }).filter((p) => p.titulo && p.chance > 0);
   const fmt = (n) => n.toLocaleString("es-AR") + "%";
-  $("#premios").innerHTML = PREMIOS.map((p) => `<div class="fila"><span class="combo">${p.combo()}</span><b>${esc(p.titulo)}</b><span class="pct">${fmt(p.chance)}</span></div>`).join("");
+  $("#premios").innerHTML = `<div class="pz-h"><h2>Premios</h2><span>Chance por tirada</span></div>` + PREMIOS.map((p, i) => `<div class="pz ${i === 0 ? "top" : ""}"><span class="pz-combo" aria-hidden="true">${p.combo[0]()}</span><span class="pz-t"><b>${esc(p.titulo)}</b><small>${p.combo[1]}</small></span><span class="pz-pct">${fmt(p.chance)}</span></div>`).join("");
 
   /* ---------- tu número, fichas y premios (los guarda la base) ---------- */
   const COMPRA = Math.max(0, Math.min(50, Math.round(CFG.fichas_compra ?? 5)));
-  $("#letra").textContent = `${FICHAS === 1 ? "Una tirada gratis" : FICHAS + " tiradas gratis"} por día${COMPRA ? ` y ${COMPRA} fichas por cada compra` : ""}. No apostás nada.`;
+  $("#letra").innerHTML = `<li>🎟️ <span><b>${FICHAS === 1 ? "1 tirada gratis" : FICHAS + " tiradas gratis"}</b> por día</span></li>${COMPRA ? `<li>🛍️ <span><b>+${COMPRA} fichas</b> por compra</span></li>` : ""}<li>✨ <span>No apostás nada</span></li>`;
   // Para jugar no se pide el celular: la tirada gratis va por este dispositivo (y la base pone un tope por red).
   // Las fichas de compra van con el celular de los pedidos hechos en este celu. Si gana sin celular, lo pide para guardar el premio.
   const TEL = "setto-maq-tel", DEV = "setto-maq-dev";
@@ -240,7 +266,7 @@ body{margin:0}
   function pintarJugador() {
     const j = $("#jugador");
     j.hidden = !tel; if (!tel) { j.innerHTML = ""; return; }
-    j.innerHTML = `<div class="linea"><span>Tus fichas de compra van con <b>${esc(API.prettyPhone(tel))}</b></span><button class="link" id="cambiar" type="button">No soy yo</button></div>`;
+    j.innerHTML = `<div class="linea"><span class="jug-info"><small>Tus fichas van con</small><b>${esc(API.prettyPhone(tel))}</b></span><button class="btn-sec" id="cambiar" type="button">No soy yo</button></div>`;
     $("#cambiar").addEventListener("click", async () => { tel = null; try { localStorage.removeItem(TEL); } catch (_) {} pintarJugador(); await cargarEstado(); });
   }
   // ganó sin celular: el premio queda guardado en este dispositivo hasta que deje su número
@@ -273,10 +299,9 @@ body{margin:0}
     pintarFichas(); pintarMios(); pintarReclamo();
   }
   function pintarFichas() {
-    const n = quedan(), MAXV = 10;
+    const n = quedan();
     if (!est) { $("#fichas").innerHTML = ""; $("#tirar").disabled = $("#palanca").disabled = true; if (!girando) $("#msg").textContent = "Cargando tus fichas…"; return; }
-    $("#fichas").innerHTML = Array.from({ length: Math.min(Math.max(n, FICHAS), MAXV) }, (_, i) => `<span class="ficha ${i < n ? "" : "vacia"}"></span>`).join("") +
-      `<span>${n === 1 ? "1 ficha" : n + " fichas"}${est.fichas && est.gratis ? ` (${est.gratis} gratis hoy)` : ""}</span>`;
+    $("#fichas").innerHTML = `<span class="ficha ${n ? "" : "vacia"}"></span><span><b class="num">${n}</b>${n === 1 ? "ficha" : "fichas"}${est.fichas && est.gratis ? ` · ${est.gratis} gratis` : ""}</span>`;
     $("#tirar").disabled = $("#palanca").disabled = n === 0 || girando;
     if (n > 0 && !girando && $("#msg").textContent === "Cargando tus fichas…") $("#msg").textContent = "¡Probá suerte!";
     if (n === 0 && !girando) $("#msg").textContent = COMPRA ? `Volvé mañana o sumá ${COMPRA} fichas con tu próxima compra` : "Volvé mañana por otra tirada";
@@ -340,15 +365,8 @@ body{margin:0}
   $("#tirar").addEventListener("click", girar);
   $("#palanca").addEventListener("click", girar);
 
-  /* ---------- luces ---------- */
-  const lucesEl = $("#luces"); lucesEl.innerHTML = "<i></i>".repeat(12);
-  let lt = null, paso = 0;
-  function luces(on) {
-    clearInterval(lt); const is = [...lucesEl.children];
-    if (!on) { is.forEach((x, i) => x.classList.toggle("on", i % 2 === 0)); return; }
-    lt = setInterval(() => { paso++; is.forEach((x, i) => x.classList.toggle("on", (i + paso) % 3 === 0)); }, 90);
-  }
-  luces(false);
+  /* ---------- cartel: brilla mientras gira ---------- */
+  const luces = (on) => $(".maq").classList.toggle("girando", on);
 
   /* ---------- sonido (opcional, arranca apagado) ---------- */
   const OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>';

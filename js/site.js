@@ -1016,11 +1016,22 @@
   // debajo de Continuar: maquinita y club en pop up, sin cerrar el carrito
   const extrasCart = () => { const b = [maqOn() ? `<button class="cx-b" type="button" data-cxmaq>🎰 Probá suerte</button>` : "", clubOn() ? `<button class="cx-b" type="button" data-cxclub>⭐ Setto Club</button>` : ""].filter(Boolean);
     return b.length ? `<div class="cx">${b.join("")}</div>` : ""; };
-  function abrirClubPop() {
-    const c = club(), meta = c.meta || 8, d = cardCache && cardCache.tel === API.normPhone(form.tel) ? cardCache.data : null, b = beneficios();
-    const tarjeta = d ? `<div class="cp-card"><b>Tenés ${d.sellos} de ${meta} sellos</b><div class="stamps cp-st">${Array.from({ length: meta }, (_, i) => i === meta - 1 ? `<div class="stamp gift ${i < d.sellos ? "on" : ""}">${i < d.sellos ? "¡Listo!" : "Premio"}</div>` : `<div class="stamp ${i < d.sellos ? "on" : ""}">${i < d.sellos ? '<img src="img/mochito-run.png" alt="">' : i + 1}</div>`).join("")}</div></div>` : "";
-    $("#cpBody").innerHTML = `${tarjeta}<p class="muted">Cada pedido desde la web suma ${sellosTxt(spp())}. El pedido que completa los ${meta} sellos viene con ${esc(premioTxt())}.${c.minimo > 0 ? ` Suman sello los pedidos desde ${money(c.minimo)}.` : ""}</p>
-      ${b.length ? `<div class="clubbenef"><b>Con tu compra tenés beneficios exclusivos del club</b><ul>${b.map((x) => `<li><span class="bn-ico" aria-hidden="true">${x.ico}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></li>`).join("")}</ul></div>` : ""}`;
+  function abrirClubPop() { // igual que la sección del club, pero sin buscador: la tarjeta es solo para mirar
+    const c = club(), meta = Math.max(2, Math.min(12, c.meta || 8)), d = cardCache && cardCache.tel === API.normPhone(form.tel) ? cardCache.data : null, n = d ? Math.min(d.sellos, meta) : 0, b = beneficios();
+    const st = Array.from({ length: meta }, (_, i) => i === meta - 1 ? `<div class="stamp gift ${i < n ? "on" : ""}">${i < n ? "¡Listo!" : "Premio"}</div>` : `<div class="stamp ${i < n ? "on" : ""}">${i < n ? '<img src="img/mochito-run.png" alt="">' : i + 1}</div>`).join("");
+    $("#cpBody").innerHTML = `<div class="cp-grid">
+      <div class="next cp-next">
+        <div><span class="k">1</span><span><b>Pedí desde la web</b></span></div>
+        <div><span class="k">2</span><span><b>Recibilo y sumás ${sellosTxt(spp())}</b>${c.minimo > 0 ? `<small>En pedidos desde ${money(c.minimo)}.</small>` : ""}</span></div>
+        <div><span class="k">3</span><span><b>Completá la tarjeta</b><small>El pedido que completa los ${meta} sellos viene con ${esc(premioTxt())}.</small></span></div>
+      </div>
+      <div class="stampcard cp-card" aria-label="Tarjeta de sellos">
+        <div class="row1"><img src="img/logo.svg" alt="Setto"><span class="eyebrow">Club</span></div>
+        <div class="stamps" style="--n:${meta}">${st}</div>
+        <p class="muted">${d ? `Tenés ${n} de ${meta} sellos.` : "Cada pedido de la web suma un sello."}</p>
+      </div>
+      ${b.length ? `<div class="clubbenef cp-benef"><b>Con tu compra tenés beneficios exclusivos del club</b><ul>${b.map((x) => `<li><span class="bn-ico" aria-hidden="true">${x.ico}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></li>`).join("")}</ul></div>` : ""}
+    </div>`;
     $("#clubPop").hidden = false; $("[data-cpclose]").focus();
   }
   function cerrarClubPop() { $("#clubPop").hidden = true; if ($("#drawer").classList.contains("on")) { const t = $("[data-cxclub]"); if (t) t.focus(); } }
