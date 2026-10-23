@@ -629,10 +629,18 @@
       } catch (err) { er.textContent = err.message; er.hidden = false; }
     };
   }
-  function stockItemSheet(id) {
+  async function stockItemSheet(id) {
     const it = id ? S.stock.find((x) => x.id === id) : { nombre: "", unidad: "unidades", minimo: 0 };
+    // vínculo con la web: el stock de este ítem es el que ve la web para ese mochi (también los del Especial)
+    let prods = [], links = [];
+    try { [prods, links] = (await Promise.all([sb.from("products").select("id,nombre,categoria,formato,activo").in("categoria", ["mochi", "especial"]).order("orden"), sb.from("caja_stock_items").select("id,product_id").not("product_id", "is", null)])).map(fail); } catch (_) {}
+    const mio = (links.find((l) => l.id === id) || {}).product_id || "", usados = links.filter((l) => l.id !== id).map((l) => l.product_id);
+    const webOpts = prods.filter((p) => (p.categoria === "mochi" || (p.formato || "mochi") === "mochi") && (p.id === mio || !usados.includes(p.id)))
+      .map((p) => `<option value="${esc(p.id)}" ${p.id === mio ? "selected" : ""}>${esc((p.categoria === "especial" ? "Especial · " : "Mochi ") + p.nombre)}${p.activo === false ? " (oculto)" : ""}</option>`).join("");
     openSheet(`<div class="sh"><h3>${id ? "Editar producto" : "Nuevo producto"}</h3><button class="x" data-close aria-label="Cerrar">×</button></div>
       <form class="form" id="sif"><label class="fl"><span>Nombre</span><input id="siN" value="${esc(it.nombre)}" required maxlength="60" placeholder="Ej: Mochi Lemon pie"></label>
+      ${prods.length ? `<label class="fl"><span>Producto de la web</span><select id="siP"><option value="">— Ninguno (solo stock interno)</option>${webOpts}</select></label>
+      <p class="hintp">Si lo vinculás, la web muestra "Quedan N" / "¡Últimos!" con este stock y no deja pedir más de lo que hay.</p>` : ""}
       <label class="fl"><span>Avisar cuando queden (total) o menos</span><input id="siM" type="number" min="0" value="${it.minimo || 0}"></label>
       <p class="hintp">0 = sin aviso.</p><p class="err" id="sierr" hidden></p>
       <button class="btn solid big" type="submit">Guardar</button>
@@ -640,6 +648,7 @@
       sh.onsubmit = async (e) => {
         e.preventDefault();
         const row = { nombre: sh.querySelector("#siN").value.trim(), minimo: Math.max(0, parseInt(sh.querySelector("#siM").value, 10) || 0) };
+        const sp = sh.querySelector("#siP"); if (sp) row.product_id = sp.value || null;
         try { if (id) fail(await sb.from("caja_stock_items").update(row).eq("id", id)); else fail(await sb.from("caja_stock_items").insert(Object.assign(row, { orden: S.stock.length + 1 }))); closeSheet(); toast("Guardado"); await loadAll(); render(); }
         catch (err) { const r = sh.querySelector("#sierr"); r.textContent = /duplicate/.test(err.message) ? "Ya existe un producto con ese nombre" : err.message; r.hidden = false; }
       };
