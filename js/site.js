@@ -44,18 +44,18 @@
   const umbral = () => Math.max(1, Number((S.stock_web || {}).umbral) || 3);
   const stockDe = (p) => {
     if (!STOCK || !p) return null;
-    const id = p.categoria === "set" ? p.set_mochi : p.id;
+    const id = fmt(p) === "set" ? p.set_mochi : p.id;
     return Object.prototype.hasOwnProperty.call(STOCK, id) ? Number(STOCK[id]) : null;
   };
   // lo que ve el cliente = stock − lo que ya tiene en su carrito (contador en vivo)
-  const libreDe = (p) => { const n = stockDe(p); if (n === null) return null; const mid = p.categoria === "set" ? p.set_mochi : p.id; return n - enCarrito(mid); };
+  const libreDe = (p) => { const n = stockDe(p); if (n === null) return null; const mid = fmt(p) === "set" ? p.set_mochi : p.id; return n - enCarrito(mid); };
   const badgeInner = (p) => { const n = stockDe(p), l = libreDe(p); if (n === null || p.agotado) return ""; return n <= 0 ? '<span class="badge">Sin stock hoy</span>' : l <= 0 ? '<span class="badge low">En tu pedido</span>' : l <= umbral() ? '<span class="badge low">¡Últimos!</span>' : ""; };
   const lineInner = (p) => {
     const n = stockDe(p), l = libreDe(p); if (n === null || p.agotado) return "";
     if (n <= 0) return '<p class="stk out">No hay stock disponible</p>';
     if (l <= 0) return `<p class="stk low">Ya tenés ${n === 1 ? "el último" : `los ${n} que quedan`} en tu pedido</p>`;
     const num = `<b class="num stkn">${l}</b>`;
-    if (p.categoria === "set") return `<p class="stk ${l <= umbral() ? "low" : ""}">${l === 1 ? "Queda" : "Quedan"} ${num} para este set</p>`;
+    if (fmt(p) === "set") return `<p class="stk ${l <= umbral() ? "low" : ""}">${l === 1 ? "Queda" : "Quedan"} ${num} para este set</p>`;
     return l <= umbral() ? `<p class="stk low">${l === 1 ? "Queda" : "Quedan"} ${num} · ¡últimos!</p>` : `<p class="stk">${num} disponibles hoy</p>`;
   };
   const stockBadge = (p) => `<span class="stkw" data-stkb="${esc(p.id)}">${badgeInner(p)}</span>`;
@@ -98,7 +98,12 @@
   const tapado = (p) => !VER_ESP && kind(p) === "premium" && (prog() ? antesProg() && (ESPC().esmerilar !== false || !!p.esmerilado) : !!p.esmerilado);
   const fechaDrop = (iso) => { const d = new Date(iso); if (isNaN(d)) return ""; const o = { timeZone: "America/Argentina/Buenos_Aires" };
     return d.toLocaleDateString("es-AR", { ...o, weekday: "long", day: "numeric", month: "numeric" }) + " a las " + d.toLocaleTimeString("es-AR", { ...o, hour: "2-digit", minute: "2-digit", hour12: false }) + " hs"; };
-  const setParts = (s) => ({ b: DIRTY.find((x) => x.id === s.bebida), m: MOCHIS.find((x) => x.id === s.mochi) });
+  // en un set del Especial la bebida y el mochi pueden ser del Especial; sin bebida fija (se elige), se compara con la más barata del drop
+  const setParts = (s) => {
+    const espDirty = s.categoria === "especial" ? on(ESP).filter((x) => fmt(x) === "dirty" && Number(x.precios["12 oz"]) > 0) : [];
+    const b = [...DIRTY, ...espDirty].find((x) => x.id === s.bebida) || (s.bebida ? null : espDirty.sort((x, y) => x.precios["12 oz"] - y.precios["12 oz"])[0]);
+    return { b, m: [...MOCHIS, ...ESP].find((x) => x.id === s.mochi) };
+  };
   const suelto = (s, sz) => { const { b, m } = setParts(s); return (b ? Number(b.precios[sz]) : 0) + (m ? Number(m.precio) : 0); };
   const descOf = (p) => { if (p.categoria !== "set") return p.desc; const { b, m } = setParts(p); return (b ? b.nombre : "Bebida") + " + mochi " + (m ? m.nombre.toLowerCase() : ""); };
 
@@ -677,7 +682,7 @@
       const code = !hideN && (p.codigo || p.tema) ? `<p class="code">${esc(p.codigo || "")}${p.codigo && p.tema ? " ✦ " : ""}${esc(p.tema || "")}</p>` : "";
       return `<article class="set prem ${p.agotado || fin ? "agotado" : ""} ${tapado(p) ? "tapado" : ""}" style="--i:${i}">
         ${ph}${pct > 0 && !hideP ? `<span class="off num">${pct}% off</span>` : ""}${tag}
-        <h3>${esc(nom)}</h3>${code}<p class="combo">${esc(hideN ? "Se revela el día del drop." : p.desc)}</p>${open ? stockLine(p) : ""}
+        <h3>${esc(nom)}</h3>${code}<p class="combo">${esc(hideN ? "Se revela el día del drop." : p.desc)}</p>${!fin && !hideN ? stockLine(p) : ""}
         <div class="foot">${precio}
         ${canBuy ? `<button class="add" ${beb ? `data-open="${p.id}"` : `data-quick="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>` : ""}</div>
       </article>`;
