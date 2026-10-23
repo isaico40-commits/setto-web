@@ -74,6 +74,8 @@
   }
   function dbSave(db) { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { throw new Error("El navegador no tiene más espacio (modo demo). Probá con fotos más livianas."); } }
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+  // reseñas: primero las que tienen número de orden (Panel → Reseñas), después de la más nueva a la más vieja (igual que la base)
+  const ordenRv = (l) => l.slice().sort((a, b) => (a.orden || 1e9) - (b.orden || 1e9) || String(b.created_at).localeCompare(String(a.created_at)));
 
   /* maquinita en modo demo */
   const MAQ_DEF = [["gift", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "Mochi gratis", 0.5, "mochi", 0], ["off", "10% off", 2, "porcentaje", 10]];
@@ -427,13 +429,14 @@
       db.reviews.unshift({ id: uid(), order_id: o.id, phone: ph, nombre: o.nombre, rating, texto: String(texto || "").trim() || null, foto: foto || null, instagram: ig.toLowerCase() || null, estado: "aprobada", revisada: false, created_at: new Date().toISOString() }); dbSave(db);
     },
     async publicReviews() {
-      const ok = (dbLoad().reviews || []).filter((r) => r.estado === "aprobada");
+      const ok = ordenRv(dbLoad().reviews || []).filter((r) => r.estado === "aprobada");
       const nom = (n) => { const [a, b] = String(n).trim().split(/\s+/); return a.charAt(0).toUpperCase() + a.slice(1) + (b ? " " + b[0].toUpperCase() + "." : ""); };
       return { cantidad: ok.length, promedio: ok.length ? Math.round((ok.reduce((s, r) => s + r.rating, 0) / ok.length) * 10) / 10 : null,
         items: ok.filter((r) => r.texto || r.foto).slice(0, 12).map((r) => { const o = dbLoad().orders.find((x) => x.id === r.order_id) || { items: [] };
           return { nombre: nom(r.nombre), rating: r.rating, texto: r.texto, foto: r.foto, instagram: r.instagram, fecha: r.created_at, pedido: [...new Set(o.items.filter((i) => !["envio", "premio", "maquinita"].includes(i.id)).map((i) => i.nombre))] }; }) };
     },
-    async listReviews() { return (dbLoad().reviews || []).slice(0, 100); },
+    async listReviews() { return ordenRv(dbLoad().reviews || []).slice(0, 100); },
+    async setReviewOrden(id, orden) { const db = dbLoad(), r = (db.reviews || []).find((x) => x.id === id); if (r) { r.orden = orden || null; dbSave(db); } },
     async createGiftcard({ diseno, monto, de, para, mensaje, phone }) {
       const db = dbLoad(), ph = normPhone(phone), cfg = db.settings.giftcards || {}; db.giftcards = db.giftcards || [];
       if (!ph) throw new Error("Revisá tu celular");
@@ -459,7 +462,7 @@
       dbSave(db); return this.pollResults(poll);
     },
     async publicReviewsAll(offset = 0) {
-      const db = dbLoad(), ok = (db.reviews || []).filter((r) => r.estado === "aprobada"), por = {};
+      const db = dbLoad(), ok = ordenRv(db.reviews || []).filter((r) => r.estado === "aprobada"), por = {};
       ok.forEach((r) => (por[r.rating] = (por[r.rating] || 0) + 1));
       const nom = (n) => { const [a, b] = String(n).trim().split(/\s+/); return a.charAt(0).toUpperCase() + a.slice(1) + (b ? " " + b[0].toUpperCase() + "." : ""); };
       return { cantidad: ok.length, promedio: ok.length ? Math.round((ok.reduce((s, r) => s + r.rating, 0) / ok.length) * 10) / 10 : null, por_estrella: por,
@@ -630,7 +633,8 @@
     async annulGiftcard(id) { const { error } = await sb.rpc("annul_giftcard", { p_id: id }); fail(error); },
     async pollResults(poll) { const { data, error } = await sb.rpc("poll_results", { p_poll: poll }); fail(error); return data; },
     async castVote(poll, opcion, phone) { const { data, error } = await sb.rpc("cast_vote", { p_poll: poll, p_opcion: opcion, p_phone: phone }); fail(error); return data; },
-    async listReviews() { const { data, error } = await sb.from("reviews").select("*").order("created_at", { ascending: false }).limit(100); fail(error); return data; },
+    async listReviews() { const { data, error } = await sb.from("reviews").select("*").order("orden", { ascending: true, nullsFirst: false }).order("created_at", { ascending: false }).limit(100); fail(error); return data; },
+    async setReviewOrden(id, orden) { const { error } = await sb.from("reviews").update({ orden: orden || null }).eq("id", id); fail(error); },
     async setReviewEstado(id, estado) { const { error } = await sb.from("reviews").update({ estado, revisada: true }).eq("id", id); fail(error); },
     async addStamps(phone, nombre, delta, motivo) { const { data, error } = await sb.rpc("add_stamps", { p_phone: phone, p_nombre: nombre || null, p_delta: delta, p_motivo: motivo || null }); fail(error); return data; },
     async redeem(phone) { const { data, error } = await sb.rpc("redeem_reward", { p_phone: phone }); fail(error); return data; },

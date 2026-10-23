@@ -194,7 +194,7 @@
 
   /* =================== RESEÑAS =================== */
   async function viewResenas() {
-    $("#view").innerHTML = `<h1 class="ph1">Reseñas</h1><p class="muted">Se publican solas apenas las deja quien recibió su pedido (en la lista de la web aparecen las que tienen texto o foto). Revisalas después: marcalas como revisadas u ocultá las que no correspondan.</p><div id="rvList" class="pgrid" style="margin-top:18px"><p class="muted">Cargando…</p></div>`;
+    $("#view").innerHTML = `<h1 class="ph1">Reseñas</h1><p class="muted">Se publican solas apenas las deja quien recibió su pedido (en la lista de la web aparecen las que tienen texto o foto). Revisalas después: marcalas como revisadas u ocultá las que no correspondan.</p><p class="muted">Para elegir cuáles se ven primero en la web, poneles un número en <b>Orden</b> (1 = primera). Las que quedan vacías van después, de la más nueva a la más vieja.</p><div id="rvList" class="pgrid" style="margin-top:18px"><p class="muted">Cargando…</p></div>`;
     try {
       const l = await API.listReviews(); P.reviews = l; contarResenas();
       $("#rvList").innerHTML = l.length ? l.map((r) => `<article class="pcard rvc ${r.estado}" data-rid="${r.id}">
@@ -203,7 +203,7 @@
           <p style="margin:6px 0">${r.texto ? esc(r.texto) : '<i class="muted">Sin texto (solo puntaje)</i>'}</p>
           ${r.instagram ? `<a class="linkbtn" href="https://instagram.com/${encodeURIComponent(r.instagram)}" target="_blank" rel="noopener">@${esc(r.instagram)}</a>` : ""}
           <div class="who2"><b>${esc(r.nombre)}</b><span class="num">${esc(pretty(r.phone))}</span></div>
-          <div class="acts">${r.estado === "oculta" ? '<button class="btn" data-rv="aprobada">Volver a publicar</button>' : !r.revisada ? '<button class="btn solid" data-rv="aprobada">Revisada</button>' : ""}${r.estado !== "oculta" ? '<button class="linkbtn warn" data-rv="oculta">Ocultar</button>' : ""}</div></article>`).join("") : '<p class="muted">Todavía no hay reseñas.</p>';
+          <div class="acts">${r.estado === "oculta" ? '<button class="btn" data-rv="aprobada">Volver a publicar</button>' : !r.revisada ? '<button class="btn solid" data-rv="aprobada">Revisada</button>' : ""}${r.estado !== "oculta" ? '<button class="linkbtn warn" data-rv="oculta">Ocultar</button>' : ""}<label class="rvord">Orden<input class="inp" type="number" inputmode="numeric" min="1" max="999" placeholder="—" value="${r.orden || ""}" data-rvord aria-label="Orden de la reseña de ${esc(r.nombre)}"></label></div></article>`).join("") : '<p class="muted">Todavía no hay reseñas.</p>';
     } catch (e) { $("#rvList").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
   }
   function contarResenas() { const n = (P.reviews || []).filter((r) => !r.revisada).length, el = $("#resN"); if (el) { el.textContent = n; el.hidden = !n; } }
@@ -211,6 +211,12 @@
     const b = e.target.closest("[data-rv]"); if (!b) return;
     const id = b.closest("[data-rid]").dataset.rid; b.disabled = true;
     try { await API.setReviewEstado(id, b.dataset.rv); toast(b.dataset.rv === "oculta" ? "Oculta" : b.textContent === "Revisada" ? "Marcada como revisada" : "Publicada de nuevo"); viewResenas(); } catch (err) { toast(err.message); b.disabled = false; }
+  });
+  document.addEventListener("change", async (e) => {
+    const inp = e.target.closest("[data-rvord]"); if (!inp) return;
+    const id = inp.closest("[data-rid]").dataset.rid, v = Math.round(+inp.value || 0), orden = v >= 1 ? Math.min(999, v) : null;
+    inp.disabled = true;
+    try { await API.setReviewOrden(id, orden); toast(orden ? `Va en el lugar ${orden}` : "Sin orden: va por fecha"); viewResenas(); } catch (err) { toast(err.message); inp.disabled = false; }
   });
   async function refreshOrders(notify) {
     try {
@@ -632,13 +638,15 @@
         <form class="pcard wide" data-set="hero"><b>Portada (slides del inicio)</b>
           <span class="hintp">Dos tipos de slide. <b>Foto + texto de la web</b>: subís la foto y escribís título y texto acá (el texto va siempre abajo). <b>Diseño propio</b>: imagen o video con el texto ya diseñado adentro. Medidas: <b>compu 2000 × 1000</b> (2:1) y <b>celular 1080 × 1350</b> (4:5); si no subís la de celular, se usa la de compu recortada. Video: corto (5–15 s), sin sonido, MP4, hasta 25 MB.</span>
           <span class="hintp">En la web se ve solo el primer botón de cada slide, chico y dentro de la foto. Dejá el texto vacío para no mostrarlo. El título y el texto son opcionales: sin ellos la foto ocupa toda la slide.</span>
+          <span class="hintp"><b>Orden</b>: el número dice en qué lugar sale cada slide (1 = la primera). Para cambiar el orden, cambiá los números y tocá Guardar; no hace falta volver a subir nada.</span>
           ${[0, 1, 2, 3, 4, 5].map((i) => { const x = ((S.hero || {}).slides || [])[i] || {}, tp = x.tipo === "media" ? "media" : "texto", bs = heroBotones(x);
             const prev = (n, v, vid) => `<span class="upprev ${vid ? "vid" : ""}" data-prevfor="${n}${i}">${v ? (vid ? `<video src="${esc(v)}" muted playsinline></video>` : `<img src="${esc(v)}" alt="">`) : "—"}</span>`;
             const up = (n, label, vid, max, cls = "") => `<div class="upbox ${cls}"><small>${label}</small>${prev(n, x[{ si: "img", sm: "img_m", sv: "video", sw: "video_m" }[n]], vid)}<input type="hidden" name="${n}${i}" value="${esc(x[{ si: "img", sm: "img_m", sv: "video", sw: "video_m" }[n]] || "")}">
               <span class="acts" style="gap:4px"><label class="linkbtn">${vid ? "Subir video" : "Subir"}<input type="file" accept="${vid ? "video/mp4,video/webm,video/quicktime" : "image/*"}" ${vid ? `data-upvid="${n}${i}"` : `data-upimg="${n}${i}" data-upmax="${max}"`} hidden></label><button type="button" class="linkbtn warn" data-upx="${n}${i}">✕</button></span></div>`;
             const opt = (list, cur) => list.map(([v, l]) => `<option value="${v}" ${cur === v ? "selected" : ""}>${l}</option>`).join("");
             return `<div class="slrow2" data-tipo="${tp}"><div class="slhead"><b class="sln">Slide ${i + 1}</b>
-              <select class="inp" name="sk${i}" data-sltipo aria-label="Tipo de slide ${i + 1}">${opt([["texto", "Foto + texto de la web"], ["media", "Diseño propio (imagen o video)"]], tp)}</select></div>
+              <select class="inp" name="sk${i}" data-sltipo aria-label="Tipo de slide ${i + 1}">${opt([["texto", "Foto + texto de la web"], ["media", "Diseño propio (imagen o video)"]], tp)}</select>
+              <label class="slord">Orden<input class="inp" name="so${i}" type="number" inputmode="numeric" min="1" max="6" value="${i + 1}" aria-label="Orden de la slide ${i + 1}"></label></div>
               <div class="upgrid">${up("si", "Imagen compu", false, 2000)}${up("sm", "Imagen celu", false, 1350)}${up("sv", "Video compu", true, 0, "only-media")}${up("sw", "Video celu", true, 0, "only-media")}</div>
               <div class="slf3 only-texto"><label>Título<input class="inp" name="sti${i}" maxlength="40" value="${esc(x.titulo || "")}" placeholder="Ej: Mochis rellenos"></label>
                 <label>Texto<input class="inp" name="stx${i}" maxlength="90" value="${esc(x.texto || "")}" placeholder="Ej: Masa suave por fuera, crema por dentro."></label>
@@ -855,8 +863,10 @@
           const x = { tipo, img: g("si"), img_m: g("sm"), botones };
           if (tipo === "media") Object.assign(x, { video: g("sv"), video_m: g("sw"), alt: g("st") });
           else Object.assign(x, { titulo: g("sti"), texto: g("stx"), ajuste: f["sa" + i] === "recorte" ? "recorte" : "foto", pos: f["sp" + i] || "centro", alt: g("sti") });
-          return x;
-        }).filter((x) => x.img || x.img_m || x.video || x.video_m);
+          return { x, o: Math.round(+f["so" + i]) || i + 1, i };
+        }).filter(({ x }) => x.img || x.img_m || x.video || x.video_m)
+          // el número de "Orden" decide el lugar; si dos tienen el mismo número, queda primero la que estaba más arriba
+          .sort((a, b) => a.o - b.o || a.i - b.i).map(({ x }) => x);
         if (!slides.length) throw new Error("Subí al menos una imagen o video");
         await API.saveSetting("hero", { slides, intervalo: Math.max(3, Math.min(15, +f.intervalo || 5)) });
       }
