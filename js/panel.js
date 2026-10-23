@@ -564,7 +564,8 @@
     return `<article class="pcard ${dirty ? "dirty" : ""} ${p.activo === false ? "oculto" : ""}" data-pid="${esc(p.id)}">
       <div class="ptop"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><div><b>${esc(p.nombre)}</b><br>
         <label class="up">${p.img ? "Cambiar foto" : "Subir foto"}<input type="file" accept="image/*" data-photo></label>
-        ${p.img && c === "especial" ? `<button class="linkbtn" data-nophoto>Quitar foto</button>` : ""}</div></div>
+        ${p.img && c === "especial" ? `<button class="linkbtn" data-nophoto>Quitar foto</button>` : ""}</div>
+        ${p.img ? `<div class="p2">${p.img2 ? `<img src="${esc(p.img2)}" alt="">` : ""}<label class="up">${p.img2 ? "Cambiar 2ª foto" : "+ 2ª foto (opcional)"}<input type="file" accept="image/*" data-photo2></label>${p.img2 ? `<button class="linkbtn" data-nophoto2>Quitar</button>` : ""}</div>` : ""}</div>
       ${inp("nombre", "Nombre")}
       ${c === "especial" ? `<label>Tipo<select data-f="formato">${[["mochi", "Mochi (precio por unidad)"], ["dirty", "Dirty / latte (12 y 16 oz, leche y extras)"], ["set", "Set (bebida + mochi, 12 y 16 oz)"]].map(([v, l]) => `<option value="${v}" ${F === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
       ${c === "especial" && F === "set" ? `<label>Mochi que incluye (para el stock)<select data-f="set_mochi"><option value="">—</option>${opts("mochi", p.set_mochi)}${P.products.filter((x) => x.categoria === "especial" && (x.formato || "mochi") === "mochi").map((x) => `<option value="${esc(x.id)}" ${x.id === p.set_mochi ? "selected" : ""}>${esc(x.nombre)} (especial)</option>`).join("")}</select></label>` : ""}
@@ -1093,6 +1094,7 @@
         if (base && base._new) { P.products = P.products.filter((x) => x.id !== id); viewCarta(); } else redrawCard(id);
       }
       if (b.dataset.nophoto !== undefined) { P.drafts[id] = { ...(P.drafts[id] || base), img: "" }; redrawCard(id); }
+      if (b.dataset.nophoto2 !== undefined) { P.drafts[id] = { ...(P.drafts[id] || base), img2: null }; redrawCard(id); }
       if (b.dataset.delp !== undefined) {
         const used = P.products.find((x) => x.categoria === "set" && (x.set_bebida === id || x.set_mochi === id));
         if (used) return toast(`No se puede: lo usa ${used.nombre}. Ocultalo con "Visible en la web".`);
@@ -1143,6 +1145,12 @@
       try { const blob = await squareBlob(t.files[0], 256); const url = await API.uploadPhoto(blob, "app-logo-" + i); row.querySelector(`[name=al${i}]`).value = url; row.querySelector(".lprev").innerHTML = `<img src="${url}" alt="">`; toast("Logo listo · tocá Guardar"); }
       catch (err) { toast(err.message || "No se pudo subir el logo"); }
       return;
+    }
+    if (t.matches("[data-photo2]") && t.files && t.files[0]) {
+      const id = t.closest("[data-pid]").dataset.pid, base = P.products.find((x) => x.id === id);
+      toast("Subiendo foto…");
+      try { const blob = await squareBlob(t.files[0]); const url = await API.uploadPhoto(blob, id + "-2"); P.drafts[id] = { ...(P.drafts[id] || base), img2: url }; redrawCard(id); toast("2ª foto lista · tocá Guardar para publicarla"); }
+      catch (err) { toast(err.message || "No se pudo subir la foto"); }
     }
     if (t.matches("[data-photo]") && t.files && t.files[0]) {
       const id = t.closest("[data-pid]").dataset.pid, base = P.products.find((x) => x.id === id);

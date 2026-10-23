@@ -71,6 +71,9 @@ main.pmain{padding-block:24px 80px}
 .ptop{display:flex;gap:10px;align-items:center}
 .ptop img{width:54px;height:54px;object-fit:cover;border-radius:12px;background:var(--bg-2)}
 .ptop b{font-weight:600;line-height:1.2}
+.ptop{flex-wrap:wrap}
+.ptop .p2{flex-basis:100%;display:flex;gap:8px;align-items:center;font-size:.85rem}
+.ptop .p2 img{width:36px;height:36px;border-radius:9px}
 .calc{font-size:.8rem;background:var(--bg-2);border-radius:10px;padding:8px 10px}
 .calc.bad{background:var(--coral-2)}
 .up{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--turquesa);border-radius:999px;padding:6px 12px;color:var(--turquesa);font-size:.82rem;font-weight:600;cursor:pointer;background:var(--card);position:relative;overflow:hidden}
