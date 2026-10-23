@@ -32,6 +32,13 @@
   // 5 estrellas rellenas según el promedio (4,5 → cuatro y media), como en Crumbl
   const rateTag = (p) => { const r = RATINGS[p.id]; if (!r || !r.cantidad) return ""; const w = Math.max(0, Math.min(100, (r.promedio / 5) * 100)); return `<span class="rate" role="img" aria-label="${r.promedio} de 5, ${r.cantidad} reseña${r.cantidad > 1 ? "s" : ""}"><span class="stars5" aria-hidden="true"><span>★★★★★</span><span style="width:${w}%">★★★★★</span></span><b>${String(r.promedio).replace(".", ",")}</b><small>(${r.cantidad})</small></span>`; };
 
+  /* ---------- hasta 2 fotos por tarjeta: con 2 aparece una flecha para pasar a la otra ---------- */
+  const picsHtml = (p, alt, fb) => {
+    const l = [p.img || fb, p.img && p.img2].filter(Boolean);
+    if (l.length < 2) return `<img src="${esc(l[0] || "")}" alt="${esc(alt)}" loading="lazy">`;
+    return `<span class="duo">${l.map((u, i) => `<span><img src="${esc(u)}" alt="${esc(alt + (i ? " (otra foto)" : ""))}" loading="lazy"></span>`).join("")}</span><span class="ph-arr" data-phnext role="button" aria-label="Ver la otra foto"></span>`;
+  };
+
   /* ---------- stock visible (sale de la caja del equipo) ---------- */
   let STOCK = null;
   const umbral = () => Math.max(1, Number((S.stock_web || {}).umbral) || 3);
@@ -57,6 +64,8 @@
     document.querySelectorAll("[data-stkb]").forEach((el) => { const p = find(el.dataset.stkb); if (p) el.innerHTML = badgeInner(p); });
     document.querySelectorAll("[data-stkl]").forEach((el) => { const p = find(el.dataset.stkl); if (!p) return; const prev = el.textContent; el.innerHTML = lineInner(p); if (prev && prev !== el.textContent) { el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); } });
   }
+
+  document.addEventListener("click", (e) => { const a = e.target.closest("[data-phnext]"); if (!a) return; e.preventDefault(); e.stopPropagation(); a.closest(".ph").classList.toggle("alt"); }, true);
 
   /* el stock frena: no se puede pedir más de lo que hay (la base también lo controla) */
   const mochiDe = (p) => (!p ? null : fmt(p) === "set" ? p.set_mochi : fmt(p) === "mochi" ? p.id : null);
@@ -661,7 +670,7 @@
       const antes = fmt(p) === "set" ? suelto(p, "12 oz") : 0, ahorro = base > 0 && antes > base ? antes - base : 0, pct = ahorro ? Math.round((ahorro / antes) * 100) : 0;
       const foto = !!p.img, canBuy = open && !p.agotado && !sinStock(p) && base > 0;
       const nom = hideN ? "Sabor sorpresa" + (items.length > 1 ? " #" + (i + 1) : "") : p.nombre;
-      const pic = foto ? `<img src="${esc(p.img)}" alt="${esc(hideN ? nom : nameOf(p))}" loading="lazy">` : `<span class="pend"><img src="img/mochito-lie.png" alt="">Foto en camino</span>`;
+      const pic = foto ? (tapado(p) || hideN ? `<img src="${esc(p.img)}" alt="${esc(hideN ? nom : nameOf(p))}" loading="lazy">` : picsHtml(p, nameOf(p))) : `<span class="pend"><img src="img/mochito-lie.png" alt="">Foto en camino</span>`;
       const tag = p.agotado ? '<span class="badge">Agotado</span>' : fin ? '<span class="badge">Terminó</span>' : !open ? '<span class="badge">Próximamente</span>' : stockBadge(p);
       const ph = hideN ? `<div class="ph ${foto ? "foto" : ""}">${pic}</div>` : `<button class="ph ${foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${pic}</button>`;
       const precio = hideP ? '<span class="from">Precio<b class="tbd">el día del drop</b></span>' : base > 0 ? `<span class="from num">${beb ? "Desde" : "Unidad"}<b>${money(base)}${ahorro > 0 ? `<s>${money(antes)}</s>` : ""}</b>${hideN ? "" : rateTag(p)}</span>` : '<span class="from">Precio<b class="tbd">a confirmar</b></span>';
@@ -751,7 +760,7 @@
     $("#setsGrid").innerHTML = on(SETS).map((s) => {
       const ahora = s.precios["12 oz"], antes = suelto(s, "12 oz"), ahorro = antes - ahora, pct = antes > 0 ? Math.round((ahorro / antes) * 100) : 0;
       return `<article class="set">
-        <button class="ph ${s.foto ? "foto" : ""}" data-open="${s.id}" aria-label="Ver ${esc(s.nombre)}"><img src="${esc(s.img || "img/mochito-lie.png")}" alt="${esc(descOf(s))}" loading="lazy"></button>
+        <button class="ph ${s.foto ? "foto" : ""}" data-open="${s.id}" aria-label="Ver ${esc(s.nombre)}">${picsHtml(s, descOf(s), "img/mochito-lie.png")}</button>
         ${pct > 0 ? `<span class="off num">${pct}% off</span>` : ""}${stockBadge(s)}
         <h3>${esc(s.nombre)}</h3>
         <p class="code">${esc(s.codigo || "")}${s.tema ? " ✦ " + esc(s.tema) : ""}</p>
@@ -775,7 +784,7 @@
       const sb = tab === "mochi" ? stockBadge(p) : "";
       const badge = agot ? '<span class="badge">Agotado</span>' : sb ? sb : p.rotativo ? '<span class="badge">Rotativo</span>' : "";
       return `<article class="item">
-        <button class="ph ${p.foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(nameOf(p))}">${badge}<img src="${esc(p.img || "img/mochito-lie.png")}" alt="${esc(tab === "dirty" ? p.nombre + " en vaso transparente" : "Mochi de " + p.nombre + " entero y cortado")}" loading="lazy"></button>
+        <button class="ph ${p.foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(nameOf(p))}">${badge}${picsHtml(p, tab === "dirty" ? p.nombre + " en vaso transparente" : "Mochi de " + p.nombre + " entero y cortado", "img/mochito-lie.png")}</button>
         <h3>${esc(p.nombre)}</h3><p class="desc">${esc(p.desc)}</p>${tab === "mochi" ? stockLine(p) : ""}
         <div class="row">${precio}${agot || (tab === "mochi" && sinStock(p)) ? "" : `<button class="add" style="margin-left:auto" ${tab === "dirty" ? `data-open="${p.id}"` : `data-quick="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>`}</div>
       </article>`;
