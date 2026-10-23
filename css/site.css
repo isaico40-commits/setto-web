@@ -880,6 +880,15 @@ body>.mito.in{opacity:1;transform:none}
 body>.mito.lift{bottom:calc(82px + env(safe-area-inset-bottom,0px))}
 body>.mito.hide,body>.mito.bye{opacity:0;transform:translateY(30px) scale(.7)}
 .mito-btn{pointer-events:auto;touch-action:manipulation;position:relative;width:66px;height:66px;border:0;background:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mito-btn{touch-action:none;transition:scale .25s cubic-bezier(.3,1.6,.5,1)}
+/* Agarrado con el dedo: se agranda, el aro se marca y aparece el nombre de la sección al costado */
+.mito.grab .mito-btn{scale:1.22;cursor:grabbing}
+.mito.grab .mito-ring circle:not(.p){stroke:var(--turquesa)}
+.mito.grab .mito-btn{border-radius:50%;box-shadow:0 6px 16px rgba(18,107,105,.28)}
+.mito.grab .mito-shadow{opacity:.4}
+.mito-tag{position:absolute;right:calc(100% + 12px);top:50%;translate:6px -50%;white-space:nowrap;background:var(--turquesa);color:#fff;border-radius:99px;padding:5px 12px;font-size:.8rem;font-weight:700;
+  box-shadow:var(--sombra-chica);opacity:0;pointer-events:none;transition:opacity .15s,translate .2s}
+.mito.grab .mito-tag.on{opacity:1;translate:0 -50%}
 .mito-ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
 .mito-ring circle{fill:var(--card,#fffaf0);stroke:color-mix(in srgb,var(--turquesa) 16%,transparent);stroke-width:4}
 .mito-ring .p{fill:none;stroke:var(--coral,#f8a29a);stroke-linecap:round;stroke-dasharray:0 100;transition:stroke-dasharray .15s linear}
