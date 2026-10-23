@@ -139,20 +139,10 @@ section.blk{padding-block:72px}
 .set:hover .off{box-shadow:0 0 0 2px var(--card),0 0 22px 5px color-mix(in srgb,var(--turquesa) 45%,transparent)}
 .setsnote{margin:22px auto 0;font-size:.9rem;color:var(--ink-2);max-width:60ch;text-align:center}
 /* edición especial */
-.prem{display:flex;flex-direction:column;gap:10px;min-width:0;text-align:center}
-.prem .ph{all:unset;cursor:pointer;aspect-ratio:1/1;border-radius:26px;background:var(--bg-2);display:grid;place-items:center;position:relative;overflow:hidden}
-.prem .ph::before{content:"";position:absolute;width:66%;aspect-ratio:1;border-radius:50%;background:var(--coral-2)}
-.prem .ph.foto::before{display:none}
-.prem .ph img{position:relative;max-width:84%;max-height:84%}
-.prem .ph.foto img{width:100%;height:100%;max-width:none;max-height:none;object-fit:cover}
-.prem .ph:focus-visible{outline:3px solid var(--turquesa)}
+/* el Especial usa la misma tarjeta que Sets (.set); acá solo lo propio: foto sin recortar, "Foto en camino" y precio pendiente */
 .prem .ph .pend{position:relative;display:grid;justify-items:center;gap:6px;font-size:.8rem;font-weight:600;color:var(--ink-2)}
-.prem .ph .pend img{width:84px}
-.prem h3{font-size:1.3rem}
-.prem .desc{font-size:.85rem;color:var(--ink-2)}
-.prem .row{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:auto}
-.prem .price{font-weight:700;font-size:1.25rem}
-.prem .badge{left:auto;right:12px}
+.prem .ph .pend img{width:84px;max-height:none}
+.prem .from b.tbd{font-size:1.05rem}
 .prem.agotado .ph img{filter:grayscale(.6) opacity(.7)}
 .prem-soon{margin:26px auto 0;max-width:560px;border-radius:22px;background:var(--bg-2);padding:18px 22px;display:flex;gap:16px;align-items:center;text-align:left}
 .prem-soon img{width:74px;flex:none}
@@ -970,17 +960,19 @@ body>.mito{translate:var(--px,0px) var(--py,0px)}
 @media (max-width:820px){.ubi{grid-template-columns:1fr}.ubi-map{aspect-ratio:4/3.4}}
 
 /* ---------- Edición especial: tarjetas tipo set en rosa + esmerilado si todavía no salió ---------- */
-#especial .prem{background:#fde3df;border:var(--line);border-radius:var(--r);box-shadow:var(--sombra);padding:16px;gap:8px}
-#especial .prem .ph{background:#f9d0ca;border-radius:18px;width:100%;box-sizing:border-box;aspect-ratio:auto;height:230px}
+#especial .prem{--card:#fde3df}
+#especial .prem > .badge{top:28px;left:28px;padding:5px 11px}
+#especial .prem .ph{background:#f9d0ca;width:100%;box-sizing:border-box}
 #especial .prem .ph::before{background:var(--coral);opacity:.85}
-#especial .prem.soon .ph::after{content:"";position:absolute;inset:0;z-index:1;background:rgba(253,227,223,.32);-webkit-backdrop-filter:blur(14px) saturate(1.25);backdrop-filter:blur(14px) saturate(1.25)}
-#especial .prem.soon .ph .badge{z-index:2}
-#especial .prem.soon .ph::before{z-index:0}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){#especial .prem.soon .ph img{filter:blur(14px)}}
+#especial .prem .ph.foto::before{display:none}
+#especial .prem .ph.foto img{width:100%;height:100%;max-height:none;object-fit:cover}
+#especial .prem.tapado .ph::after{content:"";position:absolute;inset:0;z-index:1;background:rgba(253,227,223,.32);-webkit-backdrop-filter:blur(14px) saturate(1.25);backdrop-filter:blur(14px) saturate(1.25)}
+#especial .prem.tapado .ph::before{z-index:0}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){#especial .prem.tapado .ph img{filter:blur(14px)}}
 .t-halloween #especial .prem{background:#fde3df;color:var(--ink)}
 .t-halloween #especial .prem h3{color:var(--ink)}
-.t-halloween #especial .prem .price{color:var(--ink)}
-.t-halloween #especial .prem .desc,.t-halloween #especial .prem .muted,.t-halloween #especial .prem p{color:var(--ink-2)}
+.t-halloween #especial .prem .from b{color:var(--ink)}
+.t-halloween #especial .prem .desc,.t-halloween #especial .prem .muted,.t-halloween #especial .prem p:not(.stk):not(.code){color:var(--ink-2)}
 
 /* ---------- Stickers de WhatsApp ---------- */
 .stk-in{display:grid;grid-template-columns:1fr 1.15fr;gap:clamp(20px,4vw,56px);align-items:center}

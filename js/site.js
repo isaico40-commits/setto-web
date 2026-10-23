@@ -655,17 +655,21 @@
     document.querySelectorAll('a[href="#especial"]').forEach((a) => (a.textContent = E.titulo || "Edición especial"));
     $("#espIntro").textContent = (open && E.intro_post) || E.intro || "";
     const hideN = antesProg() && !!E.ocultar_nombres, hideP = antesProg() && !!E.ocultar_precios;
+    // misma tarjeta que Sets (foto, título, descripción, línea fina, Desde $, +, estrellas, badges); el rosado la diferencia
     $("#espGrid").innerHTML = items.map((p, i) => {
       const beb = bebida(p), base = beb ? Number(p.precios["12 oz"]) : Number(p.precio);
+      const antes = fmt(p) === "set" ? suelto(p, "12 oz") : 0, ahorro = base > 0 && antes > base ? antes - base : 0, pct = ahorro ? Math.round((ahorro / antes) * 100) : 0;
       const foto = !!p.img, canBuy = open && !p.agotado && !sinStock(p) && base > 0;
       const nom = hideN ? "Sabor sorpresa" + (items.length > 1 ? " #" + (i + 1) : "") : p.nombre;
       const pic = foto ? `<img src="${esc(p.img)}" alt="${esc(hideN ? nom : nameOf(p))}" loading="lazy">` : `<span class="pend"><img src="img/mochito-lie.png" alt="">Foto en camino</span>`;
       const tag = p.agotado ? '<span class="badge">Agotado</span>' : fin ? '<span class="badge">Terminó</span>' : !open ? '<span class="badge">Próximamente</span>' : stockBadge(p);
-      const ph = hideN ? `<div class="ph ${foto ? "foto" : ""}">${tag}${pic}</div>` : `<button class="ph ${foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${tag}${pic}</button>`;
-      const precio = hideP ? '<span class="muted" style="font-size:.85rem">Precio el día del drop</span>' : base > 0 ? `<span class="price num">${beb ? "Desde " : ""}${money(base)}</span>` : '<span class="muted" style="font-size:.85rem">Precio a confirmar</span>';
-      return `<article class="prem ${p.agotado || fin ? "agotado" : ""} ${tapado(p) ? "soon" : ""}" style="--i:${i}">
-        ${ph}<h3>${esc(nom)}</h3><p class="desc">${esc(hideN ? "Se revela el día del drop." : p.desc)}</p>${open ? stockLine(p) : ""}
-        <div class="row">${precio}
+      const ph = hideN ? `<div class="ph ${foto ? "foto" : ""}">${pic}</div>` : `<button class="ph ${foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${pic}</button>`;
+      const precio = hideP ? '<span class="from">Precio<b class="tbd">el día del drop</b></span>' : base > 0 ? `<span class="from num">${beb ? "Desde" : "Unidad"}<b>${money(base)}${ahorro > 0 ? `<s>${money(antes)}</s>` : ""}</b>${hideN ? "" : rateTag(p)}</span>` : '<span class="from">Precio<b class="tbd">a confirmar</b></span>';
+      const code = !hideN && (p.codigo || p.tema) ? `<p class="code">${esc(p.codigo || "")}${p.codigo && p.tema ? " ✦ " : ""}${esc(p.tema || "")}</p>` : "";
+      return `<article class="set prem ${p.agotado || fin ? "agotado" : ""} ${tapado(p) ? "tapado" : ""}" style="--i:${i}">
+        ${ph}${pct > 0 && !hideP ? `<span class="off num">${pct}% off</span>` : ""}${tag}
+        <h3>${esc(nom)}</h3>${code}<p class="combo">${esc(hideN ? "Se revela el día del drop." : p.desc)}</p>${open ? stockLine(p) : ""}
+        <div class="foot">${precio}
         ${canBuy ? `<button class="add" ${beb ? `data-open="${p.id}"` : `data-quick="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>` : ""}</div>
       </article>`;
     }).join("");
