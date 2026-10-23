@@ -971,6 +971,7 @@ body>.mito{translate:var(--px,0px) var(--py,0px)}
 /* ---------- Edición especial: tarjetas tipo set en rosa + esmerilado si todavía no salió ---------- */
 #especial .prem{--card:#fde3df}
 #especial .prem > .badge{top:28px;left:28px;padding:5px 11px}
+#especial .prem:has(> .badge) .off{top:206px}   /* con "Próximamente" arriba, el % off baja a la esquina inferior de la foto para no pisarse */
 #especial .prem .ph{background:#f9d0ca;width:100%;box-sizing:border-box}
 #especial .prem .ph::before{background:var(--coral);opacity:.85}
 #especial .prem .ph.foto::before{display:none}
@@ -982,6 +983,9 @@ body>.mito{translate:var(--px,0px) var(--py,0px)}
 .t-halloween #especial .prem h3{color:var(--ink)}
 .t-halloween #especial .prem .from b{color:var(--ink)}
 .t-halloween #especial .prem .desc,.t-halloween #especial .prem .muted,.t-halloween #especial .prem p:not(.stk):not(.code){color:var(--ink-2)}
+.t-halloween #especial .prem .stk{color:var(--turquesa)}
+.t-halloween #especial .prem .stk.low{color:#8a2a22}
+.t-halloween #especial .prem .stk.out{color:var(--ink-2)}
 
 /* ---------- Stickers de WhatsApp ---------- */
 .stk-in{display:grid;grid-template-columns:1fr 1.15fr;gap:clamp(20px,4vw,56px);align-items:center}
