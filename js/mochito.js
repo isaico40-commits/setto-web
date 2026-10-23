@@ -36,6 +36,7 @@
       <svg class="mito-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46"/><circle class="p" cx="50" cy="50" r="46" pathLength="100"/></svg>
       <span class="mito-body"><span class="rig quieto"><i class="lg l"></i><i class="lg r"></i><i class="bd"></i><i class="ey"></i></span><span class="rig latte"><i class="lg l"></i><i class="lg r"></i><i class="bd"></i><i class="tz"></i></span></span>
       <span class="mito-shadow"></span>
+      <span class="mito-tag" aria-hidden="true"></span>
     </button>`;
   document.body.appendChild(el);
   const btn = el.querySelector(".mito-btn"), body = el.querySelector(".mito-body"),
@@ -84,7 +85,7 @@
   function hideBub() { bub.classList.remove("on"); clearTimeout(bubT); bubT = setTimeout(() => (bub.hidden = true), 220); }
 
   btn.addEventListener("click", () => {
-    if (recien()) return;
+    if (recien() || arrastro) return;
     if (!bub.hidden && bub.classList.contains("on")) { hideBub(); }
     if (items()) { abrirPedido(); return; }
     hop(); go("#sets");
@@ -195,6 +196,45 @@
     clearTimeout(stopT);
     stopT = setTimeout(() => { moving = false; pose("idle"); }, 260);
   }
+  // Mochito como barra de scroll: lo agarrás con el dedo (o el mouse) y lo deslizás por el camino para recorrer el
+  // sitio rápido. Solo atrapa los toques que empiezan sobre Mochito; el resto de la página scrollea normal.
+  // Un toque sin arrastrar sigue siendo un click (te lleva a los sets o al pedido).
+  const tag = el.querySelector(".mito-tag");
+  let agarre = null, arrastro = false;
+  btn.addEventListener("pointerdown", (e) => {
+    if (e.button || !el.classList.contains("in") || alto <= 0) return;
+    soltar(); arrastro = false;
+    agarre = { id: e.pointerId, y: e.clientY, p: progreso(), activo: false };
+  });
+  btn.addEventListener("pointermove", (e) => {
+    if (!agarre || e.pointerId !== agarre.id) return;
+    const dy = e.clientY - agarre.y;
+    if (!agarre.activo) {
+      if (Math.abs(dy) < 6) return;
+      agarre.activo = arrastro = true;
+      try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+      el.classList.add("grab"); hideBub();
+      if (e.pointerType === "touch") navigator.vibrate?.(8);
+    }
+    e.preventDefault();
+    const max = document.documentElement.scrollHeight - innerHeight;
+    const p = Math.min(1, Math.max(0, agarre.p + dy / alto)); // 1:1 con el dedo: Mochito queda debajo
+    scrollTo({ top: p * max, behavior: "instant" });
+    const s = seccion(), nombre = s === "top" ? "Inicio" : (paradas.find((x) => x.id === s)?.nombre || "");
+    if (tag.textContent !== nombre) tag.textContent = nombre;
+    tag.classList.toggle("on", !!nombre);
+  });
+  const soltarMochito = (e) => {
+    if (!agarre || e.pointerId !== agarre.id) return;
+    const fue = agarre.activo; agarre = null;
+    if (!fue) return;
+    el.classList.remove("grab"); tag.classList.remove("on");
+    // el click que llega justo después de soltar no cuenta
+    setTimeout(() => (arrastro = false), 50);
+  };
+  btn.addEventListener("pointerup", soltarMochito);
+  btn.addEventListener("pointercancel", soltarMochito);
+
   body.addEventListener("animationend", (e) => { if (e.animationName === "mitohop") body.classList.remove("hop"); });
   function hop() { if (RM) return; body.classList.remove("hop"); void body.offsetWidth; body.classList.add("hop"); }
 
