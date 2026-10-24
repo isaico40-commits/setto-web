@@ -133,7 +133,9 @@
         if (!pr) throw new Error("Un producto del pedido ya no está disponible");
         const qty = Math.max(1, Math.min(20, it.qty || 1));
         let price, size = null, name = pr.nombre;
-        if (pr.categoria === "set" || pr.categoria === "dirty") {
+        const conTam = pr.categoria === "set" || pr.categoria === "dirty" || (pr.categoria === "especial" && ["set", "dirty"].includes(pr.formato));
+        if (conTam) {
+          if (pr.categoria === "especial" && dropEstado(esp) !== "abierto") throw new Error(pr.nombre + " no está disponible ahora");
           size = it.size; price = size === "12 oz" ? pr.precio_12 : size === "16 oz" ? pr.precio_16 : null;
           if (!price) throw new Error("Falta elegir el tamaño de " + pr.nombre);
         } else {
@@ -143,14 +145,21 @@
         if (pr.agotado) throw new Error(pr.nombre + " está agotado");
         if (!(price > 0)) throw new Error(pr.nombre + " todavía no tiene precio");
         let leche = null, sin = [], det = null;
-        if ((pr.categoria === "set" || pr.categoria === "dirty") && pers.activo !== false) {
+        if (conTam && pers.activo !== false) {
           leche = String(it.leche || "").trim() || null;
           if (leche) { const l = (pers.leches || []).find((x) => x.nombre === leche); if (!l) throw new Error("Esa leche ya no está disponible, elegí otra"); price += Math.max(0, Number(l.precio) || 0); if (Number(l.precio) > 0 || leche !== ((pers.leches || [])[0] || {}).nombre) det = leche; }
           for (const x of it.sin || []) { if (!(pers.sin || []).includes(x)) throw new Error("Opción no disponible: " + x); if (!sin.includes(x)) sin.push(x); }
           if (sin.length) det = [det, ...sin].filter(Boolean).join(" · ");
         }
+        // set del Especial sin bebida fija: la bebida elegida tiene que ser una dirty activa del drop
+        let bebida = null;
+        if (pr.categoria === "especial" && pr.formato === "set" && !pr.set_bebida) {
+          const bp = db.products.find((x) => x.id === it.bebida && x.categoria === "especial" && x.formato === "dirty" && x.activo !== false && !x.agotado);
+          if (it.bebida && !bp) throw new Error("Esa bebida ya no está disponible, elegí otra");
+          bebida = bp ? bp.id : null; det = [bp ? "Bebida: " + bp.nombre.trim() : "Bebida: a confirmar", det].filter(Boolean).join(" · ");
+        }
         total += price * qty;
-        lines.push({ id: pr.id, nombre: name, size, qty, precio: price, subtotal: price * qty, leche, sin, detalle: det });
+        lines.push({ id: pr.id, nombre: name, size, qty, precio: price, subtotal: price * qty, leche, sin, detalle: det, bebida });
       }
       const sub = total, costo = modo === "envio" ? Math.max(0, Number(envio.costo) || 0) : 0;
       if (costo > 0) { lines.push({ id: "envio", nombre: "Envío", size: null, qty: 1, precio: costo, subtotal: costo }); total += costo; }
@@ -546,7 +555,7 @@
     },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift, maq }) {
       const { data, error } = await sb.rpc("create_order_v6", {
-        p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty, leche: i.leche || null, sin: i.sin || [] })),
+        p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty, leche: i.leche || null, sin: i.sin || [], bebida: i.bebida || null })),
         p_retiro: retiro, p_pago: pago, p_nota: nota || null, p_modo: modo || "retiro", p_direccion: direccion || null, p_premio: premio || null, p_gift: gift || null, p_maq: maq || null,
       });
       fail(error); return data;
