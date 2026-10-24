@@ -180,7 +180,10 @@
   const sinOpts = () => (pers().activo === false ? [] : pers().sin || []);
   const persOn = (p) => bebida(p) && (leches().length > 0 || sinOpts().length > 0);
   const lechePrecio = (n) => { const l = leches().find((x) => x.nombre === n); return l ? Number(l.precio) || 0 : 0; };
-  const detalleOf = (leche, sin) => [leche && (lechePrecio(leche) > 0 || leche !== (leches()[0] || {}).nombre) ? leche : "", ...(sin || [])].filter(Boolean).join(" · ");
+  const detalleOf = (leche, sin, beb = "") => [beb && find(beb) ? "Bebida: " + find(beb).nombre.trim() : "", leche && (lechePrecio(leche) > 0 || leche !== (leches()[0] || {}).nombre) ? leche : "", ...(sin || [])].filter(Boolean).join(" · ");
+  // set del Especial sin bebida fija: el cliente elige una de las dirty del drop
+  const bebOpts = (p) => (p && p.categoria === "especial" && fmt(p) === "set" && !p.bebida ? on(ESP).filter((x) => fmt(x) === "dirty" && !x.agotado && Number(x.precios["12 oz"]) > 0) : []);
+  const eligeBeb = (p) => bebOpts(p).length > 0;
   function syncCart() { // si cambió la carta, actualiza precios y saca lo que ya no existe
     cart = cart.filter((c) => {
       const p = find(c.id); if (!p || p.activo === false || (p.categoria === "especial" && !espOpen())) return false; const pr = priceOf(p, c.size); if (!(pr > 0)) return false;
@@ -188,20 +191,23 @@
         if (c.leche && !leches().some((l) => l.nombre === c.leche)) c.leche = (leches()[0] || {}).nombre || "";
         c.sin = (c.sin || []).filter((x) => sinOpts().includes(x));
       } else { c.leche = ""; c.sin = []; }
-      c.precio = pr + lechePrecio(c.leche); c.detalle = detalleOf(c.leche, c.sin); c.nombre = nameOf(p); return true;
+      if (!eligeBeb(p)) c.beb = ""; else if (!bebOpts(p).some((x) => x.id === c.beb)) return false;
+      c.precio = pr + lechePrecio(c.leche); c.detalle = detalleOf(c.leche, c.sin, c.beb); c.nombre = nameOf(p); return true;
     });
     save();
   }
   /* Pixel de Meta (js/pixel.js): solo IDs de producto, cantidades y montos */
   const px = (name, data) => { if (window.SettoPixel) window.SettoPixel.track(name, data); };
   const pxCarrito = () => ({ content_type: "product", content_ids: [...new Set(cart.map((c) => c.id))], contents: cart.map((c) => ({ id: c.id, quantity: c.qty, item_price: c.precio })), num_items: units() });
-  function addItem(p, sz, qty = 1, leche = "", sin = []) {
+  function addItem(p, sz, qty = 1, leche = "", sin = [], beb = "") {
+    if (eligeBeb(p) && !bebOpts(p).some((x) => x.id === beb)) { if (!sheetState || sheetState.p !== p) openSheet(p.id); toast("Elegí la bebida del set"); return false; }
+    if (!eligeBeb(p)) beb = "";
     const fr = frenoStock(p, qty); if (fr) { toast(fr); return false; }
     if (!persOn(p)) { leche = ""; sin = []; }
-    const key = p.id + "|" + (sz || "") + "|" + leche + "|" + sin.join(",");
+    const key = p.id + "|" + (sz || "") + "|" + leche + "|" + sin.join(",") + "|" + beb;
     const ex = cart.find((c) => c.key === key);
     if (ex) ex.qty += qty;
-    else cart.push({ key, id: p.id, nombre: nameOf(p), size: sz || "", leche, sin: [...sin], detalle: detalleOf(leche, sin), precio: priceOf(p, sz) + lechePrecio(leche), img: p.img || "img/mochito-lie.png", qty });
+    else cart.push({ key, id: p.id, nombre: nameOf(p), size: sz || "", leche, sin: [...sin], beb, detalle: detalleOf(leche, sin, beb), precio: priceOf(p, sz) + lechePrecio(leche), img: p.img || "img/mochito-lie.png", qty });
     save(); renderBadge(); toast("Sumado: " + nameOf(p) + (sz ? " · " + sz : ""));
     const pu = priceOf(p, sz) + lechePrecio(leche);
     px("AddToCart", { content_type: "product", content_ids: [p.id], content_name: nameOf(p), contents: [{ id: p.id, quantity: qty, item_price: pu }], value: pu * qty });
@@ -922,14 +928,15 @@
   let sheetState = null;
   function openSheet(id) {
     const p = find(id); if (!p) return;
-    sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1, leche: persOn(p) ? (leches()[0] || {}).nombre || "" : "", sin: [], rvOpen: false };
+    sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1, leche: persOn(p) ? (leches()[0] || {}).nombre || "" : "", sin: [], beb: bebOpts(p).length === 1 ? bebOpts(p)[0].id : "", rvOpen: false };
     drawSheet();
     px("ViewContent", { content_type: "product", content_ids: [p.id], content_name: nameOf(p), value: Number(priceOf(p, sheetState.sz)) || 0 });
     $("#sheet").classList.add("on"); $("#scrim").classList.add("on"); renderBadge();
     setTimeout(() => $("#sheet .x").focus(), 60);
   }
   function drawSheet() {
-    const { p, sz, qty, leche, sin } = sheetState, k = kind(p);
+    const { p, sz, qty, leche, sin, beb } = sheetState, k = kind(p);
+    const bebSel = eligeBeb(p) ? `<div id="sBeb"><span class="eyebrow">Elegí la bebida</span><div class="chips" style="margin-top:8px">${bebOpts(p).map((x) => `<button data-beb="${esc(x.id)}" aria-pressed="${x.id === beb}">${esc(x.nombre.trim())}</button>`).join("")}</div></div>` : "";
     const custom = persOn(p) ? `${leches().length ? `<div><span class="eyebrow">Leche${fmt(p) === "set" ? " de la bebida" : ""}</span><div class="chips lechas" style="margin-top:8px">${leches().map((l) => `<button data-leche="${esc(l.nombre)}" aria-pressed="${l.nombre === leche}">${esc(l.nombre)}${Number(l.precio) > 0 ? ` <span class="num">+${money(l.precio)}</span>` : ""}</button>`).join("")}</div></div>` : ""}
       ${sinOpts().length ? `<div><span class="eyebrow">¿Algo para sacar?</span><div class="chips" style="margin-top:8px">${sinOpts().map((x) => `<button data-sin="${esc(x)}" aria-pressed="${sin.includes(x)}">${esc(x)}</button>`).join("")}</div></div>` : ""}` : "";
     const opts = unit(p) ? "" : `<div><span class="eyebrow">Tamaño</span><div class="opts" style="margin-top:8px">${["12 oz", "16 oz"].map((oz) => {
@@ -947,6 +954,7 @@
         <div class="s-rv" id="sRv" ${sheetState.rvOpen ? "" : "hidden"}>${sheetState.rvOpen ? sheetRvHtml(p) : ""}</div>
         <p class="muted">${esc(descOf(p))}</p>
         ${k === "premium" && !espOpen() ? "" : stockLine(p)}
+        ${bebSel}
         ${opts}
         ${custom}
         ${clubOn() && !blocked ? `<span class="clubtag">Tu pedido suma ${sellosTxt(spp())} del Setto Club</span>` : ""}
@@ -1167,7 +1175,7 @@
     sending = true; drawFootOnly();
     try {
       const isEnv = form.modo === "envio";
-      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [] })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null, gift: GIFT ? GIFT.code : null, maq: MAQ && maqOff() > 0 ? MAQ.code : null });
+      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [], bebida: c.beb || null })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null, gift: GIFT ? GIFT.code : null, maq: MAQ && maqOff() > 0 ? MAQ.code : null });
       const pxPed = pxCarrito(); // para mandar Purchase con los mismos productos cuando el pedido se entregue
       if (window.SettoPixel) window.SettoPixel.once("order_created:" + o.code, () => window.SettoPixel.custom("order_created", { ...pxPed, value: Number(o.total) || 0 }, "creado-" + o.code));
       const ph = o.phone || API.normPhone(form.tel);
@@ -1232,7 +1240,8 @@
     if (b.dataset.close !== undefined) closeSheet();
     if (b.dataset.sz) { sheetState.sz = b.dataset.sz; drawSheet(); }
     if (b.dataset.sq) { sheetState.qty = Math.max(1, sheetState.qty + +b.dataset.sq); drawSheet(); }
-    if (b.id === "sheetAdd") { if (addItem(sheetState.p, sheetState.sz, sheetState.qty, sheetState.leche, sheetState.sin)) { closeSheet(); if (view === "cart" && $("#drawer").classList.contains("on")) drawDrawer(); } }
+    if (b.id === "sheetAdd") { if (addItem(sheetState.p, sheetState.sz, sheetState.qty, sheetState.leche, sheetState.sin, sheetState.beb)) { closeSheet(); if (view === "cart" && $("#drawer").classList.contains("on")) drawDrawer(); } }
+    if (b.dataset.beb !== undefined && sheetState) { sheetState.beb = b.dataset.beb; drawSheet(); }
     if (b.dataset.leche !== undefined && sheetState) { sheetState.leche = b.dataset.leche; drawSheet(); }
     if (b.dataset.sin !== undefined && sheetState) { const x = b.dataset.sin, s = sheetState.sin; sheetState.sin = s.includes(x) ? s.filter((y) => y !== x) : [...s, x]; drawSheet(); }
     if (b.id === "tab-dirty" || b.id === "tab-mochi") { tab = b.id.slice(4); renderCarta(); }
