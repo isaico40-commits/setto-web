@@ -9,7 +9,8 @@
 <link rel="icon" href="img/mochito-cup.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Poppins:wght@400;500;600;700&display=swap">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Poppins:wght@400;500;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Poppins:wght@400;500;600;700&display=swap"></noscript>
 <link rel="stylesheet" href="css/site.css">
 <style>
   .priv{max-width:680px;margin-inline:auto;padding:28px 16px 64px;display:grid;gap:22px}
@@ -60,7 +61,7 @@
 
   <p><a class="btn" href="/">Volver a Setto</a></p>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="js/vendor/supabase-2.45.4.js"></script>
 <script src="js/config.js"></script>
 <script src="js/pixel.js"></script>
 <script src="js/privacidad.js"></script>

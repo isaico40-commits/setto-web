@@ -16,7 +16,19 @@
     } catch (_) { return false; }
   })();
   const DEMO = PRUEBA || !cfg.supabaseUrl || !cfg.supabaseAnonKey || !window.supabase;
-  const sb = DEMO ? null : window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+  /* Lecturas y RPC con tiempo límite: con una red móvil mala un pedido colgado dejaba la carta "cargando" para siempre.
+     Las subidas de fotos (storage) no tienen límite. */
+  const conLimite = (url, opts = {}) => {
+    if (!/\/rest\/v1\//.test(String(url && url.url || url)) || opts.signal || !window.AbortController) return fetch(url, opts);
+    const ac = new AbortController(), t = setTimeout(() => ac.abort(), 20000);
+    return fetch(url, { ...opts, signal: ac.signal }).finally(() => clearTimeout(t));
+  };
+  // la web pública no inicia sesión: sin el candado de sesión del navegador (en algunos navegadores internos de apps se traba y frena todas las consultas)
+  const PUBLICA = !/^\/panel/.test(location.pathname);
+  const sb = DEMO ? null : window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+    global: { fetch: conLimite },
+    auth: PUBLICA ? { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, lock: (_n, _t, fn) => fn() } : {},
+  });
 
   /* Celulares argentinos → 549 + 10 dígitos (igual que norm_phone en la base) */
   function normPhone(p) {
