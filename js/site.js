@@ -1676,28 +1676,52 @@
   function loading() {
     ["espGrid", "setsGrid", "grid"].forEach((id) => (document.getElementById(id).innerHTML = '<p class="loading">Cargando la carta…</p>'));
   }
-  async function boot() {
+  /* La última carta que vio esta persona: se muestra al instante y después se actualiza.
+     Así, con una red lenta (o el navegador de Instagram), no queda una pantalla en blanco esperando la base. */
+  const SNAP = "setto-snap", SNAP_DIAS = 7;
+  function leerSnap() { try { const x = JSON.parse(localStorage.getItem(SNAP) || "null"); return x && x.settings && x.products && Date.now() - x.at < SNAP_DIAS * 864e5 ? x : null; } catch (_) { return null; } }
+  function guardarSnap(settings, products, stock) { try { localStorage.setItem(SNAP, JSON.stringify({ at: Date.now(), settings, products, stock })); } catch (_) {} }
+  const conTiempo = (pr, ms) => Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej(new Error("La carta tardó demasiado")), ms))]);
+  let pintado = false;
+  function pintar(settings, products) {
+    S = settings; adapt(products); syncCart();
+    renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); renderFooter(); renderBadge();
+    if (pintado) return;
+    pintado = true;
+    verSeguimiento(); renderResenas(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo);
+    if (maqAlCargar && maqOn()) { maqAlCargar = false; abrirMaq(); }
+    if (form.tel) $("#cardPhone").value = form.tel;
+    let vc = null; try { vc = sessionStorage.getItem("setto-vercard"); sessionStorage.removeItem("setto-vercard"); } catch (_) {}
+    if (vc !== null && clubOn()) setTimeout(() => verSellos(vc), 300); // vino desde "Ver mis sellos" en otra página
+    if (PAGE === "listo" && form.tel && clubOn()) setTimeout(() => { if (!lsTel) { lsTel = true; $("#cardForm").requestSubmit(); } }, 1500);
+    if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
+  }
+  async function cargar(intento = 1) {
+    const lento = setTimeout(() => { if (pintado) return; const bar = $("#errBar"); bar.hidden = false; bar.textContent = "La carta está tardando más de lo normal, ya casi…"; }, 5000);
+    try {
+      const stockP = API.getStock ? conTiempo(API.getStock(), 10000).catch(() => null) : Promise.resolve(null);
+      const { settings, products } = await conTiempo(API.loadAll(), 12000);
+      STOCK = await stockP;
+      $("#errBar").hidden = true;
+      if (!API.DEMO) guardarSnap(settings, products, STOCK);
+      pintar(settings, products);
+      API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
+    } catch (e) {
+      console.error(e);
+      if (intento < 3) { setTimeout(() => cargar(intento + 1), 1000 * intento); return; }
+      if (pintado) return; // ya se ve la última carta guardada
+      const bar = $("#errBar"); bar.hidden = false; bar.innerHTML = 'No pudimos cargar la carta. <a href="" onclick="location.reload();return false">Probá de nuevo</a> o escribinos por WhatsApp.';
+      ["espGrid", "setsGrid", "grid"].forEach((id) => (document.getElementById(id).innerHTML = ""));
+    } finally { clearTimeout(lento); }
+  }
+  function boot() {
     $("#demoBar").hidden = !API.DEMO;
     fetch("/", { method: "HEAD", cache: "no-store" }).then((r) => { const d = Date.parse(r.headers.get("date") || ""); if (d && Math.abs(d - Date.now()) > 3000) { SKEW = d - Date.now(); tickDrop(); } }).catch(() => {});
-    renderBand(); loading();
-    try {
-      const stockP = API.getStock ? API.getStock().catch(() => null) : Promise.resolve(null);
-      const { settings, products } = await API.loadAll();
-      STOCK = await stockP;
-      verSeguimiento(); renderResenas();
-      API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
-      S = settings; adapt(products); syncCart();
-      renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); if (maqAlCargar && maqOn()) { maqAlCargar = false; abrirMaq(); } renderFooter(); renderBadge();
-      if (form.tel) $("#cardPhone").value = form.tel;
-      let vc = null; try { vc = sessionStorage.getItem("setto-vercard"); sessionStorage.removeItem("setto-vercard"); } catch (_) {}
-      if (vc !== null && clubOn()) setTimeout(() => verSellos(vc), 300); // vino desde "Ver mis sellos" en otra página
-      if (PAGE === "listo" && form.tel && clubOn()) setTimeout(() => { if (!lsTel) { lsTel = true; $("#cardForm").requestSubmit(); } }, 1500);
-      if (lastOrder && location.hash !== "#club") { /* vuelve de WhatsApp: deja el código a mano */ view = "sent"; }
-    } catch (e) {
-      const bar = $("#errBar"); bar.hidden = false; bar.textContent = "No pudimos cargar la carta. Escribinos por WhatsApp.";
-      ["espGrid", "setsGrid", "grid"].forEach((id) => (document.getElementById(id).innerHTML = ""));
-      console.error(e);
-    }
+    renderBand();
+    const snap = API.DEMO ? null : leerSnap();
+    if (snap) { STOCK = snap.stock || null; pintar(snap.settings, snap.products); }
+    else { loading(); setTimeout(() => { if (!pintado) renderHero(); }, 2000); } // primera visita: si la base tarda, la portada de siempre
+    cargar();
   }
   boot();
 })();

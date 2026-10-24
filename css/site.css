@@ -29,6 +29,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .num{font-variant-numeric:tabular-nums}
 
 .proto{background:var(--ink);color:var(--bg);font-size:.78rem;text-align:center;padding:6px 16px}
+.proto a{color:inherit;text-decoration:underline}
 
 /* header */
 header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1.5px solid color-mix(in srgb,var(--turquesa) 35%,transparent)}
