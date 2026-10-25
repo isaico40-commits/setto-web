@@ -16,6 +16,26 @@
 <link rel="preconnect" href="https://vqgfckswnqoekotmsyam.supabase.co" crossorigin>
 <script src="js/config.js"></script>
 <script>
+/* Fotos al tamaño justo: en setto.com.ar (y los previews de Vercel) las fotos de Supabase y de img/ pasan por el
+   optimizador de Vercel (vercel.json → images), que las achica, las pasa a AVIF/WebP y las deja en caché un año.
+   w = ancho en pantalla en px CSS. Si el optimizador falla, la foto vuelve sola a la original. */
+(function () {
+  var c = window.SETTO_CONFIG || {}, S = [64, 128, 256, 384, 512, 640, 828, 1080, 1600];
+  var ok = /(^|\.)setto\.com\.ar$|\.vercel\.app$/.test(location.hostname) || /[?&]optimg/.test(location.search);
+  window.settoImg = function (u, w) {
+    if (!ok || !u || typeof u !== "string") return u;
+    var sb = c.supabaseUrl && u.indexOf(c.supabaseUrl + "/storage/v1/object/public/") === 0, loc = /^\/?img\/[^?#]+$/.test(u);
+    if (!(sb || loc) || !/\.(webp|png|jpe?g)$/i.test(u)) return u;
+    var t = Math.round(w * Math.min(window.devicePixelRatio || 1, 2)), s = S.filter(function (x) { return x >= t; })[0] || 1600;
+    return "/_vercel/image?url=" + encodeURIComponent(loc && u.charAt(0) !== "/" ? "/" + u : u) + "&w=" + s + "&q=75";
+  };
+  var orig = function (u) { try { return new URL(u, location.href).searchParams.get("url") || u; } catch (e) { return u; } };
+  document.addEventListener("error", function (e) {
+    var t = e.target; if (!t || t.tagName !== "IMG" || (t.currentSrc || t.src || "").indexOf("/_vercel/image") < 0) return;
+    var p = t.parentNode; if (p && p.tagName === "PICTURE") [].forEach.call(p.querySelectorAll("source"), function (x) { if (x.srcset.indexOf("/_vercel/image") >= 0) x.srcset = orig(x.srcset); });
+    if (t.src.indexOf("/_vercel/image") >= 0) t.src = orig(t.src);
+  }, true);
+})();
 /* Pide la carta apenas abre la página (sin esperar al resto de los scripts) y precarga la foto de portada.
    js/api.js usa estas respuestas en la primera carga. */
 (function () {
@@ -31,7 +51,7 @@
       var x = (((st || {}).hero || {}).slides || []).filter(function (x) { return x && (x.img || x.img_m || x.video || x.titulo); })[0];
       return x ? (cel ? x.img_m || x.img : x.img || x.img_m) : null;
     };
-    var precargar = function (u) { if (!u) return; var l = document.createElement("link"); l.rel = "preload"; l.as = "image"; l.href = u; l.setAttribute("fetchpriority", "high"); document.head.appendChild(l); };
+    var precargar = function (u) { if (!u) return; u = window.settoImg(u, window.innerWidth); var l = document.createElement("link"); l.rel = "preload"; l.as = "image"; l.href = u; l.setAttribute("fetchpriority", "high"); document.head.appendChild(l); };
     var snap = null; try { snap = JSON.parse(localStorage.getItem("setto-snap") || "null"); } catch (e) {}
     if (snap && snap.settings) precargar(foto(snap.settings));
     else s.then(function (rows) { var o = {}; rows.forEach(function (r) { o[r.key] = r.value; }); precargar(foto(o)); }).catch(function () {});
@@ -131,12 +151,12 @@
       </div>
       <div class="switch" role="tablist" aria-label="Categorías de la carta">
         <button class="sw" role="tab" id="tab-dirty" aria-selected="true" aria-controls="panel">
-          <span class="sw-th"><img src="img/dirty-strawberry.webp" alt="" loading="lazy" decoding="async"></span>
+          <span class="sw-th"><img src="img/sm/dirty-strawberry.webp" alt="" loading="lazy" decoding="async"></span>
           <span class="sw-tx"><b>Dirty lattes</b><small id="cntDirty">5 sabores · fríos</small></span>
           <span class="sw-go" aria-hidden="true">→</span>
         </button>
         <button class="sw" role="tab" id="tab-mochi" aria-selected="false" aria-controls="panel">
-          <span class="sw-th"><img src="img/mochi-oreo.webp" alt="" loading="lazy" decoding="async"></span>
+          <span class="sw-th"><img src="img/sm/mochi-oreo.webp" alt="" loading="lazy" decoding="async"></span>
           <span class="sw-tx"><b>Mochis</b><small id="cntMochi">6 sabores · por unidad</small></span>
           <span class="sw-go" aria-hidden="true">→</span>
         </button>
@@ -166,8 +186,8 @@
           <span class="sl-tope" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1 6.1 20.3l1.3-6.5L2.5 9.3l6.6-.8z" fill="#F2C14E" stroke="#1F5452" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
           <div class="sl-top"><span>Setto</span><b>Luckyslot</b></div>
           <div class="mq-ventana" aria-hidden="true">
-            <span class="mq-reel"><span class="mq-strip"><img src="img/mochito-cup.png" alt="" loading="lazy" decoding="async"></span></span>
-            <span class="mq-reel"><span class="mq-strip"><img src="img/mochi-frutilla.webp" alt="" loading="lazy" decoding="async"></span></span>
+            <span class="mq-reel"><span class="mq-strip"><img src="img/sm/mochito-cup.webp" alt="" loading="lazy" decoding="async"></span></span>
+            <span class="mq-reel"><span class="mq-strip"><img src="img/sm/mochi-frutilla.webp" alt="" loading="lazy" decoding="async"></span></span>
             <span class="mq-reel"><span class="mq-strip"><img src="img/dirty-caramel.webp" alt="" loading="lazy" decoding="async"></span></span>
           </div>
           <a class="mq-tirar" id="mqTirar" href="/?maquinita" data-maq>Tirar</a>
@@ -196,7 +216,7 @@
             <li>Enviá el WhatsApp y listo.</li>
           </ol>
           <div style="position:relative;z-index:1"><a class="btn solid" href="#sets">Empezar pedido</a></div>
-          <img class="mito" src="img/mochito-run.png" alt="" loading="lazy" decoding="async">
+          <img class="mito" src="img/sm/mochito-run.webp" alt="" loading="lazy" decoding="async">
         </div>
         <div class="apps" id="apps"></div>
       </div>
@@ -264,7 +284,7 @@
   <section class="blk listo" id="listo" aria-labelledby="t-listo">
     <div class="wrap">
       <div class="ls-hero">
-        <img src="img/mochito-cup.png" alt="" class="ls-mito" loading="lazy" decoding="async">
+        <img src="img/sm/mochito-cup.webp" alt="" class="ls-mito" loading="lazy" decoding="async">
         <span class="eyebrow">Ya lo tenés</span>
         <h1 id="t-listo">¡Llegó tu Setto!</h1>
         <p>Armá tu bebida, contanos qué tal y mirá tus sellos.</p>
@@ -306,7 +326,7 @@
         <li><img src="img/armar/paso5.webp" alt="Bebida revuelta, con las capas integradas" loading="lazy" decoding="async"><span><i>5</i>Revolvé hasta integrar las capas y tomala con el sorbete.</span></li>
       </ol>
       <div class="ar-fin">
-        <img src="img/mochito-run.png" alt="" loading="lazy" decoding="async">
+        <img src="img/sm/mochito-run.webp" alt="" loading="lazy" decoding="async">
         <p><b>¿Te gustó?</b> Subí una historia y etiquetanos en <a href="https://instagram.com/setto.project" target="_blank" rel="noopener">@setto.project</a>.</p>
         <div class="ctas"><a class="btn solid" href="/#sets">Hacer un pedido</a><a class="btn" href="img/armar/guia-setto.pdf" download>Descargar la guía (PDF)</a></div>
       </div>

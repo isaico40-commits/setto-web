@@ -641,7 +641,7 @@
     async createReview(code, phone, rating, texto, foto, instagram) { const { error } = await sb.rpc("create_review_v2", { p_code: code, p_phone: phone, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); },
     async uploadReviewPhoto(blob) {
       const ext = (blob.type || "").includes("webp") ? "webp" : "jpg", path = `r/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
-      const { error } = await sb.storage.from("resenas").upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: false });
+      const { error } = await sb.storage.from("resenas").upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: false, cacheControl: "31536000" });
       if (error) throw new Error("No pudimos subir la foto. Probá con otra o enviá la reseña sin foto.");
       return sb.storage.from("resenas").getPublicUrl(path).data.publicUrl;
     },
@@ -682,14 +682,14 @@
     async uploadMedia(file, id) {
       const ext = ((file.name || "").split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "") || (file.type.includes("webm") ? "webm" : "mp4");
       const path = `${id}-${Date.now()}.${ext}`;
-      const { error } = await sb.storage.from("productos").upload(path, file, { contentType: file.type || "video/mp4", upsert: true });
+      const { error } = await sb.storage.from("productos").upload(path, file, { contentType: file.type || "video/mp4", upsert: true, cacheControl: "31536000" });
       fail(error);
       return sb.storage.from("productos").getPublicUrl(path).data.publicUrl;
     },
     async uploadPhoto(blob, id) {
       const ext = (blob.type || "").includes("webp") ? "webp" : "jpg";
       const path = `${id}-${Date.now()}.${ext}`;
-      const { error } = await sb.storage.from("productos").upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: true });
+      const { error } = await sb.storage.from("productos").upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: true, cacheControl: "31536000" /* el nombre lleva la hora: nunca se pisa */ });
       fail(error);
       return sb.storage.from("productos").getPublicUrl(path).data.publicUrl;
     },
