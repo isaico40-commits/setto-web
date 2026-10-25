@@ -26,6 +26,8 @@
   }
 
   if (off) return;
+  // Mochito arranca cuando terminó de cargar la página (portada incluida): sus dibujos no le restan velocidad a la primera foto
+  const arrancar = () => {
 
   /* ---------- 2) Mochito ---------- */
   // Mochito animado por partes, recortado de los dibujos originales: quieto = mochito-run.png (parpadea); scrolleando = mochito-cup.png con el latte (corre)
@@ -261,4 +263,6 @@
   if (!RM) raf = requestAnimationFrame(tick);
   setTimeout(() => { el.classList.add("in"); hop(); if (scrollY < 200) { seen.top = 1; say(TIPS.top, 5200); } }, 1400);
   onScroll();
+  };
+  if (document.readyState === "complete") arrancar(); else addEventListener("load", arrancar, { once: true });
 })();

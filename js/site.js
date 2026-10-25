@@ -233,7 +233,8 @@
     const h = S.hero || {}; HS = (h.slides || []).filter((x) => x && (x.img || x.img_m || x.video || x.titulo)); if (!HS.length) HS = HERO_DEF;
     const MOB = matchMedia("(max-width: 820px)").matches, todoMedia = HS.every((x) => x.tipo === "media");
     $("#heroSlides").classList.toggle("all-media", todoMedia);
-    const pic = (x, i, alt, style = "") => `<picture>${x.img_m ? `<source media="(max-width: 820px)" srcset="${esc(x.img_m)}">` : ""}<img src="${esc(x.img || x.img_m || "img/mochito-lie.png")}" alt="${alt}" ${i ? 'loading="lazy"' : 'fetchpriority="high"'}${style}></picture>`;
+    // solo la primera foto se pide enseguida; las demás esperan a que esté (heroResto), así no le sacan velocidad
+    const pic = (x, i, alt, style = "") => { const d = i ? "data-" : ""; return `<picture>${x.img_m ? `<source media="(max-width: 820px)" ${d}srcset="${esc(x.img_m)}">` : ""}<img ${d}src="${esc(x.img || x.img_m || "img/mochito-lie.png")}" alt="${alt}" ${i ? 'decoding="async"' : 'fetchpriority="high"'}${style}></picture>`; };
     // un solo botón, chico y dentro de la slide (el primero de los que se cargan en el panel)
     const cta = (x) => { const b = heroBotones(x)[0]; return b ? `<a class="btn hcta ${b.estilo === "secundario" ? "ghost" : "solid"}" href="${esc(b.link || "#sets")}">${esc(b.texto)}</a>` : ""; };
     // vuelta sin fin (como Crumbl): una copia de todas las slides a cada lado; al quedar sobre una copia saltamos a la real
@@ -259,6 +260,12 @@
     $("#heroSlides").innerHTML = copias + reales + copias;
     document.querySelector(".hnav").hidden = HS.length < 2;
     heroI = 0; heroIr(0, false); heroAuto();
+    const f = document.querySelector('#heroSlides .hcard[data-hi="0"]:not(.clon) img');
+    if (!f || f.complete) heroResto(); else { f.addEventListener("load", heroResto, { once: true }); f.addEventListener("error", heroResto, { once: true }); setTimeout(heroResto, 4000); }
+  }
+  function heroResto() {
+    document.querySelectorAll("#heroSlides [data-srcset]").forEach((el) => { el.srcset = el.dataset.srcset; el.removeAttribute("data-srcset"); });
+    document.querySelectorAll("#heroSlides img[data-src]").forEach((el) => { el.src = el.dataset.src; el.removeAttribute("data-src"); });
   }
   const heroCards = () => Array.from(document.querySelectorAll("#heroSlides .hcard:not(.clon)"));
   const heroPad = (tr) => parseFloat(getComputedStyle(tr).scrollPaddingLeft) || 0;
@@ -744,7 +751,7 @@
     const show = prog() && E.barra !== false && lan && on(ESP).length && !cerrada && (f === "antes" || (f === "abierto" && ahora() - lan < 48 * 36e5));
     let bar = $("#dropBar");
     if (!show) { if (bar) bar.remove(); return; }
-    if (!bar) { document.body.insertAdjacentHTML("afterbegin", '<div class="drop-bar" id="dropBar" role="region" aria-label="Lanzamiento"></div>'); bar = $("#dropBar"); }
+    if (!bar) { $("header.top").insertAdjacentHTML("beforeend", '<div class="drop-bar" id="dropBar" role="region" aria-label="Lanzamiento"></div>'); bar = $("#dropBar"); }
     const t = esc(E.titulo || "la edición especial");
     bar.innerHTML = `<a href="/#especial">${f === "antes" ? `<i class="db-dot"></i><b class="db-t">${t}</b><span class="db-cd">sale en <span class="num" data-cdtxt></span></span>` : `<i class="db-dot on"></i><b class="db-t">¡Ya salió ${t}!</b><span class="db-cd">Pedilo →</span>`}</a><button type="button" class="db-x" data-dropx aria-label="Cerrar aviso">✕</button>`;
     bar.dataset.k = f + lan;
@@ -1719,6 +1726,7 @@
       console.error(e);
       if (intento < 3) { setTimeout(() => cargar(intento + 1), 1000 * intento); return; }
       if (pintado) return; // ya se ve la última carta guardada
+      renderHero(); // portada de siempre
       const bar = $("#errBar"); bar.hidden = false; bar.innerHTML = 'No pudimos cargar la carta. <a href="" onclick="location.reload();return false">Probá de nuevo</a> o escribinos por WhatsApp.';
       ["espGrid", "setsGrid", "grid"].forEach((id) => (document.getElementById(id).innerHTML = ""));
     } finally { clearTimeout(lento); }
@@ -1729,7 +1737,7 @@
     renderBand();
     const snap = API.DEMO ? null : leerSnap();
     if (snap) { STOCK = snap.stock || null; pintar(snap.settings, snap.products); }
-    else { loading(); setTimeout(() => { if (!pintado) renderHero(); }, 2000); } // primera visita: si la base tarda, la portada de siempre
+    else loading(); // primera visita: la portada guarda su lugar (css .htrack:empty) hasta que llega la de la base
     cargar();
   }
   boot();

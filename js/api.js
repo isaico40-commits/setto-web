@@ -545,13 +545,16 @@
   const trkChans = new Map();
   const live = {
     async loadAll() {
+      const arma = (filas, products) => { const settings = {}; filas.forEach((r) => (settings[r.key] = r.value)); return { settings, products }; };
+      // primera carga: lo que ya pidió index.html en el <head>; si falló, se pide de nuevo acá
+      const pre = window.SETTO_PRE; window.SETTO_PRE = null;
+      if (pre) { try { const [filas, prods] = await Promise.all([pre.settings, pre.products]); return arma(filas, prods); } catch (_) {} }
       const [s, p] = await Promise.all([
         sb.from("settings").select("key,value"),
         sb.from("products").select("*").order("orden", { ascending: true }),
       ]);
       fail(s.error); fail(p.error);
-      const settings = {}; s.data.forEach((r) => (settings[r.key] = r.value));
-      return { settings, products: p.data };
+      return arma(s.data, p.data);
     },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift, maq }) {
       const { data, error } = await sb.rpc("create_order_v6", {
