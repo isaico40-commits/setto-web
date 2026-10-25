@@ -264,5 +264,8 @@
   setTimeout(() => { el.classList.add("in"); hop(); if (scrollY < 200) { seen.top = 1; say(TIPS.top, 5200); } }, 1400);
   onScroll();
   };
-  if (document.readyState === "complete") arrancar(); else addEventListener("load", arrancar, { once: true });
+  // y unos segundos después (o apenas la persona toca o scrollea), así sus dibujos no compiten con las fotos de arriba
+  let listo = false; const ya = () => { if (listo) return; listo = true; arrancar(); };
+  const despues = () => { setTimeout(ya, 3000); ["scroll", "touchstart", "pointerdown", "keydown"].forEach((ev) => addEventListener(ev, ya, { once: true, passive: true })); };
+  if (document.readyState === "complete") despues(); else addEventListener("load", despues, { once: true });
 })();

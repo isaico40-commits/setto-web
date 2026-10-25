@@ -33,10 +33,11 @@
   const rateTag = (p) => { const r = RATINGS[p.id]; if (!r || !r.cantidad) return ""; const w = Math.max(0, Math.min(100, (r.promedio / 5) * 100)); return `<span class="rate" role="img" aria-label="${r.promedio} de 5, ${r.cantidad} reseña${r.cantidad > 1 ? "s" : ""}"><span class="stars5" aria-hidden="true"><span>★★★★★</span><span style="width:${w}%">★★★★★</span></span><b>${String(r.promedio).replace(".", ",")}</b><small>(${r.cantidad})</small></span>`; };
 
   /* ---------- hasta 2 fotos por tarjeta: con 2 aparece una flecha para pasar a la otra ---------- */
-  const picsHtml = (p, alt, fb) => {
+  const IMG = (u, w) => (window.settoImg ? window.settoImg(u, w) : u); // foto achicada al ancho en pantalla (index.html)
+  const picsHtml = (p, alt, fb, w = 250) => {
     const l = [p.img || fb, p.img && p.img2].filter(Boolean);
-    if (l.length < 2) return `<img src="${esc(l[0] || "")}" alt="${esc(alt)}" loading="lazy">`;
-    return `<span class="duo">${l.map((u, i) => `<span><img src="${esc(u)}" alt="${esc(alt + (i ? " (otra foto)" : ""))}" loading="lazy"></span>`).join("")}</span><span class="ph-arr" data-phnext role="button" aria-label="Ver la otra foto"></span>`;
+    if (l.length < 2) return `<img src="${esc(IMG(l[0] || "", w))}" alt="${esc(alt)}" loading="lazy">`;
+    return `<span class="duo">${l.map((u, i) => `<span><img src="${esc(IMG(u, w))}" alt="${esc(alt + (i ? " (otra foto)" : ""))}" loading="lazy"></span>`).join("")}</span><span class="ph-arr" data-phnext role="button" aria-label="Ver la otra foto"></span>`;
   };
 
   /* ---------- stock visible (sale de la caja del equipo) ---------- */
@@ -151,9 +152,9 @@
   const fichasCompra = () => (maqOn() ? Math.max(0, Math.min(50, Math.round((S.maquinita || {}).fichas_compra ?? 5))) : 0);
   function clubLine(corto) { // corto: en Entrega va en una línea para dejarle lugar al formulario
     const fc = fichasCompra(), fTxt = fc ? (corto ? ` · <b>+${fc} fichas</b> maquinita` : ` Y suma <b>${fc} fichas</b> para la maquinita.`) : "";
-    if (!clubOn()) return fc ? `<div class="clubline"><img src="img/mochito-run.png" alt=""><div>Este pedido suma <b>${fc} fichas</b> para la maquinita.</div></div>` : "";
+    if (!clubOn()) return fc ? `<div class="clubline"><img src="img/sm/mochito-run.webp" alt=""><div>Este pedido suma <b>${fc} fichas</b> para la maquinita.</div></div>` : "";
     const min = Number(club().minimo) || 0;
-    if (min > 0 && total() < min) return `<div class="clubline"><img src="img/mochito-run.png" alt=""><div>Sumá <b>${money(min - total())}</b> más y sumás ${sellosTxt(spp())} del Club.${fTxt}</div></div>`;
+    if (min > 0 && total() < min) return `<div class="clubline"><img src="img/sm/mochito-run.webp" alt=""><div>Sumá <b>${money(min - total())}</b> más y sumás ${sellosTxt(spp())} del Club.${fTxt}</div></div>`;
     const n = spp(), meta = club().meta || 8;
     const c = cardCache && cardCache.tel === API.normPhone(form.tel) ? cardCache.data : null;
     let txt, pct = null;
@@ -166,7 +167,7 @@
       txt = corto ? `Suma <b>+${sellosTxt(n)}</b> Setto Club` : `Este pedido tiene beneficios: suma <b>${sellosTxt(n)}</b> del Setto Club. Con ${meta} sellos tenés premio.`;
     }
     txt += fTxt;
-    return `<div class="clubline${corto ? " corta" : ""}"><img src="img/mochito-run.png" alt=""><div style="flex:1">${txt}${pct !== null ? `<div class="clubbar"><i style="width:${pct}%"></i></div>` : ""}</div></div>`;
+    return `<div class="clubline${corto ? " corta" : ""}"><img src="img/sm/mochito-run.webp" alt=""><div style="flex:1">${txt}${pct !== null ? `<div class="clubbar"><i style="width:${pct}%"></i></div>` : ""}</div></div>`;
   }
 
   /* ---------- carrito ---------- */
@@ -234,7 +235,8 @@
     const MOB = matchMedia("(max-width: 820px)").matches, todoMedia = HS.every((x) => x.tipo === "media");
     $("#heroSlides").classList.toggle("all-media", todoMedia);
     // solo la primera foto se pide enseguida; las demás esperan a que esté (heroResto), así no le sacan velocidad
-    const pic = (x, i, alt, style = "") => { const d = i ? "data-" : ""; return `<picture>${x.img_m ? `<source media="(max-width: 820px)" ${d}srcset="${esc(x.img_m)}">` : ""}<img ${d}src="${esc(x.img || x.img_m || "img/mochito-lie.png")}" alt="${alt}" ${i ? 'decoding="async"' : 'fetchpriority="high"'}${style}></picture>`; };
+    const W = window.innerWidth; // igual que la precarga del <head>, así no se baja dos veces
+    const pic = (x, i, alt, style = "") => { const d = i ? "data-" : ""; return `<picture>${x.img_m ? `<source media="(max-width: 820px)" ${d}srcset="${esc(IMG(x.img_m, W))}">` : ""}<img ${d}src="${esc(IMG(x.img || x.img_m || "img/mochito-lie.png", W))}" alt="${alt}" ${i ? 'decoding="async"' : 'fetchpriority="high"'}${style}></picture>`; };
     // un solo botón, chico y dentro de la slide (el primero de los que se cargan en el panel)
     const cta = (x) => { const b = heroBotones(x)[0]; return b ? `<a class="btn hcta ${b.estilo === "secundario" ? "ghost" : "solid"}" href="${esc(b.link || "#sets")}">${esc(b.texto)}</a>` : ""; };
     // vuelta sin fin (como Crumbl): una copia de todas las slides a cada lado; al quedar sobre una copia saltamos a la real
@@ -242,7 +244,7 @@
       const cl = clon ? ' clon" aria-hidden="true" inert data-clon="1' : "", h1 = i === 0 && !clon;
       if (x.tipo === "media") {
         const vid = MOB ? x.video_m || x.video : x.video || x.video_m, poster = MOB ? x.img_m || x.img : x.img || x.img_m, alt = esc(x.alt || "Setto");
-        const media = vid ? `<video muted loop playsinline preload="${i ? "none" : "metadata"}" ${poster ? `poster="${esc(poster)}"` : ""} data-src="${esc(vid)}" aria-label="${alt}"></video>` : pic(x, i, alt);
+        const media = vid ? `<video muted loop playsinline preload="${i ? "none" : "metadata"}" ${poster ? `poster="${esc(IMG(poster, W))}"` : ""} data-src="${esc(vid)}" aria-label="${alt}"></video>` : pic(x, i, alt);
         return `<article class="hcard media${cl}" aria-roledescription="slide" aria-label="${i + 1} de ${HS.length}" data-hi="${i}">${h1 ? `<h1 class="sr-only">${esc(x.alt || "Setto · Asian Inspired Home Cafe en Mar del Plata")}</h1>` : ""}<div class="hmedia">${media}</div>${cta(x) ? `<div class="h2txt">${cta(x)}</div>` : ""}</article>`;
       }
       // sin título ni texto (se borran desde el panel) la foto ocupa toda la slide y queda solo el botón
@@ -420,14 +422,14 @@
   const gdesc = (k) => { const it = gitem(k); return it.desc != null && it.desc !== "" ? it.desc : (GD[k] || {}).desc || ""; };
   function gcardHtml(k, monto, tag = "div", attrs = "") {
     const it = gitem(k);
-    if (it.img) return `<${tag} class="gcard gimg" ${attrs}><img class="g-img" src="${esc(it.img)}" alt="Gift card ${esc(gnombre(k))}"><span class="g-logo"><img src="img/logo.svg" alt="Setto"></span><span class="g-bot"><span class="g-amt num">${monto ? money(monto) : esc(gnombre(k))}</span></span></${tag}>`;
+    if (it.img) return `<${tag} class="gcard gimg" ${attrs}><img class="g-img" src="${esc(IMG(it.img, 400))}" alt="Gift card ${esc(gnombre(k))}"><span class="g-logo"><img src="img/logo.svg" alt="Setto"></span><span class="g-bot"><span class="g-amt num">${monto ? money(monto) : esc(gnombre(k))}</span></span></${tag}>`;
     const d = GD[k] || GD.porquesi;
     return `<${tag} class="gcard" style="--gbg:${d.bg};--gfg:${d.fg};--gpat:${d.pat};--gpsz:${d.psz}" ${attrs}>
       <span class="g-logo"><img src="img/logo.svg" alt="Setto"></span>
       ${d.bats ? `<span class="g-bat" style="top:16px;right:22px">${BAT}</span><span class="g-bat" style="top:44px;right:64px;width:20px">${BAT}</span>` : ""}
       <span class="g-tit">${esc(d.tit)}</span>
       <span class="g-bot"><span class="g-amt num">${monto ? money(monto) : "Gift card"}</span></span>
-      <img class="g-mito" src="${d.img}" alt=""></${tag}>`;
+      <img class="g-mito" src="${IMG(d.img, 120)}" alt=""></${tag}>`;
   }
   function renderGift() {
     const gc = $("#lsGc"); if (gc) gc.hidden = gcfg().activo === false;
@@ -606,7 +608,7 @@
     if (yo || cerrada) { try { VOTO.res = await API.pollResults(v.id); } catch (_) {} }
     const tot = (VOTO.res && VOTO.res.total) || 0;
     $("#vtGrid").innerHTML = ops.map((o) => { const n = (VOTO.res && VOTO.res.conteo && VOTO.res.conteo[o.id]) || 0, pct = tot ? Math.round((n / tot) * 100) : 0, ver = !!VOTO.res;
-      return `<button class="vt" data-vt="${esc(o.id)}" aria-pressed="${(VOTO.sel || yo) === o.id}" ${cerrada ? "disabled" : ""}>${yo === o.id ? '<span class="vt-yo">Tu voto</span>' : ""}<span class="vt-img">${o.img ? `<img src="${esc(o.img)}" alt="" loading="lazy">` : "<span>🍡</span>"}</span><b>${esc(o.nombre)}</b>
+      return `<button class="vt" data-vt="${esc(o.id)}" aria-pressed="${(VOTO.sel || yo) === o.id}" ${cerrada ? "disabled" : ""}>${yo === o.id ? '<span class="vt-yo">Tu voto</span>' : ""}<span class="vt-img">${o.img ? `<img src="${esc(IMG(o.img, 200))}" alt="" loading="lazy">` : "<span>🍡</span>"}</span><b>${esc(o.nombre)}</b>
         ${ver ? `<span class="vt-bar"><i style="width:${pct}%"></i></span><span class="vt-pct">${pct}%</span>` : ""}</button>`; }).join("");
     $("#vtTel").hidden = !VOTO.sel || cerrada; if (VOTO.sel && !$("#vtPhone").value) $("#vtPhone").value = form.tel || "";
     $("#vtMsg").textContent = VOTO.res && tot ? `${tot} voto${tot > 1 ? "s" : ""} hasta ahora` : "";
@@ -688,7 +690,7 @@
       const antes = fmt(p) === "set" ? suelto(p, "12 oz") : 0, ahorro = base > 0 && antes > base ? antes - base : 0, pct = ahorro ? Math.round((ahorro / antes) * 100) : 0;
       const foto = !!p.img, canBuy = open && !p.agotado && !sinStock(p) && base > 0;
       const nom = hideN ? "Sabor sorpresa" + (items.length > 1 ? " #" + (i + 1) : "") : p.nombre;
-      const pic = foto ? (tapado(p) || hideN ? `<img src="${esc(p.img)}" alt="${esc(hideN ? nom : nameOf(p))}" loading="lazy">` : picsHtml(p, nameOf(p))) : `<span class="pend"><img src="img/mochito-lie.png" alt="">Foto en camino</span>`;
+      const pic = foto ? (tapado(p) || hideN ? `<img src="${esc(IMG(p.img, 300))}" alt="${esc(hideN ? nom : nameOf(p))}" loading="lazy">` : picsHtml(p, nameOf(p))) : `<span class="pend"><img src="${IMG("img/mochito-lie.png", 120)}" alt="">Foto en camino</span>`;
       const tag = p.agotado ? '<span class="badge">Agotado</span>' : fin ? '<span class="badge">Terminó</span>' : !open ? '<span class="badge">Próximamente</span>' : stockBadge(p);
       const ph = hideN ? `<div class="ph ${foto ? "foto" : ""}">${pic}</div>` : `<button class="ph ${foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${pic}</button>`;
       const precio = hideP ? '<span class="from">Precio<b class="tbd">el día del drop</b></span>' : base > 0 ? `<span class="from num">${beb ? "Desde" : "Unidad"}<b>${money(base)}${ahorro > 0 ? `<s>${money(antes)}</s>` : ""}</b>${hideN ? "" : rateTag(p)}</span>` : '<span class="from">Precio<b class="tbd">a confirmar</b></span>';
@@ -701,9 +703,9 @@
       </article>`;
     }).join("");
     const ig = `<strong>@${esc(S.instagram || "setto.project")}</strong>`;
-    $("#espSoon").innerHTML = fin ? `<div class="prem-soon"><img src="img/mochito-lie.png" alt=""><div><b>Este drop terminó</b><p>${E.avisame !== false && dropAvHtml("x") ? "Anotate y te avisamos cuando salga el próximo." : `Seguinos en Instagram ${ig} para enterarte del próximo.`}</p>${E.avisame !== false ? `<div class="cd-acts">${dropAvHtml("Avisame del próximo drop")}</div>` : ""}</div></div>`
+    $("#espSoon").innerHTML = fin ? `<div class="prem-soon"><img src="img/sm/mochito-lie.webp" alt=""><div><b>Este drop terminó</b><p>${E.avisame !== false && dropAvHtml("x") ? "Anotate y te avisamos cuando salga el próximo." : `Seguinos en Instagram ${ig} para enterarte del próximo.`}</p>${E.avisame !== false ? `<div class="cd-acts">${dropAvHtml("Avisame del próximo drop")}</div>` : ""}</div></div>`
       : antesProg() && E.lanzamiento ? dropCdHtml()
-      : !open ? `<div class="prem-soon"><img src="img/mochito-run.png" alt=""><div><b>Todavía no salió</b><p>Avisamos en Instagram ${ig}.</p></div></div>` : "";
+      : !open ? `<div class="prem-soon"><img src="img/sm/mochito-run.webp" alt=""><div><b>Todavía no salió</b><p>Avisamos en Instagram ${ig}.</p></div></div>` : "";
     // antes del lanzamiento las tarjetas se ocultan (quedan cuenta regresiva y Avisame) salvo que el panel diga lo contrario
     const sinCards = antesProg() && !E.tarjetas_antes && !VER_ESP;
     $("#espGrid").hidden = sinCards; const dd = document.querySelector('.dots[data-for="espGrid"]'); if (dd) dd.closest(".hint").hidden = sinCards;
@@ -778,7 +780,7 @@
     $("#setsGrid").innerHTML = on(SETS).map((s) => {
       const ahora = s.precios["12 oz"], antes = suelto(s, "12 oz"), ahorro = antes - ahora, pct = antes > 0 ? Math.round((ahorro / antes) * 100) : 0;
       return `<article class="set">
-        <button class="ph ${s.foto ? "foto" : ""}" data-open="${s.id}" aria-label="Ver ${esc(s.nombre)}">${picsHtml(s, descOf(s), "img/mochito-lie.png")}</button>
+        <button class="ph ${s.foto ? "foto" : ""}" data-open="${s.id}" aria-label="Ver ${esc(s.nombre)}">${picsHtml(s, descOf(s), "img/mochito-lie.png", 180)}</button>
         ${pct > 0 ? `<span class="off num">${pct}% off</span>` : ""}${stockBadge(s)}
         <h3>${esc(s.nombre)}</h3>
         <p class="code">${esc(s.codigo || "")}${s.tema ? " ✦ " + esc(s.tema) : ""}</p>
@@ -807,7 +809,7 @@
         <div class="row">${precio}${agot || (tab === "mochi" && sinStock(p)) ? "" : `<button class="add" style="margin-left:auto" ${tab === "dirty" ? `data-open="${p.id}"` : `data-quick="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>`}</div>
       </article>`;
     }).join("") + (tab === "dirty"
-      ? `<button class="next-cat" data-goto="mochi"><span class="nc-th"><img src="img/mochi-sakura.webp" alt=""></span><b>¿Y para acompañar?</b><span class="cta">Ver los ${on(MOCHIS).length} mochis →</span></button>`
+      ? `<button class="next-cat" data-goto="mochi"><span class="nc-th"><img src="img/sm/mochi-sakura.webp" alt=""></span><b>¿Y para acompañar?</b><span class="cta">Ver los ${on(MOCHIS).length} mochis →</span></button>`
       : `<button class="next-cat" data-goto="dirty"><span class="nc-th"><img src="img/dirty-caramel.webp" alt=""></span><b>¿Y para tomar?</b><span class="cta">Ver los ${on(DIRTY).length} dirty lattes →</span></button>`);
     $("#panelExtra").innerHTML = "";
     document.querySelectorAll(".sw").forEach((t) => t.setAttribute("aria-selected", String(t.id === "tab-" + tab)));
@@ -849,7 +851,7 @@
     $("#stamps").innerHTML = Array.from({ length: meta }, (_, i) => {
       const last = i === meta - 1, filled = i < n;
       if (last) return `<div class="stamp gift ${filled ? "on" : ""}">${filled ? "¡Listo!" : "Premio"}</div>`;
-      return `<div class="stamp ${filled ? "on" : ""}">${filled ? '<img src="img/mochito-run.png" alt="">' : i + 1}</div>`;
+      return `<div class="stamp ${filled ? "on" : ""}">${filled ? '<img src="img/sm/mochito-run.webp" alt="">' : i + 1}</div>`;
     }).join("");
     $("#stamps").style.opacity = ejemplo ? ".55" : "1";
   }
@@ -863,7 +865,7 @@
     const fc = Math.max(0, Math.min(50, Math.round((S.maquinita || {}).fichas_compra ?? 5)));
     $("#mqCompra").textContent = `Cada compra suma ${fc} fichas`; $("#mqCompra").closest(".next > div").hidden = !fc;
     const sim = (S.maquinita || {}).simbolos || [];
-    MQ_IMG = MAQ_BASE.map((d, i) => (sim[i] && sim[i].img) || d); // Panel → Maquinita → símbolos
+    MQ_IMG = MAQ_BASE.map((d, i) => IMG((sim[i] && sim[i].img) || d, 128)); // Panel → Maquinita → símbolos
     sec.querySelectorAll(".mq-strip").forEach((st, i) => { st.innerHTML = `<img src="${esc(MQ_IMG[i])}" alt="">`; });
   }
   function abrirMaq() {
@@ -953,7 +955,7 @@
     }).join("")}</div></div>`;
     const sinSt = sinStock(p) && !(k === "premium" && !espOpen());
     const blocked = p.agotado || sinSt || (k === "premium" && (!espOpen() || !(Number(bebida(p) ? p.precios[sz || "12 oz"] : p.precio) > 0)));
-    $("#sheet").innerHTML = `<div class="sph"><img src="${esc(tapado(p) ? "img/mochito-lie.png" : p.img || "img/mochito-lie.png")}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
+    $("#sheet").innerHTML = `<div class="sph"><img src="${esc(IMG(tapado(p) ? "img/mochito-lie.png" : p.img || "img/mochito-lie.png", 600))}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
       <div class="sb">
         ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
         <h3 id="sTitle">${esc(nameOf(p))}</h3>
@@ -1059,7 +1061,7 @@
   function sugHtml() {
     const l = sugeridos(); if (!l.length) return "";
     return `<div class="sug"><b class="sug-t">¿Le sumás algo?</b><div class="sug-r">${l.map((p) => `<div class="sug-i">
-      <button class="sug-ph" data-open="${p.id}" aria-label="Ver ${esc(nameOf(p))}"><img src="${esc(p.img || "img/mochito-lie.png")}" alt="" loading="lazy"></button>
+      <button class="sug-ph" data-open="${p.id}" aria-label="Ver ${esc(nameOf(p))}"><img src="${esc(IMG(p.img || "img/mochito-lie.png", 120))}" alt="" loading="lazy"></button>
       <button class="add sug-add" ${unit(p) ? `data-quick="${p.id}"` : `data-open="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>
       <b>${esc(p.nombre)}</b><small class="num">${unit(p) ? "" : "Desde "}${money(unit(p) ? p.precio : p.precios["12 oz"])}</small></div>`).join("")}</div></div>`;
   }
@@ -1069,7 +1071,7 @@
     return b.length ? `<div class="cx">${b.join("")}</div>` : ""; };
   function abrirClubPop() { // igual que la sección del club, pero sin buscador: la tarjeta es solo para mirar
     const c = club(), meta = Math.max(2, Math.min(12, c.meta || 8)), d = cardCache && cardCache.tel === API.normPhone(form.tel) ? cardCache.data : null, n = d ? Math.min(d.sellos, meta) : 0, b = beneficios();
-    const st = Array.from({ length: meta }, (_, i) => i === meta - 1 ? `<div class="stamp gift ${i < n ? "on" : ""}">${i < n ? "¡Listo!" : "Premio"}</div>` : `<div class="stamp ${i < n ? "on" : ""}">${i < n ? '<img src="img/mochito-run.png" alt="">' : i + 1}</div>`).join("");
+    const st = Array.from({ length: meta }, (_, i) => i === meta - 1 ? `<div class="stamp gift ${i < n ? "on" : ""}">${i < n ? "¡Listo!" : "Premio"}</div>` : `<div class="stamp ${i < n ? "on" : ""}">${i < n ? '<img src="img/sm/mochito-run.webp" alt="">' : i + 1}</div>`).join("");
     $("#cpBody").innerHTML = `<div class="cp-grid">
       <div class="next cp-next">
         <div><span class="k">1</span><span><b>Pedí desde la web</b></span></div>
@@ -1097,8 +1099,8 @@
     $("#dBack").hidden = view !== "checkout" && view !== "buscar";
     if (view === "cart") {
       $("#dTitle").textContent = "Tu pedido";
-      if (!cart.length) { body.innerHTML = `${trackHtml()}${maqCartHtml()}<div class="empty"><img src="img/mochito-cup.png" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><div class="empty-acts"><a class="btn" href="#sets" data-closedrawer>Ver sets</a><button class="btn" id="toBuscar">Consultar mi pedido</button></div></div>`; foot.innerHTML = ""; return; }
-      body.innerHTML = trackHtml() + maqCartHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(c.img)}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
+      if (!cart.length) { body.innerHTML = `${trackHtml()}${maqCartHtml()}<div class="empty"><img src="img/sm/mochito-cup.webp" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><div class="empty-acts"><a class="btn" href="#sets" data-closedrawer>Ver sets</a><button class="btn" id="toBuscar">Consultar mi pedido</button></div></div>`; foot.innerHTML = ""; return; }
+      body.innerHTML = trackHtml() + maqCartHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(IMG(c.img, 96))}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
         <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("") + sugHtml() + `<div class="ctas">${giftCta()}</div>`;
       const mOff = Math.min(maqOff(), total());
@@ -1147,8 +1149,8 @@
     if (view === "sent" && lastOrder) {
       $("#dTitle").textContent = "¡Pedido registrado!";
       const est = trackVivos.find((x) => x.code === lastOrder.code) || { code: lastOrder.code, status: "pendiente", etapa: "recibido", modo: lastOrder.modo, retiro: "" };
-      body.innerHTML = `<div class="ok"><img src="img/mochito-cup.png" alt=""><span class="eyebrow">Tu código de pedido</span><div class="coderow num">${esc(lastOrder.code)}</div>
-        ${lastOrder.premio ? `<div class="clubline" style="width:100%;text-align:left"><img src="img/mochito-run.png" alt=""><div><b>¡Completaste tu tarjeta!</b> Tu premio: ${esc(lastOrder.premio_txt || "a confirmar")}.</div></div>` : ""}
+      body.innerHTML = `<div class="ok"><img src="img/sm/mochito-cup.webp" alt=""><span class="eyebrow">Tu código de pedido</span><div class="coderow num">${esc(lastOrder.code)}</div>
+        ${lastOrder.premio ? `<div class="clubline" style="width:100%;text-align:left"><img src="img/sm/mochito-run.webp" alt=""><div><b>¡Completaste tu tarjeta!</b> Tu premio: ${esc(lastOrder.premio_txt || "a confirmar")}.</div></div>` : ""}
         <p class="muted" style="font-size:.9rem">Fijate que el mensaje se haya enviado en WhatsApp: con eso te confirmamos ${lastOrder.modo === "envio" ? "envío" : "dirección"} y pago.${clubOn() ? " Al recibirlo sumás tu sello." : ""}</p></div>
         <div class="dtrk sent-trk">${trackCard(est)}</div>
         <p class="muted" style="font-size:.84rem;text-align:center">Te avisamos acá cuando esté listo. El link para volver va en tu WhatsApp.</p>
@@ -1523,7 +1525,7 @@
       else { const a = f.alternativas.find((x) => x.id === e); if (a) total += (a.precio - f.precio) * f.qty; }
       const dif = (p) => { const x = (p - f.precio) * f.qty; return x === 0 ? "mismo precio" : (x > 0 ? "+" : "−") + money(Math.abs(x)).replace("−", ""); };
       return `<div class="cmb-f"><b>${f.qty}× ${esc(f.nombre)}${f.size ? ` (${esc(f.size)})` : ""}</b><small>${f.qty < f.de ? `Nos quedaron ${f.de - f.qty} de ${f.de}. ¿Qué hacemos con ${f.qty === 1 ? "el que falta" : `los ${f.qty} que faltan`}?` : "¿Con qué lo reemplazamos?"}</small>
-        <div class="cmb-opts">${f.alternativas.map((a) => `<button type="button" data-cmbsel="${f.idx}:${esc(a.id)}" aria-pressed="${e === a.id}">${a.img ? `<img src="${esc(a.img)}" alt="">` : ""}<span>${esc(a.nombre)}<small>${dif(a.precio)}</small></span></button>`).join("")}
+        <div class="cmb-opts">${f.alternativas.map((a) => `<button type="button" data-cmbsel="${f.idx}:${esc(a.id)}" aria-pressed="${e === a.id}">${a.img ? `<img src="${esc(IMG(a.img, 96))}" alt="">` : ""}<span>${esc(a.nombre)}<small>${dif(a.precio)}</small></span></button>`).join("")}
           <button type="button" class="cmb-quitar" data-cmbsel="${f.idx}:quitar" aria-pressed="${e === "quitar"}"><span>Sacarlo<small>−${money(f.precio * f.qty)}</small></span></button></div>
         ${f.alternativas.length ? "" : '<small class="muted">No tenemos otro igual disponible ahora.</small>'}</div>`;
     }).join("");

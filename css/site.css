@@ -462,7 +462,7 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .clubbar{height:8px;border-radius:999px;background:color-mix(in srgb,var(--turquesa) 18%,transparent);overflow:hidden;margin-top:6px}
 .clubbar i{display:block;height:100%;background:var(--turquesa);border-radius:999px}
 .clubtag{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:600;color:var(--turquesa)}
-.clubtag::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--menta) url(../img/mochito-run.png) center/12px no-repeat;border:1.5px solid var(--turquesa)}
+.clubtag::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--menta) url(../img/sm/mochito-run.webp) center/12px no-repeat;border:1.5px solid var(--turquesa)}
 
 /* retiro / envío */
 .modo{display:grid;grid-template-columns:1fr 1fr;gap:8px}
