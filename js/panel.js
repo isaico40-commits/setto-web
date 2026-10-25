@@ -585,11 +585,11 @@
     const p = P.drafts[id] || P.products.find((x) => x.id === id); if (!p) { el.remove(); return; }
     const y = window.scrollY; el.outerHTML = cardP(p); window.scrollTo(0, y);
   }
-  async function fitBlob(file, max = 1600) { // achica sin recortar
+  async function fitBlob(file, max = 1600, q = 0.84) { // achica sin recortar
     let src; try { src = await createImageBitmap(file); } catch (_) { src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(file); }); }
     const k = Math.min(1, max / Math.max(src.width, src.height)), cv = document.createElement("canvas");
     cv.width = Math.round(src.width * k); cv.height = Math.round(src.height * k); cv.getContext("2d").drawImage(src, 0, 0, cv.width, cv.height);
-    const as = (t, q) => new Promise((r) => cv.toBlob(r, t, q)); let b = await as("image/webp", 0.84); if (!b || b.type !== "image/webp") b = await as("image/jpeg", 0.86); return b;
+    const as = (t, q) => new Promise((r) => cv.toBlob(r, t, q)); let b = await as("image/webp", q); if (!b || b.type !== "image/webp") b = await as("image/jpeg", q + 0.02); return b;
   }
   async function squareBlob(file, size = 900) {
     let src;
@@ -1126,7 +1126,7 @@
       if (t.checked) F.sel[ix] = o.items[ix].qty; else delete F.sel[ix]; drawOrders(); return; }
     if (t.matches("[data-upimg]") && t.files && t.files[0]) {
       const form = t.closest("form"), name = t.dataset.upimg, max = +t.dataset.upmax || 1600; toast("Subiendo foto…");
-      try { const blob = await fitBlob(t.files[0], max); const url = await API.uploadPhoto(blob, "web-" + name); form.querySelector(`[name="${name}"]`).value = url;
+      try { const blob = await fitBlob(t.files[0], max, /^s[im]\d/.test(name) ? 0.74 : 0.84); /* portada: más liviana, es lo primero que se descarga */ const url = await API.uploadPhoto(blob, "web-" + name); form.querySelector(`[name="${name}"]`).value = url;
         const prev = form.querySelector(`[data-prevfor="${name}"]`) || (t.closest(".slrow, .acts") || t.parentElement).querySelector(".upprev") || (t.closest(".slrow") || form).querySelector(".upprev"); if (prev) prev.innerHTML = `<img src="${url}" alt="">`; toast("Foto lista · tocá Guardar"); }
       catch (err) { toast(err.message || "No se pudo subir la foto"); }
       return;
