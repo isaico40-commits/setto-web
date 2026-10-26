@@ -137,6 +137,15 @@
   // el efectivo se cobra al retirar y lo entregado ya está en la Caja. El cliente no lo ve.
   const conPago = (o) => o.status === "pendiente" && /transfer/i.test(o.pago || "");
   const pagoTag = (o) => !conPago(o) ? "" : o.pagado_at ? `<span class="pago-tag si">✓ Pagado</span>` : `<span class="pago-tag">💸 Sin pagar</span>`;
+  // forma de pago editable: las opciones de Ajustes + la que trajo el pedido si ya no está en la lista
+  function pagoEdit(o) {
+    if (o.status === "cancelado") return `Pago: <b>${esc(o.pago || "—")}</b>`;
+    if (P.editPago !== o.id) return `<span class="pagoedit">Pago: <b>${esc(o.pago || "—")}</b> <button class="linkbtn" data-pagoedit>Cambiar</button></span>`;
+    const ops = [...new Set([...(P.settings.pagos || []), o.pago].filter(Boolean))];
+    return `<div class="pagopick"><b>¿Cómo pagó?</b><div class="chips">${ops.map((p) => `<button data-pagoset="${esc(p)}" aria-pressed="${p === o.pago}">${esc(p)}</button>`).join("")}</div>
+      ${o.status === "entregado" ? `<span class="hintp">Ya está entregado: si cambia entre efectivo y transferencia/tarjeta, el cobro pasa a esa cuenta en la Caja.</span>` : ""}
+      <button class="linkbtn" data-pagoedit>Listo</button></div>`;
+  }
   function pagoBox(o) {
     if (!conPago(o)) return "";
     return o.pagado_at
@@ -310,7 +319,9 @@
     const club = P.settings.club || {};
     box.innerHTML = list.map((o) => {
       const prodTotal = (o.items || []).filter((i) => i.id !== "envio").reduce((a, i) => a + (i.subtotal || 0), 0);
-      const c = P.confirm[o.id] || (P.confirm[o.id] = { phone: pretty(o.phone), n: club.activo === false || prodTotal < (Number(club.minimo) || 0) ? 0 : (club.sellos_por_pedido ?? 1) });
+      // cada pedido suma 1 sello (0 si el Club está apagado o no llega al mínimo)
+      const c = P.confirm[o.id] || (P.confirm[o.id] = { phone: pretty(o.phone) });
+      c.n = club.activo === false || prodTotal < (Number(club.minimo) || 0) ? 0 : 1;
       const env = o.modo === "envio";
       return `<article class="pcard" data-oid="${o.id}">
         <div class="ohead"><span class="ocode num">${esc(o.code)}</span><span class="ago">${ago(o.created_at)}</span><span class="st ${o.status}">${o.status}</span></div>
@@ -319,7 +330,7 @@
         <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}${faltaAvisar(o) ? `<span class="falta-tag">💬 Falta avisar</span>` : ""}${pagoTag(o)}</div>
         ${env ? `<div class="dirbox"><b>${esc(o.direccion || "")}</b><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.direccion || "") + ", Mar del Plata")}" target="_blank" rel="noopener">Ver en Maps</a></div>` : ""}
         ${o.premio && o.status === "pendiente" ? `<div class="premiobox">Este pedido completa la tarjeta del Club. Premio elegido: <b>${esc(o.premio_txt || "a confirmar con el cliente")}</b>${/off/.test(o.premio_txt || "") ? " (ya descontado del total)" : ""}. Al tocar Entregado se canjea solo.</div>` : ""}
-        <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>Pago: <b>${esc(o.pago || "—")}</b></span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}${o.last_touch_source ? `<span>Llegó por: <b>${esc(origenTxt(o.last_touch_source, o.last_touch_campaign))}</b></span>` : ""}</div>
+        <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>${pagoEdit(o)}</span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}${o.last_touch_source ? `<span>Llegó por: <b>${esc(origenTxt(o.last_touch_source, o.last_touch_campaign))}</b></span>` : ""}</div>
         <div class="olines">${(o.items || []).map((i) => `<div><span>${i.qty}× ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""}${i.detalle ? `<small class="det">${esc(i.detalle)}</small>` : ""}</span><span class="num">${money(i.subtotal)}</span></div>`).join("")}</div>
         <div class="otot"><span>Total</span><span class="num">${money(o.total)}</span></div>
         ${pagoBox(o)}
@@ -327,7 +338,7 @@
         ${o.status === "pendiente" ? estadoBox(o) : ""}
         ${o.status === "pendiente" ? `<div class="confirm">
             <label>Número del chat de WhatsApp<input class="inp" data-cphone value="${esc(c.phone)}" inputmode="tel"></label>
-            <div class="acts"><span style="font-size:.85rem;font-weight:600">Sellos a sumar</span><span class="stepper"><button data-cn="-1" aria-label="Menos">−</button><span>${c.n}</span><button data-cn="1" aria-label="Más">+</button></span></div>
+            ${c.n ? "" : `<span class="hintp">${club.activo === false ? "El Club está apagado: no suma sello." : "No llega al mínimo del Club: no suma sello."}</span>`}
             <div class="acts"><button class="btn solid" data-deliver>Entregado ✓</button><button class="linkbtn warn" data-cancel>${P.cancelArm === o.id ? "¿Seguro? Tocá de nuevo para cancelar" : "Cancelar pedido"}</button></div>
           </div>` : o.status === "entregado" ? `<p class="hintp">Entregado ${o.closed_at ? ago(o.closed_at) : ""} · ${o.sellos || 0} sello(s) sumado(s) a ${esc(pretty(o.phone))} · <a class="tocaja" href="caja.html#movs">Cobro en la Caja →</a></p>
             ${(o.avisos || {}).resena ? `<p class="hintp">✓ Le pedimos la reseña por WhatsApp ${ago(o.avisos.resena)}</p>` : `<a class="btn solid" style="margin-top:8px" target="_blank" rel="noopener" href="https://wa.me/${esc(o.wa_phone || o.phone)}?text=${encodeURIComponent(resenaTxt(o))}">Pedir reseña por WhatsApp</a>`}` : ""}
@@ -694,7 +705,7 @@
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="club"><b>Setto Club</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${club.activo !== false ? "checked" : ""}> Mostrar el Club en la web</label></div>
-          <div class="row2"><label>Sellos para el premio<input class="inp" name="meta" type="number" min="2" max="20" value="${club.meta || 8}"></label><label>Sellos por pedido (sugerido)<input class="inp" name="spp" type="number" min="0" max="10" value="${club.sellos_por_pedido ?? 1}"></label></div>
+          <div class="row2"><label>Sellos para el premio<input class="inp" name="meta" type="number" min="2" max="20" value="${club.meta || 8}"></label><span class="hintp" style="align-self:end">Cada pedido entregado suma 1 sello.</span></div>
           <label>Texto del premio (solo se usa si no ofrecés set ni descuento)<input class="inp" name="premio" value="${esc(club.premio || "")}" placeholder="Ej: un set de regalo o 35% off en ese pedido"></label>
           <div class="checks"><label><input type="checkbox" name="pset" ${club.premio_set !== false ? "checked" : ""}> Opción: un set de regalo (12 oz)</label></div>
           <div class="row2"><label>Opción: % de descuento (0 = no ofrecer)<input class="inp" name="pdesc" type="number" min="0" max="100" value="${club.premio_descuento ?? 35}"></label>
@@ -923,7 +934,7 @@
           cierres: cierresVigentes(prev), cadaMin: Math.max(5, +f.cada || 30), anticipacionMin: Math.max(0, +f.antic || 0),
           cupoTurno: Math.max(0, Math.min(20, Math.round(+f.cupo || 0))) });
       }
-      if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: Math.max(0, Math.min(10, +f.spp)), premio: (f.premio || "").trim(), minimo: Math.max(0, +f.minimo || 0),
+      if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: 1, premio: (f.premio || "").trim(), minimo: Math.max(0, +f.minimo || 0),
         premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0), regalo: !!f.regalo, sello_resena: !!f.sres });
       if (k === "maquinita") {
         const premios = MQ_PREM.map(([id, , , , tipo]) => { const tp = MQ_TIPO.some(([k]) => k === f["pk_" + id]) ? f["pk_" + id] : tipo;
@@ -1086,6 +1097,15 @@
         catch (err) { toast(err.message); b.disabled = false; }
         return;
       }
+      if (b.dataset.pagoedit !== undefined) { P.editPago = P.editPago === id ? null : id; drawOrders(); return; }
+      if (b.dataset.pagoset !== undefined) {
+        const o = P.orders.find((x) => x.id === id), nuevo = b.dataset.pagoset;
+        if (!o || nuevo === o.pago) { P.editPago = null; drawOrders(); return; }
+        b.disabled = true;
+        try { const r = await API.setPago(id, nuevo); o.pago = r.pago; P.editPago = null; drawOrders(); toast(`Pago: ${r.pago}${r.caja ? ` · en la Caja pasó a ${r.cuenta === "efectivo" ? "Efectivo" : "MP"}` : ""}`); }
+        catch (err) { toast(err.message); b.disabled = false; }
+        return;
+      }
       if (b.dataset.usarwa !== undefined) { // tipeó mal su número: pasamos el pedido (y los sellos) al número desde el que escribió
         b.disabled = true;
         try { const ph = await API.usarNumeroWa(id), o = P.orders.find((x) => x.id === id); if (o) { o.phone = ph; o.wa_phone = null; } delete P.confirm[id]; drawOrders(); toast(`Listo · el pedido y los sellos van a ${pretty(ph)}`); }
@@ -1107,7 +1127,6 @@
         return;
       }
       if (b.dataset.fquitar !== undefined) { try { await API.quitarCambio(id); const o = P.orders.find((x) => x.id === id); if (o) o.cambio = null; drawOrders(); toast("Aviso quitado"); } catch (err) { toast(err.message); } return; }
-      if (b.dataset.cn) { c.n = Math.max(0, Math.min(10, c.n + +b.dataset.cn)); drawOrders(); }
       if (b.dataset.deliver !== undefined) {
         b.disabled = true;
         const od = P.orders.find((x) => x.id === id);
