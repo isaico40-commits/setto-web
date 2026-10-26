@@ -400,14 +400,26 @@
   }
 
 
+  /* ---------- Franjas: las apagadas en Ajustes no se ofrecen; las cerradas u ocupadas desde el panel valen solo ese día ---------- */
+  function fechaKey(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+  function hhmm(s) { const [h, m] = s.split(":").map(Number); return h * 60 + m; }
+  function franjasDia(day) { // [{ a, b, estado: "abierta" | "cerrada" | "ocupada" }]; vacío si ese día no se atiende
+    const r = S.retiro || {}; if (!(r.dias || []).includes(day.getDay())) return [];
+    const off = r.apagadas || [], k = fechaKey(day);
+    return (r.rangos || []).filter(([a, b]) => !off.includes(a + "-" + b)).map(([a, b]) => {
+      const c = (r.cierres || []).find((x) => x.fecha === k && x.franja === a + "-" + b);
+      return { a, b, estado: c ? c.motivo : "abierta" };
+    });
+  }
+  const franjaTxt = (f) => `de ${f.a.replace(":00", "")} a ${f.b.replace(":00", "")}`;
+
   /* ---------- Abierto / cerrado ahora (sale de los horarios de retiro) ---------- */
   function renderAbierto() {
     const el = $("#abierto"); if (!el) return;
-    const r = S.retiro || {}, now = new Date(), toMin = (s) => { const [h, m] = s.split(":").map(Number); return h * 60 + m; };
-    const mins = now.getHours() * 60 + now.getMinutes();
-    const abierto = (r.dias || []).includes(now.getDay()) && (r.rangos || []).some(([a, b]) => mins >= toMin(a) && mins < toMin(b));
-    el.classList.toggle("open", abierto); el.classList.toggle("closed", !abierto);
-    el.innerHTML = abierto ? "<i></i>Abierto ahora" : "<i></i>Cerrado ahora";
+    const now = new Date(), mins = now.getHours() * 60 + now.getMinutes();
+    const f = franjasDia(now).find((x) => mins >= hhmm(x.a) && mins < hhmm(x.b)), st = f ? f.estado : "cerrada";
+    el.classList.toggle("open", st === "abierta"); el.classList.toggle("closed", st !== "abierta");
+    el.innerHTML = st === "abierta" ? "<i></i>Abierto ahora" : st === "ocupada" ? "<i></i>Alta demanda ahora" : "<i></i>Cerrado ahora";
   }
   setInterval(() => { try { renderAbierto(); } catch (_) {} }, 60000);
 
@@ -914,8 +926,8 @@
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#mqView").hidden) { e.preventDefault(); cerrarMaq(); } });
   function renderFooter() {
-    const r = S.retiro || { rangos: [] };
-    HORARIO = "De " + r.rangos.map(([a, b]) => a.replace(":00", "") + " a " + b.replace(":00", "")).join(" y de ") + " hs.";
+    const r = S.retiro || { rangos: [] }, rs = r.rangos.filter(([a, b]) => !(r.apagadas || []).includes(a + "-" + b));
+    HORARIO = "De " + rs.map(([a, b]) => a.replace(":00", "") + " a " + b.replace(":00", "")).join(" y de ") + " hs.";
     $("#footHours").textContent = "Retiro: " + HORARIO.charAt(0).toLowerCase() + HORARIO.slice(1);
     $("#waNum").textContent = S.whatsapp_visible || API.prettyPhone(S.whatsapp);
     $("#mnavWa").textContent = S.whatsapp_visible || API.prettyPhone(S.whatsapp);
@@ -1008,21 +1020,65 @@
 
   /* ---------- pedido ---------- */
   let HORARIO = "";
-  function slots() {
-    const r = S.retiro || { dias: [], rangos: [], cadaMin: 30, anticipacionMin: 40 }, out = [], now = new Date();
-    const toMin = (s) => { const [h, m] = s.split(":").map(Number); return h * 60 + m; };
-    for (let d = 0; d < 3 && out.length < 40; d++) {
+  /* cuántos pedidos hay en cada turno: al llegar al cupo, ese turno pasa a alta demanda y se sugiere el siguiente libre */
+  let OCUP = null; // null = todavía no se pudo consultar; entonces no se bloquea nada
+  const cupo = () => Math.max(0, Math.round(+((S.retiro || {}).cupoTurno ?? 3)));
+  const ocupados = (f, h) => { if (!OCUP) return 0; const x = OCUP.find((o) => o.f === f && o.h === h); return x ? x.n : 0; };
+  const lleno = (f, h) => cupo() > 0 && ocupados(f, h) >= cupo();
+  async function refrescarOcupados() {
+    if (!API.turnosOcupados) return false;
+    try { const l = await API.turnosOcupados(); if (l && JSON.stringify(l) !== JSON.stringify(OCUP)) { OCUP = l; return true; } } catch (_) {}
+    return false;
+  }
+  // los próximos 3 días: turnos para elegir, franjas cerradas u ocupadas (se ven pero no se eligen) y un aviso si hace falta
+  function horarios() {
+    const r = S.retiro || {}, now = new Date(), dias = [], avisos = [];
+    let n = 0;
+    for (let d = 0; d < 3 && n < 40; d++) {
       const day = new Date(now); day.setDate(now.getDate() + d);
-      if (!r.dias.includes(day.getDay())) continue;
-      for (const [a, b] of r.rangos) {
-        for (let m = toMin(a); m <= toMin(b); m += r.cadaMin || 30) {
+      const nom = d === 0 ? "Hoy" : d === 1 ? "Mañana" : day.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" });
+      const items = [], tapadas = [], llenos = [];
+      for (const f of franjasDia(day)) {
+        const turnos = [];
+        for (let m = hhmm(f.a); m <= hhmm(f.b); m += r.cadaMin || 30) {
           const t = new Date(day); t.setHours(Math.floor(m / 60), m % 60, 0, 0);
           if (t - now < (r.anticipacionMin || 0) * 60000) continue;
-          out.push((d === 0 ? "Hoy" : d === 1 ? "Mañana" : t.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })) + " · " + t.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) + " hs");
+          const h = t.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+          turnos.push({ txt: nom + " · " + h + " hs", h });
         }
+        if (!turnos.length) continue; // ya pasó
+        if (f.estado === "abierta") { turnos.forEach(({ txt, h }) => { const full = lleno(fechaKey(day), h); if (full) llenos.push(txt); items.push({ txt, ok: !full, hora: h }); if (!full) n++; }); }
+        else { items.push({ txt: `${nom} · ${f.a} a ${f.b} · ${f.estado === "ocupada" ? "alta demanda" : "cerrado"}`, ok: false }); tapadas.push(f); }
       }
+      if (!items.length) continue;
+      if (llenos.length) {
+        // el turno siguiente libre: el primero que quede después del último lleno
+        const ix = items.findIndex((x) => x.txt === llenos[llenos.length - 1]), sig = items.slice(ix + 1).find((x) => x.ok);
+        avisos.push(`${llenos.length === 1 ? "El turno de" : "Los turnos de"} ${llenos.map((t) => t.split(" · ")[1].replace(" hs", "")).join(", ")} ${d === 0 ? "de hoy" : d === 1 ? "de mañana" : "de ese día"} ${llenos.length === 1 ? "ya tiene" : "ya tienen"} muchos pedidos. ` + (sig ? `Te recomendamos ${sig.txt.split(" · ")[1].replace(" hs", "")} hs.` : "Elegí otro día y te lo preparamos tranquilos."));
+      }
+      if (tapadas.length) {
+        const quedan = items.some((x) => x.ok);
+        const por = (st, txt) => { const l = tapadas.filter((f) => f.estado === st); return l.length ? l.map(franjaTxt).join(" y ") + txt : ""; };
+        avisos.push(`${nom} ${[por("cerrada", " está cerrado"), por("ocupada", " tenemos alta demanda")].filter(Boolean).join(" y ")}. ` + (quedan ? "Podés elegir otro horario." : `${d === 0 ? "Hoy" : "Ese día"} no quedan horarios: elegí otro día.`));
+      }
+      dias.push({ nom, items });
     }
-    return out;
+    return { dias, avisos, libres: dias.flatMap((g) => g.items.filter((x) => x.ok).map((x) => x.txt)) };
+  }
+  const slots = () => horarios().libres;
+  function horaSelect(isEnv) {
+    const H = horarios(), r = S.retiro || {};
+    if (form.hora && !H.libres.includes(form.hora)) form.hora = ""; // se cerró la franja que había elegido
+    const lab = isEnv ? "Horario de entrega" : "Horario de retiro";
+    if (!H.libres.length) return `<div class="f" id="fHora"><span>${lab}</span><p class="hora-aviso">Por ahora no hay horarios para elegir. Escribinos por WhatsApp y lo vemos.</p></div>`;
+    return `<label class="f" for="fHora">${lab}${H.avisos.length ? `<span class="hora-aviso">${H.avisos.map(esc).join("<br>")}</span>` : ""}<select id="fHora"><option value="">Elegí un horario</option>${H.dias.map((g) => `<optgroup label="${esc(g.nom.charAt(0).toUpperCase() + g.nom.slice(1))}">${g.items.map((o) => o.ok ? `<option ${o.txt === form.hora ? "selected" : ""}>${esc(o.txt)}</option>` : `<option disabled>${esc(o.txt)}${o.hora ? " · alta demanda" : ""}</option>`).join("")}</optgroup>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>`;
+  }
+  // trae los horarios de nuevo: si cerraron una franja con la web abierta, el cliente no la puede elegir
+  async function refrescarHorarios() {
+    let cambio = false;
+    if (API.getSetting) { try { const r = await API.getSetting("retiro"); if (r && JSON.stringify(r) !== JSON.stringify(S.retiro)) { S.retiro = r; cambio = true; } } catch (_) {} }
+    if (await refrescarOcupados()) cambio = true;
+    return cambio;
   }
   let view = "cart", sending = false;
   let form = { nombre: "", tel: "", hora: "", pago: "", nota: "", modo: "retiro", dir: "", dirExtra: "", premio: "", okWa: true, okAds: true }; // vienen tildadas (decisión de Isa); la versión del aviso lo deja registrado
@@ -1121,7 +1177,7 @@
       const pagoEnvio = (S.envio || {}).pago || "Transferencia / Mercado Pago";
       const pagosVer = form.modo === "envio" ? [pagoEnvio] : S.pagos || [];
       if (!pagosVer.includes(form.pago)) form.pago = pagosVer.length === 1 ? pagosVer[0] : ""; // con varias opciones no viene ninguna marcada
-      const r = S.retiro || {}, isEnv = form.modo === "envio", costo = Math.max(0, Number((S.envio || {}).costo) || 0);
+      const isEnv = form.modo === "envio", costo = Math.max(0, Number((S.envio || {}).costo) || 0);
       body.innerHTML = `
         ${envioOn() ? `<div class="modo" role="radiogroup" aria-label="Forma de entrega">
           <button data-modo="retiro" role="radio" aria-checked="${!isEnv}"><b>Retiro</b><small>Pasás a buscarlo</small></button>
@@ -1132,7 +1188,7 @@
           <label class="f" for="fDir2">Piso, depto o referencia (opcional)<input id="fDir2" value="${esc(form.dirExtra)}" placeholder="Ej: 3° B, timbre 2, entre Colón y Moreno"></label>` : ""}
         <label class="f" for="fNombre">Nombre<input id="fNombre" autocomplete="given-name" value="${esc(form.nombre)}" placeholder="Cómo te llamamos"></label>
         <label class="f" for="fTel">Tu celular (WhatsApp)<input id="fTel" type="tel" inputmode="tel" autocomplete="tel" value="${esc(form.tel)}" placeholder="223 347-1277"><span class="hintf" id="fTelOk">${telHint(form.tel)}</span></label>
-        <label class="f" for="fHora">${isEnv ? "Horario de entrega" : "Horario de retiro"}<select id="fHora"><option value="">Elegí un horario</option>${slots().map((o) => `<option ${o === form.hora ? "selected" : ""}>${esc(o)}</option>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>
+        ${horaSelect(isEnv)}
         <div class="f" id="fPago"><span>Forma de pago</span><div class="chips">${pagosVer.map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">${form.modo === "envio" ? "Con envío, solo transferencia." : "El pago se coordina por WhatsApp."}</span></div>
         ${premioPicker()}
         ${giftBox()}
@@ -1186,6 +1242,8 @@
       return;
     }
     if (sending) return;
+    await refrescarHorarios();
+    if (!slots().includes(form.hora)) { form.hora = ""; drawDrawer(); const e2 = $("#fErr"); e2.hidden = false; e2.textContent = "Ese horario ya no está disponible. Elegí otro."; $("#fHora")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
     if (clubOn() && API.normPhone(form.tel)) await loadCard();
     if (completes() && !form.premio) { drawDrawer(); const e2 = $("#fErr"); e2.hidden = false; e2.textContent = "Completaste tu tarjeta: elegí tu premio antes de enviar."; $(".premio-pick")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
     sending = true; drawFootOnly();
@@ -1266,7 +1324,7 @@
     if (b.id === "openCart" || b.id === "mbarBtn") openDrawer();
     if (b.id === "dClose" || b.dataset.closedrawer !== undefined) closeDrawer();
     if (b.id === "dBack") { view = "cart"; drawDrawer(); }
-    if (b.id === "toCheckout") { view = "checkout"; drawDrawer(); if (cart.length) px("InitiateCheckout", { ...pxCarrito(), value: total() }); }
+    if (b.id === "toCheckout") { view = "checkout"; drawDrawer(); refrescarHorarios().then((c) => { if (c && view === "checkout") drawDrawer(); }); if (cart.length) px("InitiateCheckout", { ...pxCarrito(), value: total() }); }
     if (b.id === "toBuscar") { BQ.res = null; BQ.err = ""; BQ.tel = BQ.tel || form.tel; view = "buscar"; drawDrawer(); setTimeout(() => { const i = $("#bqTel"); if (i && !i.value) i.focus(); }, 30); }
     if (b.dataset.pago) { form.pago = b.dataset.pago; document.querySelectorAll("[data-pago]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); const fp = $("#fPago"); if (fp) fp.classList.remove("inval"); }
     if (b.id === "toWA") sendOrder();

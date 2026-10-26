@@ -131,6 +131,18 @@
   }
   const demo = {
     async loadAll() { const db = dbLoad(); return { settings: db.settings, products: db.products }; },
+    async getSetting(key) { return dbLoad().settings[key]; },
+    async turnosOcupados() { // mismo cálculo que la función turnos_ocupados de Supabase
+      const k = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`, hoy = k(new Date()), cnt = {};
+      dbLoad().orders.filter((o) => o.status !== "cancelado" && /· \d{1,2}:\d{2} hs$/.test(o.retiro || "")).forEach((o) => {
+        const [dia, resto] = o.retiro.split(" · "), base = new Date(o.created_at); let f = null;
+        if (dia === "Hoy") f = base; else if (dia === "Mañana") { f = new Date(base); f.setDate(f.getDate() + 1); }
+        else { const n = +(dia.match(/(\d+)$/) || [])[1]; for (let i = 0; i < 7 && n; i++) { const g = new Date(base); g.setDate(g.getDate() + i); if (g.getDate() === n) { f = g; break; } } }
+        if (!f || k(f) < hoy) return;
+        const key = k(f) + "|" + resto.replace(" hs", "").padStart(5, "0"); cnt[key] = (cnt[key] || 0) + 1;
+      });
+      return Object.entries(cnt).map(([key, n]) => { const [f, h] = key.split("|"); return { f, h, n }; });
+    },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio: elegido, gift, maq }) {
       const db = dbLoad(), ph = normPhone(phone), esp = db.settings.especial || {}, envio = db.settings.envio || {}, club = db.settings.club || {}, pers = db.settings.personalizacion || {};
       modo = modo === "envio" ? "envio" : "retiro";
@@ -572,6 +584,10 @@
       fail(s.error); fail(p.error);
       return arma(s.data, p.data);
     },
+    // un ajuste suelto y fresco (los horarios pueden cambiar con la web abierta)
+    async getSetting(key) { const { data, error } = await sb.from("settings").select("value").eq("key", key).maybeSingle(); fail(error); return data ? data.value : undefined; },
+    // cuántos pedidos hay por turno (fecha + hora), sin datos de clientes; null si la función todavía no está en la base
+    async turnosOcupados() { const { data, error } = await sb.rpc("turnos_ocupados"); return error ? null : data || []; },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift, maq }) {
       const { data, error } = await sb.rpc("create_order_v6", {
         p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty, leche: i.leche || null, sin: i.sin || [], bebida: i.bebida || null })),
