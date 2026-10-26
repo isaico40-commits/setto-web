@@ -133,10 +133,12 @@
   const avisadoEn = (o, e) => (o.avisos || {})[e] || avisosLocal()[o.id + ":" + e] || null;
   const faltaAvisar = (o) => o.status === "pendiente" && !avisadoEn(o, o.etapa || "recibido");
   const etapaNom = (o, e) => (e === "listo" ? (o.modo === "envio" ? "En camino" : "Listo para retirar") : e === "preparando" ? "En preparación" : "Recibido");
-  // pagado: lo marca el equipo a mano (transferencia recibida, efectivo cobrado). El cliente no lo ve.
-  const pagoTag = (o) => o.status === "cancelado" ? "" : o.pagado_at ? `<span class="pago-tag si">✓ Pagado</span>` : `<span class="pago-tag">💸 Sin pagar</span>`;
+  // pagado: lo marca el equipo a mano cuando llega la transferencia. Solo en pendientes por transferencia:
+  // el efectivo se cobra al retirar y lo entregado ya está en la Caja. El cliente no lo ve.
+  const conPago = (o) => o.status === "pendiente" && /transfer/i.test(o.pago || "");
+  const pagoTag = (o) => !conPago(o) ? "" : o.pagado_at ? `<span class="pago-tag si">✓ Pagado</span>` : `<span class="pago-tag">💸 Sin pagar</span>`;
   function pagoBox(o) {
-    if (o.status === "cancelado" && !o.pagado_at) return "";
+    if (!conPago(o)) return "";
     return o.pagado_at
       ? `<div class="pagobox si"><span><b>✓ Pagado</b><small>${esc(o.pago || "")}${o.pago ? " · " : ""}marcado ${ago(o.pagado_at)}</small></span><button class="linkbtn" data-pagado="0">Desmarcar</button></div>`
       : `<div class="pagobox"><span><b>Sin pagar</b><small>${esc(o.pago || "Forma de pago a confirmar")}</small></span><button class="btn solid" data-pagado="1">Marcar pagado</button></div>`;
@@ -341,7 +343,7 @@
         ${cons ? consentHtml(cons) : ""}
         <b style="margin-top:6px">Historial</b>
         <div class="hist">${(r.events || []).map((e) => `<div><span>${esc(e.motivo || "")} <span class="muted">${ago(e.created_at)}</span></span><span class="${e.delta > 0 ? "pos" : "neg"} num">${e.delta > 0 ? "+" : ""}${e.delta}</span></div>`).join("") || '<span class="muted">Sin movimientos.</span>'}</div>
-        ${(r.orders || []).length ? `<b>Pedidos</b><div class="hist">${r.orders.map((o) => `<div><span>${esc(o.code)} · ${esc(o.status)}${o.status !== "cancelado" ? (o.pagado_at ? " · pagado" : " · sin pagar") : ""} <span class="muted">${ago(o.created_at)}</span></span><span class="num">${money(o.total)}</span></div>`).join("")}</div>` : ""}
+        ${(r.orders || []).length ? `<b>Pedidos</b><div class="hist">${r.orders.map((o) => `<div><span>${esc(o.code)} · ${esc(o.status)}${o.status === "pendiente" && o.pagado_at ? " · pagado" : ""} <span class="muted">${ago(o.created_at)}</span></span><span class="num">${money(o.total)}</span></div>`).join("")}</div>` : ""}
       </div></section>`;
     } catch (e) { box.innerHTML = `<p class="err" style="margin-top:14px">${esc(e.message)}</p>`; }
   }
