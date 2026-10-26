@@ -4,6 +4,8 @@
   const MSG = {
     pedido_inicio: { grupo: "Lo que manda el cliente", titulo: "Pedido · primera línea", vars: ["codigo", "entrega"],
       texto: "¡Hola Setto! Te paso mi pedido {codigo} {entrega}:" },
+    pedido_transferencia: { grupo: "Lo que manda el cliente", titulo: "Pedido · pago por transferencia (va después del pago)", vars: ["total", "alias", "titular"],
+      texto: "💸 Transfiero {total} al alias {alias}\nA nombre de: {titular}\nTe mando el comprobante por acá para confirmar el pedido." },
     pedido_cierre: { grupo: "Lo que manda el cliente", titulo: "Pedido · cierre (va al final)", vars: ["link"],
       texto: "📍 Sigo mi pedido acá: {link}" },
     consulta: { grupo: "Lo que manda el cliente", titulo: "Botón WhatsApp del menú", vars: [],
@@ -30,7 +32,7 @@
   const VARS = {
     nombre: "nombre del cliente", codigo: "código (STT-1234 o GIFT-…)", link: "link de seguimiento o de la gift card",
     entrega: "“para retirar” o “con envío a domicilio”", sellos: "“Sumaste 1 sello al Setto Club.” (vacío si no sumó)", faltan: "lo que falta (ej: 2 Mochi Oreo)",
-    diseno: "diseño de la gift card", monto: "monto", para: "para quién", de: "de quién (si no hay, se borra la línea)",
+    diseno: "diseño de la gift card", total: "total a pagar", alias: "alias de transferencia (Ajustes → Formas de pago)", titular: "a nombre de quién está la cuenta (si no hay, se borra la línea)", monto: "monto", para: "para quién", de: "de quién (si no hay, se borra la línea)",
   };
   function texto(key, settings) { const m = (settings && settings.mensajes) || {}; return (m[key] && String(m[key]).trim()) || (MSG[key] ? MSG[key].texto : ""); }
   function render(key, vars, settings) {

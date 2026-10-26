@@ -1030,8 +1030,19 @@
     const premio = o.premio ? `\n\n🎁 Con este pedido completo mi tarjeta del Setto Club: ${o.premio_txt || "premio"}` : "";
     const M = window.SettoMSG, ini = M.render("pedido_inicio", { codigo: o.code, entrega: envio ? "con envío a domicilio" : "para retirar" }, S);
     const cierre = o.track ? M.render("pedido_cierre", { link: linkSeguir(o.track) }, S) : "";
+    const transf = esTransf(o.pago) && aliasTransf() ? M.render("pedido_transferencia", { total: money(o.total), alias: aliasTransf(), titular: (S.transferencia || {}).titular || "" }, S) : "";
     return `${ini}\n\n${lines.join("\n")}\n\nTotal: ${money(o.total)}${premio}\n\nNombre: ${o.nombre}\n${entrega}\nPago: ${o.pago}` + (o.nota ? `\nNota: ${o.nota}` : "")
-      + (cierre ? `\n\n${cierre}` : "");
+      + (transf ? `\n\n${transf}` : "") + (cierre ? `\n\n${cierre}` : "");
+  }
+  // alias de transferencia: se carga en Panel → Ajustes → Formas de pago (settings.transferencia)
+  const aliasTransf = () => String((S.transferencia || {}).alias || "").trim();
+  const esTransf = (pago) => /transfer/i.test(pago || "");
+  function transfHtml(total) { // alias a la vista + pedido de comprobante, cuando eligió transferencia
+    const al = aliasTransf(), tit = String((S.transferencia || {}).titular || "").trim();
+    if (!al) return "";
+    return `<div class="transf"><span class="eyebrow">Pagás por transferencia${total != null ? ` · <span class="num">${money(total)}</span>` : ""}</span>
+      <div class="transf-al"><span>Alias: <b class="num">${esc(al)}</b></span><button type="button" class="back" data-copyalias>Copiar</button></div>${tit ? `<small>A nombre de ${esc(tit)}</small>` : ""}
+      <small>Mandanos el comprobante por WhatsApp, en el mismo chat del pedido, y lo confirmamos.</small></div>`;
   }
   // muestra el número como lo va a usar Setto, para que vea si lo tipeó mal antes de mandar el pedido
   function telHint(v) {
@@ -1126,7 +1137,7 @@
         <label class="f" for="fNombre">Nombre<input id="fNombre" autocomplete="given-name" value="${esc(form.nombre)}" placeholder="Cómo te llamamos"></label>
         <label class="f" for="fTel">Tu celular (WhatsApp)<input id="fTel" type="tel" inputmode="tel" autocomplete="tel" value="${esc(form.tel)}" placeholder="223 347-1277"><span class="hintf" id="fTelOk">${telHint(form.tel)}</span></label>
         <label class="f" for="fHora">${isEnv ? "Horario de entrega" : "Horario de retiro"}<select id="fHora"><option value="">Elegí un horario</option>${slots().map((o) => `<option ${o === form.hora ? "selected" : ""}>${esc(o)}</option>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>
-        <div class="f" id="fPago"><span>Forma de pago</span><div class="chips">${pagosVer.map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">${form.modo === "envio" ? "Con envío, solo transferencia." : "El pago se coordina por WhatsApp."}</span></div>
+        <div class="f" id="fPago"><span>Forma de pago</span><div class="chips">${pagosVer.map((p) => `<button data-pago="${esc(p)}" aria-pressed="${p === form.pago}">${esc(p)}</button>`).join("")}</div><span class="hintf">${form.modo === "envio" ? "Con envío, solo transferencia." : "El pago se coordina por WhatsApp."}</span>${esTransf(form.pago) ? transfHtml(null) : ""}</div>
         ${premioPicker()}
         ${giftBox()}
         <div class="consent"><label><input type="checkbox" id="fOkWa" ${form.okWa ? "checked" : ""}> Avisame por WhatsApp cuando salgan sabores nuevos o limitados.</label>
@@ -1152,6 +1163,7 @@
       body.innerHTML = `<div class="ok"><img src="img/sm/mochito-cup.webp" alt=""><span class="eyebrow">Tu código de pedido</span><div class="coderow num">${esc(lastOrder.code)}</div>
         ${lastOrder.premio ? `<div class="clubline" style="width:100%;text-align:left"><img src="img/sm/mochito-run.webp" alt=""><div><b>¡Completaste tu tarjeta!</b> Tu premio: ${esc(lastOrder.premio_txt || "a confirmar")}.</div></div>` : ""}
         <p class="muted" style="font-size:.9rem">Fijate que el mensaje se haya enviado en WhatsApp: con eso te confirmamos ${lastOrder.modo === "envio" ? "envío" : "dirección"} y pago.${clubOn() ? " Al recibirlo sumás tu sello." : ""}</p></div>
+        ${esTransf(lastOrder.pago) ? transfHtml(lastOrder.total) : ""}
         <div class="dtrk sent-trk">${trackCard(est)}</div>
         <p class="muted" style="font-size:.84rem;text-align:center">Te avisamos acá cuando esté listo. El link para volver va en tu WhatsApp.</p>
         <div class="msg" id="msgText" hidden>${esc(lastOrder.message)}</div>`;
@@ -1195,7 +1207,7 @@
       let track = o.track || null;
       if (!track) { try { const st = await API.orderStatus([o.code], ph); track = (st.find((x) => x.code === o.code) || {}).track || null; } catch (_) {} }
       const full = { ...o, track, nombre: form.nombre.trim(), retiro: form.hora, pago: form.pago, nota: form.nota.trim() };
-      lastOrder = { code: o.code, track, message: buildMessage(full), modo: o.modo || "retiro", premio: !!o.premio, premio_txt: o.premio_txt, enviado: true };
+      lastOrder = { code: o.code, track, message: buildMessage(full), modo: o.modo || "retiro", premio: !!o.premio, premio_txt: o.premio_txt, enviado: true, pago: form.pago, total: o.total };
       cardCache = null;
       trackVivos = [{ code: o.code, status: "pendiente", etapa: "recibido", modo: o.modo || "retiro", retiro: form.hora, created_at: new Date().toISOString(), track }, ...trackVivos.filter((x) => x.code !== o.code)];
       guardarSeguimiento({ code: o.code, phone: ph, track, at: Date.now(), px: pxPed });
@@ -1261,11 +1273,12 @@
     if (b.id === "dBack") { view = "cart"; drawDrawer(); }
     if (b.id === "toCheckout") { view = "checkout"; drawDrawer(); if (cart.length) px("InitiateCheckout", { ...pxCarrito(), value: total() }); }
     if (b.id === "toBuscar") { BQ.res = null; BQ.err = ""; BQ.tel = BQ.tel || form.tel; view = "buscar"; drawDrawer(); setTimeout(() => { const i = $("#bqTel"); if (i && !i.value) i.focus(); }, 30); }
-    if (b.dataset.pago) { form.pago = b.dataset.pago; document.querySelectorAll("[data-pago]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); const fp = $("#fPago"); if (fp) fp.classList.remove("inval"); }
+    if (b.dataset.pago) { form.pago = b.dataset.pago; document.querySelectorAll("[data-pago]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); const fp = $("#fPago"); if (fp) { fp.classList.remove("inval"); fp.querySelector(".transf")?.remove(); if (esTransf(form.pago)) fp.insertAdjacentHTML("beforeend", transfHtml(null)); } }
     if (b.id === "toWA") sendOrder();
     if (b.dataset.resend !== undefined && lastOrder) abrioWhatsApp(lastOrder.code, telDe(lastOrder.code));
     if (b.dataset.premio) { form.premio = b.dataset.premio; drawDrawer(); }
     if (b.dataset.modo) { form.modo = b.dataset.modo; drawDrawer(); if (form.modo === "envio") setTimeout(() => { const d = $("#fDir"); if (d && !d.value) d.focus(); }, 30); }
+    if (b.dataset.copyalias !== undefined) { try { navigator.clipboard.writeText(aliasTransf()).then(() => toast("Alias copiado"), () => toast("Alias: " + aliasTransf())); } catch (_) { toast("Alias: " + aliasTransf()); } }
     if (b.id === "copyMsg") {
       const txt = lastOrder ? lastOrder.message : "";
       const fallback = () => { const r = document.createRange(); r.selectNodeContents($("#msgText")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast("Seleccionado: copialo con tu teclado"); };
