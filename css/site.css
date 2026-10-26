@@ -1118,3 +1118,24 @@ article.set,article.item,article.prem{cursor:pointer}
 .ph.alt .ph-arr{right:auto;left:10px}
 .ph.alt .ph-arr::before{transform:translateX(1px) rotate(-135deg)}
 .ph-arr:hover{background:#FFFDF8}
+
+/* ---------- Promos (Box 5x4): misma tarjeta que Sets; con una sola promo la tarjeta no queda perdida a la izquierda ---------- */
+@media (min-width:761px){.promos.una .rail{grid-template-columns:minmax(0,420px);justify-content:center}}
+@media (max-width:760px){.promos.una .rail{grid-auto-columns:min(100%,420px);justify-content:center}.promos.una .hint{display:none}}
+/* ficha de la promo: elegir los sabores de la box */
+.boxpick{display:grid;gap:10px}
+.bp-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.bp-cnt{font-size:.95rem;color:var(--ink-2)}
+.bp-cnt.ok{color:var(--turquesa)}
+.bp-list{display:grid;gap:8px}
+.bp-row{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:6px 10px 6px 6px;border-radius:14px;background:var(--card);border:1.5px solid transparent}
+.bp-row.on{border-color:color-mix(in srgb,var(--turquesa) 55%,transparent)}
+.bp-row .th{width:44px;height:44px;border-radius:10px;background:var(--bg-2);display:grid;place-items:center;overflow:hidden}
+.bp-row .th img{max-width:100%;max-height:100%}
+.bp-n{font-weight:600;font-size:.95rem;display:grid}
+.bp-n small{font-weight:500;font-size:.75rem;color:var(--ink-2)}
+.bp-row .qty{margin:0}
+.bp-row .qty .num{min-width:16px;text-align:center}
+.bp-row .qty button:disabled{opacity:.35;cursor:default}
+.bp-ah{font-size:.86rem;color:var(--ink-2);margin:0}
+.bp-ah s{color:var(--tachado)}

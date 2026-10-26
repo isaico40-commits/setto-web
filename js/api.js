@@ -183,8 +183,18 @@
           if (it.bebida && !bp) throw new Error("Esa bebida ya no está disponible, elegí otra");
           bebida = bp ? bp.id : null; det = [bp ? "Bebida: " + bp.nombre.trim() : "Bebida: a confirmar", det].filter(Boolean).join(" · ");
         }
+        // promo (box): los sabores tienen que ser mochis de la carta visibles y sin agotar (igual que la migración 047)
+        let mochis = null;
+        if (pr.categoria === "promo") {
+          const cant = pr.promo_cant || 5; name = pr.nombre.trim();
+          if (!Array.isArray(it.mochis) || it.mochis.length !== cant) throw new Error(`Elegí los ${cant} mochis de ${name}`);
+          const ms = it.mochis.map((id) => db.products.find((x) => x.id === id && x.categoria === "mochi" && x.activo !== false && !x.agotado));
+          if (ms.some((m) => !m)) throw new Error(`Un sabor de ${name} ya no está disponible, elegí otro`);
+          mochis = ms.map((m) => m.id); const c = new Map(); ms.forEach((m) => c.set(m.nombre.trim(), (c.get(m.nombre.trim()) || 0) + 1));
+          det = [...c].map(([n, k]) => n + (k > 1 ? " ×" + k : "")).join(" · ");
+        }
         total += price * qty;
-        lines.push({ id: pr.id, nombre: name, size, qty, precio: price, subtotal: price * qty, leche, sin, detalle: det, bebida });
+        lines.push({ id: pr.id, nombre: name, size, qty, precio: price, subtotal: price * qty, leche, sin, detalle: det, bebida, mochis });
       }
       const sub = total, costo = modo === "envio" ? Math.max(0, Number(envio.costo) || 0) : 0;
       if (costo > 0) { lines.push({ id: "envio", nombre: "Envío", size: null, qty: 1, precio: costo, subtotal: costo }); total += costo; }
@@ -590,7 +600,7 @@
     async turnosOcupados() { const { data, error } = await sb.rpc("turnos_ocupados"); return error ? null : data || []; },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift, maq }) {
       const { data, error } = await sb.rpc("create_order_v6", {
-        p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty, leche: i.leche || null, sin: i.sin || [], bebida: i.bebida || null })),
+        p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty, leche: i.leche || null, sin: i.sin || [], bebida: i.bebida || null, ...(i.mochis ? { mochis: i.mochis } : {}) })),
         p_retiro: retiro, p_pago: pago, p_nota: nota || null, p_modo: modo || "retiro", p_direccion: direccion || null, p_premio: premio || null, p_gift: gift || null, p_maq: maq || null,
       });
       fail(error); return data;

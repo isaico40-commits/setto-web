@@ -471,6 +471,19 @@ window.SETTO_SEED = {
    "agotado": false,
    "activo": true,
    "orden": 6
+  },
+  {
+   "id": "promo-box5x4",
+   "categoria": "promo",
+   "nombre": "Box de mochis 5x4",
+   "descripcion": "Llevás 5 mochis y pagás 4. Elegís los sabores y van en una box.",
+   "img": "",
+   "precio": 22000,
+   "promo_cant": 5,
+   "rotativo": false,
+   "agotado": false,
+   "activo": true,
+   "orden": 1
   }
  ]
 };
