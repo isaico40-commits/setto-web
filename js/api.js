@@ -134,7 +134,7 @@
     async getSetting(key) { return dbLoad().settings[key]; },
     async turnosOcupados() { // mismo cálculo que la función turnos_ocupados de Supabase
       const k = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`, hoy = k(new Date()), cnt = {};
-      dbLoad().orders.filter((o) => o.status !== "cancelado" && /· \d{1,2}:\d{2} hs$/.test(o.retiro || "")).forEach((o) => {
+      dbLoad().orders.filter((o) => o.status === "pendiente" && (o.etapa || "recibido") !== "listo" && /· \d{1,2}:\d{2} hs$/.test(o.retiro || "")).forEach((o) => {
         const [dia, resto] = o.retiro.split(" · "), base = new Date(o.created_at); let f = null;
         if (dia === "Hoy") f = base; else if (dia === "Mañana") { f = new Date(base); f.setDate(f.getDate() + 1); }
         else { const n = +(dia.match(/(\d+)$/) || [])[1]; for (let i = 0; i < 7 && n; i++) { const g = new Date(base); g.setDate(g.getDate() + i); if (g.getDate() === n) { f = g; break; } } }

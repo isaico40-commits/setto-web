@@ -238,12 +238,11 @@ a.ptab{text-decoration:none}
 .hseg{display:inline-flex;border:1.5px solid color-mix(in srgb,var(--turquesa) 45%,transparent);border-radius:999px;overflow:hidden;background:var(--card)}
 .hseg button{border:0;background:none;padding:7px 12px;min-height:36px;font-weight:600;font-size:.82rem;color:var(--ink-2)}
 .hseg button+button{border-left:1px solid color-mix(in srgb,var(--turquesa) 25%,transparent)}
-.hseg .h-abierta[aria-pressed="true"]{background:var(--turquesa);color:#fff}
-.hseg .h-tope[aria-pressed="true"]{background:#e9a23b;color:#1f1c18}
-.hseg .h-cerrada[aria-pressed="true"]{background:#9b2c2c;color:#fff}
+.hseg .h-abierta[aria-checked="true"]{background:var(--turquesa);color:#fff}
+.hseg .h-cerrada[aria-checked="true"]{background:#9b2c2c;color:#fff}
 .hseg button:disabled{opacity:.45}
 .hseg button{white-space:nowrap}
-@media (max-width:420px){.hrow{flex-direction:column;align-items:stretch}.hseg{display:grid;grid-template-columns:1fr 1.25fr 1fr}.hseg button{padding:7px 6px;font-size:.8rem}}
+@media (max-width:420px){.hrow{flex-direction:column;align-items:stretch}.hseg{display:grid;grid-template-columns:1fr 1fr}.hseg button{padding:7px 6px;font-size:.8rem}}
 /* Ajustes → Horarios de retiro: una fila por franja con interruptor */
 .frlist{display:grid;gap:8px;max-width:720px}.frlist>small{font-size:.85rem;font-weight:600;color:var(--ink)}
 .frrow{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;grid-template-areas:"sw sw sw x" "a sep b .";align-items:center;gap:6px 8px;background:var(--bg);border-radius:12px;padding:8px 10px}
@@ -253,10 +252,18 @@ a.ptab{text-decoration:none}
 .frsw input{width:auto;margin:0}
 @media (min-width:600px){.frrow{grid-template-columns:110px minmax(0,150px) auto minmax(0,150px) auto;grid-template-areas:"sw a sep b x";justify-content:start}}
 .frrow:has(.frsw input:not(:checked)) .inp{opacity:.5}
-.horcard .hfull{background:#fdf1dc;border-radius:10px;padding:8px 10px;color:var(--ink)}
 .pagoedit .linkbtn{padding:0 0 0 4px;font-size:.8rem}
 .pagopick{display:grid;gap:8px;border:1.5px solid color-mix(in srgb,var(--turquesa) 45%,transparent);border-radius:12px;padding:10px 12px;margin:2px 0}
 .pagopick .chips{display:flex;flex-wrap:wrap;gap:6px}
 .pagopick .chips button{border:1.5px solid var(--turquesa);background:var(--card);border-radius:999px;padding:7px 12px;font-size:.84rem;font-weight:600;color:var(--turquesa)}
 .pagopick .chips button[aria-pressed="true"]{background:var(--turquesa);color:#fff}
 .pagopick .linkbtn{justify-self:start}
+/* Alta demanda por turno: turnos con pedidos en curso, llenos y liberados a mano */
+.tbox{display:grid;gap:8px;padding-top:10px;border-top:1px dashed color-mix(in srgb,var(--turquesa) 25%,transparent)}
+.ttit{font-size:.92rem}
+.tturno{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-radius:12px;background:var(--bg);font-size:.88rem}
+.tturno>span:first-child{margin-right:auto}
+.tturno.lleno{background:#fdf1dc}
+.ttag{font-size:.74rem;font-weight:700;border-radius:999px;padding:3px 9px}
+.ttag.alta{background:#e9a23b;color:#1f1c18}.ttag.ok{background:color-mix(in srgb,var(--turquesa) 15%,var(--card));color:var(--turquesa)}.ttag.lib{background:var(--card);border:1px solid #e9a23b;color:#8a5a12}
+.btn.sm{padding:6px 12px;font-size:.8rem;min-height:0}

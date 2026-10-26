@@ -424,15 +424,14 @@
   }
 
 
-  /* ---------- Franjas: las apagadas en Ajustes no se ofrecen; cerrar una franja o sacarle el tope desde el panel vale solo ese día ---------- */
+  /* ---------- Franjas: las apagadas en Ajustes no se ofrecen; cerrar una franja desde el panel vale solo ese día ---------- */
   function fechaKey(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
   function hhmm(s) { const [h, m] = s.split(":").map(Number); return h * 60 + m; }
-  function franjasDia(day) { // [{ a, b, estado: "abierta" | "cerrada", tope }]; vacío si ese día no se atiende
+  function franjasDia(day) { // [{ a, b, estado: "abierta" | "cerrada" }]; vacío si ese día no se atiende
     const r = S.retiro || {}; if (!(r.dias || []).includes(day.getDay())) return [];
-    const off = r.apagadas || [], k = fechaKey(day), es = (l, fr) => (l || []).some((x) => x.fecha === k && x.franja === fr);
+    const off = r.apagadas || [], k = fechaKey(day);
     return (r.rangos || []).filter(([a, b]) => !off.includes(a + "-" + b)).map(([a, b]) => ({
       a, b, estado: (r.cierres || []).some((x) => x.fecha === k && x.franja === a + "-" + b && x.motivo === "cerrada") ? "cerrada" : "abierta",
-      tope: !es(r.sinTope, a + "-" + b), // el tope de pedidos por turno vale salvo que lo apaguen ese día
     }));
   }
   const franjaTxt = (f) => `de ${f.a.replace(":00", "")} a ${f.b.replace(":00", "")}`;
@@ -1092,11 +1091,13 @@
 
   /* ---------- pedido ---------- */
   let HORARIO = "";
-  /* cuántos pedidos hay en cada turno: al llegar al cupo, ese turno pasa a alta demanda y se sugiere el siguiente libre */
+  /* cuántos pedidos en curso hay en cada turno (los listos y entregados ya no cuentan): al llegar al cupo, ese turno
+     pasa a alta demanda y se sugiere el siguiente libre */
   let OCUP = null; // null = todavía no se pudo consultar; entonces no se bloquea nada
   const cupo = () => Math.max(0, Math.round(+((S.retiro || {}).cupoTurno ?? 3)));
   const ocupados = (f, h) => { if (!OCUP) return 0; const x = OCUP.find((o) => o.f === f && o.h === h); return x ? x.n : 0; };
-  const lleno = (f, h) => cupo() > 0 && ocupados(f, h) >= cupo();
+  // un turno liberado a mano desde el panel acepta pedidos aunque esté lleno (vale ese día)
+  const lleno = (f, h) => cupo() > 0 && ocupados(f, h) >= cupo() && !((S.retiro || {}).liberados || []).some((x) => x.fecha === f && x.hora === h);
   async function refrescarOcupados() {
     if (!API.turnosOcupados) return false;
     try { const l = await API.turnosOcupados(); if (l && JSON.stringify(l) !== JSON.stringify(OCUP)) { OCUP = l; return true; } } catch (_) {}
@@ -1119,7 +1120,7 @@
           turnos.push({ txt: nom + " · " + h + " hs", h });
         }
         if (!turnos.length) continue; // ya pasó
-        if (f.estado === "abierta") { turnos.forEach(({ txt, h }) => { const full = f.tope && lleno(fechaKey(day), h); if (full) llenos.push(txt); items.push({ txt, ok: !full, hora: h }); if (!full) n++; }); }
+        if (f.estado === "abierta") { turnos.forEach(({ txt, h }) => { const full = lleno(fechaKey(day), h); if (full) llenos.push(txt); items.push({ txt, ok: !full, hora: h }); if (!full) n++; }); }
         else { items.push({ txt: `${nom} · ${f.a} a ${f.b} · cerrado`, ok: false }); tapadas.push(f); }
       }
       if (!items.length) continue;

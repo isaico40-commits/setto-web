@@ -156,14 +156,14 @@ En **Ajustes → Votación**: pregunta, hasta 6 opciones con foto, "solo cliente
 ### Abierto / cerrado
 Arriba de la portada se ve "Abierto ahora · retirás desde las …" o "Cerrado · abrimos …", calculado con los horarios de retiro.
 
-### Cerrar u ocupar una franja sin borrarla
-- **Pedidos → Horarios para pedir**: cada franja de hoy o mañana tiene *Abierta* o *Cerrada*, y el botón *Alta demanda* prende o apaga el tope de pedidos por turno ese día (y una fila "Todo el día"). Se guarda al tocar. Las que no están abiertas se ven en el selector de la web pero no se pueden elegir, con un aviso arriba ("Hoy de 10 a 13 está cerrado. Podés elegir otro horario."). Vuelven solas a abierta al día siguiente.
+### Cerrar una franja sin borrarla
+- **Pedidos → Horarios para pedir**: cada franja de hoy o mañana tiene *Abierta* o *Cerrada* (y una fila "Todo el día"). Se guarda al tocar. Las cerradas se ven en el selector de la web pero no se pueden elegir, con un aviso arriba ("Hoy de 10 a 13 está cerrado. Podés elegir otro horario."). Vuelven solas a abierta al día siguiente.
 - **Ajustes → Horarios de retiro**: cada franja es una fila con su interruptor *Activa / Apagada*. Una apagada deja de ofrecerse todos los días hasta que la prendas, sin perder el horario.
 - La web vuelve a leer los horarios al pasar al checkout y al enviar: si cerraron la franja elegida con la página abierta, le pide al cliente que elija otra.
 - Se guarda en el ajuste `retiro` (`apagadas` y `cierres`); no necesita migración.
 
 ### Tope de pedidos por turno
-Con el tope puesto (**Ajustes → Horarios de retiro → Pedidos por turno**, 3 por defecto, 0 = sin tope), un turno que llega a ese número pasa solo a alta demanda: la web no lo deja elegir, avisa "El turno de 16:00 de hoy ya tiene muchos pedidos" y recomienda el siguiente libre. En **Pedidos → Horarios para pedir** se ve cuáles llegaron al tope. Los cancelados no cuentan.
+Con el tope puesto (**Ajustes → Horarios de retiro → Pedidos por turno**, 3 por defecto, 0 = sin tope), un turno que llega a ese número de pedidos en curso pasa solo a alta demanda: la web no lo deja elegir, avisa "El turno de 16:00 de hoy ya tiene muchos pedidos" y recomienda el siguiente libre. El largo del turno es el de **Turnos cada** (hoy 15 min). Cuentan solo los pedidos pendientes que no están en *Listo*: al marcar uno como Listo o Entregado se libera su lugar solo. En **Pedidos → Horarios para pedir → Alta demanda por turno** se ve cada turno con pedidos ("16:00 · 3 de 3 pedidos"); *Liberar turno* saca el tope de ese turno a mano y *Volver al tope* lo restituye (`settings.retiro.liberados`). Requiere la migración `047_turno_libera_al_estar_listo.sql`.
 Lo calcula la función `turnos_ocupados()` (migración `046_cupo_por_turno.sql`), que devuelve solo fecha, hora y cantidad. Mientras la migración no esté aplicada, la web funciona igual y no bloquea ningún turno.
 
 ### Mensajes de WhatsApp
