@@ -352,6 +352,7 @@
     },
     async setEtapa(id, etapa) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o || o.status !== "pendiente") throw new Error("El pedido no está pendiente"); o.etapa = etapa; dbSave(db); },
     async marcarAviso(id, etapa) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o) return; o.avisos = { ...(o.avisos || {}), [etapa]: new Date().toISOString() }; dbSave(db); },
+    async marcarPagado(id, pagado) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o) throw new Error("No encontramos ese pedido"); o.pagado_at = pagado ? o.pagado_at || new Date().toISOString() : null; dbSave(db); return o.pagado_at; },
     async usarNumeroWa(id) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o || o.status !== "pendiente" || !o.wa_phone) throw new Error("El pedido ya no está pendiente o no tiene otro número"); o.phone = o.wa_phone; o.wa_phone = null; dbSave(db); return o.phone; },
     // consentimientos de marketing (migración 030): historial; vale la última fila por celular y canal
     async registrarConsentimiento(code, phone, canales, version) {
@@ -593,6 +594,8 @@
     async resolverCambio(track, elecciones, cancelar) { const { data, error } = await sb.rpc("resolver_cambio", { p_track: track, p_elecciones: elecciones || [], p_cancelar: !!cancelar }); fail(error); return data; },
     async setEtapa(id, etapa) { const { error } = await sb.rpc("set_order_etapa", { p_id: id, p_etapa: etapa }); fail(error); },
     async marcarAviso(id, etapa) { const { error } = await sb.rpc("marcar_aviso", { p_id: id, p_etapa: etapa }); fail(error); },
+    // pagado o no: dato interno del equipo (migración 044)
+    async marcarPagado(id, pagado) { const { data, error } = await sb.rpc("marcar_pagado", { p_id: id, p_pagado: !!pagado }); if (error && /marcar_pagado|function/i.test(error.message || "")) throw new Error("Falta activar “pagado” en Supabase (migración 044)"); fail(error); return data; },
     async usarNumeroWa(id) { const { data, error } = await sb.rpc("usar_numero_wa", { p_id: id }); fail(error); return data; },
     // el cliente abrió WhatsApp para mandar el pedido (migración 029; sin ella, no pasa nada)
     async marcarContacto(code, phone) { await sb.rpc("marcar_contacto", { p_code: code, p_phone: phone }); },

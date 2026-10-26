@@ -132,6 +132,14 @@
   const avisadoEn = (o, e) => (o.avisos || {})[e] || avisosLocal()[o.id + ":" + e] || null;
   const faltaAvisar = (o) => o.status === "pendiente" && !avisadoEn(o, o.etapa || "recibido");
   const etapaNom = (o, e) => (e === "listo" ? (o.modo === "envio" ? "En camino" : "Listo para retirar") : e === "preparando" ? "En preparación" : "Recibido");
+  // pagado: lo marca el equipo a mano (transferencia recibida, efectivo cobrado). El cliente no lo ve.
+  const pagoTag = (o) => o.status === "cancelado" ? "" : o.pagado_at ? `<span class="pago-tag si">✓ Pagado</span>` : `<span class="pago-tag">💸 Sin pagar</span>`;
+  function pagoBox(o) {
+    if (o.status === "cancelado" && !o.pagado_at) return "";
+    return o.pagado_at
+      ? `<div class="pagobox si"><span><b>✓ Pagado</b><small>${esc(o.pago || "")}${o.pago ? " · " : ""}marcado ${ago(o.pagado_at)}</small></span><button class="linkbtn" data-pagado="0">Desmarcar</button></div>`
+      : `<div class="pagobox"><span><b>Sin pagar</b><small>${esc(o.pago || "Forma de pago a confirmar")}</small></span><button class="btn solid" data-pagado="1">Marcar pagado</button></div>`;
+  }
   function estadoBox(o) {
     const et = o.etapa || "recibido", orden = ["recibido", "preparando", "listo"], idx = orden.indexOf(et), av = avisadoEn(o, et);
     const wa = `https://wa.me/${esc(o.wa_phone || o.phone)}?text=${encodeURIComponent(avisoTxt(o))}`;
@@ -260,12 +268,13 @@
         <div class="ohead"><span class="ocode num">${esc(o.code)}</span><span class="ago">${ago(o.created_at)}</span><span class="st ${o.status}">${o.status}</span></div>
         <div class="who2"><b>${esc(o.nombre)}</b><span class="num">${esc(pretty(o.phone))}</span><a class="chat" href="https://wa.me/${esc(o.wa_phone || o.phone)}" target="_blank" rel="noopener">Abrir chat</a></div>
         ${o.wa_phone && o.status === "pendiente" ? `<div class="aviso pend"><span class="aviso-t"><b>📱 Escribió desde otro número</b><small>Cargó ${esc(pretty(o.phone))} en la web pero mandó el pedido desde ${esc(pretty(o.wa_phone))}. Los avisos van a ese.</small></span><button class="btn solid" data-usarwa>Usar ese número</button></div>` : ""}
-        <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}${faltaAvisar(o) ? `<span class="falta-tag">💬 Falta avisar</span>` : ""}</div>
+        <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}${faltaAvisar(o) ? `<span class="falta-tag">💬 Falta avisar</span>` : ""}${pagoTag(o)}</div>
         ${env ? `<div class="dirbox"><b>${esc(o.direccion || "")}</b><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.direccion || "") + ", Mar del Plata")}" target="_blank" rel="noopener">Ver en Maps</a></div>` : ""}
         ${o.premio && o.status === "pendiente" ? `<div class="premiobox">Este pedido completa la tarjeta del Club. Premio elegido: <b>${esc(o.premio_txt || "a confirmar con el cliente")}</b>${/off/.test(o.premio_txt || "") ? " (ya descontado del total)" : ""}. Al tocar Entregado se canjea solo.</div>` : ""}
         <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>Pago: <b>${esc(o.pago || "—")}</b></span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}${o.last_touch_source ? `<span>Llegó por: <b>${esc(origenTxt(o.last_touch_source, o.last_touch_campaign))}</b></span>` : ""}</div>
         <div class="olines">${(o.items || []).map((i) => `<div><span>${i.qty}× ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""}${i.detalle ? `<small class="det">${esc(i.detalle)}</small>` : ""}</span><span class="num">${money(i.subtotal)}</span></div>`).join("")}</div>
         <div class="otot"><span>Total</span><span class="num">${money(o.total)}</span></div>
+        ${pagoBox(o)}
         ${cambioBox(o)}
         ${o.status === "pendiente" ? estadoBox(o) : ""}
         ${o.status === "pendiente" ? `<div class="confirm">
@@ -331,7 +340,7 @@
         ${cons ? consentHtml(cons) : ""}
         <b style="margin-top:6px">Historial</b>
         <div class="hist">${(r.events || []).map((e) => `<div><span>${esc(e.motivo || "")} <span class="muted">${ago(e.created_at)}</span></span><span class="${e.delta > 0 ? "pos" : "neg"} num">${e.delta > 0 ? "+" : ""}${e.delta}</span></div>`).join("") || '<span class="muted">Sin movimientos.</span>'}</div>
-        ${(r.orders || []).length ? `<b>Pedidos</b><div class="hist">${r.orders.map((o) => `<div><span>${esc(o.code)} · ${esc(o.status)} <span class="muted">${ago(o.created_at)}</span></span><span class="num">${money(o.total)}</span></div>`).join("")}</div>` : ""}
+        ${(r.orders || []).length ? `<b>Pedidos</b><div class="hist">${r.orders.map((o) => `<div><span>${esc(o.code)} · ${esc(o.status)}${o.status !== "cancelado" ? (o.pagado_at ? " · pagado" : " · sin pagar") : ""} <span class="muted">${ago(o.created_at)}</span></span><span class="num">${money(o.total)}</span></div>`).join("")}</div>` : ""}
       </div></section>`;
     } catch (e) { box.innerHTML = `<p class="err" style="margin-top:14px">${esc(e.message)}</p>`; }
   }
@@ -998,6 +1007,12 @@
         if (o && (o.etapa || "recibido") === b.dataset.etapa) return;
         try { await API.setEtapa(id, b.dataset.etapa); if (o) o.etapa = b.dataset.etapa; drawOrders(); toast("Estado actualizado · el WhatsApp le sale solo"); }
         catch (err) { toast(err.message); b.disabled = false; }
+      }
+      if (b.dataset.pagado) {
+        const o = P.orders.find((x) => x.id === id), si = b.dataset.pagado === "1"; b.disabled = true;
+        try { const at = await API.marcarPagado(id, si); if (o) o.pagado_at = si ? at || new Date().toISOString() : null; drawOrders(); toast(si ? `${o ? o.code : "Pedido"} marcado como pagado` : "Marcado como sin pagar"); }
+        catch (err) { toast(err.message); b.disabled = false; }
+        return;
       }
       if (b.dataset.usarwa !== undefined) { // tipeó mal su número: pasamos el pedido (y los sellos) al número desde el que escribió
         b.disabled = true;
