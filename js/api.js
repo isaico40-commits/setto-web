@@ -390,6 +390,7 @@
     async setEtapa(id, etapa) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o || o.status !== "pendiente") throw new Error("El pedido no está pendiente"); o.etapa = etapa; dbSave(db); },
     async marcarAviso(id, etapa) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o) return; o.avisos = { ...(o.avisos || {}), [etapa]: new Date().toISOString() }; dbSave(db); },
     async marcarPagado(id, pagado) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o) throw new Error("No encontramos ese pedido"); o.pagado_at = pagado ? o.pagado_at || new Date().toISOString() : null; dbSave(db); return o.pagado_at; },
+    async setPago(id, pago) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o || o.status === "cancelado") throw new Error("Ese pedido ya no se puede cambiar"); o.pago = String(pago).trim().slice(0, 60); dbSave(db); return { pago: o.pago, caja: false }; },
     async usarNumeroWa(id) { const db = dbLoad(), o = db.orders.find((x) => x.id === id); if (!o || o.status !== "pendiente" || !o.wa_phone) throw new Error("El pedido ya no está pendiente o no tiene otro número"); o.phone = o.wa_phone; o.wa_phone = null; dbSave(db); return o.phone; },
     // consentimientos de marketing (migración 030): historial; vale la última fila por celular y canal
     async registrarConsentimiento(code, phone, canales, version) {
@@ -637,6 +638,17 @@
     async marcarAviso(id, etapa) { const { error } = await sb.rpc("marcar_aviso", { p_id: id, p_etapa: etapa }); fail(error); },
     // pagado o no: dato interno del equipo (migración 044)
     async marcarPagado(id, pagado) { const { data, error } = await sb.rpc("marcar_pagado", { p_id: id, p_pagado: !!pagado }); if (error && /marcar_pagado|function/i.test(error.message || "")) throw new Error("Falta activar “pagado” en Supabase (migración 044)"); fail(error); return data; },
+    // corregir la forma de pago (llegó como tarjeta y pagaron por transferencia, etc.). Si ya estaba entregado,
+    // el cobro de la Caja pasa a la cuenta que corresponde (efectivo o MP), igual que lo carga el trigger pedido_a_caja.
+    async setPago(id, pago) {
+      pago = String(pago).trim().slice(0, 60);
+      const { data: o, error } = await sb.from("orders").update({ pago }).eq("id", id).neq("status", "cancelado").select("status, caja_mov_id").maybeSingle(); fail(error);
+      if (!o) throw new Error("Ese pedido ya no se puede cambiar");
+      if (o.status !== "entregado" || !o.caja_mov_id) return { pago, caja: false };
+      const cuenta = /efectivo/i.test(pago) ? "efectivo" : "mp";
+      const { data: m, error: e2 } = await sb.from("caja_movimientos").update({ cuenta_id: cuenta, editado_por: "Pedidos web" }).eq("id", o.caja_mov_id).eq("estado", "activo").neq("cuenta_id", cuenta).select("id"); fail(e2);
+      return { pago, caja: !!(m && m.length), cuenta };
+    },
     async usarNumeroWa(id) { const { data, error } = await sb.rpc("usar_numero_wa", { p_id: id }); fail(error); return data; },
     // el cliente abrió WhatsApp para mandar el pedido (migración 029; sin ella, no pasa nada)
     async marcarContacto(code, phone) { await sb.rpc("marcar_contacto", { p_code: code, p_phone: phone }); },
