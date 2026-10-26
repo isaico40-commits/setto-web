@@ -702,6 +702,9 @@
           <label>Título<input class="inp" name="titulo" maxlength="40" value="${esc((S.ubicacion || {}).titulo || "Dónde estamos")}"></label>
           <label>Texto (opcional)<input class="inp" name="texto" maxlength="160" value="${esc((S.ubicacion || {}).texto || "")}" placeholder="Ej: Retirás por la zona de Güemes. Te pasamos la dirección exacta por WhatsApp."></label>
           <label>Zoom<select class="inp" name="zoom" style="width:auto">${[[13, "Barrio"], [15, "Cuadras"], [17, "Calle"]].map(([v, l]) => `<option value="${v}" ${(+(S.ubicacion || {}).zoom || 15) === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+          ${(() => { const c = (S.ubicacion || {}).captura || ""; return `<div class="slrow"><span class="upprev" data-prevfor="captura">${c ? `<img src="${esc(c)}" alt="">` : "Sin captura"}</span><div class="slf"><input type="hidden" name="captura" value="${esc(c)}">
+            <b style="font-size:.9rem">Captura del mapa (opcional)</b><span class="hintp">Solo si el mapa se ve mal: subí una captura de Google Maps con el punto de retiro al centro (horizontal, 1600×1000) y se muestra en lugar del mapa. Al tocarla abre Google Maps.</span>
+            <span class="acts" style="gap:6px"><label class="btn">Subir captura<input type="file" accept="image/*" data-upimg="captura" data-upmax="1600" hidden></label>${c ? `<button type="button" class="linkbtn warn" data-upx="captura">Quitar</button>` : ""}</span></div></div>`; })()}
           <button class="btn solid">Guardar ubicación</button></form>
         <form class="pcard wide" data-set="mensajes"><b>Mensajes de WhatsApp</b>
           <span class="hintp">Lo que va entre llaves se completa solo. Si borrás un mensaje entero, vuelve al original.</span>
@@ -898,7 +901,7 @@
         if (f.activo && !link) throw new Error("Para mostrar los stickers falta el link del pack");
         await API.saveSetting("stickers", { activo: !!f.activo, link, titulo: (f.titulo || "").trim() || "Stickers de Mochito", texto: (f.texto || "").trim() });
       }
-      if (k === "ubicacion") await API.saveSetting("ubicacion", { activo: !!f.activo, mapa: (f.mapa || "").trim(), titulo: (f.titulo || "").trim() || "Dónde estamos", texto: (f.texto || "").trim(), zoom: +f.zoom || 15 });
+      if (k === "ubicacion") await API.saveSetting("ubicacion", { activo: !!f.activo, mapa: (f.mapa || "").trim(), titulo: (f.titulo || "").trim() || "Dónde estamos", texto: (f.texto || "").trim(), zoom: +f.zoom || 15, captura: (f.captura || "").trim() });
       if (k === "tema") await API.saveSetting("tema", { nombre: f.nombre || "" });
       if (k === "faq") await API.saveSetting("faq", { items: Array.from({ length: 10 }, (_, i) => ({ p: (f["fp" + i] || "").trim(), r: (f["fr" + i] || "").trim() })).filter((x) => x.p && x.r) });
       if (false) await API.saveSetting("mochi_info", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "¿Qué es un mochi?", texto: (f.texto || "").trim(),
