@@ -236,7 +236,7 @@
       const n = $("#pendN"); if (n) { n.textContent = pend.length; n.hidden = !pend.length; }
       document.title = (pend.length ? `(${pend.length}) ` : "") + "Panel Setto";
       if (notify && pend.length > prev) toast("Entró un pedido nuevo");
-      if (P.view === "pedidos") { P.orders = P.sub === "pendiente" ? pend : await API.listOrders(P.sub); drawOrders(); }
+      if (P.view === "pedidos") { P.orders = P.sub === "pendiente" ? pend : await API.listOrders(P.sub); drawOrders(); cargarOcupados(); }
     } catch (e) { console.error(e); }
   }
   function viewPedidos() {
@@ -250,7 +250,13 @@
       <div class="justdel" id="justDel" hidden></div>
       <div class="pgrid" id="olist"><p class="muted">Cargando…</p></div>`;
     drawHorarios();
+    cargarOcupados();
     refreshOrders(false);
+  }
+  // cuántos pedidos hay en cada turno (para avisar cuáles están llenos)
+  async function cargarOcupados() {
+    if (!API.turnosOcupados) return;
+    try { const l = await API.turnosOcupados(); if (l) { P.ocup = l; if (P.view === "pedidos") drawHorarios(); } } catch (_) {}
   }
   /* ---------- Horarios para pedir: cerrar u ocupar una franja hoy o mañana sin tocar los horarios fijos ---------- */
   const fechaKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -265,12 +271,15 @@
     const seg = (franja, st) => `<div class="hseg" role="radiogroup" aria-label="Estado ${franja ? "de " + franja.replace("-", " a ") : "de todo el día"}">${HOR_EST.map(([v, l]) => `<button type="button" role="radio" class="h-${v}" aria-checked="${st === v}" data-hor="${v}" data-hfr="${franja}">${l}</button>`).join("")}</div>`;
     const todos = fr.length && fr.every((x) => x.st === fr[0].st) ? fr[0].st : "";
     const tapadas = fr.filter((x) => x.st !== "abierta").length;
+    const cupo = Math.max(0, Math.round(+(r.cupoTurno ?? 3)));
+    const llenos = cupo > 0 ? (P.ocup || []).filter((o) => o.f === k && o.n >= cupo).sort((a, b) => (a.h < b.h ? -1 : 1)) : [];
     el.innerHTML = `<div class="hhead"><div><b>Horarios para pedir</b><span class="hintp">${dia ? "Mañana" : "Hoy"}, ${esc(nom)}</span></div>
         <div class="hdia" role="tablist">${["Hoy", "Mañana"].map((l, i) => `<button type="button" role="tab" aria-selected="${dia === i}" data-hdia="${i}">${l}</button>`).join("")}</div></div>
       ${!atiende ? `<p class="hintp">Ese día no atienden. Cambialo en <a href="#ajustes/retiro">Ajustes → Horarios de retiro</a>.</p>`
         : !fr.length ? `<p class="hintp">No hay franjas activas. Prendelas en <a href="#ajustes/retiro">Ajustes → Horarios de retiro</a>.</p>`
         : `${fr.map((x) => `<div class="hrow ${x.st}"><span class="hfr num">${x.a} a ${x.b}</span>${seg(x.a + "-" + x.b, x.st)}</div>`).join("")}
           ${fr.length > 1 ? `<div class="hrow todo"><span class="hfr">Todo el día</span>${seg("", todos)}</div>` : ""}
+          ${llenos.length ? `<p class="hintp hfull">⚠ ${llenos.length === 1 ? "El turno de" : "Los turnos de"} <b>${llenos.map((o) => esc(o.h)).join(", ")}</b> ${llenos.length === 1 ? "llegó" : "llegaron"} al tope de ${cupo} ${cupo === 1 ? "pedido" : "pedidos"}: la web ya no ${llenos.length === 1 ? "lo ofrece" : "los ofrece"} y recomienda el turno siguiente.</p>` : ""}
           <p class="hintp">${tapadas ? (tapadas === fr.length ? "Ese día no se puede pedir. " : "Pueden pedir para las franjas abiertas. ") : ""}<b>Alta demanda</b> y <b>Cerrada</b> no se pueden elegir en la web y vuelven solas a abierta al día siguiente. Los horarios fijos están en <a href="#ajustes/retiro">Ajustes</a>.</p>`}`;
   }
   document.addEventListener("click", async (e) => {
@@ -671,6 +680,8 @@
           <button type="button" class="linkbtn" data-fradd>+ Agregar franja</button>
           <span class="hintp">Apagá una franja para dejar de ofrecerla sin borrar el horario. Para cerrarla solo hoy o mañana (o marcar alta demanda), usá <b>Horarios para pedir</b> arriba de Pedidos.</span>
           <div class="row2"><label>Turnos cada (min)<input class="inp" name="cada" type="number" value="${r.cadaMin || 30}"></label><label>Anticipación mínima (min)<input class="inp" name="antic" type="number" value="${r.anticipacionMin || 40}"></label></div>
+          <label>Pedidos por turno antes de marcar alta demanda (0 = sin tope)<input class="inp" name="cupo" type="number" min="0" max="20" value="${r.cupoTurno ?? 3}"></label>
+          <span class="hintp">Al llegar a ese número, la web deja de ofrecer ese turno, avisa que hay muchos pedidos y recomienda el siguiente libre.</span>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="club"><b>Setto Club</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${club.activo !== false ? "checked" : ""}> Mostrar el Club en la web</label></div>
@@ -824,7 +835,7 @@
   const MQ_TIPO = [["monto", "Descuento en $"], ["porcentaje", "Descuento en %"], ["mochi", "Un mochi gratis"]];
   const AJ_SEC = [
     { k: "contacto", g: "Pedidos", t: "Contacto", d: "El WhatsApp que recibe los pedidos, Instagram y tu link de links.", s: (S) => pretty(S.whatsapp) || "Sin WhatsApp" },
-    { k: "retiro", g: "Pedidos", t: "Horarios de retiro", d: "Qué días y en qué franjas pueden elegir retirar.", s: (S) => { const r = S.retiro || {}, off = r.apagadas || []; return (r.dias || []).length ? `${r.dias.length} días · ${(r.rangos || []).filter((x) => !off.includes(x.join("-"))).map((x) => x.join("–")).join(", ") || "sin franjas activas"}${off.length ? ` · ${off.length} apagada${off.length > 1 ? "s" : ""}` : ""}` : "Sin días"; } },
+    { k: "retiro", g: "Pedidos", t: "Horarios de retiro", d: "Qué días y en qué franjas pueden elegir retirar.", s: (S) => { const r = S.retiro || {}, off = r.apagadas || []; return (r.dias || []).length ? `${r.dias.length} días · ${(r.rangos || []).filter((x) => !off.includes(x.join("-"))).map((x) => x.join("–")).join(", ") || "sin franjas activas"}${off.length ? ` · ${off.length} apagada${off.length > 1 ? "s" : ""}` : ""}${(r.cupoTurno ?? 3) > 0 ? ` · tope ${r.cupoTurno ?? 3} por turno` : ""}` : "Sin días"; } },
     { k: "envio", g: "Pedidos", t: "Envío a domicilio", d: "Si ofrecés envío, cuánto cuesta y cómo se paga.", s: (S) => ((S.envio || {}).activo ? ((S.envio || {}).costo ? "Activo · " + money((S.envio || {}).costo) : "Activo · a coordinar") : "Apagado") },
     { k: "pagos", g: "Pedidos", t: "Formas de pago", d: "Las opciones que ve el cliente al pedir.", s: (S) => `${(S.pagos || []).length} formas` },
     { k: "personalizacion", g: "Pedidos", t: "Personalizar bebidas", d: "Leches con recargo y lo que se puede sacar.", s: (S) => ((S.personalizacion || {}).activo !== false ? `Activo · ${((S.personalizacion || {}).leches || []).length} leches` : "Apagado") },
@@ -900,7 +911,8 @@
         if (fr.some(([a, b]) => !/^\d{2}:\d{2}$/.test(a) || !/^\d{2}:\d{2}$/.test(b) || a >= b)) throw new Error("Revisá las franjas: cada una necesita desde y hasta, y el hasta va después");
         const dias = [0, 1, 2, 3, 4, 5, 6].filter((i) => f["d" + i]), prev = P.settings.retiro || {};
         await API.saveSetting("retiro", { dias, rangos: fr.map(([a, b]) => [a, b]), apagadas: fr.filter((x) => !x[2]).map(([a, b]) => a + "-" + b),
-          cierres: cierresVigentes(prev), cadaMin: Math.max(5, +f.cada || 30), anticipacionMin: Math.max(0, +f.antic || 0) });
+          cierres: cierresVigentes(prev), cadaMin: Math.max(5, +f.cada || 30), anticipacionMin: Math.max(0, +f.antic || 0),
+          cupoTurno: Math.max(0, Math.min(20, Math.round(+f.cupo || 0))) });
       }
       if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: Math.max(0, Math.min(10, +f.spp)), premio: (f.premio || "").trim(), minimo: Math.max(0, +f.minimo || 0),
         premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0), regalo: !!f.regalo, sello_resena: !!f.sres });

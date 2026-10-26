@@ -162,6 +162,10 @@ Arriba de la portada se ve "Abierto ahora · retirás desde las …" o "Cerrado 
 - La web vuelve a leer los horarios al pasar al checkout y al enviar: si cerraron la franja elegida con la página abierta, le pide al cliente que elija otra.
 - Se guarda en el ajuste `retiro` (`apagadas` y `cierres`); no necesita migración.
 
+### Tope de pedidos por turno
+Con el tope puesto (**Ajustes → Horarios de retiro → Pedidos por turno**, 3 por defecto, 0 = sin tope), un turno que llega a ese número pasa solo a alta demanda: la web no lo deja elegir, avisa "El turno de 16:00 de hoy ya tiene muchos pedidos" y recomienda el siguiente libre. En **Pedidos → Horarios para pedir** se ve cuáles llegaron al tope. Los cancelados no cuentan.
+Lo calcula la función `turnos_ocupados()` (migración `046_cupo_por_turno.sql`), que devuelve solo fecha, hora y cantidad. Mientras la migración no esté aplicada, la web funciona igual y no bloquea ningún turno.
+
 ### Mensajes de WhatsApp
 En **Ajustes → Mensajes de WhatsApp** editás todos los textos precargados: el inicio y cierre del pedido, el botón de consulta, la compra de gift card, los avisos de estado, el pedido de reseña y la gift card activada. Lo que va entre llaves (`{nombre}`, `{codigo}`, `{link}`…) se completa solo. "Volver al original" restaura el texto.
 

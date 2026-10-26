@@ -1020,6 +1020,16 @@
 
   /* ---------- pedido ---------- */
   let HORARIO = "";
+  /* cuántos pedidos hay en cada turno: al llegar al cupo, ese turno pasa a alta demanda y se sugiere el siguiente libre */
+  let OCUP = null; // null = todavía no se pudo consultar; entonces no se bloquea nada
+  const cupo = () => Math.max(0, Math.round(+((S.retiro || {}).cupoTurno ?? 3)));
+  const ocupados = (f, h) => { if (!OCUP) return 0; const x = OCUP.find((o) => o.f === f && o.h === h); return x ? x.n : 0; };
+  const lleno = (f, h) => cupo() > 0 && ocupados(f, h) >= cupo();
+  async function refrescarOcupados() {
+    if (!API.turnosOcupados) return false;
+    try { const l = await API.turnosOcupados(); if (l && JSON.stringify(l) !== JSON.stringify(OCUP)) { OCUP = l; return true; } } catch (_) {}
+    return false;
+  }
   // los próximos 3 días: turnos para elegir, franjas cerradas u ocupadas (se ven pero no se eligen) y un aviso si hace falta
   function horarios() {
     const r = S.retiro || {}, now = new Date(), dias = [], avisos = [];
@@ -1027,19 +1037,25 @@
     for (let d = 0; d < 3 && n < 40; d++) {
       const day = new Date(now); day.setDate(now.getDate() + d);
       const nom = d === 0 ? "Hoy" : d === 1 ? "Mañana" : day.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" });
-      const items = [], tapadas = [];
+      const items = [], tapadas = [], llenos = [];
       for (const f of franjasDia(day)) {
         const turnos = [];
         for (let m = hhmm(f.a); m <= hhmm(f.b); m += r.cadaMin || 30) {
           const t = new Date(day); t.setHours(Math.floor(m / 60), m % 60, 0, 0);
           if (t - now < (r.anticipacionMin || 0) * 60000) continue;
-          turnos.push(nom + " · " + t.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) + " hs");
+          const h = t.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+          turnos.push({ txt: nom + " · " + h + " hs", h });
         }
         if (!turnos.length) continue; // ya pasó
-        if (f.estado === "abierta") { turnos.forEach((txt) => items.push({ txt, ok: true })); n += turnos.length; }
+        if (f.estado === "abierta") { turnos.forEach(({ txt, h }) => { const full = lleno(fechaKey(day), h); if (full) llenos.push(txt); items.push({ txt, ok: !full, hora: h }); if (!full) n++; }); }
         else { items.push({ txt: `${nom} · ${f.a} a ${f.b} · ${f.estado === "ocupada" ? "alta demanda" : "cerrado"}`, ok: false }); tapadas.push(f); }
       }
       if (!items.length) continue;
+      if (llenos.length) {
+        // el turno siguiente libre: el primero que quede después del último lleno
+        const ix = items.findIndex((x) => x.txt === llenos[llenos.length - 1]), sig = items.slice(ix + 1).find((x) => x.ok);
+        avisos.push(`${llenos.length === 1 ? "El turno de" : "Los turnos de"} ${llenos.map((t) => t.split(" · ")[1].replace(" hs", "")).join(", ")} ${d === 0 ? "de hoy" : d === 1 ? "de mañana" : "de ese día"} ${llenos.length === 1 ? "ya tiene" : "ya tienen"} muchos pedidos. ` + (sig ? `Te recomendamos ${sig.txt.split(" · ")[1].replace(" hs", "")} hs.` : "Elegí otro día y te lo preparamos tranquilos."));
+      }
       if (tapadas.length) {
         const quedan = items.some((x) => x.ok);
         const por = (st, txt) => { const l = tapadas.filter((f) => f.estado === st); return l.length ? l.map(franjaTxt).join(" y ") + txt : ""; };
@@ -1055,13 +1071,14 @@
     if (form.hora && !H.libres.includes(form.hora)) form.hora = ""; // se cerró la franja que había elegido
     const lab = isEnv ? "Horario de entrega" : "Horario de retiro";
     if (!H.libres.length) return `<div class="f" id="fHora"><span>${lab}</span><p class="hora-aviso">Por ahora no hay horarios para elegir. Escribinos por WhatsApp y lo vemos.</p></div>`;
-    return `<label class="f" for="fHora">${lab}${H.avisos.length ? `<span class="hora-aviso">${H.avisos.map(esc).join("<br>")}</span>` : ""}<select id="fHora"><option value="">Elegí un horario</option>${H.dias.map((g) => `<optgroup label="${esc(g.nom.charAt(0).toUpperCase() + g.nom.slice(1))}">${g.items.map((o) => o.ok ? `<option ${o.txt === form.hora ? "selected" : ""}>${esc(o.txt)}</option>` : `<option disabled>${esc(o.txt)}</option>`).join("")}</optgroup>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>`;
+    return `<label class="f" for="fHora">${lab}${H.avisos.length ? `<span class="hora-aviso">${H.avisos.map(esc).join("<br>")}</span>` : ""}<select id="fHora"><option value="">Elegí un horario</option>${H.dias.map((g) => `<optgroup label="${esc(g.nom.charAt(0).toUpperCase() + g.nom.slice(1))}">${g.items.map((o) => o.ok ? `<option ${o.txt === form.hora ? "selected" : ""}>${esc(o.txt)}</option>` : `<option disabled>${esc(o.txt)}${o.hora ? " · alta demanda" : ""}</option>`).join("")}</optgroup>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>`;
   }
   // trae los horarios de nuevo: si cerraron una franja con la web abierta, el cliente no la puede elegir
   async function refrescarHorarios() {
-    if (!API.getSetting) return false;
-    try { const r = await API.getSetting("retiro"); if (r && JSON.stringify(r) !== JSON.stringify(S.retiro)) { S.retiro = r; return true; } } catch (_) {}
-    return false;
+    let cambio = false;
+    if (API.getSetting) { try { const r = await API.getSetting("retiro"); if (r && JSON.stringify(r) !== JSON.stringify(S.retiro)) { S.retiro = r; cambio = true; } } catch (_) {} }
+    if (await refrescarOcupados()) cambio = true;
+    return cambio;
   }
   let view = "cart", sending = false;
   let form = { nombre: "", tel: "", hora: "", pago: "", nota: "", modo: "retiro", dir: "", dirExtra: "", premio: "", okWa: true, okAds: true }; // vienen tildadas (decisión de Isa); la versión del aviso lo deja registrado
@@ -1226,7 +1243,7 @@
     }
     if (sending) return;
     await refrescarHorarios();
-    if (!slots().includes(form.hora)) { form.hora = ""; drawDrawer(); const e2 = $("#fErr"); e2.hidden = false; e2.textContent = "Ese horario se acaba de cerrar. Elegí otro."; $("#fHora")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+    if (!slots().includes(form.hora)) { form.hora = ""; drawDrawer(); const e2 = $("#fErr"); e2.hidden = false; e2.textContent = "Ese horario ya no está disponible. Elegí otro."; $("#fHora")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
     if (clubOn() && API.normPhone(form.tel)) await loadCard();
     if (completes() && !form.premio) { drawDrawer(); const e2 = $("#fErr"); e2.hidden = false; e2.textContent = "Completaste tu tarjeta: elegí tu premio antes de enviar."; $(".premio-pick")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
     sending = true; drawFootOnly();

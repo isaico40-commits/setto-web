@@ -253,3 +253,4 @@ a.ptab{text-decoration:none}
 .frsw input{width:auto;margin:0}
 @media (min-width:600px){.frrow{grid-template-columns:110px minmax(0,150px) auto minmax(0,150px) auto;grid-template-areas:"sw a sep b x";justify-content:start}}
 .frrow:has(.frsw input:not(:checked)) .inp{opacity:.5}
+.horcard .hfull{background:#fdf1dc;border-radius:10px;padding:8px 10px;color:var(--ink)}
