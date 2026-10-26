@@ -528,7 +528,7 @@
   }
 
   /* =================== CARTA =================== */
-  const CATS = [["especial", "Edición especial"], ["set", "Sets"], ["dirty", "Dirty lattes"], ["mochi", "Mochis"]];
+  const CATS = [["especial", "Edición especial"], ["set", "Sets"], ["promo", "Promos"], ["dirty", "Dirty lattes"], ["mochi", "Mochis"]];
   const byCat = (c) => P.products.filter((p) => p.categoria === c).sort((a, b) => (a.orden || 0) - (b.orden || 0));
   const draftOf = (p) => P.drafts[p.id] || p;
   function viewCarta() {
@@ -537,8 +537,9 @@
       <p class="muted">Cada tarjeta se guarda por separado con su botón <b>Guardar</b>. Los cambios se ven en la web al instante. Las tarjetas con borde rosa tienen cambios sin guardar.</p>
       ${CATS.map(([c, l]) => `<section class="sec"><h2>${l}</h2>
         ${c === "especial" ? espCfgHtml(E) : ""}
+        ${c === "promo" ? `<p class="hintp" style="margin-bottom:12px">Una box de mochis a precio fijo: el cliente elige los sabores entre los mochis visibles de la carta. El cartel de ahorro se calcula solo con el precio del mochi suelto.</p>` : ""}
         <div class="pgrid">${byCat(c).map(cardP).join("")}</div>
-        <button class="btn" data-addp="${c}" style="margin-top:14px">+ Agregar ${l === "Sets" ? "set" : l === "Mochis" ? "mochi" : l === "Dirty lattes" ? "dirty" : "sabor especial"}</button>
+        <button class="btn" data-addp="${c}" style="margin-top:14px">+ Agregar ${l === "Sets" ? "set" : l === "Promos" ? "promo" : l === "Mochis" ? "mochi" : l === "Dirty lattes" ? "dirty" : "sabor especial"}</button>
       </section>`).join("")}`;
     loadDropInfo();
   }
@@ -612,6 +613,13 @@
     });
     return `<div class="calc ${rows.some((r) => r.bad) ? "bad" : ""}" data-calc>${rows.map((r) => r.txt).join("<br>")}</div>`;
   }
+  // promo: N mochis sueltos (al precio del más barato visible) contra el precio de la box
+  function promoCalc(p) {
+    const ms = P.products.filter((x) => x.categoria === "mochi" && x.activo !== false && Number(x.precio) > 0).map((x) => Number(x.precio));
+    const ref = ms.length ? Math.min(...ms) : 0, n = parseInt(p.promo_cant, 10) || 0, sv = ref * n, pr = parseInt(p.precio, 10) || 0, a = sv - pr;
+    const txt = !ref ? "No hay mochis visibles en la carta para armar la box." : `${n} mochis sueltos ${money(sv)} → promo ${money(pr)} · ${a > 0 ? `en la web: "Ahorrás ${money(a)}" (${Math.round((a / sv) * 100)}%)` : "sin ahorro: no se muestra cartel"}`;
+    return `<div class="calc ${!ref || a <= 0 ? "bad" : ""}" data-calc>${txt}</div>`;
+  }
   function cardP(p0) {
     const p = draftOf(p0), c = p.categoria, dirty = !!P.drafts[p.id] || p._new, F = c === "especial" ? p.formato || "mochi" : c;
     const inp = (f, label, type = "text", extra = "") => `<label>${label}<input data-f="${f}" type="${type}" value="${esc(p[f] ?? "")}" ${extra}></label>`;
@@ -629,9 +637,10 @@
       ${c === "set" ? `<div class="row2">${inp("codigo", "Código (ej: Set 04)")}${inp("tema", "Tema (ej: Matcha & cereza)")}</div>
         <div class="row2"><label>Bebida<select data-f="set_bebida">${opts("dirty", p.set_bebida)}</select></label><label>Mochi<select data-f="set_mochi">${opts("mochi", p.set_mochi)}</select></label></div>`
         : `<label>Descripción<textarea data-f="descripcion">${esc(p.descripcion || "")}</textarea></label>`}
-      ${c === "set" || c === "dirty" || (c === "especial" && F !== "mochi") ? `<div class="row3">${inp("precio_12", "Precio 12 oz", "number", money3)}${inp("precio_16", "Precio 16 oz", "number", money3)}${inp("orden", "Orden", "number")}</div>`
+      ${c === "promo" ? `<div class="row3">${inp("precio", "Precio de la promo", "number", money3)}${inp("promo_cant", "Mochis que trae", "number", 'min="2" max="20" step="1" inputmode="numeric"')}${inp("orden", "Orden", "number")}</div>`
+        : c === "set" || c === "dirty" || (c === "especial" && F !== "mochi") ? `<div class="row3">${inp("precio_12", "Precio 12 oz", "number", money3)}${inp("precio_16", "Precio 16 oz", "number", money3)}${inp("orden", "Orden", "number")}</div>`
         : `<div class="row2">${inp("precio", c === "especial" ? "Precio (0 = a confirmar)" : "Precio por unidad", "number", money3)}${inp("orden", "Orden", "number")}</div>`}
-      ${c === "set" ? setCalc(p) : ""}
+      ${c === "set" ? setCalc(p) : c === "promo" ? promoCalc(p) : ""}
       <div class="checks">${chk("activo", "Visible en la web")}${chk("agotado", "Agotado")}${c === "mochi" ? chk("rotativo", "Rotativo") : ""}${c === "especial" ? chk("esmerilado", "Esmerilado (tapa la foto)") : ""}</div>
       <div class="savebar"><button class="linkbtn warn" data-delp>${P.cancelArm === "del-" + p.id ? "¿Seguro? Tocá de nuevo" : "Eliminar"}</button>
         <span>${dirty ? `<button class="linkbtn" data-undo>Descartar</button> ` : ""}<button class="btn solid" data-savep>Guardar</button></span></div>
@@ -1145,10 +1154,10 @@
       loadDropInfo();
     }
     if (b.dataset.addp) {
-      const c = b.dataset.addp, base = { especial: "esp", set: "set", dirty: "dirty", mochi: "mochi" }[c];
+      const c = b.dataset.addp, base = { especial: "esp", set: "set", promo: "promo", dirty: "dirty", mochi: "mochi" }[c];
       const id = base + "-" + Date.now().toString(36);
       const first = (cat) => (P.products.find((x) => x.categoria === cat) || {}).id || null;
-      const p = { id, categoria: c, nombre: c === "set" ? "Nuevo set" : "Nuevo sabor", descripcion: "", img: "", precio: c === "mochi" ? 5000 : 0, precio_12: c === "set" || c === "dirty" ? 0 : null, precio_16: c === "set" || c === "dirty" ? 0 : null,
+      const p = { id, categoria: c, nombre: c === "set" ? "Nuevo set" : c === "promo" ? "Nueva promo" : "Nuevo sabor", ...(c === "promo" ? { promo_cant: 5 } : {}), descripcion: "", img: "", precio: c === "mochi" ? 5000 : 0, precio_12: c === "set" || c === "dirty" ? 0 : null, precio_16: c === "set" || c === "dirty" ? 0 : null,
         codigo: c === "set" ? "Set 0" + (byCat("set").length + 1) : null, tema: c === "set" ? "" : null, set_bebida: c === "set" ? first("dirty") : null, set_mochi: c === "set" ? first("mochi") : null,
         rotativo: false, agotado: false, activo: false, orden: byCat(c).length + 1, _new: true };
       P.products.push(p); P.drafts[id] = { ...p }; viewCarta();
@@ -1162,7 +1171,8 @@
         const d = { ...(P.drafts[id] || base) }; delete d._new;
         if (!String(d.nombre || "").trim()) return toast("Falta el nombre");
         if (d.set_mochi === "") d.set_mochi = null;
-        ["precio", "precio_12", "precio_16", "orden"].forEach((k) => { if (d[k] !== null && d[k] !== undefined && d[k] !== "") d[k] = parseInt(d[k], 10) || 0; });
+        if (d.categoria === "promo" && !((parseInt(d.promo_cant, 10) || 0) >= 2 && parseInt(d.promo_cant, 10) <= 20)) return toast("Los mochis de la promo van de 2 a 20");
+        ["precio", "precio_12", "precio_16", "orden", "promo_cant"].forEach((k) => { if (d[k] !== null && d[k] !== undefined && d[k] !== "") d[k] = parseInt(d[k], 10) || 0; });
         b.disabled = true;
         try { await API.saveProduct(d); delete P.drafts[id]; await loadBase(); toast("Guardado"); redrawCard(id); }
         catch (err) { toast(err.message); b.disabled = false; }
@@ -1192,7 +1202,7 @@
     d[t.dataset.f] = t.type === "checkbox" ? t.checked : t.value;
     pc.classList.add("dirty");
     if (!pc.querySelector("[data-undo]")) { const sp = pc.querySelector("[data-savep]").parentElement; sp.insertAdjacentHTML("afterbegin", '<button class="linkbtn" data-undo>Descartar</button> '); }
-    if (d.categoria === "set") { const c = pc.querySelector("[data-calc]"); if (c) c.outerHTML = setCalc(d); }
+    if (d.categoria === "set" || d.categoria === "promo") { const c = pc.querySelector("[data-calc]"); if (c) c.outerHTML = d.categoria === "set" ? setCalc(d) : promoCalc(d); }
     if (t.dataset.f === "activo") pc.classList.toggle("oculto", !t.checked);
     if (t.dataset.f === "formato") redrawCard(id);
   });

@@ -11,7 +11,7 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   let S = {}; // ajustes
-  let SETS = [], DIRTY = [], MOCHIS = [], ESP = [];
+  let SETS = [], DIRTY = [], MOCHIS = [], ESP = [], PROMOS = [];
   const on = (list) => list.filter((x) => x.activo !== false);
 
   /* filas de la base → forma que usa la página */
@@ -24,7 +24,7 @@
       foto: !!r.img && !String(r.img).startsWith("img/"),
     });
     const by = (c) => rows.filter((r) => r.categoria === c).sort((a, b) => (a.orden || 0) - (b.orden || 0)).map(map);
-    SETS = by("set"); DIRTY = by("dirty"); MOCHIS = by("mochi"); ESP = by("especial");
+    SETS = by("set"); DIRTY = by("dirty"); MOCHIS = by("mochi"); ESP = by("especial"); PROMOS = by("promo");
   }
 
   /* ---------- estrellas por producto (reseñas publicadas) ---------- */
@@ -71,21 +71,39 @@
   /* el stock frena: no se puede pedir más de lo que hay (la base también lo controla) */
   const mochiDe = (p) => (!p ? null : fmt(p) === "set" ? p.set_mochi : fmt(p) === "mochi" ? p.id : null);
   const sinStock = (p) => { const n = stockDe(p); return n !== null && n <= 0; };
-  const enCarrito = (mid) => cart.reduce((a, c) => a + (mochiDe(find(c.id)) === mid ? c.qty : 0), 0);
+  const enCarrito = (mid) => cart.reduce((a, c) => a + (mochiDe(find(c.id)) === mid ? c.qty : 0) + (c.mochis || []).filter((x) => x === mid).length * c.qty, 0);
   function frenoStock(p, extra) {
     const mid = mochiDe(p), n = stockDe(p); if (!mid || n === null) return null;
     const ya = enCarrito(mid); if (ya + extra <= n) return null;
     const m = find(mid), nom = m ? "mochi " + m.nombre : "ese mochi";
     return n <= 0 ? `No nos quedan ${nom} por hoy` : `De ${nom} nos quedan ${n}${ya ? ` y ya tenés ${ya} en el pedido` : ""}`;
   }
+  // box de una promo: cada sabor elegido cuenta para el stock de ese mochi
+  function frenoBox(mochis, boxes) {
+    for (const mid of new Set(mochis || [])) { const fr = frenoStock(find(mid), (mochis || []).filter((x) => x === mid).length * boxes); if (fr) return fr; }
+    return null;
+  }
 
-  const find = (id) => [...SETS, ...DIRTY, ...MOCHIS, ...ESP].find((x) => x.id === id);
+  const find = (id) => [...SETS, ...DIRTY, ...MOCHIS, ...ESP, ...PROMOS].find((x) => x.id === id);
   const kind = (p) => p.categoria === "especial" ? "premium" : p.categoria;
   const fmt = (p) => (p.categoria === "especial" ? p.formato || "mochi" : p.categoria);   // especial puede ser mochi, dirty o set
   const bebida = (p) => ["set", "dirty"].includes(fmt(p));
   const unit = (p) => !bebida(p);
   const priceOf = (p, sz) => (unit(p) ? p.precio : p.precios[sz]);
-  const nameOf = (p) => (unit(p) ? "Mochi " + p.nombre : p.nombre);
+  const nameOf = (p) => (unit(p) && !esPromo(p) ? "Mochi " + p.nombre : p.nombre);
+  /* ---------- Promos (Box 5x4): precio fijo por N mochis que elige el cliente entre los de la carta ---------- */
+  const esPromo = (p) => !!p && p.categoria === "promo";
+  const promoCant = (p) => Math.max(2, Math.min(20, Math.round(Number(p.promo_cant) || 5)));
+  const promoSabores = () => on(MOCHIS).filter((m) => !m.agotado && Number(m.precio) > 0);
+  // el ahorro se calcula contra el mochi suelto más barato: nunca se muestra más de lo que realmente ahorra
+  const mochiRef = () => { const l = on(MOCHIS).map((m) => Number(m.precio)).filter((x) => x > 0); return l.length ? Math.min(...l) : 0; };
+  const promoAntes = (p) => promoCant(p) * mochiRef();
+  const promoAhorro = (p) => Math.max(0, promoAntes(p) - Number(p.precio || 0));
+  // sabores que entran hoy en una box (con stock en la web prendido, lo que queda libre de cada uno)
+  const promoLibres = () => promoSabores().reduce((a, m) => { const l = libreDe(m); return a + (l === null ? 99 : Math.max(0, l)); }, 0);
+  const promoSinStock = (p) => !!STOCK && promoLibres() < promoCant(p);
+  // "Oreo ×2 · Frutilla · Sakura", igual que el detalle que guarda create_order_v6
+  const promoDet = (mochis) => { const c = new Map(); (mochis || []).forEach((id) => c.set(id, (c.get(id) || 0) + 1)); return [...c].map(([id, n]) => ((find(id) || {}).nombre || "Mochi").trim() + (n > 1 ? " ×" + n : "")).join(" · "); };
   /* ---------- Drop de la edición especial (se abre sola en la fecha programada) ---------- */
   let SKEW = 0; // diferencia con la hora del servidor: la cuenta regresiva no depende del reloj del celular
   const ahora = () => Date.now() + SKEW;
@@ -193,22 +211,28 @@
         c.sin = (c.sin || []).filter((x) => sinOpts().includes(x));
       } else { c.leche = ""; c.sin = []; }
       if (!eligeBeb(p)) c.beb = ""; else if (!bebOpts(p).some((x) => x.id === c.beb)) return false;
-      c.precio = pr + lechePrecio(c.leche); c.detalle = detalleOf(c.leche, c.sin, c.beb); c.nombre = nameOf(p); return true;
+      if (esPromo(p)) { // la box se arma de nuevo si cambió la cantidad o se fue algún sabor
+        const ok = promoSabores().map((m) => m.id);
+        if (!Array.isArray(c.mochis) || c.mochis.length !== promoCant(p) || !c.mochis.every((id) => ok.includes(id))) return false;
+      } else delete c.mochis;
+      c.precio = pr + lechePrecio(c.leche); c.detalle = esPromo(p) ? promoDet(c.mochis) : detalleOf(c.leche, c.sin, c.beb); c.nombre = nameOf(p); return true;
     });
     save();
   }
   /* Pixel de Meta (js/pixel.js): solo IDs de producto, cantidades y montos */
   const px = (name, data) => { if (window.SettoPixel) window.SettoPixel.track(name, data); };
   const pxCarrito = () => ({ content_type: "product", content_ids: [...new Set(cart.map((c) => c.id))], contents: cart.map((c) => ({ id: c.id, quantity: c.qty, item_price: c.precio })), num_items: units() });
-  function addItem(p, sz, qty = 1, leche = "", sin = [], beb = "") {
+  function addItem(p, sz, qty = 1, leche = "", sin = [], beb = "", mochis = []) {
     if (eligeBeb(p) && !bebOpts(p).some((x) => x.id === beb)) { if (!sheetState || sheetState.p !== p) openSheet(p.id); toast("Elegí la bebida del set"); return false; }
+    if (esPromo(p) && (mochis || []).length !== promoCant(p)) { if (!sheetState || sheetState.p !== p) openSheet(p.id); toast(`Elegí los ${promoCant(p)} mochis de la box`); return false; }
     if (!eligeBeb(p)) beb = "";
-    const fr = frenoStock(p, qty); if (fr) { toast(fr); return false; }
+    mochis = esPromo(p) ? [...mochis].sort((a, b) => MOCHIS.findIndex((m) => m.id === a) - MOCHIS.findIndex((m) => m.id === b)) : [];
+    const fr = esPromo(p) ? frenoBox(mochis, qty) : frenoStock(p, qty); if (fr) { toast(fr); return false; }
     if (!persOn(p)) { leche = ""; sin = []; }
-    const key = p.id + "|" + (sz || "") + "|" + leche + "|" + sin.join(",") + "|" + beb;
+    const key = p.id + "|" + (sz || "") + "|" + leche + "|" + sin.join(",") + "|" + beb + (mochis.length ? "|" + mochis.join(",") : "");
     const ex = cart.find((c) => c.key === key);
     if (ex) ex.qty += qty;
-    else cart.push({ key, id: p.id, nombre: nameOf(p), size: sz || "", leche, sin: [...sin], beb, detalle: detalleOf(leche, sin, beb), precio: priceOf(p, sz) + lechePrecio(leche), img: p.img || "img/mochito-lie.png", qty });
+    else cart.push({ key, id: p.id, nombre: nameOf(p), size: sz || "", leche, sin: [...sin], beb, ...(mochis.length ? { mochis } : {}), detalle: mochis.length ? promoDet(mochis) : detalleOf(leche, sin, beb), precio: priceOf(p, sz) + lechePrecio(leche), img: p.img || "img/mochito-lie.png", qty });
     save(); renderBadge(); toast("Sumado: " + nameOf(p) + (sz ? " · " + sz : ""));
     const pu = priceOf(p, sz) + lechePrecio(leche);
     px("AddToCart", { content_type: "product", content_ids: [p.id], content_name: nameOf(p), contents: [{ id: p.id, quantity: qty, item_price: pu }], value: pu * qty });
@@ -811,6 +835,40 @@
     $("#sets").hidden = on(SETS).length === 0;
     dots("setsGrid");
   }
+  /* Promos: misma tarjeta que Sets; el cartel dice cuánto ahorrás contra los mochis sueltos */
+  function renderPromos() {
+    const sec = $("#promos"), l = on(PROMOS); if (!sec) return;
+    sec.hidden = !l.length || !promoSabores().length; if (sec.hidden) return;
+    $("#promosGrid").innerHTML = l.map((p) => {
+      const precio = Number(p.precio) || 0, antes = promoAntes(p), ah = promoAhorro(p), cant = promoCant(p), sin = promoSinStock(p);
+      const badge = p.agotado ? '<span class="badge">Agotado</span>' : sin ? '<span class="badge">Sin stock hoy</span>' : "";
+      return `<article class="set promo ${p.agotado ? "agotado" : ""}">
+        <button class="ph ${p.foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${picsHtml(p, p.nombre, "img/mochito-lie.png", 180)}</button>
+        ${ah > 0 ? `<span class="off num">Ahorrás ${money(ah)}</span>` : ""}${badge ? `<span class="stkw">${badge}</span>` : ""}
+        <h3>${esc(p.nombre)}</h3>
+        <p class="code">${cant} mochis ✦ en box</p>
+        <p class="combo">${esc(p.desc || `Elegís ${cant} sabores de la carta.`)}</p>
+        <div class="foot"><span class="from num">Box<b>${precio > 0 ? money(precio) : "a confirmar"}${ah > 0 ? `<s>${money(antes)}</s>` : ""}</b>${rateTag(p)}</span>
+        ${p.agotado || sin || !(precio > 0) ? "" : `<button class="add" data-open="${p.id}" aria-label="Armar ${esc(p.nombre)}">+</button>`}</div>
+      </article>`;
+    }).join("");
+    sec.classList.toggle("una", l.length === 1);
+    dots("promosGrid");
+  }
+  // ficha de la promo: un contador por sabor hasta completar la box
+  function promoPickHtml(p) {
+    const cant = promoCant(p), sel = sheetState.mochis, n = Object.values(sel).reduce((a, b) => a + b, 0), falta = cant - n;
+    const precio = Number(p.precio) || 0, antes = promoAntes(p), ah = promoAhorro(p);
+    return `<div class="boxpick" id="sBox"><div class="bp-head"><span class="eyebrow">Elegí ${cant} mochis</span><b class="num bp-cnt ${falta === 0 ? "ok" : ""}">${n} de ${cant}</b></div>
+      <div class="bp-list">${promoSabores().map((m) => {
+        const k = sel[m.id] || 0, l = libreDe(m), puede = falta > 0 && (l === null || k < l);
+        return `<div class="bp-row ${k ? "on" : ""}"><span class="th"><img src="${esc(IMG(m.img || "img/mochito-lie.png", 96))}" alt=""></span>
+          <span class="bp-n">${esc(m.nombre)}${l !== null && l - k <= 0 && !k ? "<small>Sin stock hoy</small>" : ""}</span>
+          <div class="qty"><button data-bx="${esc(m.id)}" data-bd="-1" ${k ? "" : "disabled"} aria-label="Sacar un ${esc(m.nombre)}">−</button><span class="num">${k}</span><button data-bx="${esc(m.id)}" data-bd="1" ${puede ? "" : "disabled"} aria-label="Sumar un ${esc(m.nombre)}">+</button></div></div>`;
+      }).join("")}</div>
+      ${ah > 0 ? `<p class="bp-ah">${cant} mochis sueltos <s class="num">${money(antes)}</s> → en la box <b class="num">${money(precio)}</b>. Ahorrás <b class="num">${money(ah)}</b>.</p>` : ""}</div>`;
+  }
+  const boxList = () => Object.entries((sheetState || {}).mochis || {}).flatMap(([id, k]) => Array(k).fill(id));
   let tab = "dirty";
   function renderCarta() {
     const list = on(tab === "dirty" ? DIRTY : MOCHIS);
@@ -950,13 +1008,13 @@
     const i = Math.min(rail.children.length - 1, Math.round(rail.scrollLeft / w));
     d.querySelectorAll("i").forEach((el, k) => el.classList.toggle("on", k === i));
   }
-  ["espGrid", "setsGrid", "grid"].forEach((id) => document.getElementById(id).addEventListener("scroll", onRail, { passive: true }));
+  ["espGrid", "setsGrid", "promosGrid", "grid"].forEach((id) => document.getElementById(id).addEventListener("scroll", onRail, { passive: true }));
 
   /* ---------- hoja de producto ---------- */
   let sheetState = null;
   function openSheet(id) {
     const p = find(id); if (!p) return;
-    sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1, leche: persOn(p) ? (leches()[0] || {}).nombre || "" : "", sin: [], beb: bebOpts(p).length === 1 ? bebOpts(p)[0].id : "", rvOpen: false };
+    sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1, leche: persOn(p) ? (leches()[0] || {}).nombre || "" : "", sin: [], beb: bebOpts(p).length === 1 ? bebOpts(p)[0].id : "", mochis: {}, rvOpen: false };
     drawSheet();
     px("ViewContent", { content_type: "product", content_ids: [p.id], content_name: nameOf(p), value: Number(priceOf(p, sheetState.sz)) || 0 });
     $("#sheet").classList.add("on"); $("#scrim").classList.add("on"); renderBadge();
@@ -972,22 +1030,24 @@
       const pr = k === "set" && sv > pv ? `<s>${money(sv)}</s>${money(pv)} <em class="pct">−${Math.round(((sv - pv) / sv) * 100)}%</em>` : money(pv);
       return `<button class="opt" data-sz="${oz}" aria-pressed="${oz === sz}"><span class="rd"></span><b>${oz.toUpperCase()}</b><span class="pp num">${pr}</span></button>`;
     }).join("")}</div></div>`;
-    const sinSt = sinStock(p) && !(k === "premium" && !espOpen());
-    const blocked = p.agotado || sinSt || (k === "premium" && (!espOpen() || !(Number(bebida(p) ? p.precios[sz || "12 oz"] : p.precio) > 0)));
+    const box = esPromo(p) ? promoPickHtml(p) : "", falta = esPromo(p) ? promoCant(p) - boxList().length : 0;
+    const sinSt = (sinStock(p) || (esPromo(p) && promoSinStock(p))) && !(k === "premium" && !espOpen());
+    const blocked = p.agotado || sinSt || (k === "premium" && (!espOpen() || !(Number(bebida(p) ? p.precios[sz || "12 oz"] : p.precio) > 0))) || (esPromo(p) && !(Number(p.precio) > 0));
     $("#sheet").innerHTML = `<div class="sph"><img src="${esc(IMG(tapado(p) ? "img/mochito-lie.png" : p.img || "img/mochito-lie.png", 600))}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
       <div class="sb">
-        ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
+        ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : esPromo(p) ? `<span class="eyebrow">Promo ✦ ${promoCant(p)} mochis en box</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
         <h3 id="sTitle">${esc(nameOf(p))}</h3>
-        <div class="s-row">${sheetRate(p)}<div class="qty" style="margin:0"><button data-sq="-1" aria-label="Restar uno">−</button><span class="num" style="min-width:18px;text-align:center">${qty}</span><button data-sq="1" aria-label="Sumar uno">+</button></div></div>
+        <div class="s-row">${sheetRate(p)}<div class="qty" style="margin:0" ${esPromo(p) ? "hidden" : ""}><button data-sq="-1" aria-label="Restar uno">−</button><span class="num" style="min-width:18px;text-align:center">${qty}</span><button data-sq="1" aria-label="Sumar uno">+</button></div></div>
         <div class="s-rv" id="sRv" ${sheetState.rvOpen ? "" : "hidden"}>${sheetState.rvOpen ? sheetRvHtml(p) : ""}</div>
         <p class="muted">${esc(descOf(p))}</p>
         ${k === "premium" && !espOpen() ? "" : stockLine(p)}
         ${bebSel}
+        ${box}
         ${opts}
         ${custom}
         ${clubOn() && !blocked ? `<span class="clubtag">Tu pedido suma ${sellosTxt(spp())} del Setto Club</span>` : ""}
         <div class="act">
-        ${blocked ? `<span class="btn big" style="flex:1;opacity:.7;box-shadow:none;background:var(--bg-2);color:var(--ink);cursor:default">${p.agotado ? "Agotado" : sinSt ? "Sin stock hoy" : "Todavía no disponible"}</span>` : `<button class="btn solid big" id="sheetAdd">Agregar · <span class="num">${money((priceOf(p, sz) + lechePrecio(leche)) * qty)}</span></button>`}</div>
+        ${blocked ? `<span class="btn big" style="flex:1;opacity:.7;box-shadow:none;background:var(--bg-2);color:var(--ink);cursor:default">${p.agotado ? "Agotado" : sinSt ? "Sin stock hoy" : "Todavía no disponible"}</span>` : falta > 0 ? `<button class="btn solid big" id="sheetAdd">Elegí ${falta} ${falta === 1 ? "mochi" : "mochis"} más</button>` : `<button class="btn solid big" id="sheetAdd">Agregar · <span class="num">${money((priceOf(p, sz) + lechePrecio(leche)) * qty)}</span></button>`}</div>
       </div>`;
   }
   /* reseñas dentro de la ficha: promedio con estrellas + desplegable */
@@ -1249,7 +1309,7 @@
     sending = true; drawFootOnly();
     try {
       const isEnv = form.modo === "envio";
-      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [], bebida: c.beb || null })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null, gift: GIFT ? GIFT.code : null, maq: MAQ && maqOff() > 0 ? MAQ.code : null });
+      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [], bebida: c.beb || null, mochis: c.mochis || null })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null, gift: GIFT ? GIFT.code : null, maq: MAQ && maqOff() > 0 ? MAQ.code : null });
       const pxPed = pxCarrito(); // para mandar Purchase con los mismos productos cuando el pedido se entregue
       if (window.SettoPixel) window.SettoPixel.once("order_created:" + o.code, () => window.SettoPixel.custom("order_created", { ...pxPed, value: Number(o.total) || 0 }, "creado-" + o.code));
       const ph = o.phone || API.normPhone(form.tel);
@@ -1280,7 +1340,7 @@
       if (/premio/i.test(e.message || "")) { await loadCard(true); drawDrawer(); }
       if (/gift card/i.test(e.message || "")) { quitarGift(); drawDrawer(); }
       if (/maquinita|otro número/i.test(e.message || "")) { quitarMaq(); maqSug = { tel: null, premios: [] }; drawDrawer(); }
-      if (/nos qued/i.test(e.message || "") && API.getStock) { try { STOCK = await API.getStock(); renderEspecial(); renderSets(); renderCarta(); } catch (_) {} }
+      if (/nos qued/i.test(e.message || "") && API.getStock) { try { STOCK = await API.getStock(); renderEspecial(); renderSets(); renderPromos(); renderCarta(); } catch (_) {} }
       drawFootOnly();
       const el2 = $("#fErr"); if (el2) { el2.hidden = false; el2.textContent = e.message || "No pudimos registrar el pedido. Probá de nuevo."; }
     }
@@ -1314,13 +1374,15 @@
     if (b.dataset.close !== undefined) closeSheet();
     if (b.dataset.sz) { sheetState.sz = b.dataset.sz; drawSheet(); }
     if (b.dataset.sq) { sheetState.qty = Math.max(1, sheetState.qty + +b.dataset.sq); drawSheet(); }
-    if (b.id === "sheetAdd") { if (addItem(sheetState.p, sheetState.sz, sheetState.qty, sheetState.leche, sheetState.sin, sheetState.beb)) { closeSheet(); if (view === "cart" && $("#drawer").classList.contains("on")) drawDrawer(); } }
+    if (b.dataset.bx && sheetState) { const m = sheetState.mochis, d = +b.dataset.bd; m[b.dataset.bx] = Math.max(0, (m[b.dataset.bx] || 0) + d); if (!m[b.dataset.bx]) delete m[b.dataset.bx]; drawSheet(); }
+    if (b.id === "sheetAdd" && esPromo(sheetState.p) && boxList().length < promoCant(sheetState.p)) { $("#sBox")?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+    else if (b.id === "sheetAdd") { if (addItem(sheetState.p, sheetState.sz, sheetState.qty, sheetState.leche, sheetState.sin, sheetState.beb, boxList())) { closeSheet(); if (view === "cart" && $("#drawer").classList.contains("on")) drawDrawer(); } }
     if (b.dataset.beb !== undefined && sheetState) { sheetState.beb = b.dataset.beb; drawSheet(); }
     if (b.dataset.leche !== undefined && sheetState) { sheetState.leche = b.dataset.leche; drawSheet(); }
     if (b.dataset.sin !== undefined && sheetState) { const x = b.dataset.sin, s = sheetState.sin; sheetState.sin = s.includes(x) ? s.filter((y) => y !== x) : [...s, x]; drawSheet(); }
     if (b.id === "tab-dirty" || b.id === "tab-mochi") { tab = b.id.slice(4); renderCarta(); }
     if (b.dataset.goto) { tab = b.dataset.goto; renderCarta(); $(".switch").scrollIntoView({ behavior: "smooth", block: "center" }); }
-    if (b.dataset.q !== undefined) { const c = cart[+b.dataset.q]; if (+b.dataset.d > 0) { const fr = frenoStock(find(c.id), 1); if (fr) { toast(fr); return; } } c.qty += +b.dataset.d; if (c.qty <= 0) cart.splice(+b.dataset.q, 1); save(); renderBadge(); drawDrawer(); }
+    if (b.dataset.q !== undefined) { const c = cart[+b.dataset.q]; if (+b.dataset.d > 0) { const fr = c.mochis ? frenoBox(c.mochis, 1) : frenoStock(find(c.id), 1); if (fr) { toast(fr); return; } } c.qty += +b.dataset.d; if (c.qty <= 0) cart.splice(+b.dataset.q, 1); save(); renderBadge(); drawDrawer(); }
     if (b.id === "openCart" || b.id === "mbarBtn") openDrawer();
     if (b.id === "dClose" || b.dataset.closedrawer !== undefined) closeDrawer();
     if (b.id === "dBack") { view = "cart"; drawDrawer(); }
@@ -1401,7 +1463,7 @@
   });
 
   /* ---------- stock en vivo ---------- */
-  async function refrescarStock() { if (!API.getStock) return; try { STOCK = await API.getStock(); renderEspecial(); renderSets(); renderCarta(); renderBadge(); } catch (_) {} }
+  async function refrescarStock() { if (!API.getStock) return; try { STOCK = await API.getStock(); renderEspecial(); renderSets(); renderPromos(); renderCarta(); renderBadge(); } catch (_) {} }
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { refrescarStock(); if (misPedidos().length) verSeguimiento(); } });
 
   /* ---------- seguimiento de pedidos ---------- */
@@ -1778,7 +1840,7 @@
   let pintado = false;
   function pintar(settings, products) {
     S = settings; adapt(products); syncCart();
-    renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); renderFooter(); renderBadge();
+    renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderPromos(); renderCarta(); renderClubInfo(); renderMaquinita(); renderFooter(); renderBadge();
     if (pintado) return;
     pintado = true;
     verSeguimiento(); renderResenas(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo);
@@ -1798,14 +1860,14 @@
       $("#errBar").hidden = true;
       if (!API.DEMO) guardarSnap(settings, products, STOCK);
       pintar(settings, products);
-      API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
+      API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderPromos(); renderCarta(); renderEspecial(); }).catch(() => {});
     } catch (e) {
       console.error(e);
       if (intento < 3) { setTimeout(() => cargar(intento + 1), 1000 * intento); return; }
       if (pintado) return; // ya se ve la última carta guardada
       renderHero(); // portada de siempre
       const bar = $("#errBar"); bar.hidden = false; bar.innerHTML = 'No pudimos cargar la carta. <a href="" onclick="location.reload();return false">Probá de nuevo</a> o escribinos por WhatsApp.';
-      ["espGrid", "setsGrid", "grid"].forEach((id) => (document.getElementById(id).innerHTML = ""));
+      ["espGrid", "setsGrid", "promosGrid", "grid"].forEach((id) => (document.getElementById(id).innerHTML = ""));
     } finally { clearTimeout(lento); }
   }
   function boot() {
