@@ -1119,9 +1119,20 @@ article.set,article.item,article.prem{cursor:pointer}
 .ph.alt .ph-arr::before{transform:translateX(1px) rotate(-135deg)}
 .ph-arr:hover{background:#FFFDF8}
 
-/* ---------- Promos (Box 5x4): misma tarjeta que Sets; con una sola promo la tarjeta no queda perdida a la izquierda ---------- */
-@media (min-width:761px){.promos.una .rail{grid-template-columns:minmax(0,420px);justify-content:center}}
-@media (max-width:760px){.promos.una .rail{grid-auto-columns:min(100%,420px);justify-content:center}.promos.una .hint{display:none}}
+/* ---------- Promos (Box 5x4): pestaña de la carta, misma tarjeta que Sets ---------- */
+/* pestaña Promos de la carta: siempre en coral para que resalte */
+.switch.tres{grid-template-columns:1fr 1fr 1fr}
+@media (max-width:560px){.switch.tres{grid-template-columns:1fr}}
+.sw.sw-promo{background:var(--coral);border-color:var(--coral)}
+.sw.sw-promo:hover{border-color:var(--turquesa)}
+.sw.sw-promo .sw-th{background:var(--card)}
+.sw.sw-promo .sw-tx b,.sw.sw-promo .sw-tx small{color:var(--ink)}
+.sw.sw-promo[aria-selected="false"] .sw-go{background:var(--turquesa);border-color:var(--turquesa);color:#FFFDF8}
+.sw.sw-promo[aria-selected="true"]{background:var(--coral);border-color:var(--turquesa);box-shadow:0 0 0 4px color-mix(in srgb,var(--coral) 35%,transparent),0 0 22px 4px color-mix(in srgb,var(--coral) 55%,transparent)}
+.sw.sw-promo[aria-selected="true"] .sw-tx b,.sw.sw-promo[aria-selected="true"] .sw-tx small{color:var(--ink)}
+.sw.sw-promo[aria-selected="true"] .sw-th{background:var(--card)}
+.sw.sw-promo[aria-selected="true"] .sw-go{border-color:var(--turquesa);background:var(--turquesa);color:#FFFDF8}
+#grid .set.promo{min-width:0}
 /* ficha de la promo: elegir los sabores de la box */
 .boxpick{display:grid;gap:10px}
 .bp-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}

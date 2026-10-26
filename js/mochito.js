@@ -8,7 +8,7 @@
   let off = false; try { localStorage.removeItem("setto-mochito-off"); off = sessionStorage.getItem("setto-mochito-off") === "1"; } catch (_) {}
 
   /* ---------- 1) Aparición suave de bloques al hacer scroll ---------- */
-  const revealSel = "#especial .head, #sets .head, #promos .head, #carta .head, #pedir .head, #club .club > div, .stampcard, #faq .head, #resenas .head";
+  const revealSel = "#especial .head, #sets .head, #carta .head, #pedir .head, #club .club > div, .stampcard, #faq .head, #resenas .head";
   const cardSel = "article.set, article.item, .cv, #resenas .rv, .faq-list > *";
   if (!RM && "IntersectionObserver" in window) {
     document.documentElement.classList.add("rv-on");
@@ -62,7 +62,6 @@
     top:      { t: "¡Hola! Soy Mochito 👋 ¿Te llevo a los sets?", a: [["Ver sets", () => go("#sets")]] },
     especial:  { t: "Esto sale por tiempo limitado 👀", a: [] },
     sets:      { t: "Un set es bebida + mochi, y sale menos que por separado.", a: [] },
-    promos:    { t: "En la box elegís los sabores y pagás menos que sueltos.", a: [] },
     maquinita: { t: "🎰 Esta es mi maquinita. ¡Probá suerte!", a: [["Tirar", () => document.getElementById("mqTirar")?.click()]] },
     votar:     { t: "¿Qué sabor querés probar? Dejá tu voto 🗳️", a: [] },
     carta:     { t: "¿Algo suelto? Tocá cualquier producto para elegir.", a: [] },
