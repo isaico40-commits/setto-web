@@ -332,15 +332,19 @@
     const q = (u.mapa || "").trim(); sec.hidden = !(u.activo && q); if (sec.hidden) return;
     $("#t-ubi").textContent = u.titulo || "Dónde estamos";
     $("#ubiTexto").textContent = u.texto || ""; $("#ubiTexto").hidden = !u.texto;
-    const map = $("#ubiMap"), src = `https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=${Math.max(12, Math.min(18, +u.zoom || 15))}&output=embed`;
-    if (map.getAttribute("src") !== src) map.setAttribute("src", src);
-    $("#ubiLink").href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+    // captura fija del mapa (Panel → Ajustes → Ubicación): se ve igual en cualquier pantalla, el iframe de Google no
+    const href = mapsUrl(q), img = $("#ubiImg"), cap = (u.captura || "").trim();
+    $("#ubiLink").href = href; $("#ubiMapLink").href = href;
+    $("#ubiMapLink").classList.toggle("sin-cap", !cap); img.hidden = !cap;
+    if (cap) { const src = IMG(cap, 1200); if (img.getAttribute("src") !== src) img.setAttribute("src", src); }
   }
+  // si la búsqueda no dice la ciudad, Google puede caer en otra (pasó con Tucumán)
+  function mapsUrl(q) { return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(/mar del plata/i.test(q) ? q : q + ", Mar del Plata")}`; }
 
   // dónde se retira: sale de Panel → Ajustes → Ubicación; si el mapa está apagado no se muestra nada
   function retiroDondeHtml() {
     const u = S.ubicacion || {}, q = (u.mapa || "").trim(); if (!(u.activo && q)) return "";
-    return `<div class="ret-donde"><span aria-hidden="true">📍</span><div><b>Dónde retirás</b><p>${esc(u.texto || q)}</p><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}" target="_blank" rel="noopener">Ver en Google Maps</a></div></div>`;
+    return `<div class="ret-donde"><span aria-hidden="true">📍</span><div><b>Dónde retirás</b><p>${esc(u.texto || q)}</p><a href="${mapsUrl(q)}" target="_blank" rel="noopener">Ver en Google Maps</a></div></div>`;
   }
 
   /* ---------- Stickers para WhatsApp (Panel → Ajustes → Stickers). El pack vive en Sticker.ly:
