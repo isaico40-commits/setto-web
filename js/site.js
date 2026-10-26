@@ -835,25 +835,20 @@
     $("#sets").hidden = on(SETS).length === 0;
     dots("setsGrid");
   }
-  /* Promos: misma tarjeta que Sets; el cartel dice cuánto ahorrás contra los mochis sueltos */
-  function renderPromos() {
-    const sec = $("#promos"), l = on(PROMOS); if (!sec) return;
-    sec.hidden = !l.length || !promoSabores().length; if (sec.hidden) return;
-    $("#promosGrid").innerHTML = l.map((p) => {
-      const precio = Number(p.precio) || 0, antes = promoAntes(p), ah = promoAhorro(p), cant = promoCant(p), sin = promoSinStock(p);
-      const badge = p.agotado ? '<span class="badge">Agotado</span>' : sin ? '<span class="badge">Sin stock hoy</span>' : "";
-      return `<article class="set promo ${p.agotado ? "agotado" : ""}">
-        <button class="ph ${p.foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${picsHtml(p, p.nombre, "img/mochito-lie.png", 180)}</button>
-        ${ah > 0 ? `<span class="off num">Ahorrás ${money(ah)}</span>` : ""}${badge ? `<span class="stkw">${badge}</span>` : ""}
-        <h3>${esc(p.nombre)}</h3>
-        <p class="code">${cant} mochis ✦ en box</p>
-        <p class="combo">${esc(p.desc || `Elegís ${cant} sabores de la carta.`)}</p>
-        <div class="foot"><span class="from num">Box<b>${precio > 0 ? money(precio) : "a confirmar"}${ah > 0 ? `<s>${money(antes)}</s>` : ""}</b>${rateTag(p)}</span>
-        ${p.agotado || sin || !(precio > 0) ? "" : `<button class="add" data-open="${p.id}" aria-label="Armar ${esc(p.nombre)}">+</button>`}</div>
-      </article>`;
-    }).join("");
-    sec.classList.toggle("una", l.length === 1);
-    dots("promosGrid");
+  /* Promos: pestaña de la carta con la misma tarjeta que Sets; el cartel dice cuánto ahorrás contra los mochis sueltos */
+  const promosOn = () => promoSabores().length > 0 ? on(PROMOS) : [];
+  function promoCard(p) {
+    const precio = Number(p.precio) || 0, antes = promoAntes(p), ah = promoAhorro(p), cant = promoCant(p), sin = promoSinStock(p);
+    const badge = p.agotado ? '<span class="badge">Agotado</span>' : sin ? '<span class="badge">Sin stock hoy</span>' : "";
+    return `<article class="set promo ${p.agotado ? "agotado" : ""}">
+      <button class="ph ${p.foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(p.nombre)}">${picsHtml(p, p.nombre, "img/mochito-lie.png", 180)}</button>
+      ${ah > 0 ? `<span class="off num">Ahorrás ${money(ah)}</span>` : ""}${badge ? `<span class="stkw">${badge}</span>` : ""}
+      <h3>${esc(p.nombre)}</h3>
+      <p class="code">${cant} mochis ✦ en box</p>
+      <p class="combo">${esc(p.desc || `Elegís ${cant} sabores de la carta.`)}</p>
+      <div class="foot"><span class="from num">Box<b>${precio > 0 ? money(precio) : "a confirmar"}${ah > 0 ? `<s>${money(antes)}</s>` : ""}</b>${rateTag(p)}</span>
+      ${p.agotado || sin || !(precio > 0) ? "" : `<button class="add" data-open="${p.id}" aria-label="Armar ${esc(p.nombre)}">+</button>`}</div>
+    </article>`;
   }
   // ficha de la promo: un contador por sabor hasta completar la box
   function promoPickHtml(p) {
@@ -871,6 +866,23 @@
   const boxList = () => Object.entries((sheetState || {}).mochis || {}).flatMap(([id, k]) => Array(k).fill(id));
   let tab = "dirty";
   function renderCarta() {
+    const PR = promosOn(), tp = $("#tab-promo");
+    if (tp) { tp.hidden = !PR.length; $(".switch").classList.toggle("tres", PR.length > 0); }
+    if (tab === "promo" && !PR.length) tab = "dirty";
+    if (tp && PR.length) {
+      const ah = Math.max(...PR.map(promoAhorro)), f = PR.find((p) => p.img);
+      $("#cntPromo").textContent = ah > 0 ? `Ahorrás ${PR.length > 1 ? "hasta " : ""}${money(ah)}` : PR.length === 1 ? "Box de mochis" : PR.length + " promos";
+      if (f) $("#promoTh").src = IMG(f.img, 120);
+    }
+    if (tab === "promo") {
+      $("#cartaEyebrow").textContent = "Por cantidad · Elegís los sabores y pagás menos";
+      $("#grid").innerHTML = PR.map(promoCard).join("") + `<button class="next-cat" data-goto="mochi"><span class="nc-th"><img src="img/sm/mochi-sakura.webp" alt=""></span><b>¿Preferís sueltos?</b><span class="cta">Ver los ${on(MOCHIS).length} mochis →</span></button>`;
+      $("#panelExtra").innerHTML = "";
+      document.querySelectorAll(".sw").forEach((t) => t.setAttribute("aria-selected", String(t.id === "tab-" + tab)));
+      $("#panel").setAttribute("aria-labelledby", "tab-" + tab);
+      $("#grid").scrollLeft = 0; dots("grid");
+      return;
+    }
     const list = on(tab === "dirty" ? DIRTY : MOCHIS);
     $("#cntDirty").textContent = on(DIRTY).length + " sabores · fríos";
     $("#cntMochi").textContent = on(MOCHIS).length + " sabores · por unidad";
@@ -1008,7 +1020,7 @@
     const i = Math.min(rail.children.length - 1, Math.round(rail.scrollLeft / w));
     d.querySelectorAll("i").forEach((el, k) => el.classList.toggle("on", k === i));
   }
-  ["espGrid", "setsGrid", "promosGrid", "grid"].forEach((id) => document.getElementById(id).addEventListener("scroll", onRail, { passive: true }));
+  ["espGrid", "setsGrid", "grid"].forEach((id) => document.getElementById(id).addEventListener("scroll", onRail, { passive: true }));
 
   /* ---------- hoja de producto ---------- */
   let sheetState = null;
@@ -1340,7 +1352,7 @@
       if (/premio/i.test(e.message || "")) { await loadCard(true); drawDrawer(); }
       if (/gift card/i.test(e.message || "")) { quitarGift(); drawDrawer(); }
       if (/maquinita|otro número/i.test(e.message || "")) { quitarMaq(); maqSug = { tel: null, premios: [] }; drawDrawer(); }
-      if (/nos qued/i.test(e.message || "") && API.getStock) { try { STOCK = await API.getStock(); renderEspecial(); renderSets(); renderPromos(); renderCarta(); } catch (_) {} }
+      if (/nos qued/i.test(e.message || "") && API.getStock) { try { STOCK = await API.getStock(); renderEspecial(); renderSets(); renderCarta(); } catch (_) {} }
       drawFootOnly();
       const el2 = $("#fErr"); if (el2) { el2.hidden = false; el2.textContent = e.message || "No pudimos registrar el pedido. Probá de nuevo."; }
     }
@@ -1380,7 +1392,7 @@
     if (b.dataset.beb !== undefined && sheetState) { sheetState.beb = b.dataset.beb; drawSheet(); }
     if (b.dataset.leche !== undefined && sheetState) { sheetState.leche = b.dataset.leche; drawSheet(); }
     if (b.dataset.sin !== undefined && sheetState) { const x = b.dataset.sin, s = sheetState.sin; sheetState.sin = s.includes(x) ? s.filter((y) => y !== x) : [...s, x]; drawSheet(); }
-    if (b.id === "tab-dirty" || b.id === "tab-mochi") { tab = b.id.slice(4); renderCarta(); }
+    if (b.id === "tab-dirty" || b.id === "tab-mochi" || b.id === "tab-promo") { tab = b.id.slice(4); renderCarta(); }
     if (b.dataset.goto) { tab = b.dataset.goto; renderCarta(); $(".switch").scrollIntoView({ behavior: "smooth", block: "center" }); }
     if (b.dataset.q !== undefined) { const c = cart[+b.dataset.q]; if (+b.dataset.d > 0) { const fr = c.mochis ? frenoBox(c.mochis, 1) : frenoStock(find(c.id), 1); if (fr) { toast(fr); return; } } c.qty += +b.dataset.d; if (c.qty <= 0) cart.splice(+b.dataset.q, 1); save(); renderBadge(); drawDrawer(); }
     if (b.id === "openCart" || b.id === "mbarBtn") openDrawer();
@@ -1463,7 +1475,7 @@
   });
 
   /* ---------- stock en vivo ---------- */
-  async function refrescarStock() { if (!API.getStock) return; try { STOCK = await API.getStock(); renderEspecial(); renderSets(); renderPromos(); renderCarta(); renderBadge(); } catch (_) {} }
+  async function refrescarStock() { if (!API.getStock) return; try { STOCK = await API.getStock(); renderEspecial(); renderSets(); renderCarta(); renderBadge(); } catch (_) {} }
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { refrescarStock(); if (misPedidos().length) verSeguimiento(); } });
 
   /* ---------- seguimiento de pedidos ---------- */
@@ -1840,7 +1852,7 @@
   let pintado = false;
   function pintar(settings, products) {
     S = settings; adapt(products); syncCart();
-    renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderPromos(); renderCarta(); renderClubInfo(); renderMaquinita(); renderFooter(); renderBadge();
+    renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); renderFooter(); renderBadge();
     if (pintado) return;
     pintado = true;
     verSeguimiento(); renderResenas(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo);
@@ -1860,14 +1872,14 @@
       $("#errBar").hidden = true;
       if (!API.DEMO) guardarSnap(settings, products, STOCK);
       pintar(settings, products);
-      API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderPromos(); renderCarta(); renderEspecial(); }).catch(() => {});
+      API.productRatings && API.productRatings().then((r) => { RATINGS = r || {}; renderSets(); renderCarta(); renderEspecial(); }).catch(() => {});
     } catch (e) {
       console.error(e);
       if (intento < 3) { setTimeout(() => cargar(intento + 1), 1000 * intento); return; }
       if (pintado) return; // ya se ve la última carta guardada
       renderHero(); // portada de siempre
       const bar = $("#errBar"); bar.hidden = false; bar.innerHTML = 'No pudimos cargar la carta. <a href="" onclick="location.reload();return false">Probá de nuevo</a> o escribinos por WhatsApp.';
-      ["espGrid", "setsGrid", "promosGrid", "grid"].forEach((id) => (document.getElementById(id).innerHTML = ""));
+      ["espGrid", "setsGrid", "grid"].forEach((id) => (document.getElementById(id).innerHTML = ""));
     } finally { clearTimeout(lento); }
   }
   function boot() {
