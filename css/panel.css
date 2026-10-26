@@ -232,16 +232,16 @@ a.ptab{text-decoration:none}
 .hdia button{border:0;background:none;border-radius:999px;padding:6px 14px;font-weight:600;font-size:.84rem;color:var(--ink-2)}
 .hdia button[aria-selected="true"]{background:var(--turquesa);color:#fff}
 .hrow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 10px;border-radius:12px;background:var(--bg)}
-.hrow.ocupada{background:#fdf1dc}.hrow.cerrada{background:color-mix(in srgb,var(--coral-2) 50%,var(--card))}
+.hrow.cerrada{background:color-mix(in srgb,var(--coral-2) 50%,var(--card))}
 .hrow.todo{background:none;padding-block:2px;border-top:1px dashed color-mix(in srgb,var(--turquesa) 25%,transparent);border-radius:0}
 .hfr{font-weight:700;font-size:.95rem}.hrow.todo .hfr{font-weight:600;font-size:.85rem;color:var(--ink-2)}
 .hseg{display:inline-flex;border:1.5px solid color-mix(in srgb,var(--turquesa) 45%,transparent);border-radius:999px;overflow:hidden;background:var(--card)}
 .hseg button{border:0;background:none;padding:7px 12px;min-height:36px;font-weight:600;font-size:.82rem;color:var(--ink-2)}
 .hseg button+button{border-left:1px solid color-mix(in srgb,var(--turquesa) 25%,transparent)}
-.hseg .h-abierta[aria-checked="true"]{background:var(--turquesa);color:#fff}
-.hseg .h-ocupada[aria-checked="true"]{background:#e9a23b;color:#1f1c18}
-.hseg .h-cerrada[aria-checked="true"]{background:#9b2c2c;color:#fff}
-.hseg button:disabled{opacity:.6}
+.hseg .h-abierta[aria-pressed="true"]{background:var(--turquesa);color:#fff}
+.hseg .h-tope[aria-pressed="true"]{background:#e9a23b;color:#1f1c18}
+.hseg .h-cerrada[aria-pressed="true"]{background:#9b2c2c;color:#fff}
+.hseg button:disabled{opacity:.45}
 .hseg button{white-space:nowrap}
 @media (max-width:420px){.hrow{flex-direction:column;align-items:stretch}.hseg{display:grid;grid-template-columns:1fr 1.25fr 1fr}.hseg button{padding:7px 6px;font-size:.8rem}}
 /* Ajustes → Horarios de retiro: una fila por franja con interruptor */

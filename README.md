@@ -157,7 +157,7 @@ En **Ajustes → Votación**: pregunta, hasta 6 opciones con foto, "solo cliente
 Arriba de la portada se ve "Abierto ahora · retirás desde las …" o "Cerrado · abrimos …", calculado con los horarios de retiro.
 
 ### Cerrar u ocupar una franja sin borrarla
-- **Pedidos → Horarios para pedir**: cada franja de hoy o mañana tiene *Abierta*, *Alta demanda* o *Cerrada* (y una fila "Todo el día"). Se guarda al tocar. Las que no están abiertas se ven en el selector de la web pero no se pueden elegir, con un aviso arriba ("Hoy de 10 a 13 está cerrado. Podés elegir otro horario."). Vuelven solas a abierta al día siguiente.
+- **Pedidos → Horarios para pedir**: cada franja de hoy o mañana tiene *Abierta* o *Cerrada*, y el botón *Alta demanda* prende o apaga el tope de pedidos por turno ese día (y una fila "Todo el día"). Se guarda al tocar. Las que no están abiertas se ven en el selector de la web pero no se pueden elegir, con un aviso arriba ("Hoy de 10 a 13 está cerrado. Podés elegir otro horario."). Vuelven solas a abierta al día siguiente.
 - **Ajustes → Horarios de retiro**: cada franja es una fila con su interruptor *Activa / Apagada*. Una apagada deja de ofrecerse todos los días hasta que la prendas, sin perder el horario.
 - La web vuelve a leer los horarios al pasar al checkout y al enviar: si cerraron la franja elegida con la página abierta, le pide al cliente que elija otra.
 - Se guarda en el ajuste `retiro` (`apagadas` y `cierres`); no necesita migración.

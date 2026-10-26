@@ -424,16 +424,16 @@
   }
 
 
-  /* ---------- Franjas: las apagadas en Ajustes no se ofrecen; las cerradas u ocupadas desde el panel valen solo ese día ---------- */
+  /* ---------- Franjas: las apagadas en Ajustes no se ofrecen; cerrar una franja o sacarle el tope desde el panel vale solo ese día ---------- */
   function fechaKey(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
   function hhmm(s) { const [h, m] = s.split(":").map(Number); return h * 60 + m; }
-  function franjasDia(day) { // [{ a, b, estado: "abierta" | "cerrada" | "ocupada" }]; vacío si ese día no se atiende
+  function franjasDia(day) { // [{ a, b, estado: "abierta" | "cerrada", tope }]; vacío si ese día no se atiende
     const r = S.retiro || {}; if (!(r.dias || []).includes(day.getDay())) return [];
-    const off = r.apagadas || [], k = fechaKey(day);
-    return (r.rangos || []).filter(([a, b]) => !off.includes(a + "-" + b)).map(([a, b]) => {
-      const c = (r.cierres || []).find((x) => x.fecha === k && x.franja === a + "-" + b);
-      return { a, b, estado: c ? c.motivo : "abierta" };
-    });
+    const off = r.apagadas || [], k = fechaKey(day), es = (l, fr) => (l || []).some((x) => x.fecha === k && x.franja === fr);
+    return (r.rangos || []).filter(([a, b]) => !off.includes(a + "-" + b)).map(([a, b]) => ({
+      a, b, estado: (r.cierres || []).some((x) => x.fecha === k && x.franja === a + "-" + b && x.motivo === "cerrada") ? "cerrada" : "abierta",
+      tope: !es(r.sinTope, a + "-" + b), // el tope de pedidos por turno vale salvo que lo apaguen ese día
+    }));
   }
   const franjaTxt = (f) => `de ${f.a.replace(":00", "")} a ${f.b.replace(":00", "")}`;
 
@@ -443,7 +443,7 @@
     const now = new Date(), mins = now.getHours() * 60 + now.getMinutes();
     const f = franjasDia(now).find((x) => mins >= hhmm(x.a) && mins < hhmm(x.b)), st = f ? f.estado : "cerrada";
     el.classList.toggle("open", st === "abierta"); el.classList.toggle("closed", st !== "abierta");
-    el.innerHTML = st === "abierta" ? "<i></i>Abierto ahora" : st === "ocupada" ? "<i></i>Alta demanda ahora" : "<i></i>Cerrado ahora";
+    el.innerHTML = st === "abierta" ? "<i></i>Abierto ahora" : "<i></i>Cerrado ahora";
   }
   setInterval(() => { try { renderAbierto(); } catch (_) {} }, 60000);
 
@@ -1102,7 +1102,7 @@
     try { const l = await API.turnosOcupados(); if (l && JSON.stringify(l) !== JSON.stringify(OCUP)) { OCUP = l; return true; } } catch (_) {}
     return false;
   }
-  // los próximos 3 días: turnos para elegir, franjas cerradas u ocupadas (se ven pero no se eligen) y un aviso si hace falta
+  // los próximos 3 días: turnos para elegir, franjas cerradas y turnos llenos (se ven pero no se eligen) y un aviso si hace falta
   function horarios() {
     const r = S.retiro || {}, now = new Date(), dias = [], avisos = [];
     let n = 0;
@@ -1119,8 +1119,8 @@
           turnos.push({ txt: nom + " · " + h + " hs", h });
         }
         if (!turnos.length) continue; // ya pasó
-        if (f.estado === "abierta") { turnos.forEach(({ txt, h }) => { const full = lleno(fechaKey(day), h); if (full) llenos.push(txt); items.push({ txt, ok: !full, hora: h }); if (!full) n++; }); }
-        else { items.push({ txt: `${nom} · ${f.a} a ${f.b} · ${f.estado === "ocupada" ? "alta demanda" : "cerrado"}`, ok: false }); tapadas.push(f); }
+        if (f.estado === "abierta") { turnos.forEach(({ txt, h }) => { const full = f.tope && lleno(fechaKey(day), h); if (full) llenos.push(txt); items.push({ txt, ok: !full, hora: h }); if (!full) n++; }); }
+        else { items.push({ txt: `${nom} · ${f.a} a ${f.b} · cerrado`, ok: false }); tapadas.push(f); }
       }
       if (!items.length) continue;
       if (llenos.length) {
@@ -1130,8 +1130,7 @@
       }
       if (tapadas.length) {
         const quedan = items.some((x) => x.ok);
-        const por = (st, txt) => { const l = tapadas.filter((f) => f.estado === st); return l.length ? l.map(franjaTxt).join(" y ") + txt : ""; };
-        avisos.push(`${nom} ${[por("cerrada", " está cerrado"), por("ocupada", " tenemos alta demanda")].filter(Boolean).join(" y ")}. ` + (quedan ? "Podés elegir otro horario." : `${d === 0 ? "Hoy" : "Ese día"} no quedan horarios: elegí otro día.`));
+        avisos.push(`${nom} ${tapadas.map(franjaTxt).join(" y ")} está cerrado. ` + (quedan ? "Podés elegir otro horario." : `${d === 0 ? "Hoy" : "Ese día"} no quedan horarios: elegí otro día.`));
       }
       dias.push({ nom, items });
     }
