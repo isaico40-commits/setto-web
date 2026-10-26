@@ -246,10 +246,46 @@
         ${[["pendiente", "Pendientes"], ["entregado", "Entregados (7 días)"], ["cancelado", "Cancelados"]].map(([k, l]) => `<button class="ptab" data-sub="${k}" aria-selected="${P.sub === k}">${l}</button>`).join("")}
         <input id="oq" placeholder="Buscar código, nombre o celular" value="${esc(P.q)}">
       </div>
+      <section class="horcard" id="horCard"></section>
       <div class="justdel" id="justDel" hidden></div>
       <div class="pgrid" id="olist"><p class="muted">Cargando…</p></div>`;
+    drawHorarios();
     refreshOrders(false);
   }
+  /* ---------- Horarios para pedir: cerrar u ocupar una franja hoy o mañana sin tocar los horarios fijos ---------- */
+  const fechaKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const diaMas = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
+  const cierresVigentes = (r) => (r.cierres || []).filter((c) => c.fecha >= fechaKey(new Date())); // los de días pasados se limpian solos
+  const HOR_EST = [["abierta", "Abierta"], ["ocupada", "A full"], ["cerrada", "Cerrada"]];
+  function drawHorarios() {
+    const el = $("#horCard"); if (!el) return;
+    const r = P.settings.retiro || {}, dia = P.horDia || 0, day = diaMas(dia), k = fechaKey(day);
+    const fr = (r.rangos || []).filter((x) => !(r.apagadas || []).includes(x.join("-"))).map(([a, b]) => { const c = (r.cierres || []).find((x) => x.fecha === k && x.franja === a + "-" + b); return { a, b, st: c ? c.motivo : "abierta" }; });
+    const nom = day.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" }), atiende = (r.dias || []).includes(day.getDay());
+    const seg = (franja, st) => `<div class="hseg" role="radiogroup" aria-label="Estado ${franja ? "de " + franja.replace("-", " a ") : "de todo el día"}">${HOR_EST.map(([v, l]) => `<button type="button" role="radio" class="h-${v}" aria-checked="${st === v}" data-hor="${v}" data-hfr="${franja}">${l}</button>`).join("")}</div>`;
+    const todos = fr.length && fr.every((x) => x.st === fr[0].st) ? fr[0].st : "";
+    const tapadas = fr.filter((x) => x.st !== "abierta").length;
+    el.innerHTML = `<div class="hhead"><div><b>Horarios para pedir</b><span class="hintp">${dia ? "Mañana" : "Hoy"}, ${esc(nom)}</span></div>
+        <div class="hdia" role="tablist">${["Hoy", "Mañana"].map((l, i) => `<button type="button" role="tab" aria-selected="${dia === i}" data-hdia="${i}">${l}</button>`).join("")}</div></div>
+      ${!atiende ? `<p class="hintp">Ese día no atienden. Cambialo en <a href="#ajustes/retiro">Ajustes → Horarios de retiro</a>.</p>`
+        : !fr.length ? `<p class="hintp">No hay franjas activas. Prendelas en <a href="#ajustes/retiro">Ajustes → Horarios de retiro</a>.</p>`
+        : `${fr.map((x) => `<div class="hrow ${x.st}"><span class="hfr num">${x.a} a ${x.b}</span>${seg(x.a + "-" + x.b, x.st)}</div>`).join("")}
+          ${fr.length > 1 ? `<div class="hrow todo"><span class="hfr">Todo el día</span>${seg("", todos)}</div>` : ""}
+          <p class="hintp">${tapadas ? (tapadas === fr.length ? "Ese día no se puede pedir. " : "Pueden pedir para las franjas abiertas. ") : ""}<b>A full</b> y <b>Cerrada</b> no se pueden elegir en la web y vuelven solas a abierta al día siguiente. Los horarios fijos están en <a href="#ajustes/retiro">Ajustes</a>.</p>`}`;
+  }
+  document.addEventListener("click", async (e) => {
+    const d = e.target.closest("[data-hdia]"); if (d) { P.horDia = +d.dataset.hdia; drawHorarios(); return; }
+    const b = e.target.closest("[data-hor]"); if (!b || b.disabled) return;
+    const r = P.settings.retiro || {}, k = fechaKey(diaMas(P.horDia || 0)), st = b.dataset.hor;
+    const fr = b.dataset.hfr ? [b.dataset.hfr] : (r.rangos || []).map((x) => x.join("-")).filter((x) => !(r.apagadas || []).includes(x));
+    const cierres = cierresVigentes(r).filter((c) => !(c.fecha === k && fr.includes(c.franja))).concat(st === "abierta" ? [] : fr.map((franja) => ({ fecha: k, franja, motivo: st })));
+    document.querySelectorAll("#horCard [data-hor]").forEach((x) => (x.disabled = true));
+    try {
+      await API.saveSetting("retiro", { ...r, cierres }); await loadBase(); drawHorarios();
+      const cual = b.dataset.hfr ? b.dataset.hfr.replace("-", " a ") : "Todo el día", cuando = P.horDia ? "mañana" : "hoy";
+      toast(st === "abierta" ? `${cual}: abierta ${cuando}` : `${cual}: ${st === "ocupada" ? "a full" : "cerrada"} ${cuando}. No se puede elegir en la web.`);
+    } catch (err) { toast(err.message); drawHorarios(); }
+  });
   function drawJust() {
     const el = $("#justDel"); if (!el) return; const o = P.justDelivered;
     el.hidden = !o; if (!o) return;
@@ -617,6 +653,9 @@
   }
 
   /* =================== AJUSTES =================== */
+  const frRow = (i, a = "", b = "", on = true) => `<div class="frrow"><label class="frsw" title="Ofrecer esta franja"><input type="checkbox" name="fon${i}" ${on ? "checked" : ""}><span>${on ? "Activa" : "Apagada"}</span></label>
+    <input class="inp" type="time" name="fa${i}" value="${esc(a)}" aria-label="Desde"><span>a</span><input class="inp" type="time" name="fb${i}" value="${esc(b)}" aria-label="Hasta">
+    <button type="button" class="linkbtn warn" data-frx aria-label="Borrar franja">✕</button></div>`;
   function ajustesHTML() {
     const S = P.settings, r = S.retiro || { dias: [], rangos: [] }, club = S.club || {};
     const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -628,7 +667,9 @@
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="retiro"><b>Horarios de retiro</b>
           <div class="checks">${dias.map((d, i) => `<label><input type="checkbox" name="d${i}" ${r.dias.includes(i) ? "checked" : ""}> ${d}</label>`).join("")}</div>
-          <label>Franjas (separadas por coma)<input class="inp" name="rangos" value="${esc(r.rangos.map((x) => x.join("-")).join(", "))}" placeholder="10:00-13:00, 14:30-21:00"></label>
+          <div class="frlist"><small>Franjas</small>${r.rangos.map(([a, b], i) => frRow(i, a, b, !(r.apagadas || []).includes(a + "-" + b))).join("")}</div>
+          <button type="button" class="linkbtn" data-fradd>+ Agregar franja</button>
+          <span class="hintp">Apagá una franja para dejar de ofrecerla sin borrar el horario. Para cerrarla solo hoy o mañana (o marcar que están a full), usá <b>Horarios para pedir</b> arriba de Pedidos.</span>
           <div class="row2"><label>Turnos cada (min)<input class="inp" name="cada" type="number" value="${r.cadaMin || 30}"></label><label>Anticipación mínima (min)<input class="inp" name="antic" type="number" value="${r.anticipacionMin || 40}"></label></div>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="club"><b>Setto Club</b>
@@ -783,7 +824,7 @@
   const MQ_TIPO = [["monto", "Descuento en $"], ["porcentaje", "Descuento en %"], ["mochi", "Un mochi gratis"]];
   const AJ_SEC = [
     { k: "contacto", g: "Pedidos", t: "Contacto", d: "El WhatsApp que recibe los pedidos, Instagram y tu link de links.", s: (S) => pretty(S.whatsapp) || "Sin WhatsApp" },
-    { k: "retiro", g: "Pedidos", t: "Horarios de retiro", d: "Qué días y en qué franjas pueden elegir retirar.", s: (S) => { const r = S.retiro || {}; return (r.dias || []).length ? `${r.dias.length} días · ${(r.rangos || []).map((x) => x.join("–")).join(", ")}` : "Sin días"; } },
+    { k: "retiro", g: "Pedidos", t: "Horarios de retiro", d: "Qué días y en qué franjas pueden elegir retirar.", s: (S) => { const r = S.retiro || {}, off = r.apagadas || []; return (r.dias || []).length ? `${r.dias.length} días · ${(r.rangos || []).filter((x) => !off.includes(x.join("-"))).map((x) => x.join("–")).join(", ") || "sin franjas activas"}${off.length ? ` · ${off.length} apagada${off.length > 1 ? "s" : ""}` : ""}` : "Sin días"; } },
     { k: "envio", g: "Pedidos", t: "Envío a domicilio", d: "Si ofrecés envío, cuánto cuesta y cómo se paga.", s: (S) => ((S.envio || {}).activo ? ((S.envio || {}).costo ? "Activo · " + money((S.envio || {}).costo) : "Activo · a coordinar") : "Apagado") },
     { k: "pagos", g: "Pedidos", t: "Formas de pago", d: "Las opciones que ve el cliente al pedir.", s: (S) => `${(S.pagos || []).length} formas` },
     { k: "personalizacion", g: "Pedidos", t: "Personalizar bebidas", d: "Leches con recargo y lo que se puede sacar.", s: (S) => ((S.personalizacion || {}).activo !== false ? `Activo · ${((S.personalizacion || {}).leches || []).length} leches` : "Apagado") },
@@ -853,10 +894,13 @@
         await API.saveSetting("instagram", (f.instagram || "").replace(/^@/, "").trim()); await API.saveSetting("links", (f.links || "").trim());
       }
       if (k === "retiro") {
-        const rangos = (f.rangos || "").split(",").map((s) => s.trim()).filter(Boolean).map((s) => s.split("-").map((x) => x.trim()));
-        if (!rangos.length || rangos.some((x) => x.length !== 2 || !/^\d{1,2}:\d{2}$/.test(x[0]) || !/^\d{1,2}:\d{2}$/.test(x[1]))) throw new Error("Franjas con formato 10:00-13:00, 14:30-21:00");
-        const dias = [0, 1, 2, 3, 4, 5, 6].filter((i) => f["d" + i]);
-        await API.saveSetting("retiro", { dias, rangos: rangos.map(([a, b]) => [a.padStart(5, "0"), b.padStart(5, "0")]), cadaMin: Math.max(5, +f.cada || 30), anticipacionMin: Math.max(0, +f.antic || 0) });
+        const fr = [...form.querySelectorAll(".frrow")].map((row) => { const v = (n) => (row.querySelector(`[name^=${n}]`).value || "").trim();
+          return [v("fa").padStart(5, "0"), v("fb").padStart(5, "0"), row.querySelector("[name^=fon]").checked, v("fa") || v("fb")]; }).filter((x) => x[3]);
+        if (!fr.length) throw new Error("Agregá al menos una franja");
+        if (fr.some(([a, b]) => !/^\d{2}:\d{2}$/.test(a) || !/^\d{2}:\d{2}$/.test(b) || a >= b)) throw new Error("Revisá las franjas: cada una necesita desde y hasta, y el hasta va después");
+        const dias = [0, 1, 2, 3, 4, 5, 6].filter((i) => f["d" + i]), prev = P.settings.retiro || {};
+        await API.saveSetting("retiro", { dias, rangos: fr.map(([a, b]) => [a, b]), apagadas: fr.filter((x) => !x[2]).map(([a, b]) => a + "-" + b),
+          cierres: cierresVigentes(prev), cadaMin: Math.max(5, +f.cada || 30), anticipacionMin: Math.max(0, +f.antic || 0) });
       }
       if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: Math.max(0, Math.min(10, +f.spp)), premio: (f.premio || "").trim(), minimo: Math.max(0, +f.minimo || 0),
         premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0), regalo: !!f.regalo, sello_resena: !!f.sres });
@@ -1181,6 +1225,11 @@
       catch (err) { toast(err.message || "No se pudo subir la foto"); }
     }
   });
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-fradd]")) { const l = e.target.closest("form").querySelector(".frlist"); l.insertAdjacentHTML("beforeend", frRow(Date.now().toString(36))); l.lastElementChild.querySelector("[name^=fa]").focus(); return; }
+    const x = e.target.closest("[data-frx]"); if (x) x.closest(".frrow").remove();
+  });
+  document.addEventListener("change", (e) => { if (e.target.matches(".frsw input")) e.target.nextElementSibling.textContent = e.target.checked ? "Activa" : "Apagada"; });
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-upx]"); if (!x) return; const n = x.dataset.upx, form = x.closest("form"); form.querySelector(`[name="${n}"]`).value = ""; const pv = form.querySelector(`[data-prevfor="${n}"]`); if (pv) pv.textContent = "—"; });
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-slx]"); if (!x) return; const r = x.closest(".slrow"), i = x.dataset.slx; ["si", "st", "sx"].forEach((p) => (r.querySelector(`[name=${p}${i}]`).value = "")); r.querySelector(".upprev").textContent = "Vacío · tocá Guardar"; x.remove(); });
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-applogo-x]"); if (!x) return; const row = x.closest(".applogo"); row.querySelector(`[name=al${x.dataset.applogoX}]`).value = ""; row.querySelector(".lprev").textContent = "Sin logo"; x.remove(); });

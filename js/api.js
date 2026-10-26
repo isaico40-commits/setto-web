@@ -131,6 +131,7 @@
   }
   const demo = {
     async loadAll() { const db = dbLoad(); return { settings: db.settings, products: db.products }; },
+    async getSetting(key) { return dbLoad().settings[key]; },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio: elegido, gift, maq }) {
       const db = dbLoad(), ph = normPhone(phone), esp = db.settings.especial || {}, envio = db.settings.envio || {}, club = db.settings.club || {}, pers = db.settings.personalizacion || {};
       modo = modo === "envio" ? "envio" : "retiro";
@@ -572,6 +573,8 @@
       fail(s.error); fail(p.error);
       return arma(s.data, p.data);
     },
+    // un ajuste suelto y fresco (los horarios pueden cambiar con la web abierta)
+    async getSetting(key) { const { data, error } = await sb.from("settings").select("value").eq("key", key).maybeSingle(); fail(error); return data ? data.value : undefined; },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift, maq }) {
       const { data, error } = await sb.rpc("create_order_v6", {
         p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty, leche: i.leche || null, sin: i.sin || [], bebida: i.bebida || null })),

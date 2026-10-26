@@ -390,6 +390,10 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .f textarea{min-height:60px;resize:vertical}
 .hintf{font-weight:400;font-size:.78rem;color:var(--ink-2)}
 .hintf b{font-weight:700;color:var(--ink)} .hintf .tel-mal{color:#b4231a;font-weight:600}
+/* franjas cerradas u ocupadas: aviso arriba del selector de horario */
+.hora-aviso{display:block;margin:0;background:color-mix(in srgb,var(--coral) 22%,var(--card));border-left:3px solid var(--coral);border-radius:10px;padding:8px 10px;font-size:.8rem;font-weight:500;line-height:1.4;color:var(--ink)}
+div.f#fHora{display:grid;gap:6px;font-size:.85rem;font-weight:600}
+.f select option:disabled{color:#9a9384}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chips button{border:1.5px solid var(--turquesa);background:var(--card);border-radius:var(--pill);padding:7px 14px;font-size:.85rem;font-weight:600;color:var(--turquesa)}
 .chips button[aria-pressed="true"]{background:var(--turquesa);color:#fff}
