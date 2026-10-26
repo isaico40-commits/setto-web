@@ -267,42 +267,60 @@
     if (!API.turnosOcupados) return;
     try { const l = await API.turnosOcupados(); if (l) { P.ocup = l; if (P.view === "pedidos") drawHorarios(); } } catch (_) {}
   }
-  /* ---------- Horarios para pedir: cerrar u ocupar una franja hoy o mañana sin tocar los horarios fijos ---------- */
+  /* ---------- Horarios para pedir: cerrar una franja hoy o mañana sin tocar los horarios fijos, y ver o liberar los turnos en alta demanda ---------- */
   const fechaKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const diaMas = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
-  const cierresVigentes = (r) => (r.cierres || []).filter((c) => c.fecha >= fechaKey(new Date())); // los de días pasados se limpian solos
-  const HOR_EST = [["abierta", "Abierta"], ["ocupada", "Alta demanda"], ["cerrada", "Cerrada"]];
+  const hoyKey = () => fechaKey(new Date());
+  const cierresVigentes = (r) => (r.cierres || []).filter((c) => c.fecha >= hoyKey() && c.motivo === "cerrada"); // los de días pasados se limpian solos
+  const liberadosVigentes = (r) => (r.liberados || []).filter((c) => c.fecha >= hoyKey());
   function drawHorarios() {
     const el = $("#horCard"); if (!el) return;
     const r = P.settings.retiro || {}, dia = P.horDia || 0, day = diaMas(dia), k = fechaKey(day);
-    const fr = (r.rangos || []).filter((x) => !(r.apagadas || []).includes(x.join("-"))).map(([a, b]) => { const c = (r.cierres || []).find((x) => x.fecha === k && x.franja === a + "-" + b); return { a, b, st: c ? c.motivo : "abierta" }; });
-    const nom = day.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" }), atiende = (r.dias || []).includes(day.getDay());
-    const seg = (franja, st) => `<div class="hseg" role="radiogroup" aria-label="Estado ${franja ? "de " + franja.replace("-", " a ") : "de todo el día"}">${HOR_EST.map(([v, l]) => `<button type="button" role="radio" class="h-${v}" aria-checked="${st === v}" data-hor="${v}" data-hfr="${franja}">${l}</button>`).join("")}</div>`;
-    const todos = fr.length && fr.every((x) => x.st === fr[0].st) ? fr[0].st : "";
-    const tapadas = fr.filter((x) => x.st !== "abierta").length;
     const cupo = Math.max(0, Math.round(+(r.cupoTurno ?? 3)));
-    const llenos = cupo > 0 ? (P.ocup || []).filter((o) => o.f === k && o.n >= cupo).sort((a, b) => (a.h < b.h ? -1 : 1)) : [];
+    const fr = (r.rangos || []).filter((x) => !(r.apagadas || []).includes(x.join("-"))).map(([a, b]) => ({ a, b,
+      st: (r.cierres || []).some((x) => x.fecha === k && x.franja === a + "-" + b && x.motivo === "cerrada") ? "cerrada" : "abierta" }));
+    const nom = day.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" }), atiende = (r.dias || []).includes(day.getDay());
+    const seg = (franja, st) => `<div class="hseg" role="radiogroup" aria-label="${franja ? "Franja " + franja.replace("-", " a ") : "Todo el día"}">${[["abierta", "Abierta"], ["cerrada", "Cerrada"]].map(([v, l]) => `<button type="button" role="radio" class="h-${v}" aria-checked="${st === v}" data-hor="${v}" data-hfr="${franja}">${l}</button>`).join("")}</div>`;
+    const todos = fr.length && fr.every((x) => x.st === fr[0].st) ? fr[0].st : "";
+    const cerradas = fr.filter((x) => x.st === "cerrada").length;
+    // turnos de ese día con pedidos en curso (los listos y entregados ya liberaron su lugar) o liberados a mano
+    const lib = (h) => (r.liberados || []).some((x) => x.fecha === k && x.hora === h);
+    const turnos = [...new Set([...(P.ocup || []).filter((o) => o.f === k).map((o) => o.h), ...(r.liberados || []).filter((x) => x.fecha === k).map((x) => x.hora)])].sort()
+      .map((h) => ({ h, n: ((P.ocup || []).find((o) => o.f === k && o.h === h) || {}).n || 0, lib: lib(h) }));
+    const turnoRow = (t) => { const full = cupo > 0 && t.n >= cupo;
+      return `<div class="tturno ${full && !t.lib ? "lleno" : ""}"><span class="num"><b>${esc(t.h)}</b> · ${t.n}${cupo ? ` de ${cupo}` : ""} ${t.n === 1 && !cupo ? "pedido" : "pedidos"}</span>
+        ${t.lib ? `<span class="ttag lib">Liberado a mano</span><button type="button" class="linkbtn" data-tlib="${esc(t.h)}" data-on="0">Volver al tope</button>`
+          : full ? `<span class="ttag alta">Alta demanda</span><button type="button" class="btn solid sm" data-tlib="${esc(t.h)}" data-on="1">Liberar turno</button>`
+          : `<span class="ttag ok">Con lugar</span>`}</div>`; };
     el.innerHTML = `<div class="hhead"><div><b>Horarios para pedir</b><span class="hintp">${dia ? "Mañana" : "Hoy"}, ${esc(nom)}</span></div>
         <div class="hdia" role="tablist">${["Hoy", "Mañana"].map((l, i) => `<button type="button" role="tab" aria-selected="${dia === i}" data-hdia="${i}">${l}</button>`).join("")}</div></div>
       ${!atiende ? `<p class="hintp">Ese día no atienden. Cambialo en <a href="#ajustes/retiro">Ajustes → Horarios de retiro</a>.</p>`
         : !fr.length ? `<p class="hintp">No hay franjas activas. Prendelas en <a href="#ajustes/retiro">Ajustes → Horarios de retiro</a>.</p>`
         : `${fr.map((x) => `<div class="hrow ${x.st}"><span class="hfr num">${x.a} a ${x.b}</span>${seg(x.a + "-" + x.b, x.st)}</div>`).join("")}
           ${fr.length > 1 ? `<div class="hrow todo"><span class="hfr">Todo el día</span>${seg("", todos)}</div>` : ""}
-          ${llenos.length ? `<p class="hintp hfull">⚠ ${llenos.length === 1 ? "El turno de" : "Los turnos de"} <b>${llenos.map((o) => esc(o.h)).join(", ")}</b> ${llenos.length === 1 ? "llegó" : "llegaron"} al tope de ${cupo} ${cupo === 1 ? "pedido" : "pedidos"}: la web ya no ${llenos.length === 1 ? "lo ofrece" : "los ofrece"} y recomienda el turno siguiente.</p>` : ""}
-          <p class="hintp">${tapadas ? (tapadas === fr.length ? "Ese día no se puede pedir. " : "Pueden pedir para las franjas abiertas. ") : ""}<b>Alta demanda</b> y <b>Cerrada</b> no se pueden elegir en la web y vuelven solas a abierta al día siguiente. Los horarios fijos están en <a href="#ajustes/retiro">Ajustes</a>.</p>`}`;
+          ${cerradas ? `<p class="hintp">${cerradas === fr.length ? "Ese día no se puede pedir." : "Pueden pedir para las franjas abiertas."} Vuelve sola a abierta al día siguiente.</p>` : ""}
+          <div class="tbox"><b class="ttit">Alta demanda por turno</b>
+            ${cupo ? `<span class="hintp">Cada turno de ${r.cadaMin || 30} minutos acepta hasta ${cupo} pedidos en curso. Al marcar uno como <b>Listo</b> o <b>Entregado</b>, libera su lugar solo.</span>` : `<span class="hintp">El tope está apagado en <a href="#ajustes/retiro">Ajustes</a>: los turnos aceptan pedidos sin límite.</span>`}
+            ${turnos.length ? turnos.map(turnoRow).join("") : `<span class="hintp">Ningún turno con pedidos en curso.</span>`}</div>`}`;
+  }
+  async function guardarRetiro(cambios, msg) {
+    document.querySelectorAll("#horCard button").forEach((x) => (x.disabled = true));
+    try { await API.saveSetting("retiro", { ...(P.settings.retiro || {}), ...cambios }); await loadBase(); drawHorarios(); toast(msg); }
+    catch (err) { toast(err.message); drawHorarios(); }
   }
   document.addEventListener("click", async (e) => {
     const d = e.target.closest("[data-hdia]"); if (d) { P.horDia = +d.dataset.hdia; drawHorarios(); return; }
-    const b = e.target.closest("[data-hor]"); if (!b || b.disabled) return;
-    const r = P.settings.retiro || {}, k = fechaKey(diaMas(P.horDia || 0)), st = b.dataset.hor;
+    const r = P.settings.retiro || {}, k = fechaKey(diaMas(P.horDia || 0)), cuando = P.horDia ? "mañana" : "hoy";
+    const t = e.target.closest("#horCard [data-tlib]");
+    if (t) { // liberar un turno lleno a mano (o devolverle el tope)
+      const h = t.dataset.tlib, otros = liberadosVigentes(r).filter((x) => !(x.fecha === k && x.hora === h));
+      return guardarRetiro({ liberados: t.dataset.on === "1" ? otros.concat([{ fecha: k, hora: h }]) : otros },
+        t.dataset.on === "1" ? `Turno de ${h} liberado ${cuando}: acepta pedidos aunque esté lleno` : `Turno de ${h}: vuelve el tope de pedidos`);
+    }
+    const b = e.target.closest("#horCard [data-hor]"); if (!b || b.disabled) return;
     const fr = b.dataset.hfr ? [b.dataset.hfr] : (r.rangos || []).map((x) => x.join("-")).filter((x) => !(r.apagadas || []).includes(x));
-    const cierres = cierresVigentes(r).filter((c) => !(c.fecha === k && fr.includes(c.franja))).concat(st === "abierta" ? [] : fr.map((franja) => ({ fecha: k, franja, motivo: st })));
-    document.querySelectorAll("#horCard [data-hor]").forEach((x) => (x.disabled = true));
-    try {
-      await API.saveSetting("retiro", { ...r, cierres }); await loadBase(); drawHorarios();
-      const cual = b.dataset.hfr ? b.dataset.hfr.replace("-", " a ") : "Todo el día", cuando = P.horDia ? "mañana" : "hoy";
-      toast(st === "abierta" ? `${cual}: abierta ${cuando}` : `${cual}: ${st === "ocupada" ? "alta demanda" : "cerrada"} ${cuando}. No se puede elegir en la web.`);
-    } catch (err) { toast(err.message); drawHorarios(); }
+    const cierres = cierresVigentes(r).filter((c) => !(c.fecha === k && fr.includes(c.franja))).concat(b.dataset.hor === "cerrada" ? fr.map((franja) => ({ fecha: k, franja, motivo: "cerrada" })) : []);
+    guardarRetiro({ cierres }, `${b.dataset.hfr ? b.dataset.hfr.replace("-", " a ") : "Todo el día"}: ${b.dataset.hor} ${cuando}`);
   });
   function drawJust() {
     const el = $("#justDel"); if (!el) return; const o = P.justDelivered;
@@ -931,7 +949,7 @@
         if (fr.some(([a, b]) => !/^\d{2}:\d{2}$/.test(a) || !/^\d{2}:\d{2}$/.test(b) || a >= b)) throw new Error("Revisá las franjas: cada una necesita desde y hasta, y el hasta va después");
         const dias = [0, 1, 2, 3, 4, 5, 6].filter((i) => f["d" + i]), prev = P.settings.retiro || {};
         await API.saveSetting("retiro", { dias, rangos: fr.map(([a, b]) => [a, b]), apagadas: fr.filter((x) => !x[2]).map(([a, b]) => a + "-" + b),
-          cierres: cierresVigentes(prev), cadaMin: Math.max(5, +f.cada || 30), anticipacionMin: Math.max(0, +f.antic || 0),
+          cierres: cierresVigentes(prev), liberados: liberadosVigentes(prev), cadaMin: Math.max(5, +f.cada || 30), anticipacionMin: Math.max(0, +f.antic || 0),
           cupoTurno: Math.max(0, Math.min(20, Math.round(+f.cupo || 0))) });
       }
       if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: 1, premio: (f.premio || "").trim(), minimo: Math.max(0, +f.minimo || 0),
@@ -1088,7 +1106,7 @@
       if (b.dataset.etapa) {
         const o = P.orders.find((x) => x.id === id); b.disabled = true;
         if (o && (o.etapa || "recibido") === b.dataset.etapa) return;
-        try { await API.setEtapa(id, b.dataset.etapa); if (o) o.etapa = b.dataset.etapa; drawOrders(); toast("Estado actualizado · el WhatsApp le sale solo"); }
+        try { await API.setEtapa(id, b.dataset.etapa); if (o) o.etapa = b.dataset.etapa; drawOrders(); cargarOcupados(); toast("Estado actualizado · el WhatsApp le sale solo"); }
         catch (err) { toast(err.message); b.disabled = false; }
       }
       if (b.dataset.pagado) {
