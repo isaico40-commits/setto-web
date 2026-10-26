@@ -4,6 +4,8 @@
   const MSG = {
     pedido_inicio: { grupo: "Lo que manda el cliente", titulo: "Pedido · primera línea", vars: ["codigo", "entrega"],
       texto: "¡Hola Setto! Te paso mi pedido {codigo} {entrega}:" },
+    pedido_transferencia: { grupo: "Lo que manda el cliente", titulo: "Pedido · pago por transferencia (va después del pago)", vars: ["total", "alias", "titular"],
+      texto: "💸 Transfiero {total} al alias {alias}\nA nombre de: {titular}\nTe mando el comprobante por acá para confirmar el pedido." },
     pedido_cierre: { grupo: "Lo que manda el cliente", titulo: "Pedido · cierre (va al final)", vars: ["link"],
       texto: "📍 Sigo mi pedido acá: {link}" },
     consulta: { grupo: "Lo que manda el cliente", titulo: "Botón WhatsApp del menú", vars: [],
@@ -30,7 +32,7 @@
   const VARS = {
     nombre: "nombre del cliente", codigo: "código (STT-1234 o GIFT-…)", link: "link de seguimiento o de la gift card",
     entrega: "“para retirar” o “con envío a domicilio”", sellos: "“Sumaste 1 sello al Setto Club.” (vacío si no sumó)", faltan: "lo que falta (ej: 2 Mochi Oreo)", sello_resena: "aviso del sello de regalo por la reseña (solo en la primera compra; si no, vacío)",
-    diseno: "diseño de la gift card", monto: "monto", para: "para quién", de: "de quién (si no hay, se borra la línea)",
+    diseno: "diseño de la gift card", total: "total a pagar", alias: "alias de transferencia (Ajustes → Formas de pago)", titular: "a nombre de quién está la cuenta (si no hay, se borra la línea)", monto: "monto", para: "para quién", de: "de quién (si no hay, se borra la línea)",
   };
   function texto(key, settings) { const m = (settings && settings.mensajes) || {}; return (m[key] && String(m[key]).trim()) || (MSG[key] ? MSG[key].texto : ""); }
   function render(key, vars, settings) {
@@ -42,5 +44,13 @@
   }
   // aviso del sello de regalo por la reseña (lo mismo en supabase/functions/_shared/crm.ts)
   const SELLO_RESENA = "Como es tu primera compra en la web, si nos dejás tu reseña con un comentario o una foto, te regalamos 1 sello extra del Setto Club 🎁";
-  window.SettoMSG = { MSG, VARS, texto, render, SELLO_RESENA };
+  // datos de transferencia (Panel → Ajustes → Formas de pago, settings.transferencia).
+  // Mientras no se guarden, valen estos; si se guardan vacíos, no se muestra nada.
+  const TRANSF_DEF = { alias: "setto.mdp", titular: "Isaias Martin Garcia" };
+  function transferencia(settings) {
+    const t = settings && settings.transferencia;
+    const v = t && typeof t === "object" ? t : TRANSF_DEF;
+    return { alias: String(v.alias || "").trim(), titular: String(v.titular || "").trim() };
+  }
+  window.SettoMSG = { MSG, VARS, texto, render, SELLO_RESENA, transferencia };
 })();
