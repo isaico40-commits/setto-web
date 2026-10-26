@@ -1407,6 +1407,15 @@
     if (etapasVistas) { const c = l.find((o) => etapasVistas[o.code] && etapasVistas[o.code] !== ahora[o.code]); if (c) toast(`Tu pedido ${c.code}: ${ahora[c.code]}`); }
     etapasVistas = ahora;
   }
+  /* sello de regalo por la reseña de la primera compra (lo da la base: dar_sello_resena) */
+  const selloResOn = () => clubOn() && club().sello_resena !== false;
+  function selloResHtml(o) {
+    if (!o.primera || !selloResOn() || o.status === "cancelado") return "";
+    if (o.sello_resena) return `<p class="srs ok">🎁 Por tu reseña te sumamos 1 sello de regalo al Setto Club. ¡Gracias!</p>`;
+    if (o.resena) return o.status === "entregado" ? "" : `<p class="srs">🎁 Si tu reseña tiene comentario o foto, el sello de regalo se suma cuando te entreguemos el pedido.</p>`;
+    if (o.status === "entregado" || o.etapa === "listo") return `<p class="srs">🎁 <b>Es tu primera compra:</b> dejá tu reseña con un comentario o una foto y te regalamos 1 sello del Setto Club.</p>`;
+    return `<p class="srs">🎁 <b>Es tu primera compra:</b> cuando lo tengas, dejá tu reseña con un comentario o una foto y te regalamos 1 sello del Setto Club.</p>`;
+  }
   function trackCard(o) {
     const env = o.modo === "envio";
     const pasos = ["Recibido", "En preparación", env ? "En camino" : "Listo para retirar", "Entregado"];
@@ -1420,6 +1429,7 @@
       ${o.status === "cancelado" ? "" : `<ol class="trk-steps">${pasos.map((p, i) => `<li class="${i < idx ? "done" : i === idx ? "now" : ""}"><i></i><span>${p}</span></li>`).join("")}</ol>`}
       <p>${txt}</p>
       ${cambioHtml(o)}
+      ${selloResHtml(o)}
       ${pushHtml(o)}
       ${o.status === "entregado" ? `<div class="trk-acts">${clubOn() ? `<button class="btn" data-vercard="${esc(o.code)}">Ver mis sellos</button>` : ""}${o.resena ? `<span class="muted" style="font-size:.84rem;align-self:center">¡Gracias por tu reseña!</span>` : `<button class="btn solid" data-resena="${esc(o.code)}">Dejar reseña</button>`}<a class="btn" href="/listo">Cómo armar tu bebida</a></div>`
         : o.status === "pendiente" && idx === 2 ? `<div class="trk-acts"><a class="btn" href="/listo">Cómo armar tu bebida</a></div>` : ""}</div>`;
@@ -1641,7 +1651,7 @@
     if (puedeResenar(o)) body = `<div class="trk-acts" hidden><button class="btn solid" data-resena="${esc(o.code)}">Dejar reseña</button></div>${rvForm(o.code)}`;
     else if (o.resena) body = `<p style="margin:6px 0 0"><b>¡Gracias por tu reseña!</b> Ya quedó publicada.</p><div class="trk-acts"><button class="btn" data-verresenas>Ver reseñas</button></div>`;
     else body = `<p style="margin:6px 0 0">Tu pedido todavía está ${o.etapa === "preparando" ? "en preparación" : "en camino a estar listo"}. Cuando esté listo vas a poder dejar tu reseña acá.</p>`;
-    box.innerHTML = `<div class="trk ls-trk"><div class="trk-h"><span class="eyebrow">Tu pedido</span><b class="num">${esc(o.code)}</b><span class="trk-r">${esc(o.retiro || "")}</span></div>${body}</div>${buscarHtml(false)}`;
+    box.innerHTML = `<div class="trk ls-trk"><div class="trk-h"><span class="eyebrow">Tu pedido</span><b class="num">${esc(o.code)}</b><span class="trk-r">${esc(o.retiro || "")}</span></div>${selloResHtml(o)}${body}</div>${buscarHtml(false)}`;
   }
   document.addEventListener("submit", async (e) => {
     if (e.target.id !== "lsBuscar") return; e.preventDefault();

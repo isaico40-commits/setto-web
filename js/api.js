@@ -102,6 +102,19 @@
   const maqVigente = (x) => !x.vence_at || new Date(x.vence_at) > new Date();
   const maqPub = (x) => ({ code: x.code, titulo: x.titulo, tipo: x.tipo, valor: x.valor, saldo: x.saldo, vence_at: x.vence_at || null });
   const maqDia = (db) => Math.max(1, Math.min(5, Math.round(+(db.settings.maquinita || {}).fichas_dia || 1)));
+  // sello de regalo por la reseña de la primera compra (mismas reglas que dar_sello_resena en la base)
+  function selloResena(db, o) {
+    const club = db.settings.club || {}; db.sellos_resena = db.sellos_resena || [];
+    if (club.activo === false || club.sello_resena === false || !o || o.status !== "entregado" || !o.primera_compra) return;
+    const r = (db.reviews || []).find((x) => x.order_id === o.id);
+    if (!r || r.estado === "oculta" || (String(r.texto || "").trim().length < 10 && !r.foto)) return;
+    if (db.sellos_resena.some((x) => x.phone === o.phone || x.order_id === o.id)) return;
+    db.sellos_resena.push({ phone: o.phone, order_id: o.id });
+    let c = db.customers.find((x) => x.phone === o.phone);
+    if (!c) { c = { phone: o.phone, nombre: o.nombre, sellos: 0, canjes: 0, created_at: new Date().toISOString() }; db.customers.push(c); }
+    c.sellos += 1; db.events.unshift({ phone: o.phone, delta: 1, motivo: "Reseña de " + o.code + " (primera compra)", created_at: new Date().toISOString() });
+  }
+  const selloResCampos = (db, o) => ({ primera: !!o.primera_compra && !(db.sellos_resena || []).some((x) => x.phone === o.phone && x.order_id !== o.id), sello_resena: (db.sellos_resena || []).some((x) => x.order_id === o.id) });
   function maqJug(db, ph) {
     db.maq = db.maq || { jug: {}, premios: [] }; db.maq.jug = db.maq.jug || {}; db.maq.premios = db.maq.premios || [];
     const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
@@ -209,6 +222,7 @@
         modo, direccion: modo === "envio" ? String(direccion).trim() : null, premio, premio_txt: ptxt };
       if (giftOff > 0) o.gift = { code: gc.code, monto: giftOff };
       if (mp) o.maq = { code: mp.code, monto: maqOff };
+      o.primera_compra = !db.orders.some((x) => x.phone === ph && x.status !== "cancelado") && !(db.sellos_resena || []).some((x) => x.phone === ph);
       o.etapa = "recibido"; o.track = uid().replace(/-/g, ""); db.orders.unshift(o); dbSave(db);
       return { id: o.id, code, total, items: lines, phone: ph, modo, direccion: o.direccion, costo_envio: costo, premio, premio_txt: ptxt, descuento: off, gift: giftOff, maquinita: maqOff, meta };
     },
@@ -307,6 +321,7 @@
       o.premio = canje;
       const mcfg = db.settings.maquinita || {}, nf = Math.max(0, Math.min(50, mcfg.fichas_compra ?? 5));
       if (mcfg.activo !== false && nf > 0) { const j = maqJug(db, ph); j.fichas += nf; }
+      selloResena(db, o);
       dbSave(db); return { phone: ph, sellos: c.sellos, canje, premio: club.premio };
     },
     async cancelOrder(id) {
@@ -409,7 +424,7 @@
     async orderStatus(codes, phone) {
       const db = dbLoad(), ph = normPhone(phone), since = Date.now() - 3 * 864e5;
       return db.orders.filter((o) => o.phone === ph && codes.includes(o.code) && new Date(o.created_at) > since)
-        .map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, track: o.track, cambio: o.cambio ? { estado: o.cambio.estado, resolucion: o.cambio.resolucion } : null, resena: (db.reviews || []).some((r) => r.order_id === o.id) }));
+        .map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, track: o.track, cambio: o.cambio ? { estado: o.cambio.estado, resolucion: o.cambio.resolucion } : null, resena: (db.reviews || []).some((r) => r.order_id === o.id), ...selloResCampos(db, o) }));
     },
     async buscarPedido(phone, code) {
       const db = dbLoad(), ph = normPhone(phone), since = Date.now() - 2 * 864e5;
@@ -418,7 +433,7 @@
     },
     async trackStatus(tracks) {
       const db = dbLoad();
-      return db.orders.filter((o) => o.track && tracks.includes(o.track)).map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, track: o.track, phone: o.phone, cambio: o.cambio ? { estado: o.cambio.estado, resolucion: o.cambio.resolucion } : null, resena: (db.reviews || []).some((r) => r.order_id === o.id) }));
+      return db.orders.filter((o) => o.track && tracks.includes(o.track)).map((o) => ({ code: o.code, status: o.status, etapa: o.etapa || "recibido", modo: o.modo, retiro: o.retiro, total: o.total, created_at: o.created_at, sellos: o.sellos || 0, track: o.track, phone: o.phone, cambio: o.cambio ? { estado: o.cambio.estado, resolucion: o.cambio.resolucion } : null, resena: (db.reviews || []).some((r) => r.order_id === o.id), ...selloResCampos(db, o) }));
     },
     async pushSuscribir() { throw new Error("En modo demo no hay notificaciones"); },
     async pushDesuscribir() {},
@@ -448,7 +463,7 @@
       const o = db.orders.find((x) => x.code === code && x.phone === ph && (x.status === "entregado" || (x.status === "pendiente" && x.etapa === "listo")));
       if (!o) throw new Error("Vas a poder dejar tu reseña cuando tu pedido esté listo");
       if (db.reviews.some((r) => r.order_id === o.id)) throw new Error("Ya dejaste una reseña de este pedido. ¡Gracias!");
-      db.reviews.unshift({ id: uid(), order_id: o.id, phone: ph, nombre: o.nombre, rating, texto: String(texto || "").trim() || null, foto: foto || null, instagram: ig.toLowerCase() || null, estado: "aprobada", revisada: false, created_at: new Date().toISOString() }); dbSave(db);
+      db.reviews.unshift({ id: uid(), order_id: o.id, phone: ph, nombre: o.nombre, rating, texto: String(texto || "").trim() || null, foto: foto || null, instagram: ig.toLowerCase() || null, estado: "aprobada", revisada: false, created_at: new Date().toISOString() }); selloResena(db, o); dbSave(db);
     },
     async publicReviews() {
       const ok = ordenRv(dbLoad().reviews || []).filter((r) => r.estado === "aprobada");

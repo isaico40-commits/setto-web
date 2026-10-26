@@ -18,8 +18,8 @@
       texto: "¡Hola {nombre}! Tu pedido {codigo} de Setto está listo. Ya podés pasar a buscarlo 🙌\n\nSeguí tu pedido acá: {link}" },
     aviso_camino: { grupo: "Lo que mandan ustedes", titulo: "Aviso · En camino (envío)", vars: ["nombre", "codigo", "link"],
       texto: "¡Hola {nombre}! Tu pedido {codigo} de Setto ya salió y va en camino 🛵\n\nSeguí tu pedido acá: {link}" },
-    pedir_resena: { grupo: "Lo que mandan ustedes", titulo: "Pedir reseña (al entregar)", vars: ["nombre", "codigo", "sellos", "link"],
-      texto: "¡Gracias por tu pedido, {nombre}! 🙌 {sellos}\n\nAcá ves cómo armar tu bebida, tus sellos y, si te gustó, podés dejar tu reseña (con foto si querés):\n{link}" },
+    pedir_resena: { grupo: "Lo que mandan ustedes", titulo: "Pedir reseña (al entregar)", vars: ["nombre", "codigo", "sellos", "sello_resena", "link"],
+      texto: "¡Gracias por tu pedido, {nombre}! 🙌 {sellos}\n\n{sello_resena}\n\nAcá ves cómo armar tu bebida, tus sellos y, si te gustó, podés dejar tu reseña (con foto si querés):\n{link}" },
     pedir_cambio: { grupo: "Lo que mandan ustedes", titulo: "Falta algo del pedido (pedir cambio)", vars: ["nombre", "codigo", "faltan", "link"],
       texto: "¡Hola {nombre}! Perdón, nos quedamos sin {faltan} para tu pedido {codigo} 😕\n\nElegí acá con qué lo reemplazamos o si preferís sacarlo (el total se ajusta solo):\n{link}" },
     aviso_cancelado: { grupo: "Lo que mandan ustedes", titulo: "Aviso · Pedido cancelado", vars: ["nombre", "codigo"],
@@ -29,7 +29,7 @@
   };
   const VARS = {
     nombre: "nombre del cliente", codigo: "código (STT-1234 o GIFT-…)", link: "link de seguimiento o de la gift card",
-    entrega: "“para retirar” o “con envío a domicilio”", sellos: "“Sumaste 1 sello al Setto Club.” (vacío si no sumó)", faltan: "lo que falta (ej: 2 Mochi Oreo)",
+    entrega: "“para retirar” o “con envío a domicilio”", sellos: "“Sumaste 1 sello al Setto Club.” (vacío si no sumó)", faltan: "lo que falta (ej: 2 Mochi Oreo)", sello_resena: "aviso del sello de regalo por la reseña (solo en la primera compra; si no, vacío)",
     diseno: "diseño de la gift card", monto: "monto", para: "para quién", de: "de quién (si no hay, se borra la línea)",
   };
   function texto(key, settings) { const m = (settings && settings.mensajes) || {}; return (m[key] && String(m[key]).trim()) || (MSG[key] ? MSG[key].texto : ""); }
@@ -40,5 +40,7 @@
     t = t.replace(/\{(\w+)\}/g, (_, k) => (vars[k] === undefined || vars[k] === null ? "" : String(vars[k])));
     return t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   }
-  window.SettoMSG = { MSG, VARS, texto, render };
+  // aviso del sello de regalo por la reseña (lo mismo en supabase/functions/_shared/crm.ts)
+  const SELLO_RESENA = "Como es tu primera compra en la web, si nos dejás tu reseña con un comentario o una foto, te regalamos 1 sello extra del Setto Club 🎁";
+  window.SettoMSG = { MSG, VARS, texto, render, SELLO_RESENA };
 })();
