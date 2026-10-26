@@ -104,13 +104,15 @@ export function nombreDrop(E: { wa_nombre?: string; titulo?: string }) {
 }
 
 /* ---------------- Avisos del pedido por WhatsApp ---------------- */
+// aviso del sello de regalo por la reseña de la primera compra (lo mismo en js/mensajes.js)
+export const SELLO_RESENA = "Como es tu primera compra en la web, si nos dejás tu reseña con un comentario o una foto, te regalamos 1 sello extra del Setto Club 🎁";
 // Mismos textos por defecto que js/mensajes.js (se editan en Panel → Ajustes → Mensajes y llegan en settings.mensajes).
 export const AVISOS: Record<string, string> = {
   aviso_recibido: "¡Hola {nombre}! Recibimos tu pedido {codigo} de Setto. Te avisamos cuando esté listo.\n\nSeguí tu pedido acá: {link}",
   aviso_preparando: "¡Hola {nombre}! Ya estamos preparando tu pedido {codigo} de Setto.\n\nSeguí tu pedido acá: {link}",
   aviso_listo: "¡Hola {nombre}! Tu pedido {codigo} de Setto está listo. Ya podés pasar a buscarlo 🙌\n\nSeguí tu pedido acá: {link}",
   aviso_camino: "¡Hola {nombre}! Tu pedido {codigo} de Setto ya salió y va en camino 🛵\n\nSeguí tu pedido acá: {link}",
-  pedir_resena: "¡Gracias por tu pedido, {nombre}! 🙌 {sellos}\n\nAcá ves cómo armar tu bebida, tus sellos y, si te gustó, podés dejar tu reseña (con foto si querés):\n{link}",
+  pedir_resena: "¡Gracias por tu pedido, {nombre}! 🙌 {sellos}\n\n{sello_resena}\n\nAcá ves cómo armar tu bebida, tus sellos y, si te gustó, podés dejar tu reseña (con foto si querés):\n{link}",
   pedir_cambio: "¡Hola {nombre}! Perdón, nos quedamos sin {faltan} para tu pedido {codigo} 😕\n\nElegí acá con qué lo reemplazamos o si preferís sacarlo (el total se ajusta solo):\n{link}",
   aviso_cancelado: "Hola {nombre}, cancelamos tu pedido {codigo} de Setto. Si tenés alguna duda, respondé este mensaje.",
   gift_activa: "¡Listo! 🎁 Tu gift card de Setto para {para} ya está activa ({monto}).\n\nMandale este link para que la vea y la use:\n{link}",
@@ -123,7 +125,7 @@ export function textoGift(g: { para: string | null; monto: number; token: string
     link: `${String(sitio || "").replace(/\/$/, "")}/gift-cards?regalo=${g.token}`,
   });
 }
-export type PedidoAviso = { code: string; nombre: string | null; track: string | null; modo: string | null; sellos?: number | null; cambio?: { faltan?: { qty: number; nombre: string; size?: string }[] } | null };
+export type PedidoAviso = { code: string; nombre: string | null; track: string | null; modo: string | null; sellos?: number | null; sello_resena?: boolean; cambio?: { faltan?: { qty: number; nombre: string; size?: string }[] } | null };
 // igual que render() de js/mensajes.js: rellena {variables}, borra líneas "Etiqueta: {var}" vacías y espacios de más
 export function rellenar(t: string, vars: Record<string, unknown>) {
   t = t.split("\n").filter((ln) => { const m = ln.match(/^[^{}]*:\s*\{(\w+)\}\s*$/); return !(m && !String(vars[m[1]] ?? "").trim()); }).join("\n");
@@ -143,6 +145,7 @@ export function textoAviso(tipo: string, o: PedidoAviso, mensajes: Record<string
     nombre: String(o.nombre || "").trim().split(/\s+/)[0] || "", codigo: o.code, faltan,
     link: tipo === "entregado" ? `${base}/listo${q}` : `${base}/${q}`,
     sellos: s > 0 ? `Sumaste ${s === 1 ? "1 sello" : s + " sellos"} al Setto Club.` : "",
+    sello_resena: tipo === "entregado" && o.sello_resena ? SELLO_RESENA : "",
   });
 }
 // el mensaje con el pedido que manda el cliente desde la web trae el código: "Te paso mi pedido STT-1234 …"

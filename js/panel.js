@@ -119,7 +119,8 @@
   }
   function resenaTxt(o) {
     const s = Number(o.sellos) || 0;
-    return M.render("pedir_resena", { nombre: primerNombre(o), codigo: o.code, link: linkListo(o), sellos: s > 0 ? `Sumaste ${s === 1 ? "1 sello" : s + " sellos"} al Setto Club.` : "" }, P.settings);
+    const club = P.settings.club || {}, regalo = o.primera_compra && club.activo !== false && club.sello_resena !== false;
+    return M.render("pedir_resena", { nombre: primerNombre(o), codigo: o.code, link: linkListo(o), sellos: s > 0 ? `Sumaste ${s === 1 ? "1 sello" : s + " sellos"} al Setto Club.` : "", sello_resena: regalo ? M.SELLO_RESENA : "" }, P.settings);
   }
   function avisoTxt(o) {
     const e = o.etapa || "recibido", key = e === "listo" ? (o.modo === "envio" ? "aviso_camino" : "aviso_listo") : e === "preparando" ? "aviso_preparando" : "aviso_recibido";
@@ -637,6 +638,7 @@
           <label>Tope del descuento en $ (0 = sin tope)<input class="inp" name="ptope" type="number" min="0" step="500" value="${club.premio_tope || 0}"></label></div>
           <label>Pedido mínimo para sumar sello (0 = sin mínimo)<input class="inp" name="minimo" type="number" min="0" step="500" value="${club.minimo || 0}"></label>
           <div class="checks"><label><input type="checkbox" name="regalo" ${club.regalo !== false && club.regalo !== "" ? "checked" : ""}> Avisar que cada pedido trae un regalo (en el Club y en el carrito)</label></div>
+          <div class="checks"><label><input type="checkbox" name="sres" ${club.sello_resena !== false ? "checked" : ""}> Regalar 1 sello por la reseña de la primera compra (con comentario o foto, una vez por celular)</label></div>
           <span class="hintp">El premio se entrega en el mismo pedido que completa la tarjeta.</span>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="personalizacion"><b>Personalización de bebidas</b>
@@ -855,7 +857,7 @@
         await API.saveSetting("retiro", { dias, rangos: rangos.map(([a, b]) => [a.padStart(5, "0"), b.padStart(5, "0")]), cadaMin: Math.max(5, +f.cada || 30), anticipacionMin: Math.max(0, +f.antic || 0) });
       }
       if (k === "club") await API.saveSetting("club", { activo: !!f.activo, meta: Math.max(2, Math.min(20, +f.meta || 8)), sellos_por_pedido: Math.max(0, Math.min(10, +f.spp)), premio: (f.premio || "").trim(), minimo: Math.max(0, +f.minimo || 0),
-        premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0), regalo: !!f.regalo });
+        premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0), regalo: !!f.regalo, sello_resena: !!f.sres });
       if (k === "maquinita") {
         const premios = MQ_PREM.map(([id, , , , tipo]) => { const tp = MQ_TIPO.some(([k]) => k === f["pk_" + id]) ? f["pk_" + id] : tipo;
           return { id, titulo: (f["pt_" + id] || "").trim(), chance: Math.max(0, Math.min(100, +String(f["pc_" + id] || "0").replace(",", ".") || 0)), tipo: tp, valor: tp === "mochi" ? 0 : Math.max(0, Math.round(+f["pv_" + id] || 0)) }; });

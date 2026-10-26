@@ -10,10 +10,10 @@ const MARCA: Record<string, string> = { recibido: "recibido", preparando: "prepa
 
 export async function avisarPedido(order_id: string, tipo: string) {
   if (!env("META_ACCESS_TOKEN") || !env("WA_PHONE_NUMBER_ID")) return { omitido: "faltan credenciales" };
-  const { data: st } = await sb.from("settings").select("key,value").in("key", ["mensajes", "wa_avisos"]);
+  const { data: st } = await sb.from("settings").select("key,value").in("key", ["mensajes", "wa_avisos", "club"]);
   const cfg = Object.fromEntries((st ?? []).map((r: any) => [r.key, r.value]));
   if (cfg.wa_avisos?.activo === false) return { omitido: "avisos apagados" };
-  const { data: o } = await sb.from("orders").select("id,code,nombre,phone,wa_phone,track,modo,sellos,cambio,avisos").eq("id", order_id).maybeSingle();
+  const { data: o } = await sb.from("orders").select("id,code,nombre,phone,wa_phone,track,modo,sellos,cambio,avisos,primera_compra").eq("id", order_id).maybeSingle();
   if (!o) return { omitido: "no existe" };
   const marca = MARCA[tipo];
   if (!marca) return { omitido: "sin aviso" };
@@ -24,7 +24,15 @@ export async function avisarPedido(order_id: string, tipo: string) {
   const desde = new Date(Date.now() - 23.5 * 3600e3).toISOString();
   const { count } = await sb.from("message_logs").select("id", { count: "exact", head: true }).eq("phone", tel).eq("direccion", "entrante").gte("created_at", desde);
   if (!count) return { omitido: "fuera de las 24 h" };
-  const texto = textoAviso(tipo, o, cfg.mensajes ?? null, env("SITE_URL"));
+  // primera compra sin reseña todavía → el pedido de reseña suma el aviso del sello de regalo (migración 045)
+  let sello_resena = false;
+  if (tipo === "entregado" && o.primera_compra && cfg.club?.activo !== false && cfg.club?.sello_resena !== false) {
+    const [{ count: rv }, { count: ya }] = await Promise.all([
+      sb.from("reviews").select("id", { count: "exact", head: true }).eq("order_id", o.id),
+      sb.from("sellos_resena").select("phone", { count: "exact", head: true }).eq("phone", o.phone)]);
+    sello_resena = !rv && !ya;
+  }
+  const texto = textoAviso(tipo, { ...o, sello_resena }, cfg.mensajes ?? null, env("SITE_URL"));
   if (!texto) return { omitido: "sin texto" };
   const r = await fetch(`https://graph.facebook.com/${VERSION}/${env("WA_PHONE_NUMBER_ID")}/messages`, {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${env("META_ACCESS_TOKEN")}` },
@@ -42,7 +50,7 @@ export async function avisarPedido(order_id: string, tipo: string) {
 // Misma regla de las 24 h: el comprador nos escribe al reservarla desde la web. Si no se puede, el panel muestra el botón manual.
 export async function avisarGift(giftcard_id: string) {
   if (!env("META_ACCESS_TOKEN") || !env("WA_PHONE_NUMBER_ID")) return { omitido: "faltan credenciales" };
-  const { data: st } = await sb.from("settings").select("key,value").in("key", ["mensajes", "wa_avisos"]);
+  const { data: st } = await sb.from("settings").select("key,value").in("key", ["mensajes", "wa_avisos", "club"]);
   const cfg = Object.fromEntries((st ?? []).map((r: any) => [r.key, r.value]));
   if (cfg.wa_avisos?.activo === false) return { omitido: "avisos apagados" };
   const { data: g } = await sb.from("giftcards").select("id,code,para,monto,token,phone,estado,link_wa_at").eq("id", giftcard_id).maybeSingle();

@@ -531,6 +531,8 @@ label.f{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 /* Seguimiento: acciones y reseña */
 .trk-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .trk-acts .btn{padding:8px 14px;font-size:.84rem}
+.trk p.srs{margin-top:10px;padding:9px 12px;border-radius:12px;background:color-mix(in srgb,var(--coral) 22%,var(--card));border:1.5px solid var(--coral);font-size:.84rem;line-height:1.45;text-align:left}
+.trk p.srs.ok{background:color-mix(in srgb,var(--turquesa) 10%,var(--card));border-color:color-mix(in srgb,var(--turquesa) 45%,transparent)}
 .push-btn{margin-top:10px;padding:8px 14px;font-size:.84rem}
 .trk p.push-on,.trk p.push-off{margin-top:8px;font-size:.84rem;color:var(--ink-2)}
 .push-ios{margin-top:10px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--turquesa) 8%,transparent);font-size:.84rem;text-align:left}
