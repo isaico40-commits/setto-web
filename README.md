@@ -254,6 +254,11 @@ python3 -m http.server 8000
 - El mensaje "Pedir reseña" del panel ahora manda a `/listo?seguir=…`.
 - Archivos del sticker: `img/qr/QR-setto-listo.pdf` (vector, 5,5 × 6,9 cm) y `.png`, apuntan a https://setto.com.ar/listo.
 
+## Pedido pagado
+- Panel → cada pedido muestra **💸 Sin pagar** o **✓ Pagado** arriba, y abajo del total un botón **Marcar pagado** (o **Desmarcar**). Sirve en pendientes y entregados; en cancelados solo se ve si ya estaba pagado.
+- Es un dato interno: el cliente no lo ve. Se guarda en `orders.pagado_at` / `pagado_por` y lo ve todo el equipo (se actualiza en vivo).
+- Migración 044 (`marcar_pagado`). Sin ella, el botón avisa que falta activarla.
+
 ## Cambio de pedido cuando falta algo
 - Panel → pedido pendiente → **¿Falta algo?**: marcás qué falta (y cuántos), nota opcional → **Pedir cambio al cliente** → botón para mandar el aviso por WhatsApp (texto editable en Ajustes → Mensajes, "Falta algo del pedido").
 - El cliente abre su link de seguimiento y elige para cada faltante un reemplazo de la misma categoría con stock, o sacarlo, o cancelar el pedido. Ve el nuevo total antes de confirmar.
