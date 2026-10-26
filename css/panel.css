@@ -242,7 +242,8 @@ a.ptab{text-decoration:none}
 .hseg .h-ocupada[aria-checked="true"]{background:#e9a23b;color:#1f1c18}
 .hseg .h-cerrada[aria-checked="true"]{background:#9b2c2c;color:#fff}
 .hseg button:disabled{opacity:.6}
-@media (max-width:420px){.hrow{flex-direction:column;align-items:stretch}.hseg{display:grid;grid-template-columns:repeat(3,1fr)}}
+.hseg button{white-space:nowrap}
+@media (max-width:420px){.hrow{flex-direction:column;align-items:stretch}.hseg{display:grid;grid-template-columns:1fr 1.25fr 1fr}.hseg button{padding:7px 6px;font-size:.8rem}}
 /* Ajustes → Horarios de retiro: una fila por franja con interruptor */
 .frlist{display:grid;gap:8px;max-width:720px}.frlist>small{font-size:.85rem;font-weight:600;color:var(--ink)}
 .frrow{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;grid-template-areas:"sw sw sw x" "a sep b .";align-items:center;gap:6px 8px;background:var(--bg);border-radius:12px;padding:8px 10px}

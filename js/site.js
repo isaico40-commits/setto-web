@@ -419,7 +419,7 @@
     const now = new Date(), mins = now.getHours() * 60 + now.getMinutes();
     const f = franjasDia(now).find((x) => mins >= hhmm(x.a) && mins < hhmm(x.b)), st = f ? f.estado : "cerrada";
     el.classList.toggle("open", st === "abierta"); el.classList.toggle("closed", st !== "abierta");
-    el.innerHTML = st === "abierta" ? "<i></i>Abierto ahora" : st === "ocupada" ? "<i></i>Ocupados ahora" : "<i></i>Cerrado ahora";
+    el.innerHTML = st === "abierta" ? "<i></i>Abierto ahora" : st === "ocupada" ? "<i></i>Alta demanda ahora" : "<i></i>Cerrado ahora";
   }
   setInterval(() => { try { renderAbierto(); } catch (_) {} }, 60000);
 
@@ -1037,13 +1037,13 @@
         }
         if (!turnos.length) continue; // ya pasó
         if (f.estado === "abierta") { turnos.forEach((txt) => items.push({ txt, ok: true })); n += turnos.length; }
-        else { items.push({ txt: `${nom} · ${f.a} a ${f.b} · ${f.estado === "ocupada" ? "sin lugar" : "cerrado"}`, ok: false }); tapadas.push(f); }
+        else { items.push({ txt: `${nom} · ${f.a} a ${f.b} · ${f.estado === "ocupada" ? "alta demanda" : "cerrado"}`, ok: false }); tapadas.push(f); }
       }
       if (!items.length) continue;
       if (tapadas.length) {
         const quedan = items.some((x) => x.ok);
         const por = (st, txt) => { const l = tapadas.filter((f) => f.estado === st); return l.length ? l.map(franjaTxt).join(" y ") + txt : ""; };
-        avisos.push(`${nom} ${[por("cerrada", " está cerrado"), por("ocupada", " estamos a full")].filter(Boolean).join(" y ")}. ` + (quedan ? "Podés elegir otro horario." : `${d === 0 ? "Hoy" : "Ese día"} no quedan horarios: elegí otro día.`));
+        avisos.push(`${nom} ${[por("cerrada", " está cerrado"), por("ocupada", " tenemos alta demanda")].filter(Boolean).join(" y ")}. ` + (quedan ? "Podés elegir otro horario." : `${d === 0 ? "Hoy" : "Ese día"} no quedan horarios: elegí otro día.`));
       }
       dias.push({ nom, items });
     }

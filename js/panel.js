@@ -256,7 +256,7 @@
   const fechaKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const diaMas = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
   const cierresVigentes = (r) => (r.cierres || []).filter((c) => c.fecha >= fechaKey(new Date())); // los de días pasados se limpian solos
-  const HOR_EST = [["abierta", "Abierta"], ["ocupada", "A full"], ["cerrada", "Cerrada"]];
+  const HOR_EST = [["abierta", "Abierta"], ["ocupada", "Alta demanda"], ["cerrada", "Cerrada"]];
   function drawHorarios() {
     const el = $("#horCard"); if (!el) return;
     const r = P.settings.retiro || {}, dia = P.horDia || 0, day = diaMas(dia), k = fechaKey(day);
@@ -271,7 +271,7 @@
         : !fr.length ? `<p class="hintp">No hay franjas activas. Prendelas en <a href="#ajustes/retiro">Ajustes → Horarios de retiro</a>.</p>`
         : `${fr.map((x) => `<div class="hrow ${x.st}"><span class="hfr num">${x.a} a ${x.b}</span>${seg(x.a + "-" + x.b, x.st)}</div>`).join("")}
           ${fr.length > 1 ? `<div class="hrow todo"><span class="hfr">Todo el día</span>${seg("", todos)}</div>` : ""}
-          <p class="hintp">${tapadas ? (tapadas === fr.length ? "Ese día no se puede pedir. " : "Pueden pedir para las franjas abiertas. ") : ""}<b>A full</b> y <b>Cerrada</b> no se pueden elegir en la web y vuelven solas a abierta al día siguiente. Los horarios fijos están en <a href="#ajustes/retiro">Ajustes</a>.</p>`}`;
+          <p class="hintp">${tapadas ? (tapadas === fr.length ? "Ese día no se puede pedir. " : "Pueden pedir para las franjas abiertas. ") : ""}<b>Alta demanda</b> y <b>Cerrada</b> no se pueden elegir en la web y vuelven solas a abierta al día siguiente. Los horarios fijos están en <a href="#ajustes/retiro">Ajustes</a>.</p>`}`;
   }
   document.addEventListener("click", async (e) => {
     const d = e.target.closest("[data-hdia]"); if (d) { P.horDia = +d.dataset.hdia; drawHorarios(); return; }
@@ -283,7 +283,7 @@
     try {
       await API.saveSetting("retiro", { ...r, cierres }); await loadBase(); drawHorarios();
       const cual = b.dataset.hfr ? b.dataset.hfr.replace("-", " a ") : "Todo el día", cuando = P.horDia ? "mañana" : "hoy";
-      toast(st === "abierta" ? `${cual}: abierta ${cuando}` : `${cual}: ${st === "ocupada" ? "a full" : "cerrada"} ${cuando}. No se puede elegir en la web.`);
+      toast(st === "abierta" ? `${cual}: abierta ${cuando}` : `${cual}: ${st === "ocupada" ? "alta demanda" : "cerrada"} ${cuando}. No se puede elegir en la web.`);
     } catch (err) { toast(err.message); drawHorarios(); }
   });
   function drawJust() {
@@ -669,7 +669,7 @@
           <div class="checks">${dias.map((d, i) => `<label><input type="checkbox" name="d${i}" ${r.dias.includes(i) ? "checked" : ""}> ${d}</label>`).join("")}</div>
           <div class="frlist"><small>Franjas</small>${r.rangos.map(([a, b], i) => frRow(i, a, b, !(r.apagadas || []).includes(a + "-" + b))).join("")}</div>
           <button type="button" class="linkbtn" data-fradd>+ Agregar franja</button>
-          <span class="hintp">Apagá una franja para dejar de ofrecerla sin borrar el horario. Para cerrarla solo hoy o mañana (o marcar que están a full), usá <b>Horarios para pedir</b> arriba de Pedidos.</span>
+          <span class="hintp">Apagá una franja para dejar de ofrecerla sin borrar el horario. Para cerrarla solo hoy o mañana (o marcar alta demanda), usá <b>Horarios para pedir</b> arriba de Pedidos.</span>
           <div class="row2"><label>Turnos cada (min)<input class="inp" name="cada" type="number" value="${r.cadaMin || 30}"></label><label>Anticipación mínima (min)<input class="inp" name="antic" type="number" value="${r.anticipacionMin || 40}"></label></div>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="club"><b>Setto Club</b>
