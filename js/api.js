@@ -132,6 +132,8 @@
   const demo = {
     async loadAll() { const db = dbLoad(); return { settings: db.settings, products: db.products }; },
     async getSetting(key) { return dbLoad().settings[key]; },
+    // Dashboard: en modo demo solo hay pedidos web (la Caja necesita Supabase)
+    async dashboard(desde) { return { orders: dbLoad().orders.filter((o) => new Date(o.created_at) >= desde), caja: null, stock: null }; },
     async turnosOcupados() { // mismo cálculo que la función turnos_ocupados de Supabase
       const k = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`, hoy = k(new Date()), cnt = {};
       dbLoad().orders.filter((o) => o.status === "pendiente" && (o.etapa || "recibido") !== "listo" && /· \d{1,2}:\d{2} hs$/.test(o.retiro || "")).forEach((o) => {
@@ -599,6 +601,19 @@
     async getSetting(key) { const { data, error } = await sb.from("settings").select("value").eq("key", key).maybeSingle(); fail(error); return data ? data.value : undefined; },
     // cuántos pedidos hay por turno (fecha + hora), sin datos de clientes; null si la función todavía no está en la base
     async turnosOcupados() { const { data, error } = await sb.rpc("turnos_ocupados"); return error ? null : data || []; },
+    // Dashboard: pedidos web, entradas y gastos de la Caja y mochis vendidos (stock) desde un día. Si la Caja falla, sigue solo con los pedidos.
+    async dashboard(desde) {
+      const iso = desde.toISOString(), f = `${desde.getFullYear()}-${String(desde.getMonth() + 1).padStart(2, "0")}-${String(desde.getDate()).padStart(2, "0")}`;
+      const [o, m, c, s, it] = await Promise.all([
+        sb.from("orders").select("id, code, phone, items, total, pago, modo, status, created_at").gte("created_at", iso).order("created_at").limit(3000),
+        sb.from("caja_movimientos").select("fecha, tipo, monto, categoria_id, registro").in("tipo", ["entrada", "gasto"]).eq("estado", "activo").gte("fecha", f).limit(5000),
+        sb.from("caja_categorias").select("id, nombre"),
+        sb.from("caja_stock_mov").select("item_id, delta, created_at").eq("motivo", "venta").eq("estado", "activo").gte("created_at", iso).limit(5000),
+        sb.from("caja_stock_items").select("id, nombre"),
+      ]);
+      fail(o.error);
+      return { orders: o.data || [], caja: m.error ? null : { movs: m.data || [], cats: c.data || [] }, stock: s.error ? null : { movs: s.data || [], items: it.data || [] } };
+    },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift, maq }) {
       const { data, error } = await sb.rpc("create_order_v6", {
         p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty, leche: i.leche || null, sin: i.sin || [], bebida: i.bebida || null, ...(i.mochis ? { mochis: i.mochis } : {}) })),

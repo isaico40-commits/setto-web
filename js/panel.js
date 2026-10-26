@@ -63,7 +63,7 @@
   async function loadBase() { const { settings, products } = await API.loadAll(); P.settings = settings; P.products = products; }
 
   /* =================== ESTRUCTURA =================== */
-  const VISTAS = ["pedidos", "club", "campanas", "carta", "resenas", "gift", "ajustes"]; // también sirven como #hash (lo usan los avisos push)
+  const VISTAS = ["pedidos", "dashboard", "club", "campanas", "carta", "resenas", "gift", "ajustes"]; // también sirven como #hash (lo usan los avisos push)
   // #vista, #ajustes/seccion o #pedidos/estado/codigo (lo usa la caja para abrir un pedido)
   function leerHash() {
     const [v, a, b] = location.hash.slice(1).split("/").map((x) => decodeURIComponent(x || ""));
@@ -78,7 +78,7 @@
         <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.svg" alt="Setto"></a>
         <nav class="appsw" aria-label="Cambiar de app"><a href="panel.html" aria-current="page">Pedidos</a><a href="caja.html">Caja</a></nav>
         <nav class="ptabs" role="tablist">
-          ${[["pedidos", "Pedidos"], ["club", "Club"], ["campanas", "Campañas"], ["carta", "Carta"], ["resenas", "Reseñas"], ["gift", "Gift cards"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : k === "resenas" ? ' <span class="n" id="resN" hidden>0</span>' : k === "gift" ? ' <span class="n" id="gcN" hidden>0</span>' : ""}</button>`).join("")}
+          ${[["pedidos", "Pedidos"], ["dashboard", "Dashboard"], ["club", "Club"], ["campanas", "Campañas"], ["carta", "Carta"], ["resenas", "Reseñas"], ["gift", "Gift cards"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : k === "resenas" ? ' <span class="n" id="resN" hidden>0</span>' : k === "gift" ? ' <span class="n" id="gcN" hidden>0</span>' : ""}</button>`).join("")}
         </nav>
         <button class="avisos-btn" id="avisosBtn" aria-expanded="false" aria-controls="avisos" title="Avisos en este dispositivo"><span>🔔</span><i hidden></i></button>
         <span class="who">${esc(P.user && P.user.email || "")}<button id="logout">Salir</button></span>
@@ -90,7 +90,7 @@
     if (!sinCheck && P.view === "ajustes" && !ajSalir()) return;
     P.view = v; marcarHash();
     document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === v)));
-    ({ pedidos: viewPedidos, club: viewClub, campanas: viewCampanas, carta: viewCarta, resenas: viewResenas, gift: viewGift, ajustes: viewAjustes })[v]();
+    ({ pedidos: viewPedidos, dashboard: viewDashboard, club: viewClub, campanas: viewCampanas, carta: viewCarta, resenas: viewResenas, gift: viewGift, ajustes: viewAjustes })[v]();
   }
 
   /* =================== PEDIDOS =================== */
@@ -246,6 +246,7 @@
       document.title = (pend.length ? `(${pend.length}) ` : "") + "Panel Setto";
       if (notify && pend.length > prev) toast("Entró un pedido nuevo");
       if (P.view === "pedidos") { P.orders = P.sub === "pendiente" ? pend : await API.listOrders(P.sub); drawOrders(); cargarOcupados(); }
+      if (P.view === "dashboard" && notify) cargarDash();
     } catch (e) { console.error(e); }
   }
   function viewPedidos() {
@@ -273,16 +274,36 @@
   const hoyKey = () => fechaKey(new Date());
   const cierresVigentes = (r) => (r.cierres || []).filter((c) => c.fecha >= hoyKey() && c.motivo === "cerrada"); // los de días pasados se limpian solos
   const liberadosVigentes = (r) => (r.liberados || []).filter((c) => c.fecha >= hoyKey());
-  function drawHorarios() {
-    const el = $("#horCard"); if (!el) return;
+  // lo que comparten las dos tarjetas: Horarios para pedir (Dashboard) y Alta demanda por turno (Pedidos)
+  function horDatos() {
     const r = P.settings.retiro || {}, dia = P.horDia || 0, day = diaMas(dia), k = fechaKey(day);
-    const cupo = Math.max(0, Math.round(+(r.cupoTurno ?? 3)));
     const fr = (r.rangos || []).filter((x) => !(r.apagadas || []).includes(x.join("-"))).map(([a, b]) => ({ a, b,
       st: (r.cierres || []).some((x) => x.fecha === k && x.franja === a + "-" + b && x.motivo === "cerrada") ? "cerrada" : "abierta" }));
-    const nom = day.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" }), atiende = (r.dias || []).includes(day.getDay());
+    return { r, dia, k, fr, cupo: Math.max(0, Math.round(+(r.cupoTurno ?? 3))), atiende: (r.dias || []).includes(day.getDay()),
+      nom: day.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" }) };
+  }
+  const horHead = (tit, H) => `<div class="hhead"><div><b>${tit}</b><span class="hintp">${H.dia ? "Mañana" : "Hoy"}, ${esc(H.nom)}</span></div>
+      <div class="hdia" role="tablist">${["Hoy", "Mañana"].map((l, i) => `<button type="button" role="tab" aria-selected="${H.dia === i}" data-hdia="${i}">${l}</button>`).join("")}</div></div>`;
+  const horSin = (H) => !H.atiende ? `<p class="hintp">Ese día no atienden. Cambialo en <a href="#ajustes/retiro">Ajustes → Horarios de retiro</a>.</p>`
+    : !H.fr.length ? `<p class="hintp">No hay franjas activas. Prendelas en <a href="#ajustes/retiro">Ajustes → Horarios de retiro</a>.</p>` : "";
+  function drawHorarios() { drawFranjas(); drawAltaDemanda(); }
+  // Dashboard → Horarios para pedir: cerrar una franja hoy o mañana sin tocar los horarios fijos
+  function drawFranjas() {
+    const el = $("#franjaCard"); if (!el) return;
+    const H = horDatos(), fr = H.fr;
     const seg = (franja, st) => `<div class="hseg" role="radiogroup" aria-label="${franja ? "Franja " + franja.replace("-", " a ") : "Todo el día"}">${[["abierta", "Abierta"], ["cerrada", "Cerrada"]].map(([v, l]) => `<button type="button" role="radio" class="h-${v}" aria-checked="${st === v}" data-hor="${v}" data-hfr="${franja}">${l}</button>`).join("")}</div>`;
     const todos = fr.length && fr.every((x) => x.st === fr[0].st) ? fr[0].st : "";
     const cerradas = fr.filter((x) => x.st === "cerrada").length;
+    el.innerHTML = horHead("Horarios para pedir", H) + (horSin(H)
+      || `${fr.map((x) => `<div class="hrow ${x.st}"><span class="hfr num">${x.a} a ${x.b}</span>${seg(x.a + "-" + x.b, x.st)}</div>`).join("")}
+          ${fr.length > 1 ? `<div class="hrow todo"><span class="hfr">Todo el día</span>${seg("", todos)}</div>` : ""}
+          ${cerradas ? `<p class="hintp">${cerradas === fr.length ? "Ese día no se puede pedir." : "Pueden pedir para las franjas abiertas."} Vuelve sola a abierta al día siguiente.</p>` : ""}
+          <p class="hintp">Los turnos en alta demanda se ven y se liberan en <a href="#pedidos">Pedidos</a>.</p>`);
+  }
+  // Pedidos → Alta demanda por turno: ver o liberar los turnos llenos
+  function drawAltaDemanda() {
+    const el = $("#horCard"); if (!el) return;
+    const H = horDatos(), { r, k, cupo } = H;
     // turnos de ese día con pedidos en curso (los listos y entregados ya liberaron su lugar) o liberados a mano
     const lib = (h) => (r.liberados || []).some((x) => x.fecha === k && x.hora === h);
     const turnos = [...new Set([...(P.ocup || []).filter((o) => o.f === k).map((o) => o.h), ...(r.liberados || []).filter((x) => x.fecha === k).map((x) => x.hora)])].sort()
@@ -292,19 +313,14 @@
         ${t.lib ? `<span class="ttag lib">Liberado a mano</span><button type="button" class="linkbtn" data-tlib="${esc(t.h)}" data-on="0">Volver al tope</button>`
           : full ? `<span class="ttag alta">Alta demanda</span><button type="button" class="btn solid sm" data-tlib="${esc(t.h)}" data-on="1">Liberar turno</button>`
           : `<span class="ttag ok">Con lugar</span>`}</div>`; };
-    el.innerHTML = `<div class="hhead"><div><b>Horarios para pedir</b><span class="hintp">${dia ? "Mañana" : "Hoy"}, ${esc(nom)}</span></div>
-        <div class="hdia" role="tablist">${["Hoy", "Mañana"].map((l, i) => `<button type="button" role="tab" aria-selected="${dia === i}" data-hdia="${i}">${l}</button>`).join("")}</div></div>
-      ${!atiende ? `<p class="hintp">Ese día no atienden. Cambialo en <a href="#ajustes/retiro">Ajustes → Horarios de retiro</a>.</p>`
-        : !fr.length ? `<p class="hintp">No hay franjas activas. Prendelas en <a href="#ajustes/retiro">Ajustes → Horarios de retiro</a>.</p>`
-        : `${fr.map((x) => `<div class="hrow ${x.st}"><span class="hfr num">${x.a} a ${x.b}</span>${seg(x.a + "-" + x.b, x.st)}</div>`).join("")}
-          ${fr.length > 1 ? `<div class="hrow todo"><span class="hfr">Todo el día</span>${seg("", todos)}</div>` : ""}
-          ${cerradas ? `<p class="hintp">${cerradas === fr.length ? "Ese día no se puede pedir." : "Pueden pedir para las franjas abiertas."} Vuelve sola a abierta al día siguiente.</p>` : ""}
-          <div class="tbox"><b class="ttit">Alta demanda por turno</b>
-            ${cupo ? `<span class="hintp">Cada turno de ${r.cadaMin || 30} minutos acepta hasta ${cupo} pedidos en curso. Al marcar uno como <b>Listo</b> o <b>Entregado</b>, libera su lugar solo.</span>` : `<span class="hintp">El tope está apagado en <a href="#ajustes/retiro">Ajustes</a>: los turnos aceptan pedidos sin límite.</span>`}
-            ${turnos.length ? turnos.map(turnoRow).join("") : `<span class="hintp">Ningún turno con pedidos en curso.</span>`}</div>`}`;
+    const cerradas = H.fr.filter((x) => x.st === "cerrada");
+    el.innerHTML = horHead("Alta demanda por turno", H) + (horSin(H)
+      || `${cupo ? `<span class="hintp">Cada turno de ${r.cadaMin || 30} minutos acepta hasta ${cupo} pedidos en curso. Al marcar uno como <b>Listo</b> o <b>Entregado</b>, libera su lugar solo.</span>` : `<span class="hintp">El tope está apagado en <a href="#ajustes/retiro">Ajustes</a>: los turnos aceptan pedidos sin límite.</span>`}
+          ${turnos.length ? turnos.map(turnoRow).join("") : `<span class="hintp">Ningún turno con pedidos en curso.</span>`}
+          ${cerradas.length ? `<p class="hintp">${cerradas.length === H.fr.length ? "Ese día está cerrado para pedir" : `Cerrada: ${cerradas.map((x) => `${x.a} a ${x.b}`).join(", ")}`}. Abrila en <a href="#dashboard">Dashboard → Horarios para pedir</a>.</p>` : ""}`);
   }
   async function guardarRetiro(cambios, msg) {
-    document.querySelectorAll("#horCard button").forEach((x) => (x.disabled = true));
+    document.querySelectorAll(".horcard button").forEach((x) => (x.disabled = true));
     try { await API.saveSetting("retiro", { ...(P.settings.retiro || {}), ...cambios }); await loadBase(); drawHorarios(); toast(msg); }
     catch (err) { toast(err.message); drawHorarios(); }
   }
@@ -317,10 +333,143 @@
       return guardarRetiro({ liberados: t.dataset.on === "1" ? otros.concat([{ fecha: k, hora: h }]) : otros },
         t.dataset.on === "1" ? `Turno de ${h} liberado ${cuando}: acepta pedidos aunque esté lleno` : `Turno de ${h}: vuelve el tope de pedidos`);
     }
-    const b = e.target.closest("#horCard [data-hor]"); if (!b || b.disabled) return;
+    const b = e.target.closest("#franjaCard [data-hor]"); if (!b || b.disabled) return;
     const fr = b.dataset.hfr ? [b.dataset.hfr] : (r.rangos || []).map((x) => x.join("-")).filter((x) => !(r.apagadas || []).includes(x));
     const cierres = cierresVigentes(r).filter((c) => !(c.fecha === k && fr.includes(c.franja))).concat(b.dataset.hor === "cerrada" ? fr.map((franja) => ({ fecha: k, franja, motivo: "cerrada" })) : []);
     guardarRetiro({ cierres }, `${b.dataset.hfr ? b.dataset.hfr.replace("-", " a ") : "Todo el día"}: ${b.dataset.hor} ${cuando}`);
+  });
+  /* =================== DASHBOARD =================== */
+  // Solo datos reales: facturación y gastos = Caja (todas las ventas), productos y horarios = pedidos web, mochis por sabor = stock de la Caja.
+  // Se traen los últimos 14 días: la semana actual se compara con la anterior y cada día con el mismo día de la semana pasada.
+  const NO_PROD = ["envio", "premio", "maquinita"];
+  const corto = (n) => { n = Math.round(n || 0); return n >= 1e6 ? "$" + (n / 1e6).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + "M" : n >= 1000 ? "$" + Math.round(n / 1000) + "k" : "$" + n; };
+  const pct = (a, b) => (b > 0 ? Math.round(((a - b) / b) * 100) : null);
+  const diaNom = (i) => (i === 0 ? "Hoy" : i === 1 ? "Ayer" : diaMas(-i).toLocaleDateString("es-AR", { weekday: "long" }));
+  function viewDashboard() {
+    $("#view").innerHTML = `<h1 class="ph1">Dashboard</h1>
+      <p class="muted">Facturación y gastos salen de la <a href="caja.html">Caja</a> (todas las ventas: web, directas, apps y cafeterías). Los productos y horarios, de los pedidos web.</p>
+      <section class="horcard" id="franjaCard"></section>
+      <div id="dash"><p class="muted">Cargando…</p></div>`;
+    drawFranjas();
+    cargarDash();
+  }
+  async function cargarDash() {
+    try { P.dash = await API.dashboard(new Date(diaMas(-13).setHours(0, 0, 0, 0))); P.dashAt = new Date(); }
+    catch (err) { const el = $("#dash"); if (el && !P.dash) el.innerHTML = `<p class="err">No se pudo cargar el dashboard: ${esc(err.message)}</p>`; return; }
+    drawDash();
+  }
+  // suma todo lo de un conjunto de días (claves AAAA-MM-DD)
+  function dashSuma(keys) {
+    const D = P.dash, ks = new Set(keys), cat = {}, itm = {};
+    ((D.caja || {}).cats || []).forEach((c) => (cat[c.id] = c.nombre)); ((D.stock || {}).items || []).forEach((x) => (itm[x.id] = x.nombre));
+    const A = { ent: 0, gas: 0, canales: {}, webN: 0, webTot: 0, canc: 0, prods: {}, mochis: {}, mochisN: 0, horas: {}, pagos: {}, modos: {}, tels: {}, dias: {} };
+    keys.forEach((k) => (A.dias[k] = { web: 0, otros: 0, n: 0 }));
+    D.orders.forEach((o) => {
+      const k = fechaKey(new Date(o.created_at)); if (!ks.has(k)) return;
+      if (o.status === "cancelado") { A.canc++; return; }
+      A.webN++; A.webTot += o.total || 0; A.dias[k].n++;
+      const h = new Date(o.created_at).getHours(); A.horas[h] = (A.horas[h] || 0) + 1;
+      const pg = o.pago || "Sin dato"; A.pagos[pg] = (A.pagos[pg] || 0) + (o.total || 0);
+      const md = o.modo === "envio" ? "Envío" : "Retiro"; A.modos[md] = (A.modos[md] || 0) + 1;
+      if (o.phone) A.tels[o.phone] = (A.tels[o.phone] || 0) + 1;
+      (o.items || []).filter((i) => !NO_PROD.includes(i.id)).forEach((i) => {
+        const n = String(i.nombre || i.id).trim(), x = A.prods[n] || (A.prods[n] = { q: 0, m: 0 }); x.q += i.qty || 0; x.m += i.subtotal || 0;
+      });
+    });
+    if (D.caja) D.caja.movs.forEach((m) => {
+      if (!ks.has(m.fecha)) return; const v = +m.monto || 0;
+      if (m.tipo === "gasto") { A.gas += v; return; }
+      const web = m.registro === "Pedidos web", c = web ? "Pedidos web" : cat[m.categoria_id] || "Sin categoría";
+      A.ent += v; A.canales[c] = (A.canales[c] || 0) + v; A.dias[m.fecha][web ? "web" : "otros"] += v;
+    });
+    if (D.stock) D.stock.movs.forEach((m) => {
+      const k = fechaKey(new Date(m.created_at)); if (!ks.has(k)) return;
+      const n = itm[m.item_id] || "Otro"; A.mochis[n] = (A.mochis[n] || 0) - (m.delta || 0); A.mochisN -= m.delta || 0;
+    });
+    return A;
+  }
+  const orden = (o, f = (v) => v) => Object.entries(o).map(([l, v]) => [l, f(v)]).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]);
+  // con comparación (cmp en %), sub es contra qué se compara; sin dato anterior (cmp === null) no se muestra
+  const tile = (lbl, val, sub, cmp) => `<div class="kpi"><span class="kl">${lbl}</span><b class="kv num">${val}</b>${cmp != null ? `<span class="kc ${cmp > 0 ? "k-sube" : cmp < 0 ? "k-baja" : ""}">${cmp > 0 ? "▲ +" : cmp < 0 ? "▼ " : "= "}${cmp}% ${sub}</span>` : sub && cmp !== null ? `<span class="kc">${sub}</span>` : ""}</div>`;
+  // barras horizontales: una sola serie, cada valor con su número al lado
+  const barras = (rows, fmt, vacio) => {
+    if (!rows.length) return `<p class="hintp">${vacio || "Sin datos."}</p>`;
+    const max = Math.max(...rows.map((r) => r[1]), 1);
+    return `<ul class="dbars">${rows.map(([l, v, sub]) => `<li title="${esc(l)}: ${esc(fmt(v))}"><span class="dl">${esc(l)}${sub ? `<small>${esc(sub)}</small>` : ""}</span><span class="dtrack"><i style="width:${Math.max(3, (v / max) * 100)}%"></i></span><b class="num">${fmt(v)}</b></li>`).join("")}</ul>`;
+  };
+  // columnas (apiladas si hay dos series): cols = [{l, v:[a, b], tip, on}]
+  const columnas = (cols, fmt) => {
+    const max = Math.max(...cols.map((c) => c.v.reduce((a, b) => a + b, 0)), 1);
+    return `<div class="dcolch" style="--n:${cols.length}">${cols.map((c) => { const t = c.v.reduce((a, b) => a + b, 0);
+      return `<div class="dcol ${c.on ? "on" : ""}" title="${esc(c.tip)}"><span class="dcv num">${t ? fmt(t) : ""}</span><span class="dstack">${c.v.map((v, i) => v ? `<i class="s${i}" style="height:${(v / max) * 100}%"></i>` : "").join("")}</span><span class="dcl">${esc(c.l)}</span></div>`; }).join("")}</div>`;
+  };
+  function drawDash() {
+    const el = $("#dash"); if (!el || !P.dash) return;
+    const D = P.dash, di = P.dashDia || 0, kDia = fechaKey(diaMas(-di)), kPas = fechaKey(diaMas(-di - 7));
+    const sem = Array.from({ length: 7 }, (_, i) => fechaKey(diaMas(-6 + i))), semAnt = Array.from({ length: 7 }, (_, i) => fechaKey(diaMas(-13 + i)));
+    const H = dashSuma([kDia]), Hp = dashSuma([kPas]), S = dashSuma(sem), Sp = dashSuma(semAnt);
+    const caja = !!D.caja, stock = !!D.stock, nomDia = diaMas(-di).toLocaleDateString("es-AR", { weekday: "long" });
+    const fact = (A) => (caja ? A.ent : A.webTot);
+    const prodRows = (A) => orden(A.prods, (x) => x.q).slice(0, 6).map(([l, q]) => [l, q, money(A.prods[l].m)]);
+    const unid = (v) => v + " u.";
+    const horasCh = (A) => { const hs = Object.keys(A.horas).map(Number); if (!hs.length) return `<p class="hintp">Sin pedidos web.</p>`;
+      const a = Math.min(...hs), b = Math.max(...hs), cols = [];
+      for (let h = a; h <= b; h++) cols.push({ l: String(h), v: [A.horas[h] || 0], tip: `${h}:00 a ${h}:59 · ${A.horas[h] || 0} pedidos` });
+      return columnas(cols, String) + `<p class="hintp">Hora en que entró cada pedido web (no la de retiro).</p>`; };
+    const sinCaja = caja ? "" : `<p class="hintp">Sin acceso a la Caja${API.DEMO ? " en modo demo" : ""}: la facturación muestra solo pedidos web.</p>`;
+    const repit = Object.values(S.tels).filter((n) => n > 1).length, clientes = Object.keys(S.tels).length;
+    const mejor = sem.map((k) => [k, caja ? S.dias[k].web + S.dias[k].otros : 0]).sort((a, b) => b[1] - a[1])[0];
+    const mejorTxt = caja && mejor[1] > 0 ? `Mejor día: <b>${new Date(mejor[0] + "T12:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}</b> con ${money(mejor[1])}.` : "";
+    el.innerHTML = `
+      <section class="dsec">
+        <div class="dhead"><h2 class="dh2">Resumen del día</h2>
+          <div class="dnav"><button type="button" data-dd="1" ${di >= 6 ? "disabled" : ""} aria-label="Día anterior">‹</button><span>${esc(diaNom(di))} ${esc(String(diaMas(-di).getDate()))}</span><button type="button" data-dd="-1" ${di <= 0 ? "disabled" : ""} aria-label="Día siguiente">›</button></div></div>
+        ${sinCaja}
+        <div class="kpis">
+          ${tile("Facturado", money(fact(H)), `vs. ${nomDia} pasado`, fact(Hp) > 0 ? pct(fact(H), fact(Hp)) : null)}
+          ${caja ? tile("Gastos", money(H.gas)) + tile("Resultado", money(H.ent - H.gas), "entradas − gastos") : ""}
+          ${tile("Pedidos web", String(H.webN), H.webN ? `ticket promedio ${money(Math.round(H.webTot / H.webN))}` : H.canc ? "" : "ninguno")}
+          ${stock ? tile("Mochis vendidos", String(H.mochisN), "todas las ventas") : ""}
+          ${H.canc ? tile("Cancelados", String(H.canc), "pedidos web") : ""}
+        </div>
+        <div class="dcols">
+          ${caja ? `<div class="dcard"><b>Por canal</b>${barras(orden(H.canales), money, "Sin entradas en la Caja.")}</div>` : ""}
+          <div class="dcard"><b>Lo que más salió en la web</b>${barras(prodRows(H), unid, "Sin pedidos web.")}</div>
+          ${stock ? `<div class="dcard"><b>Mochis por sabor</b>${barras(orden(H.mochis), unid, "Sin mochis descontados del stock.")}<p class="hintp">Lo que se descontó del stock en la Caja: web y ventas directas.</p></div>` : ""}
+          <div class="dcard"><b>Pedidos web por hora</b>${horasCh(H)}</div>
+          ${H.webN ? `<div class="dcard"><b>Formas de pago (web)</b>${barras(orden(H.pagos), money)}</div>` : ""}
+        </div>
+      </section>
+      <section class="dsec">
+        <div class="dhead"><h2 class="dh2">Últimos 7 días</h2><span class="hintp">${esc(new Date(sem[0] + "T12:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" }))} al ${esc(new Date(sem[6] + "T12:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" }))} · comparado con los 7 anteriores</span></div>
+        <div class="kpis">
+          ${tile("Facturado", money(fact(S)), "vs. semana anterior", fact(Sp) > 0 ? pct(fact(S), fact(Sp)) : null)}
+          ${tile("Promedio por día", money(Math.round(fact(S) / 7)))}
+          ${caja ? tile("Gastos", money(S.gas), "vs. semana anterior", Sp.gas > 0 ? pct(S.gas, Sp.gas) : null) + tile("Resultado", money(S.ent - S.gas), "entradas − gastos") : ""}
+          ${tile("Pedidos web", String(S.webN), "vs. semana anterior", Sp.webN > 0 ? pct(S.webN, Sp.webN) : null)}
+          ${S.webN ? tile("Ticket promedio web", money(Math.round(S.webTot / S.webN))) : ""}
+          ${stock ? tile("Mochis vendidos", String(S.mochisN), "vs. semana anterior", Sp.mochisN > 0 ? pct(S.mochisN, Sp.mochisN) : null) : ""}
+          ${clientes ? tile("Clientes web", String(clientes), repit ? `${repit} pidieron más de una vez` : "distintos") : ""}
+        </div>
+        <div class="dcols">
+          <div class="dcard wide2"><b>${caja ? "Facturado por día" : "Pedidos web por día"}</b>
+            ${caja ? `<div class="dleg"><span><i class="s0"></i>Pedidos web</span><span><i class="s1"></i>Otros canales</span></div>` : ""}
+            ${columnas(sem.map((k, i) => { const d = new Date(k + "T12:00"), x = S.dias[k];
+              return { l: d.toLocaleDateString("es-AR", { weekday: "short" }).replace(".", "") + " " + d.getDate(), on: k === kDia,
+                v: caja ? [x.web, x.otros] : [x.n], tip: caja ? `${d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}: ${money(x.web + x.otros)} (web ${money(x.web)} · otros ${money(x.otros)})` : `${x.n} pedidos` }; }), caja ? corto : String)}
+            ${mejorTxt ? `<p class="hintp">${mejorTxt}</p>` : ""}</div>
+          ${caja ? `<div class="dcard"><b>Por canal</b>${barras(orden(S.canales), money, "Sin entradas en la Caja.")}</div>` : ""}
+          <div class="dcard"><b>Lo que más salió en la web</b>${barras(prodRows(S), unid, "Sin pedidos web.")}</div>
+          ${stock ? `<div class="dcard"><b>Mochis por sabor</b>${barras(orden(S.mochis), unid, "Sin mochis descontados del stock.")}</div>` : ""}
+          ${S.webN ? `<div class="dcard"><b>Retiro o envío (web)</b>${barras(orden(S.modos), (v) => v + (v === 1 ? " pedido" : " pedidos"))}</div>` : ""}
+          ${S.webN ? `<div class="dcard"><b>Formas de pago (web)</b>${barras(orden(S.pagos), money)}</div>` : ""}
+        </div>
+      </section>
+      <p class="hintp">Actualizado ${P.dashAt ? P.dashAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""} · <button type="button" class="linkbtn" data-dre>Actualizar</button>${S.canc ? ` · ${S.canc} pedido${S.canc > 1 ? "s" : ""} web cancelado${S.canc > 1 ? "s" : ""} en la semana (no suman)` : ""}</p>`;
+  }
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("#dash [data-dd]"); if (b) { P.dashDia = Math.max(0, Math.min(6, (P.dashDia || 0) + +b.dataset.dd)); drawDash(); return; }
+    if (e.target.closest("#dash [data-dre]")) cargarDash();
   });
   function drawJust() {
     const el = $("#justDel"); if (!el) return; const o = P.justDelivered;
@@ -716,7 +865,7 @@
           <div class="checks">${dias.map((d, i) => `<label><input type="checkbox" name="d${i}" ${r.dias.includes(i) ? "checked" : ""}> ${d}</label>`).join("")}</div>
           <div class="frlist"><small>Franjas</small>${r.rangos.map(([a, b], i) => frRow(i, a, b, !(r.apagadas || []).includes(a + "-" + b))).join("")}</div>
           <button type="button" class="linkbtn" data-fradd>+ Agregar franja</button>
-          <span class="hintp">Apagá una franja para dejar de ofrecerla sin borrar el horario. Para cerrarla solo hoy o mañana (o marcar alta demanda), usá <b>Horarios para pedir</b> arriba de Pedidos.</span>
+          <span class="hintp">Apagá una franja para dejar de ofrecerla sin borrar el horario. Para cerrarla solo hoy o mañana (o marcar alta demanda), usá <b>Horarios para pedir</b> en el Dashboard. El tope de pedidos se ve en <b>Alta demanda por turno</b>, arriba de Pedidos.</span>
           <div class="row2"><label>Turnos cada (min)<input class="inp" name="cada" type="number" value="${r.cadaMin || 30}"></label><label>Anticipación mínima (min)<input class="inp" name="antic" type="number" value="${r.anticipacionMin || 40}"></label></div>
           <label>Pedidos por turno antes de marcar alta demanda (0 = sin tope)<input class="inp" name="cupo" type="number" min="0" max="20" value="${r.cupoTurno ?? 3}"></label>
           <span class="hintp">Al llegar a ese número, la web deja de ofrecer ese turno, avisa que hay muchos pedidos y recomienda el siguiente libre.</span>
