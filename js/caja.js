@@ -419,7 +419,6 @@
     if (D.tipo === "transferencia" && !D.cuenta_destino_id) D.cuenta_destino_id = (S.cuentas.find((c) => c.id !== D.cuenta_id) || {}).id;
     /* productos vendidos: el monto y el detalle se completan solos mientras no los toquen a mano */
     D.items = (pre.items || []).map((l) => Object.assign({}, l, l.mochis ? { mochis: l.mochis.slice() } : {}));
-    D.lugar = pre.stock_lugar || "cafe";
     D.montoAuto = !String(D.monto).trim() || (D.items.length > 0 && parseMoney(D.monto) === itemsTotal(D.items));
     D.detAuto = !String(D.detalle).trim() || (D.items.length > 0 && D.detalle === itemsDetalle(D.items));
     const montoTxt = (n) => Number(n).toLocaleString("es-AR", { maximumFractionDigits: 2 });
@@ -444,9 +443,9 @@
       }).join("");
       const grupos = GRUPOS.map(([g, lbl]) => { const ps = visibles.filter((p) => (p.categoria === "promo" ? "promo" : formatoDe(p)) === g); return ps.length ? `<div class="vg"><small>${lbl}</small><div class="chips">${ps.map((p) => `<button type="button" class="chip" data-set="vadd" data-v="${esc(p.id)}">+ ${esc(String(p.nombre).trim())}</button>`).join("")}</div></div>` : ""; }).join("");
       const mo = mochisDe(D.items), mids = Object.keys(mo);
-      const stk = mids.length ? `<div class="fl"><span>Los mochis salen de</span><div class="seg">${["cafe", "produ"].map((l) => `<button type="button" data-set="lugar" data-v="${l}" aria-pressed="${D.lugar === l}">${LUG[l]}</button>`).join("")}</div>
-        <div class="preview">${mids.map((pid) => { const it = stockItem(pid), p = prodPor(pid); if (!it) return `<div>${esc(p ? nombreDe(p) : pid)}: <span class="muted">sin stock vinculado, no se descuenta</span></div>`;
-          const a = it[D.lugar], b = editId ? null : a - mo[pid]; return `<div>${esc(it.nombre)} en ${LUG[D.lugar]}: <b>${a}</b>${b === null ? ` <span class="muted">(se rehace al guardar: −${mo[pid]})</span>` : ` → <b class="${b < 0 ? "neg" : ""}">${b}</b>${b < 0 ? ' <span class="muted">queda en negativo: revisá el stock</span>' : ""}`}</div>`; }).join("")}</div></div>` : "";
+      /* los mochis vendidos salen siempre del Café */
+      const stk = mids.length ? `<div class="preview">${mids.map((pid) => { const it = stockItem(pid), p = prodPor(pid); if (!it) return `<div>${esc(p ? nombreDe(p) : pid)}: <span class="muted">sin stock vinculado, no se descuenta</span></div>`;
+          const a = it.cafe, b = editId ? null : a - mo[pid]; return `<div>${esc(it.nombre)} en Café: <b>${a}</b>${b === null ? ` <span class="muted">(se rehace al guardar: −${mo[pid]})</span>` : ` → <b class="${b < 0 ? "neg" : ""}">${b}</b>${b < 0 ? ' <span class="muted">queda en negativo: revisá el stock</span>' : ""}`}</div>`; }).join("")}</div>` : "";
       return `<div class="fl vend"><span>¿Qué se vendió?</span>
         ${lineas ? `<div class="vls">${lineas}</div>` : `<p class="hintp">Tocá los productos. El precio sale de la carta y lo podés cambiar.</p>`}
         <div class="vpick">${grupos}</div>
@@ -511,7 +510,6 @@
     /* toques sobre los productos vendidos */
     const vendOp = (k, v) => {
       if (k === "verItems") { D.verItems = true; return; }
-      if (k === "lugar") { D.lugar = v; return; }
       if (k === "usarSuma") { D.montoAuto = true; return syncAuto(); }
       if (k === "vadd") {
         const p = prodPor(v); if (!p) return;
@@ -537,7 +535,7 @@
       D.monto = sh.querySelector("#fMonto").value; D.detalle = sh.querySelector("#fDet").value; D.fecha = sh.querySelector("#fFecha").value;
       if (k === "tipo") { if (v !== D.tipo) D.categoria_id = null; D.tipo = v; if (v === "transferencia" && (!D.cuenta_destino_id || D.cuenta_destino_id === D.cuenta_id)) D.cuenta_destino_id = (S.cuentas.find((c) => c.id !== D.cuenta_id) || {}).id; }
       else if (k === "pagador") { if (v.startsWith("caja:")) { D.pagador = "caja"; D.cuenta_id = v.slice(5); } else D.pagador = v; }
-      else if (["verItems", "lugar", "usarSuma", "vadd", "vq", "vsize", "vmochi", "vmclr"].includes(k)) vendOp(k, v);
+      else if (["verItems", "usarSuma", "vadd", "vq", "vsize", "vmochi", "vmclr"].includes(k)) vendOp(k, v);
       else D[k] = D[k] === v && k === "categoria_id" ? null : v;
       draw(sh);
     };
@@ -558,7 +556,7 @@
       if (D.tipo === "transferencia") { row.cuenta_id = D.cuenta_id; row.cuenta_destino_id = D.cuenta_destino_id; }
       /* productos: solo se mandan si hay (o había), así las cargas de siempre no cambian */
       const its = D.tipo === "entrada" && D.items.length ? D.items.map((l) => Object.assign({ id: l.id, nombre: l.nombre, size: l.size || null, qty: l.qty, precio: Number(l.precio) || 0 }, l.mochis ? { mochis: l.mochis.slice() } : {})) : null;
-      if (its || (pre.items && pre.items.length)) { row.items = its; row.stock_lugar = its && Object.keys(mochisDe(its)).length ? D.lugar : null; }
+      if (its || (pre.items && pre.items.length)) row.items = its;
       const box = (its || []).find((l) => l.mochis && l.mochis.length !== ((prodPor(l.id) || {}).promo_cant || 5));
       const msg = !(v > 0) ? "Poné un monto" : ["aporte", "devolucion", "retiro"].includes(D.tipo) && !row.socio_id ? "Elegí el socio" : D.tipo === "transferencia" && row.cuenta_id === row.cuenta_destino_id ? "Elegí cuentas distintas" : ["entrada", "gasto"].includes(D.tipo) && !row.detalle ? "Escribí un detalle corto" : box ? `Elegí los ${(prodPor(box.id) || {}).promo_cant || 5} sabores de ${box.nombre}` : null;
       if (msg) { er.textContent = msg; er.hidden = false; return; }
@@ -570,11 +568,11 @@
           if (onSaved) { try { await onSaved(ins.id); } catch (e2) { toast(e2.message); } }
         }
         const nm = its ? Object.values(mochisDe(its)).reduce((a, b) => a + b, 0) : 0;
-        closeSheet(); toast(editId ? "Cambios guardados" : `Guardado: ${TIPOS[row.tipo].l.toLowerCase()} de ${fmt(v)}${nm ? ` · ${nm} mochi${nm > 1 ? "s" : ""} menos en ${LUG[D.lugar]}` : ""}`);
+        closeSheet(); toast(editId ? "Cambios guardados" : `Guardado: ${TIPOS[row.tipo].l.toLowerCase()} de ${fmt(v)}${nm ? ` · ${nm} mochi${nm > 1 ? "s" : ""} menos en el Café` : ""}`);
         if (mesDe(row.fecha) !== S.mes && !editId) S.mes = mesDe(row.fecha);
         if (S.view === "retiros" && row.tipo === "retiro") S.r.ref = row.fecha;
         await loadAll(); render();
-      } catch (err) { er.textContent = /items|stock_lugar/.test(err.message) ? "Falta instalar en la base la carga por productos (migración 048)." : err.message; er.hidden = false; btn.disabled = false; }
+      } catch (err) { er.textContent = /items/.test(err.message) ? "Falta instalar en la base la carga por productos (migración 048)." : err.message; er.hidden = false; btn.disabled = false; }
     };
   }
 
@@ -589,7 +587,7 @@
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px"><span class="bigamt num ${an ? "" : ""}" style="${an ? "text-decoration:line-through;color:var(--tachado)" : ""}">${im.txt}</span><span class="muted">${esc(im.sub)}</span></div>
       <dl class="dl">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
       ${(m.items || []).length ? `<div class="vdet"><b>Qué se vendió</b>${m.items.map((l) => `<div><span>${esc(lineaTxt(l))}</span><span class="num">${fmt((Number(l.qty) || 0) * (Number(l.precio) || 0))}</span></div>`).join("")}
-        ${(() => { const nm = Object.values(mochisDe(m.items)).reduce((a, b) => a + b, 0); return nm ? `<p class="hintp">${an ? "Los mochis volvieron al stock al anularla." : `Descontó ${nm} mochi${nm > 1 ? "s" : ""} del stock (${LUG[m.stock_lugar || "cafe"]}).`}</p>` : ""; })()}</div>` : ""}
+        ${(() => { const nm = Object.values(mochisDe(m.items)).reduce((a, b) => a + b, 0); return nm ? `<p class="hintp">${an ? "Los mochis volvieron al stock al anularla." : `Descontó ${nm} mochi${nm > 1 ? "s" : ""} del stock del Café.`}</p>` : ""; })()}</div>` : ""}
       ${/^pedido:/.test(m.legacy_id || "") && /STT-\w+/.test(m.detalle || "") ? `<a class="btn" style="margin-top:12px" href="panel.html#pedidos/${an ? "cancelado" : "entregado"}/${encodeURIComponent((m.detalle.match(/STT-\w+/) || [""])[0])}">Ver el pedido en el panel →</a>` : ""}
       <div id="mlog" style="margin-top:14px"></div>
       ${an ? "" : `<div class="btnrow" style="margin-top:16px"><button class="btn" data-edit="${m.id}">Editar</button>${m.tipo !== "ajuste" ? `<button class="btn" data-dup="${m.id}">Repetir</button>` : ""}<button class="btn danger" data-anular="${m.id}">Anular</button></div>`}`);
@@ -925,8 +923,8 @@
     if (d.contar) return contarSheet(d.contar);
     if (d.devolver) { const dd = S.deudas.find((x) => x.id === d.devolver); return movForm({ tipo: "devolucion", socio_id: d.devolver, monto: String(Number(dd.le_debemos)).replace(".", ","), detalle: "Devolución a " + dd.nombre }); }
     if (d.mov) return movDetail(d.mov);
-    if (d.edit) { const m = movPorId(d.edit); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, fecha: m.fecha, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja", items: m.items, stock_lugar: m.stock_lugar, _touched: true }, m.id); }
-    if (d.dup) { const m = movPorId(d.dup); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja", items: m.items, stock_lugar: m.stock_lugar }); }
+    if (d.edit) { const m = movPorId(d.edit); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, fecha: m.fecha, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja", items: m.items, _touched: true }, m.id); }
+    if (d.dup) { const m = movPorId(d.dup); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja", items: m.items }); }
     if (d.anular) { closeSheet(); return anularSheet(d.anular); }
     if (d.f) { S.f[d.f] = d.v; return render(); }
     if (d.rf) { S.r[d.rf] = d.v; return render(); }
