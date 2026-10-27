@@ -65,6 +65,7 @@
     cuentas: [], socios: [], cats: [], saldos: [], deudas: [], movs: [], stock: [], tareas: [], compras: [],
     f: { tipo: "todos", cuenta: "todas", q: "", anul: false },
     verHechas: false,
+    csel: new Set(), clug: localStorage.getItem("setto-caja-lugar") || "", cnuevo: false, cdraft: "",
     r: { modo: "semana", socio: "todos", ref: hoy() },
   };
   const cuentaN = (id) => (S.cuentas.find((c) => c.id === id) || {}).nombre || id || "—";
@@ -190,6 +191,7 @@
     const dp = $("[data-pend]"); if (dp) { dp.textContent = S.pend || ""; dp.hidden = !S.pend; dp.title = `${S.pend} pedido(s) pendiente(s)`; }
     const mb = $("[data-who]"); if (mb) mb.innerHTML = `<i>${esc((S.me || "?")[0])}</i>${esc(S.me || "¿Quién sos?")}`;
     $(".fab").hidden = !["inicio", "movs", "retiros"].includes(S.view);
+    document.body.classList.remove("consel");
     const y = window.scrollY;
     ({ inicio: vInicio, movs: vMovs, retiros: vRetiros, stock: vStock, tareas: vTareas, compras: vCompras }[S.view] || vInicio)();
     window.scrollTo(0, y);
@@ -703,48 +705,91 @@
   }
 
   /* ---------- COMPRAS ---------- */
+  /* Lugares: salen de lo que ya se cargó. "makro" y "Makro" son el mismo lugar (se muestra la forma más usada). */
+  const lugKey = (s) => String(s || "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  function lugares() {
+    const m = {};
+    S.compras.forEach((c) => { const k = lugKey(c.donde); if (!k) return; const e = m[k] || (m[k] = { n: 0, f: {} }); e.n++; e.f[c.donde.trim()] = (e.f[c.donde.trim()] || 0) + 1; });
+    return Object.values(m).sort((a, b) => b.n - a.n).map((e) => Object.keys(e.f).sort((a, b) => e.f[b] - e.f[a])[0]);
+  }
+  const lugNombre = (s) => { const k = lugKey(s); return lugares().find((l) => lugKey(l) === k) || String(s || "").trim(); };
+  /* chips para elegir lugar: los existentes + "Otro lugar" que abre un campo */
+  function lugChips(sel, nuevo, idNuevo) {
+    const ls = lugares(), k = lugKey(sel);
+    return `<div class="chips lugs"><button type="button" class="chip" data-clug="" aria-pressed="${!k && !nuevo}">Sin lugar</button>
+      ${ls.map((l) => `<button type="button" class="chip" data-clug="${esc(l)}" aria-pressed="${!nuevo && lugKey(l) === k}">${esc(l)}</button>`).join("")}
+      <button type="button" class="chip" data-clugnew aria-pressed="${!!nuevo}">+ Otro lugar</button></div>
+      ${nuevo ? `<input id="${idNuevo}" class="lugin" placeholder="Nombre del lugar. Ej: Makro" maxlength="40" value="${esc(nuevo === true ? "" : nuevo)}">` : ""}`;
+  }
   function vCompras() {
     const pend = S.compras.filter((c) => c.estado === "pendiente").sort((a, b) => (b.urgente - a.urgente) || (a.created_at < b.created_at ? -1 : 1));
     const comp = S.compras.filter((c) => c.estado === "comprado").sort((a, b) => (b.comprada_at || "").localeCompare(a.comprada_at || ""));
+    S.csel = new Set([...S.csel].filter((id) => pend.some((c) => c.id === id)));
+    /* agrupado por lugar; lo que no tiene lugar va al final */
+    const grupos = {};
+    pend.forEach((c) => { const k = lugKey(c.donde); (grupos[k] || (grupos[k] = [])).push(c); });
+    const orden = Object.keys(grupos).sort((a, b) => (!a) - (!b) || grupos[b].length - grupos[a].length);
+    const nsel = S.csel.size;
     $("#view").innerHTML = `<h1 class="h1">Lista de compras</h1>
-      <form class="addrow" id="cadd"><input id="cIt" placeholder="¿Qué falta? Ej: crema x2 · Makro" maxlength="100"><button class="btn solid" type="submit">Agregar</button></form>
-      <p class="hintp" style="margin:-4px 0 10px">Tip: después de "·" podés poner dónde comprarlo. Al tildar, te ofrece cargar el gasto.</p>
+      <form class="addrow" id="cadd"><input id="cIt" placeholder="¿Qué falta? Ej: crema x2" maxlength="100" value="${esc(S.cdraft || "")}"><button class="btn solid" type="submit">Agregar</button></form>
+      <div class="fl cluga"><span>Dónde se compra</span>${lugChips(S.clug, S.cnuevo, "cLugN")}</div>
       <h2 class="h2">Falta comprar <small>${pend.length}</small></h2>
-      ${pend.length ? `<div class="items">${pend.map(cRow).join("")}</div>` : `<div class="emptyc"><img src="img/mochito-run.png" alt=""><span>No falta nada.</span></div>`}
-      ${comp.length ? `<button class="ghost foldbtn" data-vercomp>${S.verComp ? "Ocultar" : "Ver"} comprados (${comp.length})</button>${S.verComp ? `<div class="items" style="margin-top:10px">${comp.slice(0, 40).map(cRow).join("")}</div>` : ""}` : ""}`;
+      ${pend.length ? `<p class="hintp" style="margin:-4px 0 10px">Tocá el círculo de lo que compraste (podés elegir varios) y cargá el total en un solo gasto.</p>
+        ${orden.map((k) => { const g = grupos[k], todos = g.every((c) => S.csel.has(c.id)); return `<div class="cgrp"><div class="cgh"><b>${esc(k ? lugNombre(g[0].donde) : "Sin lugar")}</b><small>${g.length}</small>
+          <button class="more" data-cgsel="${esc(k)}">${todos ? "Ninguno" : "Elegir todos"}</button></div><div class="items">${g.map(cRow).join("")}</div></div>`; }).join("")}`
+        : `<div class="emptyc"><img src="img/mochito-run.png" alt=""><span>No falta nada.</span></div>`}
+      ${comp.length ? `<button class="ghost foldbtn" data-vercomp>${S.verComp ? "Ocultar" : "Ver"} comprados (${comp.length})</button>${S.verComp ? `<div class="items" style="margin-top:10px">${comp.slice(0, 40).map(cRow).join("")}</div>` : ""}` : ""}
+      ${nsel ? `<div class="cselbar"><div class="wrap"><div class="in"><button class="x" data-cselx aria-label="Soltar todo">×</button><b>${nsel} elegido${nsel > 1 ? "s" : ""}</b>
+        <button class="btn" data-csolo>Solo tildar</button><button class="btn solid" data-cgasto>Cargar gasto</button></div></div></div>` : ""}`;
+    document.body.classList.toggle("consel", !!nsel);
   }
   function cRow(c) {
-    const done = c.estado === "comprado";
-    const sub = [c.cantidad, c.donde, done ? `comprado por ${c.comprada_por || ""}${c.comprada_at ? " " + cuando(c.comprada_at) : ""}` : c.creada_por, done && c.movimiento_id ? "gasto cargado" : null].filter(Boolean).join(" · ");
-    return `<div class="it ${done ? "done" : ""}"><button class="ck ${done ? "on" : ""}" data-cck="${c.id}" aria-label="${done ? "Volver a la lista" : "Marcar comprado"}">${done ? "✓" : ""}</button>
+    const done = c.estado === "comprado", sel = !done && S.csel.has(c.id);
+    const sub = [c.cantidad, done ? c.donde : null, done ? `comprado por ${c.comprada_por || ""}${c.comprada_at ? " " + cuando(c.comprada_at) : ""}` : c.creada_por, done && c.movimiento_id ? "gasto cargado" : null].filter(Boolean).join(" · ");
+    return `<div class="it ${done ? "done" : ""} ${sel ? "sel" : ""}"><button class="ck ${done || sel ? "on" : ""}" data-cck="${c.id}" aria-pressed="${sel}" aria-label="${done ? "Volver a la lista" : sel ? "Soltar" : "Elegir"}">${done || sel ? "✓" : ""}</button>
       <button class="t" data-copen="${c.id}"><b>${esc(c.item)}</b><span>${esc(sub)}</span></button>${c.urgente && !done ? '<span class="pri urg">Urgente</span>' : ""}</div>`;
   }
   function compraSheet(id) {
     const c = S.compras.find((x) => x.id === id);
-    openSheet(`<div class="sh"><h3>Editar</h3><button class="x" data-close aria-label="Cerrar">×</button></div>
-      <form class="form" id="cef"><label class="fl"><span>Qué</span><input id="ceI" value="${esc(c.item)}" maxlength="100"></label>
-      <div class="row2"><label class="fl"><span>Cantidad</span><input id="ceC" value="${esc(c.cantidad || "")}" maxlength="30"></label><label class="fl"><span>Dónde</span><input id="ceD" value="${esc(c.donde || "")}" maxlength="40"></label></div>
-      <label class="checks" style="font-weight:600"><input type="checkbox" id="ceU" ${c.urgente ? "checked" : ""} style="width:auto"> Urgente</label>
-      <button class="btn solid big" type="submit">Guardar</button><button type="button" class="btn danger" data-cquit="${c.id}">Quitar de la lista</button></form>`, (sh) => {
-      sh.onsubmit = async (e) => { e.preventDefault(); try { fail(await sb.from("caja_compras").update({ item: sh.querySelector("#ceI").value.trim(), cantidad: sh.querySelector("#ceC").value.trim() || null, donde: sh.querySelector("#ceD").value.trim() || null, urgente: sh.querySelector("#ceU").checked }).eq("id", id)); closeSheet(); await loadAll(); render(); } catch (err) { toast(err.message); } };
-    });
-  }
-  function compradoSheet(id) {
-    if (!needMe()) return;
-    const c = S.compras.find((x) => x.id === id);
-    const marcar = async (movId) => { fail(await sb.from("caja_compras").update({ estado: "comprado", comprada_por: S.me, comprada_at: new Date().toISOString(), movimiento_id: movId || null }).eq("id", id)); };
-    openSheet(`<div class="sh"><h3>Compraste ${esc(c.item)}</h3><button class="x" data-close aria-label="Cerrar">×</button></div>
-      <p class="muted" style="margin-bottom:14px">¿Cargamos el gasto ahora? Así no queda colgado.</p>
-      <div class="btnrow"><button class="btn solid big" data-cgasto="${id}">Sí, cargar el gasto</button></div>
-      <div class="btnrow" style="margin-top:10px"><button class="btn" data-csolo="${id}">Solo tildar (el gasto ya está cargado)</button></div>`, (sh) => {
-      sh.onclick = async (e) => {
-        const b = e.target.closest("[data-cgasto],[data-csolo]"); if (!b) return;
-        if (b.dataset.csolo) { try { await marcar(null); closeSheet(); toast("Tildado"); await loadAll(); render(); } catch (err) { toast(err.message); } return; }
-        closeSheet();
-        /* al guardar el gasto, la compra se tilda sola y queda enlazada a ese gasto */
-        movForm({ tipo: "gasto", detalle: c.item + (c.cantidad ? " x" + c.cantidad : "") + (c.donde ? " · " + c.donde : "") }, null, (movId) => marcar(movId));
+    const L = { sel: c.donde || "", nuevo: false };
+    const keep = (sh) => ({ i: sh.querySelector("#ceI").value, c: sh.querySelector("#ceC").value, u: sh.querySelector("#ceU").checked, n: (sh.querySelector("#ceLN") || {}).value });
+    const draw = (sh, v) => {
+      sh.innerHTML = `<div class="grab"></div><div class="sh"><h3>Editar</h3><button class="x" data-close aria-label="Cerrar">×</button></div>
+      <form class="form" id="cef"><label class="fl"><span>Qué</span><input id="ceI" value="${esc(v.i)}" maxlength="100"></label>
+      <label class="fl"><span>Cantidad</span><input id="ceC" value="${esc(v.c)}" maxlength="30"></label>
+      <div class="fl"><span>Dónde</span>${lugChips(L.sel, L.nuevo ? (v.n || true) : false, "ceLN")}</div>
+      <label class="checks" style="font-weight:600"><input type="checkbox" id="ceU" ${v.u ? "checked" : ""} style="width:auto"> Urgente</label>
+      <button class="btn solid big" type="submit">Guardar</button><button type="button" class="btn danger" data-cquit="${c.id}">Quitar de la lista</button></form>`;
+    };
+    openSheet("", (sh) => {
+      draw(sh, { i: c.item, c: c.cantidad || "", u: c.urgente });
+      sh.onclick = (e) => {
+        const b = e.target.closest("[data-clug],[data-clugnew]"); if (!b) return;
+        const v = keep(sh);
+        if (b.dataset.clugnew !== undefined) { L.nuevo = true; draw(sh, v); sh.querySelector("#ceLN").focus(); return; }
+        L.nuevo = false; L.sel = b.dataset.clug; draw(sh, v);
+      };
+      sh.onsubmit = async (e) => {
+        e.preventDefault();
+        const donde = L.nuevo ? lugNombre(sh.querySelector("#ceLN").value) : L.sel;
+        try { fail(await sb.from("caja_compras").update({ item: sh.querySelector("#ceI").value.trim(), cantidad: sh.querySelector("#ceC").value.trim() || null, donde: donde.trim() || null, urgente: sh.querySelector("#ceU").checked }).eq("id", id)); closeSheet(); await loadAll(); render(); } catch (err) { toast(err.message); }
       };
     });
+  }
+  /* varios elegidos → un solo gasto (o solo tildarlos) */
+  async function marcarComprados(ids, movId) {
+    fail(await sb.from("caja_compras").update({ estado: "comprado", comprada_por: S.me, comprada_at: new Date().toISOString(), movimiento_id: movId || null }).in("id", ids));
+    S.csel.clear();
+  }
+  function gastoElegidos() {
+    if (!needMe()) return;
+    const ids = [...S.csel], cs = S.compras.filter((c) => ids.includes(c.id));
+    if (!cs.length) return;
+    const ls = [...new Set(cs.map((c) => lugKey(c.donde)).filter(Boolean))];
+    const items = cs.map((c) => c.item + (c.cantidad ? " x" + c.cantidad : "")).join(", ");
+    let detalle = (ls.length === 1 ? lugNombre(cs.find((c) => c.donde).donde) + ": " : "") + items;
+    if (detalle.length > 140) detalle = detalle.slice(0, 137).replace(/,?\s*\S*$/, "") + "…";
+    movForm({ tipo: "gasto", detalle }, null, (movId) => marcarComprados(ids, movId));
   }
 
   /* ---------- eventos ---------- */
@@ -795,8 +840,28 @@
     /* compras */
     if (d.cck) {
       const c = S.compras.find((x) => x.id === d.cck);
-      if (c.estado === "comprado") { try { fail(await sb.from("caja_compras").update({ estado: "pendiente", comprada_por: null, comprada_at: null }).eq("id", c.id)); await loadAll(); render(); } catch (err) { toast(err.message); } return; }
-      return compradoSheet(d.cck);
+      if (c.estado === "comprado") { try { fail(await sb.from("caja_compras").update({ estado: "pendiente", comprada_por: null, comprada_at: null, movimiento_id: null }).eq("id", c.id)); await loadAll(); render(); } catch (err) { toast(err.message); } return; }
+      if (S.csel.has(c.id)) S.csel.delete(c.id); else S.csel.add(c.id);
+      return render();
+    }
+    if (d.cgsel !== undefined) {
+      const g = S.compras.filter((c) => c.estado === "pendiente" && lugKey(c.donde) === d.cgsel), todos = g.every((c) => S.csel.has(c.id));
+      g.forEach((c) => (todos ? S.csel.delete(c.id) : S.csel.add(c.id)));
+      return render();
+    }
+    if (d.cselx !== undefined) { S.csel.clear(); return render(); }
+    if (d.cgasto !== undefined) return gastoElegidos();
+    if (d.csolo !== undefined) {
+      if (!needMe()) return;
+      const n = S.csel.size;
+      try { await marcarComprados([...S.csel], null); toast(n > 1 ? `${n} tildados` : "Tildado"); await loadAll(); render(); } catch (err) { toast(err.message); }
+      return;
+    }
+    if (S.view === "compras" && !b.closest("#sheet") && (d.clug !== undefined || d.clugnew !== undefined)) {
+      S.cdraft = $("#cIt").value;
+      if (d.clugnew !== undefined) { S.cnuevo = true; render(); $("#cLugN").focus(); return; }
+      S.cnuevo = false; S.clug = d.clug; try { localStorage.setItem("setto-caja-lugar", S.clug); } catch (_) {}
+      render(); return;
     }
     if (d.copen) return compraSheet(d.copen);
     if (d.cquit) { try { fail(await sb.from("caja_compras").update({ estado: "quitada" }).eq("id", d.cquit)); closeSheet(); await loadAll(); render(); toast("Quitado de la lista"); } catch (err) { toast(err.message); } return; }
@@ -812,9 +877,26 @@
     if (e.target.id === "cadd") {
       e.preventDefault(); if (!needMe()) return;
       const raw = $("#cIt").value.trim(); if (!raw) return;
-      let [item, donde] = raw.split("·").map((s) => s.trim());
+      /* lugar: el chip elegido (o el nuevo escrito). Sigue andando el viejo "crema · Makro" */
+      let [item, donde] = raw.split(/\s*[·•@]\s*/).map((s) => s.trim());
+      if (!donde && S.cnuevo) donde = ($("#cLugN") || {}).value || "";
+      if (!donde && !S.cnuevo) donde = S.clug;
+      donde = donde ? lugNombre(donde) : "";
       let cantidad = null; const m = item.match(/^(.*?)\s+x\s*(\S+)$/i); if (m) { item = m[1]; cantidad = m[2]; }
-      try { fail(await sb.from("caja_compras").insert({ item, cantidad, donde: donde || null, creada_por: S.me })); await loadAll(); render(); $("#cIt").focus(); } catch (err) { toast(err.message); }
+      try {
+        fail(await sb.from("caja_compras").insert({ item, cantidad, donde: donde || null, creada_por: S.me }));
+        S.cdraft = ""; if (donde) { S.clug = donde; S.cnuevo = false; try { localStorage.setItem("setto-caja-lugar", donde); } catch (_) {} }
+        await loadAll(); render(); $("#cIt").focus();
+      } catch (err) { toast(err.message); }
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    /* Enter en "Otro lugar": queda elegido; si ya hay algo escrito arriba, lo agrega */
+    if (e.key === "Enter" && e.target.id === "cLugN") {
+      e.preventDefault(); const v = e.target.value.trim(); if (!v) return;
+      if ($("#cIt").value.trim()) return $("#cadd").requestSubmit();
+      S.clug = lugNombre(v); S.cnuevo = false; S.cdraft = ""; try { localStorage.setItem("setto-caja-lugar", S.clug); } catch (_) {}
+      render(); $("#cIt").focus(); return;
     }
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#sheet").hidden && $("#sheet").querySelector("[data-close]")) { closeSheet(); } });
