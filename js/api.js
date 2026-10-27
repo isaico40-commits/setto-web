@@ -606,7 +606,9 @@
       const iso = desde.toISOString(), f = `${desde.getFullYear()}-${String(desde.getMonth() + 1).padStart(2, "0")}-${String(desde.getDate()).padStart(2, "0")}`;
       const [o, m, c, s, it] = await Promise.all([
         sb.from("orders").select("id, code, phone, items, total, pago, modo, status, created_at").gte("created_at", iso).order("created_at").limit(3000),
-        sb.from("caja_movimientos").select("fecha, tipo, monto, categoria_id, registro").in("tipo", ["entrada", "gasto"]).eq("estado", "activo").gte("fecha", f).limit(5000),
+        // con los productos de cada entrada (migración 048); si la base todavía no los tiene, sin ellos
+        sb.from("caja_movimientos").select("fecha, tipo, monto, categoria_id, registro, items").in("tipo", ["entrada", "gasto"]).eq("estado", "activo").gte("fecha", f).limit(5000)
+          .then((r) => (r.error ? sb.from("caja_movimientos").select("fecha, tipo, monto, categoria_id, registro").in("tipo", ["entrada", "gasto"]).eq("estado", "activo").gte("fecha", f).limit(5000) : r)),
         sb.from("caja_categorias").select("id, nombre"),
         sb.from("caja_stock_mov").select("item_id, delta, created_at").eq("motivo", "venta").eq("estado", "activo").gte("created_at", iso).limit(5000),
         sb.from("caja_stock_items").select("id, nombre"),

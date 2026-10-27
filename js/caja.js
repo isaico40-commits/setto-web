@@ -111,6 +111,14 @@
     // reservado en pedidos web pendientes y disponible en la web (si falla, la pestaña sigue igual)
     try { const { data } = await sb.rpc("caja_stock_reservas"); S.reservas = {}; (data || []).forEach((x) => (S.reservas[x.item_id] = x)); } catch (_) { S.reservas = {}; }
     stockApplyLocal();
+    // carta (para elegir qué se vendió) y qué producto de stock es cada mochi; si falla, la entrada se carga como antes
+    try {
+      const [p, l] = await Promise.all([
+        sb.from("products").select("id,categoria,nombre,formato,precio,precio_12,precio_16,set_mochi,promo_cant,activo,orden").order("orden"),
+        sb.from("caja_stock_items").select("id,product_id").not("product_id", "is", null).eq("activo", true),
+      ]);
+      S.prods = fail(p); S.stockDe = {}; fail(l).forEach((x) => (S.stockDe[x.product_id] = x.id));
+    } catch (_) { S.prods = S.prods || []; S.stockDe = S.stockDe || {}; }
     try { const { count } = await sb.from("orders").select("id", { count: "exact", head: true }).eq("status", "pendiente"); S.pend = count || 0; } catch (_) { S.pend = 0; }
   }
   let reloadT;
@@ -206,7 +214,7 @@
       const o = {}; ms.filter((m) => m.tipo === t).forEach((m) => { const k = m.categoria_id || "_"; o[k] = (o[k] || 0) + Number(m.monto); });
       return Object.entries(o).sort((a, b) => b[1] - a[1]);
     };
-    return { ent: sum("entrada"), gas: sum("gasto"), ret: sum("retiro"), aju: sum("ajuste"), n: ms.length, gc: porCat("gasto"), ec: porCat("entrada") };
+    return { ent: sum("entrada"), gas: sum("gasto"), ret: sum("retiro"), aju: sum("ajuste"), n: ms.length, gc: porCat("gasto"), ec: porCat("entrada"), vend: vendidos(ms.filter((m) => m.tipo === "entrada")) };
   }
   function vInicio() {
     const total = S.saldos.reduce((a, s) => a + Number(s.saldo), 0);
@@ -238,6 +246,7 @@
       <p class="kpinote">Los gastos incluyen lo que pagaron los socios de su bolsillo.${st.ret ? ` Retiros de ganancias: ${fmt(st.ret)}.` : ""}${st.aju ? ` Diferencias por conteo: ${signed(st.aju)}.` : ""}</p>
       ${st.gc.length ? `<div class="bars"><b style="font-size:.85rem">¿En qué se fue?</b>${bars(st.gc, "")}</div>` : ""}
       ${st.ec.length ? `<div class="bars"><b style="font-size:.85rem">¿De dónde entró?</b>${bars(st.ec, "in")}</div>` : ""}
+      ${st.vend.length ? (() => { const mx = Math.max(1, ...st.vend.map((x) => x[1].q)); return `<div class="bars"><b style="font-size:.85rem">¿Qué se vendió?</b>${st.vend.slice(0, 8).map(([n, x]) => `<div class="bar in"><span>${esc(n)}</span><span class="tr"><i style="width:${Math.max(2, (x.q / mx) * 100)}%"></i></span><span>${x.q} u.</span></div>`).join("")}<span class="kpinote" style="margin:0">Solo las entradas cargadas con productos. Los pedidos web están en el Dashboard del panel.</span></div>`; })() : ""}
 
       <h2 class="h2">Últimos movimientos <button class="more" data-go="movs">Ver todos</button></h2>
       ${ult.length ? `<div class="movs">${ult.map(movRow).join("")}</div>` : `<div class="emptyc"><img src="img/mochito-lie.png" alt=""><span>Todavía no hay movimientos. Tocá + para cargar el primero.</span></div>`}`;
@@ -277,11 +286,11 @@
   }
   function csvMes() {
     const rows = S.movs.filter((m) => mesDe(m.fecha) === S.mes).slice().reverse();
-    const head = ["Fecha", "Tipo", "Detalle", "Categoría", "Monto", "Cuenta", "Cuenta destino", "Socio", "Efecto en caja", "Cargó", "Estado", "Motivo anulación"];
+    const head = ["Fecha", "Tipo", "Detalle", "Categoría", "Monto", "Cuenta", "Cuenta destino", "Socio", "Efecto en caja", "Cargó", "Estado", "Motivo anulación", "Productos"];
     const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const lines = [head.map(q).join(";")].concat(rows.map((m) => {
       const ef = Object.values(efectos(m).cuentas).reduce((a, b) => a + b, 0);
-      return [m.fecha, TIPOS[m.tipo].l, m.detalle, ["entrada", "gasto"].includes(m.tipo) ? catN(m.categoria_id) : "", String(m.monto).replace(".", ","), m.cuenta_id ? cuentaN(m.cuenta_id) : "", m.cuenta_destino_id ? cuentaN(m.cuenta_destino_id) : "", m.socio_id ? socioN(m.socio_id) : "", String(ef).replace(".", ","), m.registro, m.estado, m.anulado_motivo || ""].map(q).join(";");
+      return [m.fecha, TIPOS[m.tipo].l, m.detalle, ["entrada", "gasto"].includes(m.tipo) ? catN(m.categoria_id) : "", String(m.monto).replace(".", ","), m.cuenta_id ? cuentaN(m.cuenta_id) : "", m.cuenta_destino_id ? cuentaN(m.cuenta_destino_id) : "", m.socio_id ? socioN(m.socio_id) : "", String(ef).replace(".", ","), m.registro, m.estado, m.anulado_motivo || "", (m.items || []).map(lineaTxt).join(" + ")].map(q).join(";");
     }));
     const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `setto-caja-${S.mes}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -366,12 +375,92 @@
       <div class="who-grid">${S.socios.filter((s) => s.activo).map((s) => `<button data-iam="${esc(s.nombre)}" aria-pressed="${S.me === s.nombre}"><i>${esc(s.nombre[0])}</i>${esc(s.nombre)}</button>`).join("")}</div>`);
   }
 
+  /* --- qué se vendió: productos de la carta en una entrada ---
+     Cada línea es { id, nombre, size, qty, precio (unitario), mochis? } con el mismo formato que los pedidos web,
+     así la base descuenta los mochis igual que con un pedido (migración 048). El monto sigue siendo editable. */
+  const prodPor = (id) => (S.prods || []).find((p) => p.id === id);
+  const formatoDe = (p) => (p.categoria === "especial" ? p.formato || "mochi" : p.categoria);
+  const conTam = (p) => ["set", "dirty"].includes(formatoDe(p));
+  const precioDe = (p, size) => Number((conTam(p) ? (size === "16 oz" ? p.precio_16 : p.precio_12) : p.precio) || 0);
+  const nombreDe = (p) => (formatoDe(p) === "mochi" ? "Mochi " : "") + String(p.nombre || "").trim();
+  const GRUPOS = [["set", "Sets"], ["dirty", "Bebidas"], ["mochi", "Mochis"], ["promo", "Promos"]];
+  const lineaNueva = (p) => ({ id: p.id, nombre: nombreDe(p), size: conTam(p) ? "12 oz" : null, qty: 1, precio: precioDe(p, "12 oz"), ...(p.categoria === "promo" ? { mochis: [] } : {}) });
+  const lineaTxt = (l) => `${l.qty > 1 ? l.qty + " " : ""}${l.nombre}${l.size ? " " + l.size : ""}`;
+  const itemsTotal = (its) => (its || []).reduce((a, l) => a + (Number(l.qty) || 0) * (Number(l.precio) || 0), 0);
+  function itemsDetalle(its) {
+    let t = (its || []).map(lineaTxt).join(" + ");
+    if (t.length > 140) t = t.slice(0, 137).replace(/\s*\+?\s*\S*$/, "") + "…";
+    return t;
+  }
+  /* mochis que salen del stock (igual que caja_mochis_de_items en la base) */
+  function mochisDe(its) {
+    const o = {};
+    (its || []).forEach((l) => {
+      const p = prodPor(l.id), q = Math.max(1, Number(l.qty) || 1); if (!p) return;
+      const f = formatoDe(p), m = f === "set" ? p.set_mochi : f === "mochi" ? p.id : null;
+      if (m) o[m] = (o[m] || 0) + q;
+      if (p.categoria === "promo") (l.mochis || []).forEach((x) => (o[x] = (o[x] || 0) + q));
+    });
+    return o;
+  }
+  const stockItem = (pid) => S.stock.find((i) => i.id === (S.stockDe || {})[pid]);
+  /* lo vendido en un conjunto de movimientos: { nombre: {q, m} } */
+  function vendidos(ms) {
+    const o = {};
+    ms.forEach((m) => (m.items || []).forEach((l) => { const x = o[l.nombre] || (o[l.nombre] = { q: 0, m: 0 }); x.q += Number(l.qty) || 0; x.m += (Number(l.qty) || 0) * (Number(l.precio) || 0); }));
+    return Object.entries(o).sort((a, b) => b[1].q - a[1].q);
+  }
+
   /* --- cargar / editar movimiento --- */
   function movForm(pre = {}, editId = null, onSaved = null) {
     if (!needMe()) return;
     const D = Object.assign({ tipo: "entrada", monto: "", detalle: "", cuenta_id: S.cuentas[0] && S.cuentas[0].id, cuenta_destino_id: null, socio_id: null, categoria_id: null, fecha: hoy(), pagador: "caja" }, pre);
     if (D.tipo === "gasto" && D.socio_id && !D.cuenta_id) D.pagador = D.socio_id;
     if (D.tipo === "transferencia" && !D.cuenta_destino_id) D.cuenta_destino_id = (S.cuentas.find((c) => c.id !== D.cuenta_id) || {}).id;
+    /* productos vendidos: el monto y el detalle se completan solos mientras no los toquen a mano */
+    D.items = (pre.items || []).map((l) => Object.assign({}, l, l.mochis ? { mochis: l.mochis.slice() } : {}));
+    D.lugar = pre.stock_lugar || "cafe";
+    D.montoAuto = !String(D.monto).trim() || (D.items.length > 0 && parseMoney(D.monto) === itemsTotal(D.items));
+    D.detAuto = !String(D.detalle).trim() || (D.items.length > 0 && D.detalle === itemsDetalle(D.items));
+    const montoTxt = (n) => Number(n).toLocaleString("es-AR", { maximumFractionDigits: 2 });
+    const sumaHtml = () => {
+      const tot = itemsTotal(D.items), v = parseMoney(D.monto);
+      if (!D.items.length) return "";
+      return `Suma de la carta: <b class="num">${fmt(tot)}</b>${!D.montoAuto && v !== tot ? ` · cobraste ${v > 0 ? fmt(v) : "otro monto"} <button type="button" class="linkbtn" data-set="usarSuma">Usar ${fmt(tot)}</button>` : ""}`;
+    };
+    const vendHtml = () => {
+      if (D.tipo !== "entrada" || !(S.prods || []).length) return "";
+      if (!D.items.length && D.categoria_id !== "venta_directa" && !D.verItems) return `<button type="button" class="ghost vbtn" data-set="verItems" data-v="1">+ Elegir lo que se vendió <small>(descuenta stock)</small></button>`;
+      const visibles = S.prods.filter((p) => p.activo !== false);
+      const mochisCarta = visibles.filter((p) => p.categoria === "mochi");
+      const lineas = D.items.map((l, i) => {
+        const p = prodPor(l.id) || {}, cant = p.promo_cant || 5, n = (l.mochis || []).length;
+        return `<div class="vl"><div class="vlt"><b>${esc(l.nombre)}</b>
+            ${l.size ? `<span class="vsz">${["12 oz", "16 oz"].map((s) => `<button type="button" data-set="vsize" data-v="${i}|${s}" aria-pressed="${l.size === s}">${s.replace(" oz", "")}</button>`).join("")}</span>` : ""}</div>
+          <div class="vlr"><span class="vq"><button type="button" data-set="vq" data-v="${i}|-1" aria-label="${l.qty > 1 ? "Uno menos" : "Quitar"}">${l.qty > 1 ? "−" : "×"}</button><b class="num">${l.qty}</b><button type="button" data-set="vq" data-v="${i}|1" aria-label="Uno más">+</button></span>
+            <label class="vp"><span>$</span><input data-vp="${i}" inputmode="decimal" value="${esc(montoTxt(l.precio))}" aria-label="Precio de cada ${esc(l.nombre)}"></label></div>
+          ${l.mochis ? `<div class="vbox"><small>Sabores: ${n} de ${cant}${n === cant ? " ✓" : ""}${n ? ` · <button type="button" class="linkbtn" data-set="vmclr" data-v="${i}">Borrar</button>` : ""}</small>
+            <div class="chips">${mochisCarta.map((m) => { const c = l.mochis.filter((x) => x === m.id).length; return `<button type="button" class="chip" data-set="vmochi" data-v="${i}|${m.id}" aria-pressed="${c > 0}" ${n >= cant && !c ? "disabled" : ""}>${esc(String(m.nombre).trim())}${c > 1 ? " ×" + c : ""}</button>`; }).join("")}</div></div>` : ""}</div>`;
+      }).join("");
+      const grupos = GRUPOS.map(([g, lbl]) => { const ps = visibles.filter((p) => (p.categoria === "promo" ? "promo" : formatoDe(p)) === g); return ps.length ? `<div class="vg"><small>${lbl}</small><div class="chips">${ps.map((p) => `<button type="button" class="chip" data-set="vadd" data-v="${esc(p.id)}">+ ${esc(String(p.nombre).trim())}</button>`).join("")}</div></div>` : ""; }).join("");
+      const mo = mochisDe(D.items), mids = Object.keys(mo);
+      const stk = mids.length ? `<div class="fl"><span>Los mochis salen de</span><div class="seg">${["cafe", "produ"].map((l) => `<button type="button" data-set="lugar" data-v="${l}" aria-pressed="${D.lugar === l}">${LUG[l]}</button>`).join("")}</div>
+        <div class="preview">${mids.map((pid) => { const it = stockItem(pid), p = prodPor(pid); if (!it) return `<div>${esc(p ? nombreDe(p) : pid)}: <span class="muted">sin stock vinculado, no se descuenta</span></div>`;
+          const a = it[D.lugar], b = editId ? null : a - mo[pid]; return `<div>${esc(it.nombre)} en ${LUG[D.lugar]}: <b>${a}</b>${b === null ? ` <span class="muted">(se rehace al guardar: −${mo[pid]})</span>` : ` → <b class="${b < 0 ? "neg" : ""}">${b}</b>${b < 0 ? ' <span class="muted">queda en negativo: revisá el stock</span>' : ""}`}</div>`; }).join("")}</div></div>` : "";
+      return `<div class="fl vend"><span>¿Qué se vendió?</span>
+        ${lineas ? `<div class="vls">${lineas}</div>` : `<p class="hintp">Tocá los productos. El precio sale de la carta y lo podés cambiar.</p>`}
+        <div class="vpick">${grupos}</div>
+        <p class="hintp vsuma" id="vSuma">${sumaHtml()}</p>
+        ${stk}</div>`;
+    };
+    const syncAuto = (sh) => {
+      if (D.montoAuto) D.monto = D.items.length ? montoTxt(itemsTotal(D.items)) : (D.items._had ? "" : D.monto);
+      if (D.detAuto) D.detalle = itemsDetalle(D.items);
+      if (sh) {
+        const mi = sh.querySelector("#fMonto"), di = sh.querySelector("#fDet"), sv = sh.querySelector("#vSuma");
+        if (mi && D.montoAuto) mi.value = D.monto; if (di && D.detAuto) di.value = D.detalle; if (sv) sv.innerHTML = sumaHtml();
+      }
+    };
     const draw = (sh) => {
       const t = D.tipo, otros = ["aporte", "devolucion", "retiro", "transferencia"];
       const cats = S.cats.filter((c) => c.tipo === t);
@@ -393,6 +482,7 @@
           <label class="fl monto"><input id="fMonto" inputmode="decimal" placeholder="0" value="${esc(D.monto)}" aria-label="Monto"></label>
           <label class="fl"><span>Detalle</span><input id="fDet" value="${esc(D.detalle)}" placeholder="${t === "entrada" ? "Ej: 3 mochis + 1 Strawberry Matcha" : t === "gasto" ? "Ej: 2 cremas en Makro" : "Opcional"}" maxlength="140"></label>
           ${cats.length ? `<div class="fl"><span>Categoría</span>${cChips("categoria_id", D.categoria_id, cats.map((c) => [c.id, c.nombre]))}</div>` : ""}
+          ${vendHtml()}
           ${campos}
           <label class="fl"><span>Fecha</span><input id="fFecha" type="date" value="${esc(D.fecha)}" max="${hoy()}"></label>
           <div id="fPrev"></div>
@@ -418,22 +508,44 @@
       if (editId) lines.unshift('<span class="muted">Vista previa sin descontar el valor original:</span>');
       box.innerHTML = lines.length ? `<div class="preview">${lines.map((l) => `<div>${l}</div>`).join("")}</div>` : "";
     };
+    /* toques sobre los productos vendidos */
+    const vendOp = (k, v) => {
+      if (k === "verItems") { D.verItems = true; return; }
+      if (k === "lugar") { D.lugar = v; return; }
+      if (k === "usarSuma") { D.montoAuto = true; return syncAuto(); }
+      if (k === "vadd") {
+        const p = prodPor(v); if (!p) return;
+        const l = D.items.find((x) => x.id === p.id && !x.mochis);
+        if (l) l.qty++; else D.items.push(lineaNueva(p));
+        if (!D.categoria_id && S.cats.some((c) => c.id === "venta_directa")) D.categoria_id = "venta_directa";
+      } else {
+        const [i, a] = v.split("|"), l = D.items[+i]; if (!l) return;
+        if (k === "vq") { l.qty += +a; if (l.qty < 1) D.items.splice(+i, 1); }
+        if (k === "vsize") { const p = prodPor(l.id); if (p && precioDe(p, l.size) === Number(l.precio)) l.precio = precioDe(p, a); l.size = a; }
+        if (k === "vmochi") { const j = l.mochis.indexOf(a), cant = (prodPor(l.id) || {}).promo_cant || 5; if (l.mochis.length < cant) l.mochis.push(a); else if (j >= 0) l.mochis.splice(j, 1); }
+        if (k === "vmclr") l.mochis = [];
+      }
+      D.items._had = true;
+      syncAuto();
+    };
     openSheet("", draw);
     const sh = $("#sheet");
     sh.onclick = (e) => {
       const b = e.target.closest("[data-set]"); if (!b) return;
       D._touched = true;
       const k = b.dataset.set, v = b.dataset.v;
+      D.monto = sh.querySelector("#fMonto").value; D.detalle = sh.querySelector("#fDet").value; D.fecha = sh.querySelector("#fFecha").value;
       if (k === "tipo") { if (v !== D.tipo) D.categoria_id = null; D.tipo = v; if (v === "transferencia" && (!D.cuenta_destino_id || D.cuenta_destino_id === D.cuenta_id)) D.cuenta_destino_id = (S.cuentas.find((c) => c.id !== D.cuenta_id) || {}).id; }
       else if (k === "pagador") { if (v.startsWith("caja:")) { D.pagador = "caja"; D.cuenta_id = v.slice(5); } else D.pagador = v; }
+      else if (["verItems", "lugar", "usarSuma", "vadd", "vq", "vsize", "vmochi", "vmclr"].includes(k)) vendOp(k, v);
       else D[k] = D[k] === v && k === "categoria_id" ? null : v;
-      D.monto = sh.querySelector("#fMonto").value; D.detalle = sh.querySelector("#fDet").value; D.fecha = sh.querySelector("#fFecha").value;
       draw(sh);
     };
     sh.oninput = (e) => {
-      if (e.target.id === "fMonto") { D.monto = e.target.value; D._touched = true; preview(sh); }
-      if (e.target.id === "fDet") D.detalle = e.target.value;
+      if (e.target.id === "fMonto") { D.monto = e.target.value; D._touched = true; D.montoAuto = !e.target.value.trim(); const sv = sh.querySelector("#vSuma"); if (sv) sv.innerHTML = sumaHtml(); preview(sh); }
+      if (e.target.id === "fDet") { D.detalle = e.target.value; D.detAuto = !e.target.value.trim(); }
       if (e.target.id === "fFecha") D.fecha = e.target.value;
+      if (e.target.dataset.vp !== undefined) { const l = D.items[+e.target.dataset.vp]; if (l) { l.precio = parseMoney(e.target.value) || 0; syncAuto(sh); preview(sh); } }
     };
     sh.onsubmit = async (e) => {
       e.preventDefault();
@@ -444,7 +556,11 @@
       if (D.tipo === "gasto") { if (D.pagador === "caja") row.cuenta_id = D.cuenta_id; else row.socio_id = D.pagador; }
       if (["aporte", "devolucion", "retiro"].includes(D.tipo)) { row.cuenta_id = D.cuenta_id; row.socio_id = D.socio_id; }
       if (D.tipo === "transferencia") { row.cuenta_id = D.cuenta_id; row.cuenta_destino_id = D.cuenta_destino_id; }
-      const msg = !(v > 0) ? "Poné un monto" : ["aporte", "devolucion", "retiro"].includes(D.tipo) && !row.socio_id ? "Elegí el socio" : D.tipo === "transferencia" && row.cuenta_id === row.cuenta_destino_id ? "Elegí cuentas distintas" : ["entrada", "gasto"].includes(D.tipo) && !row.detalle ? "Escribí un detalle corto" : null;
+      /* productos: solo se mandan si hay (o había), así las cargas de siempre no cambian */
+      const its = D.tipo === "entrada" && D.items.length ? D.items.map((l) => Object.assign({ id: l.id, nombre: l.nombre, size: l.size || null, qty: l.qty, precio: Number(l.precio) || 0 }, l.mochis ? { mochis: l.mochis.slice() } : {})) : null;
+      if (its || (pre.items && pre.items.length)) { row.items = its; row.stock_lugar = its && Object.keys(mochisDe(its)).length ? D.lugar : null; }
+      const box = (its || []).find((l) => l.mochis && l.mochis.length !== ((prodPor(l.id) || {}).promo_cant || 5));
+      const msg = !(v > 0) ? "Poné un monto" : ["aporte", "devolucion", "retiro"].includes(D.tipo) && !row.socio_id ? "Elegí el socio" : D.tipo === "transferencia" && row.cuenta_id === row.cuenta_destino_id ? "Elegí cuentas distintas" : ["entrada", "gasto"].includes(D.tipo) && !row.detalle ? "Escribí un detalle corto" : box ? `Elegí los ${(prodPor(box.id) || {}).promo_cant || 5} sabores de ${box.nombre}` : null;
       if (msg) { er.textContent = msg; er.hidden = false; return; }
       btn.disabled = true;
       try {
@@ -453,11 +569,12 @@
           const ins = fail(await sb.from("caja_movimientos").insert(Object.assign(row, { registro: S.me })).select("id").single());
           if (onSaved) { try { await onSaved(ins.id); } catch (e2) { toast(e2.message); } }
         }
-        closeSheet(); toast(editId ? "Cambios guardados" : `Guardado: ${TIPOS[row.tipo].l.toLowerCase()} de ${fmt(v)}`);
+        const nm = its ? Object.values(mochisDe(its)).reduce((a, b) => a + b, 0) : 0;
+        closeSheet(); toast(editId ? "Cambios guardados" : `Guardado: ${TIPOS[row.tipo].l.toLowerCase()} de ${fmt(v)}${nm ? ` · ${nm} mochi${nm > 1 ? "s" : ""} menos en ${LUG[D.lugar]}` : ""}`);
         if (mesDe(row.fecha) !== S.mes && !editId) S.mes = mesDe(row.fecha);
         if (S.view === "retiros" && row.tipo === "retiro") S.r.ref = row.fecha;
         await loadAll(); render();
-      } catch (err) { er.textContent = err.message; er.hidden = false; btn.disabled = false; }
+      } catch (err) { er.textContent = /items|stock_lugar/.test(err.message) ? "Falta instalar en la base la carga por productos (migración 048)." : err.message; er.hidden = false; btn.disabled = false; }
     };
   }
 
@@ -471,6 +588,8 @@
     openSheet(`<div class="sh"><h3>${esc(m.detalle || t.l)}</h3><button class="x" data-close aria-label="Cerrar">×</button></div>
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px"><span class="bigamt num ${an ? "" : ""}" style="${an ? "text-decoration:line-through;color:var(--tachado)" : ""}">${im.txt}</span><span class="muted">${esc(im.sub)}</span></div>
       <dl class="dl">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+      ${(m.items || []).length ? `<div class="vdet"><b>Qué se vendió</b>${m.items.map((l) => `<div><span>${esc(lineaTxt(l))}</span><span class="num">${fmt((Number(l.qty) || 0) * (Number(l.precio) || 0))}</span></div>`).join("")}
+        ${(() => { const nm = Object.values(mochisDe(m.items)).reduce((a, b) => a + b, 0); return nm ? `<p class="hintp">${an ? "Los mochis volvieron al stock al anularla." : `Descontó ${nm} mochi${nm > 1 ? "s" : ""} del stock (${LUG[m.stock_lugar || "cafe"]}).`}</p>` : ""; })()}</div>` : ""}
       ${/^pedido:/.test(m.legacy_id || "") && /STT-\w+/.test(m.detalle || "") ? `<a class="btn" style="margin-top:12px" href="panel.html#pedidos/${an ? "cancelado" : "entregado"}/${encodeURIComponent((m.detalle.match(/STT-\w+/) || [""])[0])}">Ver el pedido en el panel →</a>` : ""}
       <div id="mlog" style="margin-top:14px"></div>
       ${an ? "" : `<div class="btnrow" style="margin-top:16px"><button class="btn" data-edit="${m.id}">Editar</button>${m.tipo !== "ajuste" ? `<button class="btn" data-dup="${m.id}">Repetir</button>` : ""}<button class="btn danger" data-anular="${m.id}">Anular</button></div>`}`);
@@ -806,8 +925,8 @@
     if (d.contar) return contarSheet(d.contar);
     if (d.devolver) { const dd = S.deudas.find((x) => x.id === d.devolver); return movForm({ tipo: "devolucion", socio_id: d.devolver, monto: String(Number(dd.le_debemos)).replace(".", ","), detalle: "Devolución a " + dd.nombre }); }
     if (d.mov) return movDetail(d.mov);
-    if (d.edit) { const m = movPorId(d.edit); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, fecha: m.fecha, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja", _touched: true }, m.id); }
-    if (d.dup) { const m = movPorId(d.dup); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja" }); }
+    if (d.edit) { const m = movPorId(d.edit); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, fecha: m.fecha, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja", items: m.items, stock_lugar: m.stock_lugar, _touched: true }, m.id); }
+    if (d.dup) { const m = movPorId(d.dup); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja", items: m.items, stock_lugar: m.stock_lugar }); }
     if (d.anular) { closeSheet(); return anularSheet(d.anular); }
     if (d.f) { S.f[d.f] = d.v; return render(); }
     if (d.rf) { S.r[d.rf] = d.v; return render(); }
