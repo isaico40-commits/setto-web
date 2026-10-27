@@ -339,7 +339,7 @@
     guardarRetiro({ cierres }, `${b.dataset.hfr ? b.dataset.hfr.replace("-", " a ") : "Todo el día"}: ${b.dataset.hor} ${cuando}`);
   });
   /* =================== DASHBOARD =================== */
-  // Solo datos reales: facturación y gastos = Caja (todas las ventas), productos y horarios = pedidos web, mochis por sabor = stock de la Caja.
+  // Solo datos reales: facturación y gastos = Caja (todas las ventas), productos = pedidos web + entradas de la Caja con productos, horarios = pedidos web, mochis por sabor = stock de la Caja.
   // Se traen los últimos 14 días: la semana actual se compara con la anterior y cada día con el mismo día de la semana pasada.
   const NO_PROD = ["envio", "premio", "maquinita"];
   const corto = (n) => { n = Math.round(n || 0); return n >= 1e6 ? "$" + (n / 1e6).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + "M" : n >= 1000 ? "$" + Math.round(n / 1000) + "k" : "$" + n; };
@@ -347,7 +347,7 @@
   const diaNom = (i) => (i === 0 ? "Hoy" : i === 1 ? "Ayer" : diaMas(-i).toLocaleDateString("es-AR", { weekday: "long" }));
   function viewDashboard() {
     $("#view").innerHTML = `<h1 class="ph1">Dashboard</h1>
-      <p class="muted">Facturación y gastos salen de la <a href="caja.html">Caja</a> (todas las ventas: web, directas, apps y cafeterías). Los productos y horarios, de los pedidos web.</p>
+      <p class="muted">Facturación y gastos salen de la <a href="caja.html">Caja</a> (todas las ventas: web, directas, apps y cafeterías). Lo que más salió suma los pedidos web y las entradas cargadas con productos; los horarios, solo los pedidos web.</p>
       <section class="horcard" id="franjaCard"></section>
       <div id="dash"><p class="muted">Cargando…</p></div>`;
     drawFranjas();
@@ -381,6 +381,8 @@
       if (m.tipo === "gasto") { A.gas += v; return; }
       const web = m.registro === "Pedidos web", c = web ? "Pedidos web" : cat[m.categoria_id] || "Sin categoría";
       A.ent += v; A.canales[c] = (A.canales[c] || 0) + v; A.dias[m.fecha][web ? "web" : "otros"] += v;
+      // ventas cargadas en la Caja con productos (los pedidos web ya se cuentan arriba desde orders)
+      if (!web) (m.items || []).forEach((i) => { const n = String(i.nombre || i.id).trim(), x = A.prods[n] || (A.prods[n] = { q: 0, m: 0 }); x.q += +i.qty || 0; x.m += (+i.qty || 0) * (+i.precio || 0); });
     });
     if (D.stock) D.stock.movs.forEach((m) => {
       const k = fechaKey(new Date(m.created_at)); if (!ks.has(k)) return;
@@ -434,7 +436,7 @@
         </div>
         <div class="dcols">
           ${caja ? `<div class="dcard"><b>Por canal</b>${barras(orden(H.canales), money, "Sin entradas en la Caja.")}</div>` : ""}
-          <div class="dcard"><b>Lo que más salió en la web</b>${barras(prodRows(H), unid, "Sin pedidos web.")}</div>
+          <div class="dcard"><b>Lo que más salió</b>${barras(prodRows(H), unid, "Sin pedidos web ni ventas cargadas con productos.")}<p class="hintp">Pedidos web y entradas de la Caja cargadas con productos.</p></div>
           ${stock ? `<div class="dcard"><b>Mochis por sabor</b>${barras(orden(H.mochis), unid, "Sin mochis descontados del stock.")}<p class="hintp">Lo que se descontó del stock en la Caja: web y ventas directas.</p></div>` : ""}
           <div class="dcard"><b>Pedidos web por hora</b>${horasCh(H)}</div>
           ${H.webN ? `<div class="dcard"><b>Formas de pago (web)</b>${barras(orden(H.pagos), money)}</div>` : ""}
@@ -459,7 +461,7 @@
                 v: caja ? [x.web, x.otros] : [x.n], tip: caja ? `${d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}: ${money(x.web + x.otros)} (web ${money(x.web)} · otros ${money(x.otros)})` : `${x.n} pedidos` }; }), caja ? corto : String)}
             ${mejorTxt ? `<p class="hintp">${mejorTxt}</p>` : ""}</div>
           ${caja ? `<div class="dcard"><b>Por canal</b>${barras(orden(S.canales), money, "Sin entradas en la Caja.")}</div>` : ""}
-          <div class="dcard"><b>Lo que más salió en la web</b>${barras(prodRows(S), unid, "Sin pedidos web.")}</div>
+          <div class="dcard"><b>Lo que más salió</b>${barras(prodRows(S), unid, "Sin pedidos web ni ventas cargadas con productos.")}</div>
           ${stock ? `<div class="dcard"><b>Mochis por sabor</b>${barras(orden(S.mochis), unid, "Sin mochis descontados del stock.")}</div>` : ""}
           ${S.webN ? `<div class="dcard"><b>Retiro o envío (web)</b>${barras(orden(S.modos), (v) => v + (v === 1 ? " pedido" : " pedidos"))}</div>` : ""}
           ${S.webN ? `<div class="dcard"><b>Formas de pago (web)</b>${barras(orden(S.pagos), money)}</div>` : ""}
