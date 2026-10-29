@@ -517,6 +517,8 @@
     el.innerHTML = `<div><b>Entregado ${esc(o.code)} · ${esc((o.nombre || "").split(" ")[0])}</b><span>Mandale el link para que deje su reseña y vea sus sellos. El cobro y los mochis ya se cargaron en la <a class="tocaja" href="caja.html#movs">Caja</a>.</span></div>
       ${((P.orders.find((x) => x.id === o.id) || o).avisos || {}).resena ? `<span class="hintp">✓ Le mandamos el link por WhatsApp</span><button class="linkbtn" data-justx>Listo</button>` : `<a class="btn solid" target="_blank" rel="noopener" data-justgo href="https://wa.me/${esc(o.wa_phone || o.phone)}?text=${encodeURIComponent(resenaTxt(o))}">Pedir reseña por WhatsApp</a><button class="linkbtn" data-justx>Ahora no</button>`}`;
   }
+  // reserva = el cliente eligió un día con nombre ("sábado 31 · 14:45 hs"), no Hoy ni Mañana
+  const esReserva = (o) => /^[^\s·]+ \d{1,2} · \d{1,2}:\d{2} hs$/.test(o.retiro || "");
   function drawOrders() {
     drawJust();
     const box = $("#olist"); if (!box) return;
@@ -534,7 +536,7 @@
         <div class="ohead"><span class="ocode num">${esc(o.code)}</span><span class="ago">${ago(o.created_at)}</span><span class="st ${o.status}">${o.status}</span></div>
         <div class="who2"><b>${esc(o.nombre)}</b><span class="num">${esc(pretty(o.phone))}</span><a class="chat" href="https://wa.me/${esc(o.wa_phone || o.phone)}" target="_blank" rel="noopener">Abrir chat</a></div>
         ${o.wa_phone && o.status === "pendiente" ? `<div class="aviso pend"><span class="aviso-t"><b>📱 Escribió desde otro número</b><small>Cargó ${esc(pretty(o.phone))} en la web pero mandó el pedido desde ${esc(pretty(o.wa_phone))}. Los avisos van a ese.</small></span><button class="btn solid" data-usarwa>Usar ese número</button></div>` : ""}
-        <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}${faltaAvisar(o) ? `<span class="falta-tag">💬 Falta avisar</span>` : ""}${pagoTag(o)}</div>
+        <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${esReserva(o) ? `<span class="res-tag">📅 Reservado</span>` : ""}${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}${faltaAvisar(o) ? `<span class="falta-tag">💬 Falta avisar</span>` : ""}${pagoTag(o)}</div>
         ${env ? `<div class="dirbox"><b>${esc(o.direccion || "")}</b><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.direccion || "") + ", Mar del Plata")}" target="_blank" rel="noopener">Ver en Maps</a></div>` : ""}
         ${o.premio && o.status === "pendiente" ? `<div class="premiobox">Este pedido completa la tarjeta del Club. Premio elegido: <b>${esc(o.premio_txt || "a confirmar con el cliente")}</b>${/off/.test(o.premio_txt || "") ? " (ya descontado del total)" : ""}. Al tocar Entregado se canjea solo.</div>` : ""}
         <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>${pagoEdit(o)}</span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}${o.last_touch_source ? `<span>Llegó por: <b>${esc(origenTxt(o.last_touch_source, o.last_touch_campaign))}</b></span>` : ""}</div>

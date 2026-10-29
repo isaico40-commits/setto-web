@@ -88,6 +88,7 @@ main.pmain{padding-block:24px 80px}
 .stamps.sm{max-width:460px}
 .modo-tag{font-size:.74rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:3px 10px;background:var(--bg-2)}
 .modo-tag.env{background:var(--turquesa);color:#fff}
+.res-tag{font-size:.74rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:3px 10px;background:color-mix(in srgb,var(--turquesa) 16%,var(--card,#fff));color:var(--turquesa);border:1px solid var(--turquesa)}
 .premio-tag{font-size:.74rem;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--coral)}
 .dirbox{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border-radius:12px;padding:10px 12px;font-size:.92rem}
 .dirbox a{font-size:.82rem;font-weight:600;color:var(--turquesa)}
