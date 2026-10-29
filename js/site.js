@@ -1103,11 +1103,13 @@
     try { const l = await API.turnosOcupados(); if (l && JSON.stringify(l) !== JSON.stringify(OCUP)) { OCUP = l; return true; } } catch (_) {}
     return false;
   }
-  // los próximos 3 días: turnos para elegir, franjas cerradas y turnos llenos (se ven pero no se eligen) y un aviso si hace falta
-  function horarios() {
+  // hoy y mañana: turnos para elegir, franjas cerradas y turnos llenos (se ven pero no se eligen) y un aviso si hace falta.
+  // desde/hasta arman también los días de reserva (de pasado mañana a 6 días: hasta ahí llega turnos_ocupados)
+  const RES_DESDE = 2, RES_HASTA = 6;
+  function horarios(desde = 0, hasta = RES_DESDE - 1, tope = 40) {
     const r = S.retiro || {}, now = new Date(), dias = [], avisos = [];
     let n = 0;
-    for (let d = 0; d < 3 && n < 40; d++) {
+    for (let d = desde; d <= hasta && n < tope; d++) {
       const day = new Date(now); day.setDate(now.getDate() + d);
       const nom = d === 0 ? "Hoy" : d === 1 ? "Mañana" : day.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" });
       const items = [], tapadas = [], llenos = [];
@@ -1133,17 +1135,29 @@
         const quedan = items.some((x) => x.ok);
         avisos.push(`${nom} ${tapadas.map(franjaTxt).join(" y ")} está cerrado. ` + (quedan ? "Podés elegir otro horario." : `${d === 0 ? "Hoy" : "Ese día"} no quedan horarios: elegí otro día.`));
       }
-      dias.push({ nom, items });
+      dias.push({ nom, key: fechaKey(day), items });
     }
     return { dias, avisos, libres: dias.flatMap((g) => g.items.filter((x) => x.ok).map((x) => x.txt)) };
   }
-  const slots = () => horarios().libres;
+  const reservas = () => horarios(RES_DESDE, RES_HASTA, Infinity);
+  const slots = () => [...horarios().libres, ...reservas().libres];
+  // una reserva (otro día) se paga solo por transferencia
+  const esReserva = () => !!form.hora && reservas().libres.includes(form.hora);
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
   function horaSelect(isEnv) {
-    const H = horarios(), r = S.retiro || {};
-    if (form.hora && !H.libres.includes(form.hora)) form.hora = ""; // se cerró la franja que había elegido
+    const H = horarios(), R = reservas(), r = S.retiro || {};
+    if (form.hora && !H.libres.includes(form.hora) && !R.libres.includes(form.hora)) form.hora = ""; // se cerró la franja que había elegido
     const lab = isEnv ? "Horario de entrega" : "Horario de retiro";
-    if (!H.libres.length) return `<div class="f" id="fHora"><span>${lab}</span><p class="hora-aviso">Por ahora no hay horarios para elegir. Escribinos por WhatsApp y lo vemos.</p></div>`;
-    return `<label class="f" for="fHora">${lab}${H.avisos.length ? `<span class="hora-aviso">${H.avisos.map(esc).join("<br>")}</span>` : ""}<select id="fHora"><option value="">Elegí un horario</option>${H.dias.map((g) => `<optgroup label="${esc(g.nom.charAt(0).toUpperCase() + g.nom.slice(1))}">${g.items.map((o) => o.ok ? `<option ${o.txt === form.hora ? "selected" : ""}>${esc(o.txt)}</option>` : `<option disabled>${esc(o.txt)}${o.hora ? " · alta demanda" : ""}</option>`).join("")}</optgroup>`).join("")}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>`;
+    if (!H.libres.length && !R.libres.length) return `<div class="f" id="fHora"><span>${lab}</span><p class="hora-aviso">Por ahora no hay horarios para elegir. Escribinos por WhatsApp y lo vemos.</p></div>`;
+    const opt = (o) => o.ok ? `<option ${o.txt === form.hora ? "selected" : ""}>${esc(o.txt)}</option>` : `<option disabled>${esc(o.txt)}${o.hora ? " · alta demanda" : ""}</option>`;
+    const resDias = R.dias.filter((g) => g.items.some((x) => x.ok));
+    // la reserva vive en el mismo select: "Reservar para otro día" → días → turnos de ese día
+    if (form.hora && R.libres.includes(form.hora)) form.res = (R.dias.find((g) => g.items.some((x) => x.txt === form.hora)) || {}).key || form.res;
+    let ops;
+    if (form.res === "dias") ops = `<option value="">Elegí el día</option>${resDias.map((g) => `<option value="__d:${g.key}">${esc(cap(g.nom))}</option>`).join("")}<option value="__hoy">← Hoy o mañana</option>`;
+    else if (form.res) { const g = R.dias.find((x) => x.key === form.res); ops = `<option value="">Elegí un horario</option>${g ? `<optgroup label="${esc(cap(g.nom))}">${g.items.map(opt).join("")}</optgroup>` : ""}<option value="__res">← Otro día</option>`; }
+    else ops = `<option value="">Elegí un horario</option>${H.dias.map((g) => `<optgroup label="${esc(cap(g.nom))}">${g.items.map(opt).join("")}</optgroup>`).join("")}${resDias.length ? `<option value="__res">📅 Reservar para otro día</option>` : ""}`;
+    return `<label class="f" for="fHora">${lab}${!form.res && H.avisos.length ? `<span class="hora-aviso">${H.avisos.map(esc).join("<br>")}</span>` : ""}<select id="fHora">${ops}</select><span class="hintf">${esc(HORARIO)} Pedí con al menos ${r.anticipacionMin || 0} minutos.</span></label>`;
   }
   // trae los horarios de nuevo: si cerraron una franja con la web abierta, el cliente no la puede elegir
   async function refrescarHorarios() {
@@ -1153,7 +1167,7 @@
     return cambio;
   }
   let view = "cart", sending = false;
-  let form = { nombre: "", tel: "", hora: "", pago: "", nota: "", modo: "retiro", dir: "", dirExtra: "", premio: "", okWa: true, okAds: true }; // vienen tildadas (decisión de Isa); la versión del aviso lo deja registrado
+  let form = { nombre: "", tel: "", hora: "", res: "", pago: "", nota: "", modo: "retiro", dir: "", dirExtra: "", premio: "", okWa: true, okAds: true }; // vienen tildadas (decisión de Isa); la versión del aviso lo deja registrado
   try { const f = JSON.parse(localStorage.getItem("setto-form") || "null"); if (f) { form.nombre = f.nombre || ""; form.tel = f.tel || ""; form.dir = f.dir || ""; form.dirExtra = f.dirExtra || ""; } } catch (_) {}
   let lastOrder = null;
   try { lastOrder = JSON.parse(sessionStorage.getItem("setto-last-order") || "null"); } catch (_) {}
@@ -1247,7 +1261,7 @@
       $("#dTitle").textContent = "Entrega";
       if (!envioOn()) form.modo = "retiro";
       const pagoEnvio = (S.envio || {}).pago || "Transferencia / Mercado Pago";
-      const pagosVer = form.modo === "envio" ? [pagoEnvio] : S.pagos || [];
+      const pagosVer = form.modo === "envio" ? [pagoEnvio] : esReserva() ? [(S.pagos || []).find((p) => /transfer/i.test(p)) || pagoEnvio] : S.pagos || [];
       if (!pagosVer.includes(form.pago)) form.pago = pagosVer.length === 1 ? pagosVer[0] : ""; // con varias opciones no viene ninguna marcada
       const isEnv = form.modo === "envio", costo = Math.max(0, Number((S.envio || {}).costo) || 0);
       body.innerHTML = `
@@ -1270,8 +1284,16 @@
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>`;
       foot.innerHTML = `${clubLine(true)}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${maqOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Maquinita: ${esc(MAQ.titulo)}</span><span class="num">${money(-maqOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><div id="fErr" class="err" role="alert" hidden></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
       $("#fTel")?.addEventListener("input", (e) => { const h = $("#fTelOk"); if (h) h.innerHTML = telHint(e.target.value); });
-      [["fNombre", "nombre"], ["fTel", "tel"], ["fHora", "hora"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; const f = e.target.closest(".f"); if (f) f.classList.remove("inval"); }); });
-      $("#fHora").addEventListener("change", (e) => { form.hora = e.target.value; e.target.closest(".f").classList.remove("inval"); });
+      [["fNombre", "nombre"], ["fTel", "tel"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; const f = e.target.closest(".f"); if (f) f.classList.remove("inval"); }); });
+      $("#fHora")?.addEventListener("change", (e) => {
+        const v = e.target.value, antes = esReserva();
+        if (v === "__res") { form.res = "dias"; form.hora = ""; }
+        else if (v === "__hoy") { form.res = ""; form.hora = ""; }
+        else if (v.startsWith("__d:")) { form.res = v.slice(4); form.hora = ""; }
+        else form.hora = v;
+        e.target.closest(".f").classList.remove("inval");
+        if (v.startsWith("__") || antes !== esReserva()) { drawDrawer(); const s2 = $("#fHora"); if (s2 && !form.hora) s2.focus(); } // cambia el select o las formas de pago
+      });
       [["fOkWa", "okWa"], ["fOkAds", "okAds"]].forEach(([id, k]) => $("#" + id).addEventListener("change", (e) => { form[k] = e.target.checked; }));
       $("#fTel").addEventListener("change", async () => {
         if (!(await loadCard()) || view !== "checkout") return;
@@ -1341,7 +1363,7 @@
       if (GIFT && o.gift) { const rest = GIFT.saldo - o.gift; if (rest > 0) usarGift(GIFT.code, rest); else quitarGift(); }
       if (MAQ && o.maquinita) { const rest = MAQ.tipo === "monto" ? MAQ.saldo - o.maquinita : 0; if (rest > 0) usarMaq({ ...MAQ, saldo: rest }); else quitarMaq(); }
       maqSug = { tel: null, premios: [] };
-      cart = []; save(); form.hora = ""; form.nota = ""; form.premio = ""; form.okWa = true; form.okAds = true; renderBadge();
+      cart = []; save(); form.hora = ""; form.res = ""; form.nota = ""; form.premio = ""; form.okWa = true; form.okAds = true; renderBadge();
       view = "sent"; sending = false; drawDrawer();
       const link = waLink(lastOrder.message);
       abrioWhatsApp(o.code, ph);
