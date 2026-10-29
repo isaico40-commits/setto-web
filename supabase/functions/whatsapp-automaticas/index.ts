@@ -5,13 +5,17 @@
 // Secretos: META_ACCESS_TOKEN, WA_PHONE_NUMBER_ID.
 import { env, sb, esEquipo, hookValido, json, CORS, VERSION } from "../_shared/supa.ts";
 import { mensajePlantilla, soloDigitos } from "../_shared/crm.ts";
+import { usaCodigo, variablesConCodigo } from "../_shared/codigos.ts";
 
 const TOPE = 300; // por automática y por día: lo que entra cómodo en una ejecución
 
-async function mandar(to: string, nombre: string | null, a: any) {
+async function mandar(to: string, nombre: string | null, a: any, prueba = false) {
+  // {codigo} y {vence}: el código personal de la promo elegida, uno por destinatario (el de la prueba no suma a la campaña)
+  const v = await variablesConCodigo(a.variables, a.promo_id, to, prueba ? {} : { automation_id: a.id });
+  if (v.error) return { error: v.error };
   const r = await fetch(`https://graph.facebook.com/${VERSION}/${env("WA_PHONE_NUMBER_ID")}/messages`, {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${env("META_ACCESS_TOKEN")}` },
-    body: JSON.stringify(mensajePlantilla(to, a.plantilla, a.idioma, a.variables, nombre)) });
+    body: JSON.stringify(mensajePlantilla(to, a.plantilla, a.idioma, v.variables!, nombre)) });
   const d = await r.json().catch(() => ({}));
   if (!r.ok || d.error) return { error: `${d.error?.code ?? r.status} ${d.error?.error_data?.details || d.error?.message || ""}`.trim() };
   return { wamid: d.messages?.[0]?.id as string };
@@ -32,7 +36,7 @@ Deno.serve(async (req) => {
     const { data: ok } = await sb.rpc("puede_contactar", { p_phone: ph, p_canal: "whatsapp" });
     if (!ok) return json({ error: "Ese número no aceptó novedades por WhatsApp. Marcá la casilla en un pedido o escribí ALTA al WhatsApp de Setto." }, 400);
     const { data: cli } = await sb.from("customers").select("nombre").eq("phone", ph).maybeSingle();
-    const r = await mandar(ph, cli?.nombre ?? null, a);
+    const r = await mandar(ph, cli?.nombre ?? null, a, true);
     await sb.from("message_logs").insert({ automation_id: a.id, phone: ph, wamid: r.wamid ?? null, estado: r.wamid ? "enviado" : "fallo", error: r.error ?? null, texto: "[prueba]" });
     return r.error ? json({ error: r.error }, 502) : json({ ok: true, prueba: true });
   }
@@ -40,6 +44,7 @@ Deno.serve(async (req) => {
   const { data: autos } = await sb.from("marketing_automations").select("*").eq("activa", true);
   const res: Record<string, unknown> = {};
   for (const a of autos ?? []) {
+    if (usaCodigo(a.variables) && !a.promo_id) { res[a.nombre] = { error: "usa {codigo} sin código de descuento elegido" }; continue; }
     const { data: lista, error } = await sb.rpc("automatica_destinatarios", { p_id: a.id });
     if (error) { res[a.nombre] = { error: error.message }; continue; }
     let enviados = 0, fallidos = 0;

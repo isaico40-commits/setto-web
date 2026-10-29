@@ -1150,3 +1150,5 @@ article.set,article.item,article.prem{cursor:pointer}
 .bp-row .qty button:disabled{opacity:.35;cursor:default}
 .bp-ah{font-size:.86rem;color:var(--ink-2);margin:0}
 .bp-ah s{color:var(--tachado)}
+/* código de descuento aplicado (migración 052): mismo banner que la maquinita, en turquesa */
+.maqon.cupon{background:#e6f0ef;border-color:#126b69}

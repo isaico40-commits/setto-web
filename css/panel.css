@@ -358,3 +358,11 @@ a.ptab{text-decoration:none}
   .ofgs{flex-direction:column;align-items:stretch;gap:8px}.ofg{flex-direction:row;align-items:center;gap:8px;max-width:100%}.ofg small{flex:0 0 62px}.ochips{min-width:0;flex:1 1 auto;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}.ochips::-webkit-scrollbar{display:none}}
 .gasto{display:grid;gap:2px}.gasto b{font-size:2rem;font-family:var(--display);color:var(--turquesa)}
 .gbar{display:flex;align-items:flex-end;gap:3px;height:56px;padding-top:4px}.gbar i{flex:1;min-width:3px;max-width:22px;background:color-mix(in srgb,var(--turquesa) 70%,transparent);border-radius:3px 3px 0 0}
+/* códigos de descuento */
+.pcods{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pcode{font:inherit;font-weight:800;letter-spacing:.04em;color:#126b69;background:#e6f0ef;border:1.5px dashed #126b69;border-radius:10px;padding:5px 12px;cursor:pointer}
+.pcosto{margin:0;font-size:.84rem;background:#f1e4ca;border-radius:12px;padding:9px 12px}
+.pnuevo{display:grid;gap:6px;background:#e6f0ef;border-radius:14px;padding:12px}
+.pnuevo .ocode{color:#126b69;letter-spacing:.04em}
+@media (max-width:520px){#promoForm .row2,#promoForm .row3{grid-template-columns:1fr}}
+.pstat{margin:0;font-size:.86rem;font-weight:600}

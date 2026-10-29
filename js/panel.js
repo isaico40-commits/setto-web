@@ -102,7 +102,7 @@
   function cambioBox(o) {
     const c = o.cambio, F = P.falta[o.id];
     if (o.status === "pendiente" && F) {
-      const prods = (o.items || []).map((i, idx) => ({ i, idx })).filter(({ i }) => !["envio", "premio", "gift", "maquinita"].includes(i.id));
+      const prods = (o.items || []).map((i, idx) => ({ i, idx })).filter(({ i }) => !["envio", "premio", "gift", "maquinita", "codigo"].includes(i.id));
       return `<div class="faltabox"><b>¿Qué falta?</b><span class="hintp">Marcá lo que no tenés. Si te queda algo, bajá la cantidad que falta.</span>
         ${prods.map(({ i, idx }) => { const q = F.sel[idx]; return `<div class="frow"><label><input type="checkbox" data-fsel="${idx}" ${q ? "checked" : ""}> ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""} <small>×${i.qty}</small></label>
           ${q && i.qty > 1 ? `<span class="stepper sm"><button data-fq="${idx}:-1" aria-label="Menos">−</button><span>faltan ${q}</span><button data-fq="${idx}:1" aria-label="Más">+</button></span>` : ""}</div>`; }).join("")}
@@ -342,7 +342,7 @@
   /* =================== DASHBOARD =================== */
   // Solo datos reales: facturación y gastos = Caja (todas las ventas), productos = pedidos web + entradas de la Caja con productos, horarios = pedidos web, mochis por sabor = stock de la Caja.
   // Se traen los últimos 14 días: la semana actual se compara con la anterior y cada día con el mismo día de la semana pasada.
-  const NO_PROD = ["envio", "premio", "maquinita"];
+  const NO_PROD = ["envio", "premio", "maquinita", "gift", "codigo"];
   const corto = (n) => { n = Math.round(n || 0); return n >= 1e6 ? "$" + (n / 1e6).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + "M" : n >= 1000 ? "$" + Math.round(n / 1000) + "k" : "$" + n; };
   const pct = (a, b) => (b > 0 ? Math.round(((a - b) / b) * 100) : null);
   const diaNom = (i) => (i === 0 ? "Hoy" : i === 1 ? "Ayer" : diaMas(-i).toLocaleDateString("es-AR", { weekday: "long" }));
@@ -885,7 +885,7 @@
     if (!t) { box.innerHTML = ""; return; }
     const n = TP.cantidad(t.cuerpo), prev = [...box.querySelectorAll("[data-cvar]")].map((x) => x.value);
     box.innerHTML = `${n ? `<div class="tplvars">${Array.from({ length: n }, (_, i) => `<label>Qué va en {{${i + 1}}}<input class="inp" data-cvar="${i}" required value="${esc(prev[i] ?? (i === 0 && /^hola\b/i.test(t.cuerpo) ? "{nombre}" : ""))}" placeholder="${esc(t.ejemplos[i] || "")}"></label>`).join("")}</div>
-      <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente.</span>` : ""}
+      <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente y <b>{codigo}</b> para mandarle un código de descuento personal (lo elegís abajo).</span>` : ""}
       <div class="tplprev"><span class="eyebrow">Así le llega</span><div data-prev></div></div>`;
     campPrev(f);
   }
@@ -906,6 +906,8 @@
     f.addEventListener("input", (e) => { if (e.target.dataset.cvar !== undefined) campPrev(f); });
     f.addEventListener("submit", async (e) => {
       e.preventDefault(); const v = leerTplForm(f); if (!v) return;
+      const pe = promoChequeo(v); if (pe) { toast(pe); return; }
+      v.promo = v.d.promo_id ? { promo_id: v.d.promo_id } : {}; // solo si eligió uno (sin la migración 052 la columna no existe)
       try { await guardar(v); f.reset(); campVars(f); } catch (err) { toast(err.message); }
     });
   }
@@ -936,6 +938,7 @@
       box.innerHTML = l.length ? l.map((a) => { const x = r[a.id] || {}, t = tplDe(a.plantilla); return `<article class="pcard" data-auto="${esc(a.id)}">
         <div class="ohead"><b>${esc(a.nombre)}</b><span class="st ${a.activa ? "entregado" : "pendiente"}">${a.activa ? "Prendida" : "Pausada"}</span></div>
         <p class="hintp">${a.dias} ${a.dias === 1 ? "día" : "días"} después de la última compra · ${esc(segNom(a.segmento))} · plantilla <b>${esc(a.plantilla)}</b>${(a.variables || []).length ? " · " + a.variables.map(esc).join(" / ") : ""}</p>
+        ${a.promo_id ? `<p class="hintp">🏷️ Código: <b>${esc(promoNom(a.promo_id))}</b> · ${promoNums(((P.presu || {}).automatica || {})[a.id])}</p>` : ""}
         <p class="num">${x.enviados || 0} enviados · ${x.semana || 0} esta semana${x.fallidos ? ` · ${x.fallidos} con error` : ""} · ${a.activa ? `próximo envío (11 h): ${x.hoy || 0} ${x.hoy === 1 ? "persona" : "personas"}` : "si la prendés, arranca con quienes cumplan desde ese día"}</p>
         ${t ? `<details class="tplver"><summary>Así le llega</summary>${TP.burbuja(t, a.variables)}</details>` : ""}
         <div class="row2"><label>Probar con un número<input class="inp" data-prueba inputmode="tel" placeholder="223 347-1277"></label></div>
@@ -943,12 +946,155 @@
       </article>`; }).join("") : '<p class="muted">Todavía no hay automáticas.</p>';
     } catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
   }
+  /* ---- Códigos de descuento (migración 052): uno para todos que escribís vos, o uno personal por persona (a mano o en campañas con {codigo}) ---- */
+  const TIPOS_P = [["porcentaje", "% de descuento"], ["monto", "$ de descuento"], ["regalo:mochi", "Mochi de regalo"], ["regalo:bebida", "Bebida de regalo"], ["envio", "Envío gratis"]];
+  const diaCorto = (iso) => new Date(iso).toLocaleDateString("es-AR", { day: "numeric", month: "numeric" });
+  const tipoDe = (p) => (p.tipo === "regalo" ? "regalo:" + p.regalo : p.tipo);
+  const tituloDe = (t, v) => (t === "porcentaje" ? `${v || 0}% off` : t === "monto" ? `${money(v || 0)} off` : (TIPOS_P.find((x) => x[0] === t) || [, ""])[1]);
+  const desdePrecio = (f, k) => { const l = P.products.filter((p) => p.activo !== false && f(p)).map((p) => p[k]).filter((n) => n > 0); return l.length ? Math.min(...l) : 0; };
+  // cuánto le cuesta a Setto cada uso, con los precios de la carta de hoy
+  function costoTxt(p) {
+    const t = tipoDe(p), max = p.usos_max ? ` Como máximo ${p.usos_max} ${p.usos_max === 1 ? "pedido" : "pedidos"}` : "";
+    if (t === "porcentaje") { const ej = Math.round((10000 * p.valor) / 100 / 10) * 10, d = p.tope > 0 ? Math.min(ej, p.tope) : ej;
+      return `Cada uso cuesta el ${p.valor}% de los productos del pedido${p.tope > 0 ? `, hasta ${money(p.tope)}` : ""}. Ej.: en un pedido de $10.000 descuenta ${money(d)}.${max ? max + "." : ""}`; }
+    const uno = t === "monto" ? p.valor : t === "regalo:mochi" ? desdePrecio((x) => x.categoria === "mochi", "precio") : t === "regalo:bebida" ? desdePrecio((x) => x.categoria === "dirty", "precio_12") : Math.max(0, Number((P.settings.envio || {}).costo) || 0);
+    const que = t === "monto" ? `${money(p.valor)} (si el pedido es menor, hasta el total)` : t === "regalo:mochi" ? `el mochi más barato del pedido${uno ? ` (hoy desde ${money(uno)})` : ""}`
+      : t === "regalo:bebida" ? `la bebida más barata del pedido${uno ? ` (hoy desde ${money(uno)} en 12 oz)` : ""}` : uno ? `el envío (${money(uno)})` : "el envío (hoy el costo se coordina por WhatsApp)";
+    return `Cada uso cuesta ${que}.${max && uno ? `${max}: hasta ${money(uno * p.usos_max)} en total.` : max ? max + "." : ""}`;
+  }
+  const condTxt = (p) => [p.minimo > 0 && `compra mínima ${money(p.minimo)}`, p.vence_at && `vale hasta el ${diaCorto(p.vence_at)}`, p.dias && `los personales duran ${p.dias} ${p.dias === 1 ? "día" : "días"}`,
+    `${p.por_cliente || 1} ${(p.por_cliente || 1) === 1 ? "vez" : "veces"} por persona`, p.usos_max && `${p.usos_max} en total`, p.acumula ? "se suma al Club y la maquinita" : "no se suma al Club ni a la maquinita"].filter(Boolean).join(" · ");
+  const promoEstado = (p) => (p.activa === false ? ["Pausado", "pendiente"] : p.vence_at && new Date(p.vence_at) <= new Date() ? ["Vencido", "cancelado"] : ["Activo", "entregado"]);
+  const promoVigente = (p) => promoEstado(p)[0] === "Activo";
+  // texto para mandarle un código a mano por WhatsApp: con el link que lo deja aplicado en la web
+  const msgCodigo = (p, c) => `¡Hola! Te dejo tu código de Setto: *${c.code}* (${p.titulo}).${c.vence_at ? ` Vale hasta el ${diaCorto(c.vence_at)}.` : ""} Pedí en la web y ya te queda aplicado: ${location.origin}/?codigo=${encodeURIComponent(c.code)}`;
+  function promoFormHTML() {
+    return `<form class="pcard" id="promoForm" novalidate>
+      <div class="row2"><label>Nombre (para vos)<input class="inp" name="nombre" required maxlength="60" placeholder="Ej: Vuelta de los inactivos"></label>
+        <label>Qué da<select class="inp" name="tipo">${TIPOS_P.map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label></div>
+      <div class="row2" data-pval><label data-pvalor>Cuánto (%)<input class="inp" name="valor" type="number" min="1" inputmode="numeric" value="10"></label>
+        <label data-ptope>Tope en $ (opcional)<input class="inp" name="tope" type="number" min="0" inputmode="numeric" placeholder="Sin tope"></label></div>
+      <label>Lo que ve el cliente<input class="inp" name="titulo" maxlength="40" placeholder="10% off"></label>
+      <div class="row2"><label>Código para todos (opcional)<input class="inp" name="code" maxlength="20" placeholder="Ej: LEMON10" autocapitalize="characters" spellcheck="false" autocomplete="off"></label>
+        <label>Inicio de los personales<input class="inp" name="prefijo" maxlength="10" value="SETTO" autocapitalize="characters" spellcheck="false" autocomplete="off"></label></div>
+      <span class="hintp">El código para todos lo podés compartir en una historia o un posteo. Los personales (ej. SETTO-7KQ2) son uno por persona y solo sirven con su celular: salen solos en las campañas con <b>{codigo}</b> o los generás a mano desde la tarjeta.</span>
+      <div class="row3"><label>Vale hasta (opcional)<input class="inp" name="vence" type="date"></label>
+        <label>Los personales duran (días)<input class="inp" name="dias" type="number" min="1" max="365" inputmode="numeric" value="7"></label>
+        <label>Compra mínima en $<input class="inp" name="minimo" type="number" min="0" inputmode="numeric" value="0"></label></div>
+      <div class="row3"><label>Usos en total (opcional)<input class="inp" name="usos_max" type="number" min="1" inputmode="numeric" placeholder="Sin límite"></label>
+        <label>Usos por persona<input class="inp" name="por_cliente" type="number" min="1" max="50" inputmode="numeric" value="1"></label></div>
+      <label class="chk"><input type="checkbox" name="acumula"> Se suma al premio del Setto Club y al de la maquinita</label>
+      <p class="pcosto" data-pcosto></p>
+      <div class="acts"><button class="btn solid" type="submit">Crear código</button></div></form>`;
+  }
+  const leerPromo = (f) => {
+    const d = Object.fromEntries(new FormData(f)), t = d.tipo, num = (k) => (String(d[k] ?? "").trim() === "" ? null : Math.max(0, Math.round(+d[k] || 0)));
+    return { nombre: (d.nombre || "").trim(), tipo: t.startsWith("regalo") ? "regalo" : t, regalo: t.startsWith("regalo:") ? t.slice(7) : null,
+      valor: ["porcentaje", "monto"].includes(t) ? num("valor") || 0 : 0, tope: t === "porcentaje" ? num("tope") || 0 : 0,
+      titulo: (d.titulo || "").trim() || tituloDe(t, num("valor")), minimo: num("minimo") || 0, usos_max: num("usos_max") || null, por_cliente: Math.min(50, Math.max(1, num("por_cliente") || 1)),
+      dias: num("dias") ? Math.min(365, num("dias")) : null, vence_at: d.vence ? `${d.vence}T23:59:59-03:00` : null, acumula: !!d.acumula,
+      prefijo: (d.prefijo || "SETTO").trim().toUpperCase() || "SETTO", code: (d.code || "").trim().toUpperCase() };
+  };
+  function promoPintar(f) {
+    const t = f.elements.tipo.value, conValor = ["porcentaje", "monto"].includes(t);
+    f.querySelector("[data-pval]").hidden = !conValor; f.querySelector("[data-ptope]").hidden = t !== "porcentaje";
+    f.querySelector("[data-pvalor]").firstChild.textContent = t === "monto" ? "Cuánto ($)" : "Cuánto (%)";
+    f.elements.titulo.placeholder = tituloDe(t, +f.elements.valor.value || 0);
+    f.querySelector("[data-pcosto]").textContent = "💸 " + costoTxt(leerPromo(f));
+  }
+  function promoValidar(p) {
+    if (!p.nombre) return "Poné un nombre para reconocerlo";
+    if (p.tipo === "porcentaje" && !(p.valor >= 1 && p.valor <= 100)) return "El porcentaje va de 1 a 100";
+    if (p.tipo === "monto" && !(p.valor > 0)) return "Poné cuánto descuenta";
+    if (p.code && (!/^[A-Z0-9][A-Z0-9-]{2,19}$/.test(p.code) || /^(GIFT|MAQ|STT)-/.test(p.code))) return "El código va con letras y números (3 a 20, sin espacios) y no puede empezar con GIFT-, MAQ- ni STT-";
+    if (!/^[A-Z0-9]{2,10}$/.test(p.prefijo) || ["GIFT", "MAQ", "STT"].includes(p.prefijo)) return "El inicio de los personales va con 2 a 10 letras o números (no GIFT, MAQ ni STT)";
+    if (p.vence_at && new Date(p.vence_at) <= new Date()) return "La fecha de vencimiento ya pasó";
+    return null;
+  }
+  async function cargarPromos() {
+    const box = $("#promoList"); if (!box) return;
+    try {
+      const [l, r] = await Promise.all([API.listPromos(), API.promosResumen().catch(() => ({}))]);
+      P.promos = l.promos; P.pcods = l.codigos; P.presu = r || {};
+      box.innerHTML = l.promos.length ? l.promos.map((p) => { const [lbl, cls] = promoEstado(p), x = (P.presu.promo || {})[p.id] || {}, cods = l.codigos.filter((c) => c.promo_id === p.id), gen = cods.filter((c) => !c.phone), pers = cods.filter((c) => c.phone);
+        return `<article class="pcard" data-promo="${esc(p.id)}">
+        <div class="ohead"><b>${esc(p.nombre)}</b><span class="st ${cls}">${lbl}</span></div>
+        <p><b>${esc(p.titulo)}</b> <span class="hintp">${esc(condTxt(p))}</span></p>
+        ${gen.length ? `<div class="pcods">${gen.map((c) => `<button class="pcode num" data-pcopy="${esc(c.code)}" title="Copiar">${esc(c.code)}</button>`).join("")}<span class="hintp">código para todos · tocalo para copiar</span></div>` : ""}
+        <p class="pstat">${x.codigos || 0} ${x.codigos === 1 ? "código" : "códigos"} · ${x.usados || 0} ${x.usados === 1 ? "usado" : "usados"} · ${money(x.descontado || 0)} descontado · ${money(x.vendido || 0)} vendido (${x.entregados || 0} entregados)</p>
+        <p class="hintp">💸 ${esc(costoTxt(p))}</p>
+        ${promoVigente(p) ? `<div class="row2"><label>Código personal para un número<input class="inp" data-pphone inputmode="tel" placeholder="223 347-1277"></label></div><div data-pout></div>` : ""}
+        <div class="acts">${promoVigente(p) ? '<button class="btn" data-pgen>Generar código</button>' : ""}<button class="btn" data-ponoff>${p.activa === false ? "Activar" : "Pausar"}</button>${x.usados ? "" : '<button class="linkbtn warn" data-pborrar>Borrar</button>'}</div>
+        ${pers.length ? `<details><summary class="hintp">Personales hechos a mano (${pers.length})</summary><div class="hist">${pers.map((c) => `<div><span><b class="num">${esc(c.code)}</b> · ${esc(pretty(c.phone))}${c.vence_at ? ` <span class="muted">hasta el ${diaCorto(c.vence_at)}</span>` : ""}</span><span>${c.usos ? "usado" : "sin usar"}</span></div>`).join("")}</div></details>` : ""}
+      </article>`; }).join("") : '<p class="muted">Todavía no hay códigos. Armá el primero arriba.</p>';
+    } catch (e) { P.promos = null; box.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+    FORMS_TPL.forEach((q) => $(q) && promoCampo($(q)));
+    if (P.camps) pintarCampanas(); if (P.autos) cargarAutomaticas();
+  }
+  // campo "Código de descuento" de una campaña o automática
+  function promoCampo(f) {
+    const box = f.querySelector("[data-promobox]"); if (!box) return;
+    if (!P.promos) { box.innerHTML = ""; return; }
+    const elegida = (f.elements.promo_id || {}).value || "", ok = P.promos.filter(promoVigente);
+    box.innerHTML = `<label>Código de descuento (opcional)<select class="inp" name="promo_id"><option value="">Sin código</option>${ok.map((p) => `<option value="${esc(p.id)}"${p.id === elegida ? " selected" : ""}>${esc(p.nombre)} · ${esc(p.titulo)}</option>`).join("")}</select></label>
+      <span class="hintp">Si elegís uno, escribí <b>{codigo}</b> en una variable: cada persona recibe un código distinto que solo sirve con su celular. <b>{vence}</b> pone hasta qué día vale.</span>`;
+  }
+  // {codigo} sin promo, promo sin {codigo} o {vence} con un código que no vence: se avisa antes de guardar
+  function promoChequeo(v) {
+    const pid = v.d.promo_id || "", usa = (k) => v.variables.some((x) => x.includes(k)), p = pid && (P.promos || []).find((x) => x.id === pid);
+    if ((usa("{codigo}") || usa("{vence}")) && !pid) return "Elegí qué código de descuento va en {codigo}";
+    if (pid && !usa("{codigo}")) return "Elegiste un código: escribí {codigo} en alguna variable para que le llegue";
+    if (p && usa("{vence}") && !p.dias && !p.vence_at) return "Ese código no vence: sacá {vence} del mensaje";
+    return null;
+  }
+  const promoNom = (id) => { if (!P.promos) return "…"; const p = (P.promos || []).find((x) => x.id === id); return p ? `${p.nombre} (${p.titulo})` : "código borrado"; };
+  const promoNums = (x) => (x ? `${x.codigos || 0} códigos · ${x.usados || 0} usados · ${money(x.descontado || 0)} descontado · ${money(x.vendido || 0)} vendido` : "0 usados todavía");
+  function engancharPromos() {
+    const f = $("#promoForm");
+    f.addEventListener("input", () => promoPintar(f)); f.addEventListener("change", () => promoPintar(f)); promoPintar(f);
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault(); const p = leerPromo(f), err = promoValidar(p); if (err) { toast(err); return; }
+      const { code, ...promo } = p; const b = f.querySelector("[type=submit]"); b.disabled = true;
+      try { await API.createPromo(promo, code || null); toast(code ? `Listo: ${code} ya se puede usar` : "Listo: generá códigos personales desde la tarjeta o usalo en una campaña"); f.reset(); promoPintar(f); cargarPromos(); }
+      catch (err2) { toast(err2.message); } b.disabled = false;
+    });
+    $("#promoList").addEventListener("click", async (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      const card = b.closest("[data-promo]"), p = card && (P.promos || []).find((x) => x.id === card.dataset.promo);
+      if (b.dataset.pcopy) { try { await navigator.clipboard.writeText(b.dataset.pcopy); toast("Código copiado"); } catch (_) { toast(b.dataset.pcopy); } return; }
+      if (b.dataset.pmsg) { try { await navigator.clipboard.writeText(b.dataset.pmsg); toast("Mensaje copiado"); } catch (_) { toast("No se pudo copiar"); } return; }
+      if (!p) return;
+      if (b.dataset.pgen !== undefined) {
+        const ph = card.querySelector("[data-pphone]").value.trim(); if (!API.normPhone(ph)) { toast("Revisá el celular: código de área + número"); return; }
+        b.disabled = true;
+        try { const c = await API.promoCodigoNuevo(p.id, ph), m = msgCodigo(p, c), n = API.normPhone(ph);
+          card.querySelector("[data-pout]").innerHTML = `<div class="pnuevo"><span class="hintp">${c.nuevo ? "Código nuevo" : "Ya tenía este código sin usar"} para ${esc(pretty(n))}</span><b class="ocode num">${esc(c.code)}</b>
+            <div class="acts"><a class="btn solid wa" href="https://wa.me/${n}?text=${encodeURIComponent(m)}" target="_blank" rel="noopener">Mandar por WhatsApp</a><button class="btn" data-pmsg="${esc(m)}">Copiar mensaje</button></div></div>`;
+          cargarPromosSuave(p.id);
+        } catch (err) { toast(err.message); } b.disabled = false; return;
+      }
+      if (b.dataset.pborrar !== undefined && !confirm(`¿Borrar "${p.nombre}"? Sus códigos dejan de funcionar.`)) return;
+      b.disabled = true;
+      try { if (b.dataset.pborrar !== undefined) await API.deletePromo(p.id); else await API.updatePromo(p.id, { activa: p.activa === false });
+        toast(b.dataset.pborrar !== undefined ? "Borrado" : p.activa === false ? "Activado" : "Pausado: sus códigos dejan de funcionar hasta que lo actives"); cargarPromos(); } catch (err) { toast(err.message); b.disabled = false; }
+    });
+  }
+  // después de generar un código: actualiza los números sin borrar el código recién generado de la pantalla
+  async function cargarPromosSuave(id) {
+    const card = $(`[data-promo="${id}"]`), out = card && card.querySelector("[data-pout]").innerHTML;
+    await cargarPromos(); const c2 = $(`[data-promo="${id}"]`); if (c2 && out) c2.querySelector("[data-pout]").innerHTML = out;
+  }
+
   async function viewCampanas() {
     $("#view").innerHTML = `<h1 class="ph1">Campañas</h1>
       <p class="muted">Solo le llega a quien aceptó en la web o escribió ALTA. Quien toca "No quiero más novedades" (o escribe BAJA) sale solo de todo. Las plantillas se arman acá abajo y Meta las aprueba.</p>
       <section class="sec"><h2>Gasto de WhatsApp</h2><div class="pcard" id="gastoBox"><span class="muted">Cargando…</span></div></section>
       <section class="sec"><h2>Segmentos</h2><div class="pcard"><div class="hist" id="segList"><span class="muted">Cargando…</span></div>
         <div class="acts"><button class="btn" id="syncAud">Actualizar públicos de Meta</button></div><span class="hintp">Crea o actualiza un público "Setto · segmento" por cada uno, solo con quienes aceptaron anuncios.</span></div></section>
+      <section class="sec"><h2>Códigos de descuento</h2>
+        <p class="hintp" style="margin-bottom:12px">Un incentivo para tus campañas o para dar a mano: % off, monto, mochi o bebida de regalo, o envío gratis. El cliente lo escribe en el carrito y el descuento se ve antes de mandar el pedido. Si el pedido se cancela, el código vuelve a quedar disponible.</p>
+        ${promoFormHTML()}
+        <div class="pgrid" id="promoList" style="margin-top:16px"><p class="muted">Cargando…</p></div></section>
       <section class="sec"><h2>Plantillas de WhatsApp</h2>
         <p class="hintp" style="margin-bottom:12px">Armá el mensaje, mirá cómo llega y mandalo a Meta para aprobar. Solo las aprobadas se pueden usar en una campaña.</p>
         <div class="acts" style="margin-bottom:14px"><button class="btn solid" id="tplNueva">+ Nueva plantilla</button><button class="btn" id="tplRefresh">Actualizar estado</button></div>
@@ -960,6 +1106,7 @@
           <label>Segmento<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></label></div>
           <div data-tplbox><span class="muted">Cargando plantillas…</span></div>
           <div data-varsbox class="varsbox"></div>
+          <div data-promobox class="varsbox"></div>
           <button class="btn solid" type="submit">Guardar borrador</button></form></section>
       <section class="sec"><h2>Campañas</h2><div class="pgrid" id="campList"><p class="muted">Cargando…</p></div></section>
       <section class="sec"><h2>Campañas automáticas</h2>
@@ -970,6 +1117,7 @@
           <label>Solo a<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}"${k === "todos" ? " selected" : ""}>${n}</option>`).join("")}</select></label>
           <div data-tplbox><span class="muted">Cargando plantillas…</span></div>
           <div data-varsbox class="varsbox"></div>
+          <div data-promobox class="varsbox"></div>
           <button class="btn solid" type="submit">Guardar (queda pausada)</button></form>
         <div class="pgrid" id="autoList" style="margin-top:16px"><p class="muted">Cargando…</p></div></section>
       <section class="sec"><h2>Respuestas y bajas por WhatsApp</h2><div class="pcard"><div class="hist" id="msgList"><span class="muted">Cargando…</span></div></div></section>
@@ -981,13 +1129,25 @@
       const f = $("#campForm"); f.elements.plantilla.value = b.dataset.tplUsar; campVars(f);
       f.scrollIntoView({ behavior: "smooth", block: "start" }); f.elements.nombre.focus({ preventScroll: true });
     });
-    enganchar($("#campForm"), async (v) => { await API.createCampaign({ nombre: v.d.nombre.trim(), segmento: v.d.segmento, plantilla: v.plantilla, idioma: v.idioma, variables: v.variables });
+    enganchar($("#campForm"), async (v) => { await API.createCampaign({ nombre: v.d.nombre.trim(), segmento: v.d.segmento, plantilla: v.plantilla, idioma: v.idioma, variables: v.variables, ...v.promo });
       toast("Borrador guardado"); cargarCampanas(); });
-    enganchar($("#autoForm"), async (v) => { await API.createAutomation({ nombre: v.d.nombre.trim(), segmento: v.d.segmento, dias: Math.max(1, Math.min(365, +v.d.dias || 7)), plantilla: v.plantilla, idioma: v.idioma, variables: v.variables });
+    enganchar($("#autoForm"), async (v) => { await API.createAutomation({ nombre: v.d.nombre.trim(), segmento: v.d.segmento, dias: Math.max(1, Math.min(365, +v.d.dias || 7)), plantilla: v.plantilla, idioma: v.idioma, variables: v.variables, ...v.promo });
       toast("Guardada. Revisala y tocá Prender"); cargarAutomaticas(); });
     $("#gastoBox").addEventListener("click", (e) => { const b = e.target.closest("[data-gmes]"); if (b) { P.gastoAtras = +b.dataset.gmes; cargarGasto(); } });
-    cargarGasto();
-    cargarPlantillas().then(() => { cargarCampanas(); cargarAutomaticas(); });
+    cargarGasto(); engancharPromos();
+    cargarPlantillas().then(() => { cargarCampanas(); cargarAutomaticas(); cargarPromos(); });
+  }
+  function pintarCampanas() {
+    const l = P.camps || [];
+    $("#campList").innerHTML = l.length ? l.map((c) => `<article class="pcard" data-camp="${esc(c.id)}">
+        <div class="ohead"><b>${esc(c.nombre)}</b><span class="ago">${ago(c.created_at)}</span><span class="st ${EST_C[c.estado] || "pendiente"}">${c.estado}</span></div>
+        <p class="hintp">${esc(segNom(c.segmento))} · plantilla <b>${esc(c.plantilla)}</b> (${esc(c.idioma)})${(c.variables || []).length ? " · " + c.variables.map(esc).join(" / ") : ""}</p>
+        ${c.promo_id ? `<p class="hintp">🏷️ Código: <b>${esc(promoNom(c.promo_id))}</b> · ${promoNums(((P.presu || {}).campana || {})[c.id])}</p>` : ""}
+        ${tplDe(c.plantilla) ? `<details class="tplver"><summary>Así le llega</summary>${TP.burbuja(tplDe(c.plantilla), c.variables)}</details>` : ""}
+        ${c.estado === "borrador" ? `<div class="row2"><label>Probar con un número<input class="inp" data-prueba inputmode="tel" placeholder="223 347-1277"></label></div>
+          <div class="acts"><button class="btn" data-cprobar>Mandar prueba</button><button class="btn solid wa" data-cenviar>Mandar a ${(P.segs && P.segs[c.segmento] || {}).whatsapp || 0}</button></div>`
+          : `<p class="num">${c.enviados} enviados · ${c.fallidos} con error${c.enviada_at ? " · " + ago(c.enviada_at) : ""}</p>`}
+      </article>`).join("") : '<p class="muted">Todavía no hay campañas.</p>';
   }
   async function cargarCampanas() {
     try {
@@ -995,15 +1155,7 @@
       $("#segList").innerHTML = `<div><span class="muted">Segmento</span><span class="muted">WhatsApp · Anuncios</span></div>` + SEGS.map(([k, n, d]) => `<div><span><b>${n}</b> <span class="muted">${d}</span></span><span class="num">${(r[k] || {}).whatsapp || 0} · ${(r[k] || {}).meta_ads || 0}</span></div>`).join("");
     } catch (e) { $("#segList").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
     try {
-      const l = await API.listCampaigns(); P.camps = l;
-      $("#campList").innerHTML = l.length ? l.map((c) => `<article class="pcard" data-camp="${esc(c.id)}">
-        <div class="ohead"><b>${esc(c.nombre)}</b><span class="ago">${ago(c.created_at)}</span><span class="st ${EST_C[c.estado] || "pendiente"}">${c.estado}</span></div>
-        <p class="hintp">${esc(segNom(c.segmento))} · plantilla <b>${esc(c.plantilla)}</b> (${esc(c.idioma)})${(c.variables || []).length ? " · " + c.variables.map(esc).join(" / ") : ""}</p>
-        ${tplDe(c.plantilla) ? `<details class="tplver"><summary>Así le llega</summary>${TP.burbuja(tplDe(c.plantilla), c.variables)}</details>` : ""}
-        ${c.estado === "borrador" ? `<div class="row2"><label>Probar con un número<input class="inp" data-prueba inputmode="tel" placeholder="223 347-1277"></label></div>
-          <div class="acts"><button class="btn" data-cprobar>Mandar prueba</button><button class="btn solid wa" data-cenviar>Mandar a ${(P.segs && P.segs[c.segmento] || {}).whatsapp || 0}</button></div>`
-          : `<p class="num">${c.enviados} enviados · ${c.fallidos} con error${c.enviada_at ? " · " + ago(c.enviada_at) : ""}</p>`}
-      </article>`).join("") : '<p class="muted">Todavía no hay campañas.</p>';
+      P.camps = await API.listCampaigns(); pintarCampanas();
     } catch (e) { $("#campList").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
     try {
       const a = await API.crmActividad();

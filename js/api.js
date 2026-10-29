@@ -115,6 +115,21 @@
     if (!c) { c = { phone: o.phone, nombre: o.nombre, sellos: 0, canjes: 0, created_at: new Date().toISOString() }; db.customers.push(c); }
     c.sellos += 1; db.events.unshift({ phone: o.phone, delta: 1, motivo: "Reseña de " + o.code + " (primera compra)", created_at: new Date().toISOString() });
   }
+  // códigos de descuento (migración 052): mismas reglas que promo_problema() de la base
+  const promoCod = (db, code) => (db.promo_codigos || []).find((x) => x.code === String(code || "").trim().toUpperCase());
+  const promoVence = (c, p) => [c.vence_at, p.vence_at].filter(Boolean).sort()[0] || null;
+  const promoPub = (c, p, error) => ({ code: c.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, regalo: p.regalo || null, tope: p.tope || 0, minimo: p.minimo || 0, acumula: !!p.acumula, vence_at: promoVence(c, p), personal: !!c.phone, error: error || null });
+  function promoProblema(db, code, ph) {
+    const c = promoCod(db, code); if (!c) return "No encontramos ese código. Revisá que esté bien escrito.";
+    const p = (db.promos || []).find((x) => x.id === c.promo_id), usos = (db.promo_usos || []).filter((u) => u.promo_id === p.id && !u.devuelto), v = promoVence(c, p);
+    if (p.activa === false) return "Este código ya no está activo.";
+    if (v && new Date(v) <= new Date()) return `Este código venció el ${new Date(v).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" })}.`;
+    if (p.usos_max && usos.length >= p.usos_max) return "Este código ya se usó todas las veces posibles.";
+    if (!ph) return null;
+    if (c.phone && c.phone !== ph) return "Este código es personal: usalo con el celular al que te lo mandamos.";
+    if (usos.filter((u) => u.phone === ph).length >= (p.por_cliente || 1)) return "Ya usaste este código" + (p.por_cliente > 1 ? ` las ${p.por_cliente} veces` : "") + ".";
+    return null;
+  }
   const selloResCampos = (db, o) => ({ primera: !!o.primera_compra && !(db.sellos_resena || []).some((x) => x.phone === o.phone && x.order_id !== o.id), sello_resena: (db.sellos_resena || []).some((x) => x.order_id === o.id) });
   function maqJug(db, ph) {
     db.maq = db.maq || { jug: {}, premios: [] }; db.maq.jug = db.maq.jug || {}; db.maq.premios = db.maq.premios || [];
@@ -147,7 +162,7 @@
       });
       return Object.entries(cnt).map(([key, n]) => { const [f, h] = key.split("|"); return { f, h, n }; });
     },
-    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio: elegido, gift, maq }) {
+    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio: elegido, gift, maq, codigo }) {
       const db = dbLoad(), ph = normPhone(phone), esp = db.settings.especial || {}, envio = db.settings.envio || {}, club = db.settings.club || {}, pers = db.settings.personalizacion || {};
       modo = modo === "envio" ? "envio" : "retiro";
       if (modo === "envio" && !envio.activo) throw new Error("Por ahora no hacemos envíos desde la web");
@@ -216,6 +231,23 @@
           ptxt = ps.nombre + " (12 oz) de regalo"; lines.push({ id: "premio", nombre: "Premio Setto Club: " + ptxt, size: "12 oz", qty: 1, precio: 0, subtotal: 0 });
         } else throw new Error("Elegí tu premio del Setto Club");
       }
+      // código de descuento: después del premio del Club y antes de la maquinita (igual que create_order_v7)
+      let codOff = 0, pc = null, pp = null;
+      if (codigo && String(codigo).trim()) {
+        const err = promoProblema(db, codigo, ph); if (err) throw new Error(err);
+        pc = promoCod(db, codigo); pp = db.promos.find((x) => x.id === pc.promo_id);
+        if (!pp.acumula && (premio || (maq && String(maq).trim()))) throw new Error(`Este código no se suma con ${premio ? "el premio del Setto Club" : "el premio de la maquinita"}. Guardalo para tu próximo pedido.`);
+        if (sub < (pp.minimo || 0)) throw new Error("Este código es para compras desde $" + Number(pp.minimo).toLocaleString("es-AR"));
+        if (pp.tipo === "porcentaje") { codOff = Math.round((sub * pp.valor) / 100 / 10) * 10; if (pp.tope > 0) codOff = Math.min(codOff, pp.tope); }
+        else if (pp.tipo === "monto") codOff = pp.valor;
+        else if (pp.tipo === "regalo") {
+          const ps = lines.filter((l) => { const pr = db.products.find((p) => p.id === l.id); return pr && (pp.regalo === "bebida" ? pr.categoria === "dirty" || (pr.categoria === "especial" && pr.formato === "dirty") : pr.categoria === "mochi" || (pr.categoria === "especial" && (pr.formato || "mochi") === "mochi")); }).map((l) => l.precio);
+          if (!ps.length) throw new Error("Para usar este código agregá " + (pp.regalo === "bebida" ? "una bebida (dirty) al pedido" : "un mochi al pedido"));
+          codOff = Math.min(...ps);
+        } else { if (modo !== "envio") throw new Error("Este código es de envío gratis: elegí envío a domicilio"); codOff = costo; }
+        codOff = Math.max(0, Math.min(codOff, Math.max(total, 0)));
+        lines.push({ id: "codigo", nombre: `Código ${pc.code}: ${pp.titulo}`, size: null, qty: 1, precio: -codOff, subtotal: -codOff }); total -= codOff; pc.usos = (pc.usos || 0) + 1;
+      }
       let maqOff = 0, mp = null;
       if (maq && String(maq).trim()) {
         mp = ((db.maq || {}).premios || []).find((x) => x.code === String(maq).trim().toUpperCase());
@@ -248,9 +280,10 @@
         modo, direccion: modo === "envio" ? String(direccion).trim() : null, premio, premio_txt: ptxt };
       if (giftOff > 0) o.gift = { code: gc.code, monto: giftOff };
       if (mp) o.maq = { code: mp.code, monto: maqOff };
+      if (pc) (db.promo_usos = db.promo_usos || []).push({ id: uid(), promo_id: pp.id, code: pc.code, order_id: o.id, phone: ph, monto: codOff, devuelto: false, created_at: new Date().toISOString() });
       o.primera_compra = !db.orders.some((x) => x.phone === ph && x.status !== "cancelado") && !(db.sellos_resena || []).some((x) => x.phone === ph);
       o.etapa = "recibido"; o.track = uid().replace(/-/g, ""); db.orders.unshift(o); dbSave(db);
-      return { id: o.id, code, total, items: lines, phone: ph, modo, direccion: o.direccion, costo_envio: costo, premio, premio_txt: ptxt, descuento: off, gift: giftOff, maquinita: maqOff, meta };
+      return { id: o.id, code, total, items: lines, phone: ph, modo, direccion: o.direccion, costo_envio: costo, premio, premio_txt: ptxt, descuento: off, gift: giftOff, maquinita: maqOff, codigo: codOff, meta };
     },
     async getStock() { return null; },
     async getCard(phone) {
@@ -355,7 +388,8 @@
       if (!o || o.status !== "pendiente") throw new Error("El pedido no está pendiente");
       o.status = "cancelado"; o.closed_at = new Date().toISOString();
       if (o.gift && !o.gift.devuelto) { const g = (db.giftcards || []).find((x) => x.code === o.gift.code); if (g) { g.saldo += o.gift.monto; g.estado = "activa"; } o.gift.devuelto = true; }
-      if (o.maq && !o.maq.devuelto) { const m = ((db.maq || {}).premios || []).find((x) => x.code === o.maq.code); if (m) { if (m.tipo === "monto") m.saldo += o.maq.monto; m.estado = "activo"; } o.maq.devuelto = true; } dbSave(db);
+      if (o.maq && !o.maq.devuelto) { const m = ((db.maq || {}).premios || []).find((x) => x.code === o.maq.code); if (m) { if (m.tipo === "monto") m.saldo += o.maq.monto; m.estado = "activo"; } o.maq.devuelto = true; }
+      (db.promo_usos || []).filter((u) => u.order_id === o.id && !u.devuelto).forEach((u) => { u.devuelto = true; const c = promoCod(db, u.code); if (c) c.usos = Math.max(0, (c.usos || 0) - 1); }); dbSave(db);
     },
     async pedirCambio(id, faltan, nota) {
       const db = dbLoad(), o = db.orders.find((x) => x.id === id);
@@ -454,6 +488,34 @@
     async listCampaigns() { return (dbLoad().campaigns || []).slice(0, 20); },
     async createCampaign(c) { const db = dbLoad(); db.campaigns = db.campaigns || []; const n = { id: "c" + Date.now(), estado: "borrador", total: 0, enviados: 0, fallidos: 0, created_at: new Date().toISOString(), ...c }; db.campaigns.unshift(n); dbSave(db); return n; },
     async sendCampaign() { throw new Error("En modo demo no se mandan mensajes de WhatsApp"); },
+    // códigos de descuento (migración 052)
+    async promoCheck(code, phone) { const db = dbLoad(), c = promoCod(db, code), err = promoProblema(db, code, normPhone(phone)); return c ? promoPub(c, db.promos.find((x) => x.id === c.promo_id), err) : { error: err }; },
+    async listPromos() { const db = dbLoad(); return { promos: db.promos || [], codigos: (db.promo_codigos || []).filter((c) => !c.campaign_id && !c.automation_id).slice(0, 200) }; },
+    async createPromo(p, code) {
+      const db = dbLoad(); db.promos = db.promos || []; db.promo_codigos = db.promo_codigos || [];
+      if (code && promoCod(db, code)) throw new Error("Ese código ya existe: elegí otro");
+      const n = { id: uid(), activa: true, created_at: new Date().toISOString(), por_cliente: 1, tope: 0, minimo: 0, prefijo: "SETTO", ...p }; db.promos.unshift(n);
+      if (code) db.promo_codigos.unshift({ code, promo_id: n.id, phone: null, usos: 0, vence_at: null, created_at: n.created_at });
+      dbSave(db); return n;
+    },
+    async updatePromo(id, c) { const db = dbLoad(), p = (db.promos || []).find((x) => x.id === id); if (p) Object.assign(p, c); dbSave(db); return p; },
+    async deletePromo(id) { const db = dbLoad(); if ((db.promo_usos || []).some((u) => u.promo_id === id)) throw new Error("Ya se usó en pedidos: pausala en vez de borrarla"); db.promos = db.promos.filter((x) => x.id !== id); db.promo_codigos = (db.promo_codigos || []).filter((x) => x.promo_id !== id); dbSave(db); },
+    async promoCodigoNuevo(id, phone) {
+      const db = dbLoad(), ph = normPhone(phone), p = (db.promos || []).find((x) => x.id === id); if (!ph) throw new Error("Revisá el celular"); if (!p) throw new Error("No encontramos esa promo");
+      if (p.activa === false) throw new Error(`La promo "${p.nombre}" está pausada`);
+      const ya = (db.promo_codigos || []).find((c) => c.promo_id === id && c.phone === ph && !c.usos && !c.campaign_id && !c.automation_id && (!c.vence_at || new Date(c.vence_at) > Date.now() + 864e5));
+      if (ya) return { code: ya.code, vence_at: promoVence(ya, p), nuevo: false };
+      const abc = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; let code; do { code = (p.prefijo || "SETTO") + "-" + Array.from({ length: 4 }, () => abc[Math.floor(Math.random() * abc.length)]).join(""); } while (promoCod(db, code));
+      const vence = p.dias ? [new Date(Date.now() + p.dias * 864e5).toISOString(), p.vence_at].filter(Boolean).sort()[0] : p.vence_at || null;
+      db.promo_codigos.unshift({ code, promo_id: id, phone: ph, usos: 0, vence_at: vence, created_at: new Date().toISOString() }); dbSave(db);
+      return { code, vence_at: vence, nuevo: true };
+    },
+    async promosResumen() {
+      const db = dbLoad(), r = { promo: {}, campana: {}, automatica: {} };
+      (db.promo_codigos || []).forEach((c) => { const x = (r.promo[c.promo_id] = r.promo[c.promo_id] || { codigos: 0, usados: 0, descontado: 0, entregados: 0, vendido: 0 }); x.codigos++; });
+      (db.promo_usos || []).filter((u) => !u.devuelto).forEach((u) => { const x = r.promo[u.promo_id]; if (!x) return; const o = db.orders.find((y) => y.id === u.order_id); x.usados++; x.descontado += u.monto; if (o && o.status === "entregado") { x.entregados++; x.vendido += o.total; } });
+      return r;
+    },
     // plantillas de WhatsApp (Edge Function whatsapp-plantillas): en modo demo quedan "en revisión" en este navegador
     async listTemplates() { const db = dbLoad(); return db.templates || (db.templates = [{ nombre: "aviso_drop", idioma: "es_AR", estado: "APPROVED", categoria: "MARKETING", motivo: null, encabezado: "", pie: "",
       cuerpo: "Hola {{1}}, ya salió {{2}} de Setto, como te avisamos. Pedila en la web mientras dure el stock.", ejemplos: ["Isa", "la edición Halloween"],
@@ -508,7 +570,7 @@
     async productRatings() {
       const db = dbLoad(), out = {};
       (db.reviews || []).filter((r) => r.estado === "aprobada").forEach((r) => { const o = db.orders.find((x) => x.id === r.order_id); if (!o) return;
-        [...new Set(o.items.filter((i) => !["envio", "premio", "maquinita"].includes(i.id)).map((i) => i.id))].forEach((id) => { const a = (out[id] = out[id] || { s: 0, cantidad: 0 }); a.s += r.rating; a.cantidad++; }); });
+        [...new Set(o.items.filter((i) => !["envio", "premio", "maquinita", "gift", "codigo"].includes(i.id)).map((i) => i.id))].forEach((id) => { const a = (out[id] = out[id] || { s: 0, cantidad: 0 }); a.s += r.rating; a.cantidad++; }); });
       Object.values(out).forEach((a) => { a.promedio = Math.round((a.s / a.cantidad) * 10) / 10; delete a.s; }); return out;
     },
     async createReview(code, phone, rating, texto, foto, instagram) {
@@ -526,7 +588,7 @@
       const nom = (n) => { const [a, b] = String(n).trim().split(/\s+/); return a.charAt(0).toUpperCase() + a.slice(1) + (b ? " " + b[0].toUpperCase() + "." : ""); };
       return { cantidad: ok.length, promedio: ok.length ? Math.round((ok.reduce((s, r) => s + r.rating, 0) / ok.length) * 10) / 10 : null,
         items: ok.filter((r) => r.texto || r.foto).slice(0, 12).map((r) => { const o = dbLoad().orders.find((x) => x.id === r.order_id) || { items: [] };
-          return { nombre: nom(r.nombre), rating: r.rating, texto: r.texto, foto: r.foto, instagram: r.instagram, fecha: r.created_at, pedido: [...new Set(o.items.filter((i) => !["envio", "premio", "maquinita"].includes(i.id)).map((i) => i.nombre))] }; }) };
+          return { nombre: nom(r.nombre), rating: r.rating, texto: r.texto, foto: r.foto, instagram: r.instagram, fecha: r.created_at, pedido: [...new Set(o.items.filter((i) => !["envio", "premio", "maquinita", "gift", "codigo"].includes(i.id)).map((i) => i.nombre))] }; }) };
     },
     async listReviews() { return ordenRv(dbLoad().reviews || []).slice(0, 100); },
     async setReviewOrden(id, orden) { const db = dbLoad(), r = (db.reviews || []).find((x) => x.id === id); if (r) { r.orden = orden || null; dbSave(db); } },
@@ -560,7 +622,7 @@
       const nom = (n) => { const [a, b] = String(n).trim().split(/\s+/); return a.charAt(0).toUpperCase() + a.slice(1) + (b ? " " + b[0].toUpperCase() + "." : ""); };
       return { cantidad: ok.length, promedio: ok.length ? Math.round((ok.reduce((s, r) => s + r.rating, 0) / ok.length) * 10) / 10 : null, por_estrella: por,
         items: ok.slice(offset, offset + 50).map((r) => { const o = db.orders.find((x) => x.id === r.order_id) || { items: [] };
-          return { nombre: nom(r.nombre), rating: r.rating, texto: r.texto, foto: r.foto, instagram: r.instagram, fecha: r.created_at, pedido: [...new Set(o.items.filter((i) => !["envio", "premio", "maquinita"].includes(i.id)).map((i) => i.nombre))] }; }) };
+          return { nombre: nom(r.nombre), rating: r.rating, texto: r.texto, foto: r.foto, instagram: r.instagram, fecha: r.created_at, pedido: [...new Set(o.items.filter((i) => !["envio", "premio", "maquinita", "gift", "codigo"].includes(i.id)).map((i) => i.nombre))] }; }) };
     },
     async productReviews(id) {
       const db = dbLoad(), ok = (db.reviews || []).filter((r) => r.estado === "aprobada" && (db.orders.find((x) => x.id === r.order_id) || { items: [] }).items.some((i) => i.id === id)), por = {};
@@ -657,10 +719,12 @@
       if (t.error || p.error) return null;
       return { tiradas: t.data || [], premios: p.data || [], usos: u.error ? [] : u.data || [] };
     },
-    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift, maq }) {
-      const { data, error } = await sb.rpc("create_order_v6", {
+    async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift, maq, codigo }) {
+      // con código de descuento va por la v7 (migración 052); sin código, la v6 de siempre
+      const { data, error } = await sb.rpc(codigo ? "create_order_v7" : "create_order_v6", {
         p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty, leche: i.leche || null, sin: i.sin || [], bebida: i.bebida || null, ...(i.mochis ? { mochis: i.mochis } : {}) })),
         p_retiro: retiro, p_pago: pago, p_nota: nota || null, p_modo: modo || "retiro", p_direccion: direccion || null, p_premio: premio || null, p_gift: gift || null, p_maq: maq || null,
+        ...(codigo ? { p_codigo: codigo } : {}),
       });
       fail(error); return data;
     },
@@ -723,6 +787,26 @@
     async createCampaign(c) { const { data, error } = await sb.from("marketing_campaigns").insert({ ...c, estado: "borrador" }).select().single(); fail(error); return data; },
     // Edge Functions: las credenciales de Meta y WhatsApp viven solo ahí (secretos de Supabase)
     // la prueba viaja con el número normalizado (549223…), igual que en la base: así encuentra el nombre del cliente
+    // códigos de descuento (migración 052)
+    async promoCheck(code, phone) { const { data, error } = await sb.rpc("promo_check", { p_code: code, p_phone: phone || null }); fail(error); return data; },
+    async listPromos() {
+      const [p, c] = await Promise.all([sb.from("promos").select("*").order("created_at", { ascending: false }),
+        sb.from("promo_codigos").select("code, promo_id, phone, usos, vence_at, created_at").is("campaign_id", null).is("automation_id", null).order("created_at", { ascending: false }).limit(200)]);
+      if (p.error && /promos/.test(p.error.message || "")) throw new Error("Falta activar los códigos en Supabase (migración 052)");
+      fail(p.error); fail(c.error); return { promos: p.data || [], codigos: c.data || [] };
+    },
+    async createPromo(p, code) {
+      const { data, error } = await sb.from("promos").insert(p).select().single(); fail(error);
+      if (code) {
+        const r = await sb.from("promo_codigos").insert({ code, promo_id: data.id });
+        if (r.error) { await sb.from("promos").delete().eq("id", data.id); throw new Error(/duplicate|unique/i.test(r.error.message || "") ? "Ese código ya existe: elegí otro" : cleanMsg(r.error.message)); }
+      }
+      return data;
+    },
+    async updatePromo(id, c) { const { data, error } = await sb.from("promos").update(c).eq("id", id).select().single(); fail(error); return data; },
+    async deletePromo(id) { const { error } = await sb.from("promos").delete().eq("id", id); if (error && /foreign key|promo_usos/i.test(error.message || "")) throw new Error("Ya se usó en pedidos: pausala en vez de borrarla"); fail(error); },
+    async promoCodigoNuevo(id, phone) { const { data, error } = await sb.rpc("promo_codigo_nuevo", { p_promo: id, p_phone: phone }); fail(error); return data; },
+    async promosResumen() { const { data, error } = await sb.rpc("promos_resumen"); fail(error); return data || {}; },
     async sendCampaign(id, prueba) { return fn("whatsapp-campana", { campaign_id: id, prueba: prueba ? normPhone(prueba) || prueba : null }); },
     async listTemplates() { return (await fn("whatsapp-plantillas", { accion: "listar" })).plantillas || []; },
     async createTemplate(p) { return fn("whatsapp-plantillas", { accion: "crear", plantilla: p }); },
