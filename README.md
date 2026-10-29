@@ -89,6 +89,11 @@ El premio se entrega **en el mismo pedido que completa la tarjeta**. Ejemplo con
 Sin elegir, la web no deja enviar. El panel muestra 🎁 *Completa la tarjeta* con el premio elegido, y al tocar **Entregado** se canjea solo (la tarjeta vuelve a 0).
 En **Ajustes → Setto Club** definís los sellos de la tarjeta, el texto del premio, si se ofrece el set, el % de descuento (0 = no se ofrece), un tope en $ para el descuento (0 = sin tope) y un pedido mínimo opcional para sumar sello.
 
+### Sumar al Club a mano y campañas
+En **Club → Sumar sellos a mano** hay dos casillas: *Aceptó recibir novedades por WhatsApp* y *Aceptó anuncios de Meta*. Vienen destildadas: tildalas solo si el cliente te dijo que sí. Con la casilla tildada queda el permiso (origen *panel*, con quién lo cargó) y el cliente entra en las campañas de WhatsApp y en los públicos de Meta. Sin la casilla, suma sellos pero no entra en campañas.
+En la ficha del cliente, **Anotar que aceptó** hace lo mismo para alguien que ya estaba. Si el cliente se había dado de baja, el panel no lo vuelve a dar de alta: tiene que escribir ALTA al WhatsApp.
+Quien solo tiene sellos cargados a mano (sin pedidos de la web entregados) cae en el segmento **Todos**; los demás segmentos se arman con las compras de la web. Requiere la migración `050_consentimiento_panel.sql`.
+
 ### Personalización de bebidas
 En los dirty y en los sets el cliente elige la leche (con recargo) y puede marcar "Sin cold foam", "Sin endulzante" o "Sin hielo". El recargo se suma al precio y se calcula en la base. En el WhatsApp y en el panel cada bebida muestra lo que eligió.
 En **Ajustes → Personalización de bebidas** cambiás las leches (una por línea, `Nombre | recargo`, la primera es la de base) y las opciones para sacar.
