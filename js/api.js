@@ -90,12 +90,13 @@
   const ordenRv = (l) => l.slice().sort((a, b) => (a.orden || 1e9) - (b.orden || 1e9) || String(b.created_at).localeCompare(String(a.created_at)));
 
   /* maquinita en modo demo */
-  const MAQ_DEF = [["gift", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "Mochi gratis", 0.5, "mochi", 0], ["off", "10% off", 2, "porcentaje", 10]];
+  const MAQ_DEF = [["gift", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "Mochi gratis", 0.5, "mochi", 0], ["off", "10% off", 2, "porcentaje", 10], ["extra", null, 0, "porcentaje", 0]];
   function maqPremiosCfg(cfg) {
     return MAQ_DEF.map(([id, titulo, chance, tipo, valor]) => {
       const c = Array.isArray(cfg.premios) ? cfg.premios.find((x) => x.id === id) : null;
       if (!c) return { id, titulo, chance, tipo, valor };
-      return { id, titulo: String(c.titulo || "").trim() || null, chance: Math.max(0, +c.chance || 0), tipo: c.tipo || tipo, valor: c.valor != null ? Math.max(0, +c.valor || 0) : valor };
+      const tp = c.tipo || tipo, vl = c.valor != null ? Math.max(0, +c.valor || 0) : valor;
+      return { id, titulo: String(c.titulo || "").trim() || null, chance: c.activo === false || (tp !== "mochi" && !vl) ? 0 : Math.max(0, +c.chance || 0), tipo: tp, valor: vl };
     });
   }
   const MAQ_VENCE = 48 * 3600e3; // el premio dura 48 hs (migración 040)
@@ -419,6 +420,17 @@
     },
     // solo demo: fichas de prueba para este dispositivo
     async maqSumarDemo(dev, n) { const db = dbLoad(), d = maqDev(db, dev); d.gratis_usadas -= n; dbSave(db); },
+    // el equipo anota que el cliente aceptó (migración 050). Si se había dado de baja, no se toca: tiene que escribir ALTA
+    async consentimientoPanel(phone, canales) {
+      const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("Número de celular inválido");
+      db.consents = db.consents || []; const ok = [], baja = [];
+      canales.filter((c) => ["whatsapp", "meta_ads"].includes(c)).forEach((c) => {
+        const u = db.consents.find((x) => x.phone === ph && x.canal === c);
+        if (u && u.estado === "otorgado") return; if (u) { baja.push(c); return; }
+        db.consents.unshift({ phone: ph, canal: c, finalidad: c === "whatsapp" ? "novedades" : "publicidad", estado: "otorgado", origen: "panel", aviso_version: "panel-dicho", created_at: new Date().toISOString() }); ok.push(c);
+      });
+      dbSave(db); return { phone: ph, otorgados: ok, dados_de_baja: baja };
+    },
     async bajaMarketing(phone, canal) {
       const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("Revisá el número: código de área + número, por ejemplo 223 347-1277.");
       db.consents = db.consents || [];
@@ -479,6 +491,8 @@
     async equipoPushSuscribir() { throw new Error("En modo demo no hay notificaciones"); },
     async equipoPushDesuscribir() {},
     async equipoPushActivo() { return false; },
+    async equipoPushQuien() { return null; },
+    async equipoSocios() { return []; },
     async createReviewTrack(track, rating, texto, foto, instagram) { const o = dbLoad().orders.find((x) => x.track === track); if (!o) throw new Error("No encontramos ese pedido"); return this.createReview(o.code, o.phone, rating, texto, foto, instagram); },
     async uploadReviewPhoto(blob) { return await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); }); },
     async productRatings() {
@@ -690,6 +704,7 @@
     async registrarConsentimiento(code, phone, canales, version) { const { error } = await sb.rpc("registrar_consentimiento", { p_code: code, p_phone: phone, p_canales: canales, p_version: version }); fail(error); },
     async consentimientoMaquinita(phone, version) { const { error } = await sb.rpc("consentimiento_maquinita", { p_phone: phone, p_version: version }); fail(error); },
     async consentimientoMaquinita2(dev, phone, canales, version) { const { error } = await sb.rpc("consentimiento_maquinita_v2", { p_dev: dev, p_phone: phone, p_canales: canales, p_version: version }); fail(error); },
+    async consentimientoPanel(phone, canales) { const { data, error } = await sb.rpc("consentimiento_panel", { p_phone: phone, p_canales: canales }); fail(error); return data; },
     async bajaMarketing(phone, canal) { const { error } = await sb.rpc("baja_marketing", { p_phone: phone, p_canal: canal || null }); fail(error); },
     async registrarOrigen(code, phone, origen) { const { error } = await sb.rpc("registrar_origen", { p_code: code, p_phone: phone, p_origen: origen }); fail(error); },
     async crmCliente(phone) { const { data, error } = await sb.from("crm_clientes").select("*").eq("phone", normPhone(phone)).maybeSingle(); fail(error); return data; },
@@ -726,9 +741,11 @@
     async dropAvisos() { const { data, error } = await sb.rpc("drop_avisos_info"); fail(error); return data; },
     async dropAvisar() { const { data, error } = await sb.rpc("drop_avisar"); fail(error); return data; },
     /* avisos al equipo en el panel: pedido nuevo, gift card, cambio resuelto, reseña (migración 027) */
-    async equipoPushSuscribir(sub) { const k = sub.toJSON().keys || {}; const { error } = await sb.rpc("staff_push_suscribir", { p_endpoint: sub.endpoint, p_p256dh: k.p256dh, p_auth: k.auth }); fail(error); },
+    async equipoPushSuscribir(sub, quien) { const k = sub.toJSON().keys || {}; const { error } = await sb.rpc("staff_push_suscribir", { p_endpoint: sub.endpoint, p_p256dh: k.p256dh, p_auth: k.auth, p_quien: quien || null }); fail(error); },
     async equipoPushDesuscribir(endpoint) { const { error } = await sb.rpc("staff_push_desuscribir", { p_endpoint: endpoint }); fail(error); },
     async equipoPushActivo(endpoint) { const { data, error } = await sb.rpc("staff_push_activo", { p_endpoint: endpoint }); fail(error); return !!data; },
+    async equipoPushQuien(endpoint) { const { data, error } = await sb.rpc("staff_push_quien", { p_endpoint: endpoint }); fail(error); return data; }, // null = apagado, "" = sin nombre
+    async equipoSocios() { const { data, error } = await sb.from("caja_socios").select("nombre").eq("activo", true).order("nombre"); fail(error); return (data || []).map((x) => x.nombre); },
     async createReviewTrack(track, rating, texto, foto, instagram) { const { error } = await sb.rpc("create_review_track", { p_track: track, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); },
     async createReview(code, phone, rating, texto, foto, instagram) { const { error } = await sb.rpc("create_review_v2", { p_code: code, p_phone: phone, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); },
     async uploadReviewPhoto(blob) {

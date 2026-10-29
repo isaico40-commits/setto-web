@@ -21,7 +21,7 @@
     return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" }) + " · " + hh;
   };
 
-  const P = { falta: {}, user: null, view: "pedidos", sub: "pendiente", q: "", settings: {}, products: [], orders: [], pendCount: 0, drafts: {}, confirm: {}, client: null, cancelArm: null };
+  const P = { falta: {}, user: null, view: "pedidos", sub: "pendiente", q: "", fil: {}, settings: {}, products: [], orders: [], pendCount: 0, drafts: {}, confirm: {}, client: null, cancelArm: null };
 
   /* =================== LOGIN =================== */
   function drawLogin(msg) {
@@ -70,7 +70,7 @@
     if (!VISTAS.includes(v)) return false;
     P.view = v;
     if (v === "ajustes") P.ajSec = AJ_SEC.some((x) => x.k === a) ? a : null;
-    if (v === "pedidos" && ["pendiente", "entregado", "cancelado"].includes(a)) { P.sub = a; P.q = b || ""; }
+    if (v === "pedidos" && ["pendiente", "reserva", "entregado", "cancelado"].includes(a)) { P.sub = a; P.q = b || ""; }
     return true;
   }
   function drawShell() {
@@ -242,21 +242,22 @@
     try {
       const pend = await API.listOrders("pendiente");
       const prev = P.pendCount; P.pendCount = pend.length;
-      const n = $("#pendN"); if (n) { n.textContent = pend.length; n.hidden = !pend.length; }
-      document.title = (pend.length ? `(${pend.length}) ` : "") + "Panel Setto";
+      // el contador cuenta lo de hoy: las reservas para otros días esperan en su pestaña
+      const hoyN = pend.filter((o) => !enReservas(o)).length, n = $("#pendN"); if (n) { n.textContent = hoyN; n.hidden = !hoyN; }
+      document.title = (hoyN ? `(${hoyN}) ` : "") + "Panel Setto";
       if (notify && pend.length > prev) toast("Entró un pedido nuevo");
-      if (P.view === "pedidos") { P.orders = P.sub === "pendiente" ? pend : await API.listOrders(P.sub); drawOrders(); cargarOcupados(); }
+      if (P.view === "pedidos") { P.pend = pend; P.orders = P.sub === "pendiente" || P.sub === "reserva" ? pend : await API.listOrders(P.sub); drawOrders(); cargarOcupados(); }
       if (P.view === "dashboard" && notify) cargarDash();
     } catch (e) { console.error(e); }
   }
   function viewPedidos() {
     $("#view").innerHTML = `<h1 class="ph1">Pedidos</h1>
-      <p class="muted">Cuando llega el WhatsApp, buscá el código, revisá que el número del chat sea el mismo y tocá <b>Entregado</b> cuando lo retiran o lo reciben.</p>
-      <div class="sub">
-        ${[["pendiente", "Pendientes"], ["entregado", "Entregados (7 días)"], ["cancelado", "Cancelados"]].map(([k, l]) => `<button class="ptab" data-sub="${k}" aria-selected="${P.sub === k}">${l}</button>`).join("")}
-        <input id="oq" placeholder="Buscar código, nombre o celular" value="${esc(P.q)}">
+      <div class="sub"><div class="subtabs">
+        ${[["pendiente", "Pendientes"], ["reserva", "Reservas"], ["entregado", "Entregados (7 días)"], ["cancelado", "Cancelados"]].map(([k, l]) => `<button class="ptab" data-sub="${k}" aria-selected="${P.sub === k}">${l}${k === "pendiente" || k === "reserva" ? ` <span class="n" id="subN-${k}" hidden>0</span>` : ""}</button>`).join("")}</div>
+        <input id="oq" type="search" placeholder="Buscar código, nombre, celular o producto" value="${esc(P.q)}">
       </div>
-      <section class="horcard" id="horCard"></section>
+      <div class="ofil" id="ofil"></div>
+      ${P.sub === "pendiente" ? `<section class="horcard" id="horCard"></section>` : ""}
       <div class="justdel" id="justDel" hidden></div>
       <div class="pgrid" id="olist"><p class="muted">Cargando…</p></div>`;
     drawHorarios();
@@ -517,12 +518,78 @@
     el.innerHTML = `<div><b>Entregado ${esc(o.code)} · ${esc((o.nombre || "").split(" ")[0])}</b><span>Mandale el link para que deje su reseña y vea sus sellos. El cobro y los mochis ya se cargaron en la <a class="tocaja" href="caja.html#movs">Caja</a>.</span></div>
       ${((P.orders.find((x) => x.id === o.id) || o).avisos || {}).resena ? `<span class="hintp">✓ Le mandamos el link por WhatsApp</span><button class="linkbtn" data-justx>Listo</button>` : `<a class="btn solid" target="_blank" rel="noopener" data-justgo href="https://wa.me/${esc(o.wa_phone || o.phone)}?text=${encodeURIComponent(resenaTxt(o))}">Pedir reseña por WhatsApp</a><button class="linkbtn" data-justx>Ahora no</button>`}`;
   }
+  // reserva = el cliente eligió un día con nombre ("sábado 31 · 14:45 hs"), no Hoy ni Mañana
+  const esReserva = (o) => /^[^\s·]+ \d{1,2} · \d{1,2}:\d{2} hs$/.test(o.retiro || "");
+  // fecha de retiro o entrega a partir del texto ("Hoy · 15:00 hs", "Mañana · …", "sábado 31 · …") y del día en que se hizo el pedido.
+  // Mismo cálculo que turnos_ocupados. Devuelve { k: "2026-10-31", h: "15:00" } o null si no se puede leer.
+  function fechaRetiro(o) {
+    const m = (o.retiro || "").match(/^(.+?) · (\d{1,2}:\d{2}) hs$/); if (!m) return null;
+    const base = new Date(o.created_at); let f = null;
+    if (m[1] === "Hoy") f = base; else if (m[1] === "Mañana") { f = new Date(base); f.setDate(f.getDate() + 1); }
+    else { const n = +(m[1].match(/(\d+)$/) || [])[1]; for (let i = 0; i < 8 && n; i++) { const g = new Date(base); g.setDate(g.getDate() + i); if (g.getDate() === n) { f = g; break; } } }
+    return f ? { k: fechaKey(f), h: m[2].padStart(5, "0") } : null;
+  }
+  // va a Reservas mientras falte para su día; el día del retiro o envío pasa sola a Pendientes
+  const enReservas = (o) => { if (!esReserva(o)) return false; const f = fechaRetiro(o); return !!f && f.k > hoyKey(); };
+  const diaChip = (k) => { const h = hoyKey(); if (k === h) return "Hoy"; if (k === fechaKey(diaMas(1))) return "Mañana"; if (k === fechaKey(diaMas(-1))) return "Ayer";
+    return new Date(k + "T12:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric" }).replace(".", ""); };
+  // día que importa en cada pestaña: el del retiro en pendientes y reservas, el del cierre en entregados y cancelados
+  const diaDe = (o) => { if (o.status === "pendiente") { const f = fechaRetiro(o); return f ? (f.k < hoyKey() ? "atras" : f.k) : "sin"; } return fechaKey(new Date(o.closed_at || o.created_at)); };
+  const pagoDe = (o) => /transfer/i.test(o.pago || "") ? "transfer" : /efectivo/i.test(o.pago || "") ? "efectivo" : /tarjeta|cr[eé]dito|d[eé]bito/i.test(o.pago || "") ? "tarjeta" : "otro";
+  // filtros: cada grupo elige una opción; "" = todos. Se arman con lo que hay en la pestaña y muestran cuántos hay de cada uno.
+  const FIL = [
+    { k: "etapa", t: "Estado", subs: ["pendiente", "reserva"], de: (o) => o.etapa || "recibido", ops: [["recibido", "Recibido"], ["preparando", "En preparación"], ["listo", "Listo / en camino"]] },
+    { k: "aviso", t: "Aviso", subs: ["pendiente", "reserva"], de: (o) => faltaAvisar(o) ? "falta" : "ok", ops: [["falta", "💬 Falta avisar"], ["ok", "Ya avisado"]] },
+    { k: "pagado", t: "Cobro", subs: ["pendiente", "reserva"], de: (o) => !conPago(o) ? "" : o.pagado_at ? "si" : "no", ops: [["no", "💸 Sin pagar"], ["si", "✓ Pagado"]] },
+    { k: "pago", t: "Pago", de: pagoDe, ops: [["transfer", "Transferencia"], ["efectivo", "Efectivo"], ["tarjeta", "Tarjeta"], ["otro", "Otro"]] },
+    { k: "modo", t: "Entrega", de: (o) => o.modo === "envio" ? "envio" : "retiro", ops: [["retiro", "Retiro"], ["envio", "Envío"]] },
+    { k: "dia", t: "Día", de: diaDe, ops: null },
+  ];
+  const filtrosSub = () => FIL.filter((g) => !g.subs || g.subs.includes(P.sub));
+  const pasa = (o, salvo) => filtrosSub().every((g) => g.k === salvo || !P.fil[g.k] || g.de(o) === P.fil[g.k]);
+  const buscar = (o, q) => { if (!q) return true; const t = (o.code + o.nombre + o.phone + (o.items || []).map((i) => i.nombre).join("")).toLowerCase().replace(/\s/g, ""); return t.includes(q.replace(/^stt-?/, "")) || o.code.toLowerCase().includes(q); };
+  function drawFiltros(base) {
+    const el = $("#ofil"); if (!el) return;
+    const grupos = filtrosSub().map((g) => {
+      let ops = g.ops;
+      if (!ops) { // días: los que aparecen en la pestaña, en orden
+        const pos = (k) => (k === "atras" ? "0" : k === "sin" ? "z" : k), desc = P.sub === "entregado" || P.sub === "cancelado"; // lo cerrado: lo último primero
+        const ks = [...new Set(base.map(g.de))].sort((a, b) => pos(a).localeCompare(pos(b)) * (desc ? -1 : 1));
+        ops = ks.map((k) => [k, k === "atras" ? "Atrasados" : k === "sin" ? "Sin horario" : diaChip(k)]);
+      }
+      const cnt = (v) => base.filter((o) => pasa(o, g.k) && g.de(o) === v).length;
+      ops = ops.map(([v, l]) => [v, l, cnt(v)]).filter(([v, , n]) => n || P.fil[g.k] === v);
+      if (ops.length < 2 && !P.fil[g.k]) return ""; // si todos son iguales no hace falta filtrar
+      return `<div class="ofg"><small>${g.t}</small><div class="ochips">${ops.map(([v, l, n]) => `<button data-fil="${g.k}" data-fv="${esc(v)}" aria-pressed="${P.fil[g.k] === v}">${esc(l)} <i>${n}</i></button>`).join("")}</div></div>`;
+    }).join("");
+    const activos = filtrosSub().filter((g) => P.fil[g.k]).length;
+    if (P.filOpen == null) P.filOpen = matchMedia("(min-width:701px)").matches; // en celu arrancan cerrados para no tapar los pedidos
+    el.innerHTML = `<button class="ofbtn" data-filt aria-expanded="${P.filOpen}">Filtros${activos ? ` <i>${activos}</i>` : ""}<span>${P.filOpen ? "▴" : "▾"}</span></button>
+      ${activos ? `<button class="linkbtn ofx" data-filx>Limpiar filtros</button>` : ""}
+      <div class="ofgs" ${P.filOpen ? "" : "hidden"}>${grupos}</div>`;
+    el.hidden = !grupos && !activos;
+  }
   function drawOrders() {
     drawJust();
     const box = $("#olist"); if (!box) return;
     const q = P.q.trim().toLowerCase().replace(/\s/g, "");
-    const list = P.orders.filter((o) => !q || (o.code + o.nombre + o.phone).toLowerCase().replace(/\s/g, "").includes(q.replace(/^stt-?/, "")) || o.code.toLowerCase().includes(q));
-    if (!list.length) { box.innerHTML = `<div class="empty-p" style="grid-column:1/-1"><img src="img/mochito-lie.png" alt=""><b>${P.sub === "pendiente" ? "No hay pedidos pendientes" : "Nada por acá"}</b><span>${P.sub === "pendiente" ? "Cuando alguien pida desde la web, aparece acá al instante." : ""}</span></div>`; return; }
+    if (P.pend) {
+      const res = P.pend.filter(enReservas), hoy = P.pend.filter((o) => !enReservas(o));
+      [["pendiente", hoy], ["reserva", res]].forEach(([k, l]) => { const n = $("#subN-" + k); if (n) { n.textContent = l.length; n.hidden = !l.length; } });
+    }
+    // pendientes: primero el que hay que entregar antes; reservas: por día; entregados y cancelados: lo último arriba
+    const ordenRet = (o) => { const f = fechaRetiro(o); return (f ? f.k + " " + f.h : "0000") + o.created_at; };
+    const base = P.sub === "pendiente" ? P.orders.filter((o) => !enReservas(o)).sort((a, b) => ordenRet(a).localeCompare(ordenRet(b)))
+      : P.sub === "reserva" ? P.orders.filter(enReservas).sort((a, b) => ordenRet(a).localeCompare(ordenRet(b))) : P.orders;
+    drawFiltros(base);
+    const list = base.filter((o) => pasa(o) && buscar(o, q));
+    if (!list.length) {
+      // si buscó un código que está en la otra pestaña de pendientes, se lo decimos
+      const otra = q && (P.sub === "pendiente" || P.sub === "reserva") ? P.orders.filter((o) => enReservas(o) === (P.sub === "pendiente") && buscar(o, q)).length : 0;
+      const filtrado = base.length && !otra;
+      box.innerHTML = `<div class="empty-p" style="grid-column:1/-1"><img src="img/mochito-lie.png" alt=""><b>${otra ? `Está en ${P.sub === "pendiente" ? "Reservas" : "Pendientes"}` : filtrado ? "Ningún pedido con esos filtros" : P.sub === "pendiente" ? "No hay pedidos pendientes" : P.sub === "reserva" ? "No hay reservas para otros días" : "Nada por acá"}</b><span>${otra ? `<button class="btn" data-sub="${P.sub === "pendiente" ? "reserva" : "pendiente"}">Ver ${otra === 1 ? "el pedido" : "los pedidos"}</button>` : filtrado ? `<button class="linkbtn" data-filx>Limpiar filtros</button>` : P.sub === "pendiente" ? "Cuando alguien pida desde la web, aparece acá al instante." : P.sub === "reserva" ? "Los pedidos reservados para otro día esperan acá y el día del retiro pasan solos a Pendientes." : ""}</span></div>`;
+      return;
+    }
     const club = P.settings.club || {};
     box.innerHTML = list.map((o) => {
       const prodTotal = (o.items || []).filter((i) => i.id !== "envio").reduce((a, i) => a + (i.subtotal || 0), 0);
@@ -534,7 +601,7 @@
         <div class="ohead"><span class="ocode num">${esc(o.code)}</span><span class="ago">${ago(o.created_at)}</span><span class="st ${o.status}">${o.status}</span></div>
         <div class="who2"><b>${esc(o.nombre)}</b><span class="num">${esc(pretty(o.phone))}</span><a class="chat" href="https://wa.me/${esc(o.wa_phone || o.phone)}" target="_blank" rel="noopener">Abrir chat</a></div>
         ${o.wa_phone && o.status === "pendiente" ? `<div class="aviso pend"><span class="aviso-t"><b>📱 Escribió desde otro número</b><small>Cargó ${esc(pretty(o.phone))} en la web pero mandó el pedido desde ${esc(pretty(o.wa_phone))}. Los avisos van a ese.</small></span><button class="btn solid" data-usarwa>Usar ese número</button></div>` : ""}
-        <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}${faltaAvisar(o) ? `<span class="falta-tag">💬 Falta avisar</span>` : ""}${pagoTag(o)}</div>
+        <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${esReserva(o) ? `<span class="res-tag">📅 Reservado</span>` : ""}${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}${faltaAvisar(o) ? `<span class="falta-tag">💬 Falta avisar</span>` : ""}${pagoTag(o)}</div>
         ${env ? `<div class="dirbox"><b>${esc(o.direccion || "")}</b><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.direccion || "") + ", Mar del Plata")}" target="_blank" rel="noopener">Ver en Maps</a></div>` : ""}
         ${o.premio && o.status === "pendiente" ? `<div class="premiobox">Este pedido completa la tarjeta del Club. Premio elegido: <b>${esc(o.premio_txt || "a confirmar con el cliente")}</b>${/off/.test(o.premio_txt || "") ? " (ya descontado del total)" : ""}. Al tocar Entregado se canjea solo.</div>` : ""}
         <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>${pagoEdit(o)}</span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}${o.last_touch_source ? `<span>Llegó por: <b>${esc(origenTxt(o.last_touch_source, o.last_touch_campaign))}</b></span>` : ""}</div>
@@ -567,6 +634,8 @@
           <div class="row2"><label>Celular<input class="inp" id="cmPhone" inputmode="tel" required></label><label>Nombre (opcional)<input class="inp" id="cmName"></label></div>
           <div class="row2"><label>Sellos (usá − para restar)<input class="inp" id="cmN" type="number" value="1" min="-20" max="20"></label>
           <label>Motivo<select class="inp" id="cmWhy"><option>WhatsApp directo</option><option>PedidosYa</option><option>Rappi</option><option>Uber Eats</option><option>Corrección</option><option>Otro</option></select></label></div>
+          <div class="checks"><label><input type="checkbox" id="cmWa"> Aceptó recibir novedades por WhatsApp</label><label><input type="checkbox" id="cmAds"> Aceptó anuncios de Meta</label></div>
+          <span class="hintp">Tildalo solo si el cliente te dijo que sí: así entra en las campañas. Si se había dado de baja, tiene que escribir ALTA al WhatsApp.</span>
           <button class="btn" type="submit">Sumar</button></form>
       </div>
       <div id="cResult"></div>
@@ -574,7 +643,16 @@
     $("#cSearch").addEventListener("submit", (e) => { e.preventDefault(); openClient($("#csPhone").value); });
     $("#cManual").addEventListener("submit", async (e) => {
       e.preventDefault();
-      try { const r = await API.addStamps($("#cmPhone").value, $("#cmName").value, parseInt($("#cmN").value, 10), $("#cmWhy").value); toast(`Listo: ahora tiene ${r.sellos} sello(s)`); openClient(r.phone); listClients(); e.target.reset(); }
+      const canales = [$("#cmWa").checked && "whatsapp", $("#cmAds").checked && "meta_ads"].filter(Boolean);
+      try {
+        const r = await API.addStamps($("#cmPhone").value, $("#cmName").value, parseInt($("#cmN").value, 10), $("#cmWhy").value);
+        let extra = "";
+        if (canales.length) {
+          try { extra = permisoTxt(await API.consentimientoPanel(r.phone, canales)); }
+          catch (_) { extra = " · No se pudo anotar el permiso (falta la migración 050)"; }
+        }
+        toast(`Listo: ahora tiene ${r.sellos} sello(s)${extra}`); openClient(r.phone); listClients(); e.target.reset();
+      }
       catch (err) { toast(err.message); }
     });
     listClients();
@@ -622,13 +700,15 @@
       ${c.last_touch_source ? `<div><span>Último origen</span><span>${esc(origenTxt(c.last_touch_source, c.last_touch_campaign))}</span></div>` : ""}
     </div>`;
   }
-  // permisos de marketing: vale el último registro de cada canal. El equipo solo puede dar de baja, nunca autorizar.
+  // permisos de marketing: vale el último registro de cada canal. El equipo puede dar de baja y anotar un sí que dijo el cliente,
+  // pero no volver a dar de alta a quien se dio de baja (eso solo con ALTA por WhatsApp).
   const CANALES = [["whatsapp", "Novedades por WhatsApp"], ["meta_ads", "Anuncios de Meta"]];
   const ORIGEN = { checkout_web: "al pedir en la web", preferencias_web: "desde la web", panel: "desde el panel", whatsapp: "por WhatsApp", maquinita: "desde la maquinita" };
+  const permisoTxt = (r) => (r.otorgados || []).length ? " · Ya entra en las campañas" : (r.dados_de_baja || []).length ? " · Se había dado de baja: tiene que escribir ALTA al WhatsApp" : "";
   function consentHtml(l) {
     return `<b style="margin-top:6px">Permisos de marketing</b><div class="hist">${CANALES.map(([k, nom]) => {
       const u = l.find((x) => x.canal === k), si = u && u.estado === "otorgado";
-      return `<div><span>${nom} · ${si ? "<b>Sí</b>" : u ? "Se dio de baja" : "No"} <span class="muted">${u ? `${ORIGEN[u.origen] || u.origen} · ${ago(u.created_at)}` : "nunca lo aceptó"}</span></span>${si ? `<button class="linkbtn" data-baja="${k}">Dar de baja</button>` : ""}</div>`;
+      return `<div><span>${nom} · ${si ? "<b>Sí</b>" : u ? "Se dio de baja" : "No"} <span class="muted">${u ? `${ORIGEN[u.origen] || u.origen} · ${ago(u.created_at)}` : "nunca lo aceptó"}</span></span>${si ? `<button class="linkbtn" data-baja="${k}">Dar de baja</button>` : u ? "" : `<button class="linkbtn" data-alta="${k}">Anotar que aceptó</button>`}</div>`;
     }).join("")}</div>`;
   }
 
@@ -643,7 +723,7 @@
     <p class="muted">Para tener a mano. Los números marcados con ≈ son referencias para arrancar: ajustalos con tus propios datos.</p>
     <details class="pcard" open><summary>Cómo encaja todo</summary>
       <ol>
-        <li>El cliente arma el pedido en la web y lo manda por WhatsApp. Si dejó las casillas tildadas, queda con permiso para <b>novedades por WhatsApp</b> y/o <b>anuncios de Meta</b>.</li>
+        <li>El cliente arma el pedido en la web y lo manda por WhatsApp. Si dejó las casillas tildadas, queda con permiso para <b>novedades por WhatsApp</b> y/o <b>anuncios de Meta</b>. Si lo sumás al Club a mano, tildá "Aceptó…" solo si el cliente te dijo que sí.</li>
         <li>Al tocar <b>Entregado</b>, la compra viaja a Meta (aparece como "Compra STT-…" en Envíos a Meta). Así Meta aprende quién compra de verdad.</li>
         <li>Con cada compra entregada el cliente cae en un <b>segmento</b> (nuevos, recurrentes, fans de los mochis…). Los números de la tabla de arriba son "con permiso de WhatsApp · con permiso de anuncios".</li>
         <li>Con esos segmentos hacés dos cosas: <b>campañas de WhatsApp</b> (le escribís directo) y <b>públicos de Meta</b> (para anuncios en Instagram/Facebook).</li>
@@ -1084,8 +1164,9 @@
             const sim = MQ_SIM.map(([n, img], i) => { const c = (m.simbolos || [])[i] || {}, v = c.img || "", ver = v || img; return `<div class="slrow"><span class="upprev" data-prevfor="mi${i}">${ver ? `<img src="${esc(ver)}" alt="" style="object-fit:contain">` : "Estrella<br>(dibujada)"}</span><div class="slf"><input type="hidden" name="mi${i}" value="${esc(v)}">
               <label>${i ? `Símbolo ${i + 1}` : "Símbolo especial (5 iguales = premio mayor)"}<input class="inp" name="mn${i}" maxlength="30" value="${esc(c.nombre || n)}"></label>
               <span class="acts" style="gap:6px"><label class="btn">Subir imagen<input type="file" accept="image/*" data-upimg="mi${i}" data-upmax="400" hidden></label>${v ? `<button type="button" class="linkbtn warn" data-upx="mi${i}">Volver a la original</button>` : ""}</span></div></div>`; }).join("");
-            const prem = MQ_PREM.map(([id, cuando, t, ch, tipo, valor]) => { const c = (m.premios || []).find((x) => x.id === id), tp = (c && c.tipo) || tipo, vl = c && c.valor != null ? +c.valor || 0 : valor;
-              return `<div class="row2"><label>${cuando}: premio (vacío = sin premio)<input class="inp" name="pt_${id}" maxlength="40" value="${esc(c ? c.titulo || "" : t)}"></label><label>Probabilidad (%)<input class="inp" name="pc_${id}" type="number" min="0" max="100" step="0.1" value="${c ? +c.chance || 0 : ch}"></label></div>
+            const prem = MQ_PREM.map(([id, cuando, t, ch, tipo, valor]) => { const c = (m.premios || []).find((x) => x.id === id), tp = (c && c.tipo) || tipo, vl = c && c.valor != null ? +c.valor || 0 : valor, on = c ? c.activo !== false : !!t;
+              return `<label class="chk" style="margin-top:6px"><input type="checkbox" name="pa_${id}" ${on ? "checked" : ""}> Activo: ${cuando}</label>
+              <div class="row2"><label>${cuando}: premio (vacío = sin premio)<input class="inp" name="pt_${id}" maxlength="40" value="${esc(c ? c.titulo || "" : t)}"></label><label>Probabilidad (%)<input class="inp" name="pc_${id}" type="number" min="0" max="100" step="0.1" value="${c ? +c.chance || 0 : ch}"></label></div>
               <div class="row2"><label>Qué se descuenta<select class="inp" name="pk_${id}">${MQ_TIPO.map(([v, l]) => `<option value="${v}" ${tp === v ? "selected" : ""}>${l}</option>`).join("")}</select></label><label>Valor ($ o %, no aplica al mochi)<input class="inp" name="pv_${id}" type="number" min="0" step="1" value="${vl}"></label></div>`; }).join("");
             return `<label class="chk"><input type="checkbox" name="activo" ${m.activo !== false ? "checked" : ""}> Mostrar la maquinita en la web (sección entre Sets y Carta y botón del carrito)</label>
           <div class="row2"><label>Tiradas gratis por día<input class="inp" name="fichas" type="number" min="1" max="5" value="${Math.max(1, +m.fichas_dia || 1)}"></label>
@@ -1185,7 +1266,7 @@
      a la derecha, con una sola barra de Guardar que avisa cuando hay cambios sin guardar. */
   /* maquinita: símbolos y premios por defecto (los mismos que usa maquinita.html si no hay ajustes) */
   const MQ_SIM = [["Mochito", "img/mochito-cup.png"], ["Mochi frutilla", "img/mochi-frutilla.webp"], ["Mochi oreo", "img/mochi-oreo.webp"], ["Dirty caramel", "img/dirty-caramel.webp"], ["Strawberry matcha", "img/dirty-strawberry.webp"], ["Estrella", ""]];
-  const MQ_PREM = [["gift", "5 especiales", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "5 iguales", "Mochi gratis", 0.5, "mochi", 0], ["off", "4 iguales", "10% off", 2, "porcentaje", 10]];
+  const MQ_PREM = [["gift", "5 especiales", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "5 iguales", "Mochi gratis", 0.5, "mochi", 0], ["off", "4 iguales", "10% off", 2, "porcentaje", 10], ["extra", "3 iguales", "", 0, "porcentaje", 0]];
   const MQ_TIPO = [["monto", "Descuento en $"], ["porcentaje", "Descuento en %"], ["mochi", "Un mochi gratis"]];
   const AJ_SEC = [
     { k: "contacto", g: "Pedidos", t: "Contacto", d: "El WhatsApp que recibe los pedidos, Instagram y tu link de links.", s: (S) => pretty(S.whatsapp) || "Sin WhatsApp" },
@@ -1272,9 +1353,11 @@
         premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0), regalo: !!f.regalo, sello_resena: !!f.sres });
       if (k === "maquinita") {
         const premios = MQ_PREM.map(([id, , , , tipo]) => { const tp = MQ_TIPO.some(([k]) => k === f["pk_" + id]) ? f["pk_" + id] : tipo;
-          return { id, titulo: (f["pt_" + id] || "").trim(), chance: Math.max(0, Math.min(100, +String(f["pc_" + id] || "0").replace(",", ".") || 0)), tipo: tp, valor: tp === "mochi" ? 0 : Math.max(0, Math.round(+f["pv_" + id] || 0)) }; });
-        if (premios.reduce((a, p) => a + (p.titulo ? p.chance : 0), 0) > 100) throw new Error("Las probabilidades suman más de 100%");
-        const malo = premios.find((p) => p.titulo && p.tipo !== "mochi" && (!p.valor || (p.tipo === "porcentaje" && p.valor > 100)));
+          return { id, activo: !!f["pa_" + id], titulo: (f["pt_" + id] || "").trim(), chance: Math.max(0, Math.min(100, +String(f["pc_" + id] || "0").replace(",", ".") || 0)), tipo: tp, valor: tp === "mochi" ? 0 : Math.max(0, Math.round(+f["pv_" + id] || 0)) }; });
+        const sinNombre = premios.find((p) => p.activo && !p.titulo);
+        if (sinNombre) throw new Error(`Ponele nombre al premio de ${MQ_PREM.find(([id]) => id === sinNombre.id)[1]} o destildá Activo`);
+        if (premios.reduce((a, p) => a + (p.activo && p.titulo ? p.chance : 0), 0) > 100) throw new Error("Las probabilidades suman más de 100%");
+        const malo = premios.find((p) => p.activo && p.titulo && p.tipo !== "mochi" && (!p.valor || (p.tipo === "porcentaje" && p.valor > 100)));
         if (malo) throw new Error(`Revisá el valor de “${malo.titulo}”`);
         await API.saveSetting("maquinita", { activo: !!f.activo, fichas_dia: Math.max(1, Math.min(5, Math.round(+f.fichas || 1))), fichas_compra: Math.max(0, Math.min(50, Math.round(+f.fcompra || 0))), premios,
           simbolos: MQ_SIM.map(([n], i) => ({ nombre: (f["mn" + i] || "").trim() || n, img: (f["mi" + i] || "").trim() })) });
@@ -1332,8 +1415,11 @@
   }
 
   /* =================== AVISOS PUSH AL EQUIPO =================== */
-  // Este dispositivo recibe una notificación cuando entra un pedido, una gift card, un cambio resuelto o una reseña (migración 027).
-  const AV = { open: false, estado: "cargando", busy: false };
+  // Este dispositivo recibe una notificación cuando entra un pedido, una gift card, un cambio resuelto, una reseña (migración 027)
+  // o una tarea nueva en la caja (050). Cada dispositivo dice de quién es, así no le llegan las tareas que cargó esa misma persona.
+  const AV = { open: false, estado: "cargando", busy: false, quien: "", socios: [] };
+  const AVYO = "setto-caja-yo"; // el mismo "¿Quién sos?" de la caja
+  const avYo = () => { try { return localStorage.getItem(AVYO) || ""; } catch (_) { return ""; } };
   const AVX = "setto-avisos-equipo-visto";
   const vapidKey = (window.SETTO_CONFIG || {}).vapidPublicKey;
   const avSoporte = () => !!vapidKey && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -1346,9 +1432,14 @@
     if (!avSoporte()) return esIOS && !instalada ? "ios" : "nosoporta";
     if (Notification.permission === "denied") return "bloqueado";
     if (Notification.permission !== "granted") return "apagado";
-    try { const sub = await avSub(); return sub && (await API.equipoPushActivo(sub.endpoint)) ? "activo" : "apagado"; } catch (_) { return "apagado"; }
+    try {
+      const sub = await avSub(); const q = sub ? await API.equipoPushQuien(sub.endpoint) : null;
+      if (q == null) return "apagado";
+      AV.quien = q; return "activo";
+    } catch (_) { return "apagado"; }
   }
   async function avisosInit() {
+    try { AV.socios = await API.equipoSocios(); } catch (_) {}
     AV.estado = await avEstado();
     let visto = false; try { visto = !!localStorage.getItem(AVX); } catch (_) {}
     if (AV.estado === "apagado" && !visto) AV.open = true; // la primera vez se muestra solo, después queda en la campanita
@@ -1361,6 +1452,9 @@
     box.hidden = !AV.open; if (!AV.open) return;
     const qué = "pedido nuevo, gift card, cliente que responde un cambio, reseña para aprobar y tarea nueva en la caja";
     const x = `<button class="linkbtn" data-avx>Cerrar</button>`;
+    const elegido = AV.estado === "activo" ? AV.quien : AV.quien || avYo();
+    const quien = AV.socios.length ? `<div class="avquien"><span class="hintp">¿De quién es este dispositivo? Así no te avisa las tareas que cargás vos.</span>
+      <div class="chips">${AV.socios.map((n) => `<button class="chip${n === elegido ? " on" : ""}" data-avquien="${esc(n)}" aria-pressed="${n === elegido}" ${AV.busy ? "disabled" : ""}>${esc(n)}</button>`).join("")}</div></div>` : "";
     const body = {
       cargando: `<p>Revisando los avisos…</p>`,
       demo: `<p>En modo demo no hay avisos.</p>${x}`,
@@ -1370,14 +1464,25 @@
       bloqueado: `<p><b>Las notificaciones del panel están bloqueadas</b> en este navegador. Si las querés, activalas en los ajustes del sitio y volvé a entrar.</p>${x}`,
       apagado: `<p><b>Avisos en este dispositivo</b><br>Te llega una notificación con cada ${qué}, aunque tengas el panel cerrado.</p>
         ${esIOS ? `<span class="hintp">En iPhone funciona solo con el panel agregado a inicio (iOS 16.4 o más).</span>` : ""}
+        ${quien}
         <div class="acts"><button class="btn solid" data-avon ${AV.busy ? "disabled" : ""}>${AV.busy ? "Activando…" : "Activar avisos"}</button>${x}</div>`,
-      activo: `<p><b>✓ Este dispositivo recibe avisos</b><br>Con cada ${qué}.</p>
+      activo: `<p><b>✓ Este dispositivo recibe avisos${AV.quien ? ` · ${esc(AV.quien)}` : ""}</b><br>Con cada ${qué}.</p>
+        ${quien}
         <div class="acts"><button class="btn" data-avtest>Probar</button><button class="linkbtn" data-avoff ${AV.busy ? "disabled" : ""}>Apagar en este dispositivo</button>${x}</div>`,
     }[AV.estado];
     box.innerHTML = body;
   }
   document.addEventListener("click", async (e) => {
-    const b = e.target.closest("#avisosBtn,[data-avx],[data-avon],[data-avoff],[data-avtest]"); if (!b) return;
+    const b = e.target.closest("#avisosBtn,[data-avx],[data-avon],[data-avoff],[data-avtest],[data-avquien]"); if (!b) return;
+    if (b.dataset.avquien !== undefined) {
+      AV.quien = b.dataset.avquien; try { localStorage.setItem(AVYO, AV.quien); } catch (_) {}
+      if (AV.estado !== "activo") return drawAvisos();
+      AV.busy = true; drawAvisos();
+      try { const sub = await avSub(); if (sub) await API.equipoPushSuscribir(sub, AV.quien); toast(`Listo: este dispositivo es de ${AV.quien}`); }
+      catch (err) { toast(err.message || "No se pudo guardar"); }
+      finally { AV.busy = false; drawAvisos(); }
+      return;
+    }
     if (b.id === "avisosBtn" || b.dataset.avx !== undefined) {
       AV.open = b.id === "avisosBtn" ? !AV.open : false;
       if (!AV.open) { try { localStorage.setItem(AVX, "1"); } catch (_) {} }
@@ -1396,12 +1501,13 @@
         if (perm !== "granted") { AV.estado = perm === "denied" ? "bloqueado" : "apagado"; return; }
         const reg = await navigator.serviceWorker.register("/sw.js"); await navigator.serviceWorker.ready;
         const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: claveVapid(vapidKey) }));
-        await API.equipoPushSuscribir(sub);
+        AV.quien = AV.quien || avYo();
+        await API.equipoPushSuscribir(sub, AV.quien);
         AV.estado = "activo"; toast("Listo: este dispositivo recibe avisos");
       } else {
         const sub = await avSub();
         if (sub) await API.equipoPushDesuscribir(sub.endpoint); // la suscripción del navegador queda: la puede usar el seguimiento o los drops
-        AV.estado = "apagado"; toast("Avisos apagados en este dispositivo");
+        AV.estado = "apagado"; AV.quien = ""; toast("Avisos apagados en este dispositivo");
       }
     } catch (err) { toast(err.message || "No se pudieron cambiar los avisos"); }
     finally { AV.busy = false; drawAvisos(); }
@@ -1412,7 +1518,10 @@
     const b = e.target.closest("button, a"); if (!b) return;
     if (b.id === "logout") { await API.signOut(); location.reload(); return; }
     if (b.dataset.view) go(b.dataset.view);
-    if (b.dataset.sub) { P.sub = b.dataset.sub; viewPedidos(); }
+    if (b.dataset.sub) { P.sub = b.dataset.sub; P.fil = {}; viewPedidos(); }
+    if (b.dataset.fil) { P.fil[b.dataset.fil] = P.fil[b.dataset.fil] === b.dataset.fv ? "" : b.dataset.fv; drawOrders(); return; }
+    if (b.hasAttribute("data-filt")) { P.filOpen = !P.filOpen; drawOrders(); return; }
+    if (b.hasAttribute("data-filx")) { P.fil = {}; drawOrders(); return; }
     if (b.id === "resetDemo") { API.resetDemo(); location.reload(); }
     if (b.dataset.client) openClient(b.dataset.client);
 
@@ -1483,6 +1592,7 @@
       try { const r = await API.sendCampaign(id, prueba); toast(prueba ? "Prueba enviada" : `Listo: ${r.enviados} enviados, ${r.fallidos} con error`); cargarCampanas(); } catch (err) { toast(err.message); b.disabled = false; }
     }
     if (b.dataset.clientGo) { P.client = b.dataset.clientGo; go("club"); }
+    if (b.dataset.alta) { if (!confirm("¿El cliente te dijo que acepta? Anotalo solo si te lo pidió: desde ahora entra en las campañas.")) return; try { const r = await API.consentimientoPanel(P.client, [b.dataset.alta]); toast(permisoTxt(r).replace(" · ", "") || "Listo"); openClient(P.client); } catch (err) { toast(err.message); } }
     if (b.dataset.baja) { if (!confirm("¿Dar de baja este permiso? Las automatizaciones dejan de usar este número para eso.")) return; try { await API.bajaMarketing(P.client, b.dataset.baja); toast("Listo, quedó dado de baja"); openClient(P.client); } catch (err) { toast(err.message); } }
     if (b.dataset.redeem !== undefined) { try { await API.redeem(P.client); toast("Premio canjeado"); openClient(P.client); listClients(); } catch (err) { toast(err.message); } }
 

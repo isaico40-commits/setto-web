@@ -13,7 +13,8 @@
     const q = new URLSearchParams(location.search);
     if (q.get("seguir") || q.get("p") === "listo") return null; // links que mandamos por WhatsApp después de pedir: no son una visita nueva
     let ref = ""; try { ref = document.referrer ? new URL(document.referrer).hostname : ""; } catch (_) {}
-    if (ref === location.hostname) return null; // navegación dentro de la web
+    const sinWww = (h) => h.replace(/^www\./, "");
+    if (ref && sinWww(ref) === sinWww(location.hostname)) return null; // navegación dentro de la web (con o sin www)
     const utm = (k) => corto(q.get("utm_" + k), 120);
     const red = (REDES.find(([re]) => re.test(ref)) || [])[1];
     const source = utm("source") || (q.get("fbclid") ? "meta" : "") || red || (ref ? ref.replace(/^www\./, "") : "");

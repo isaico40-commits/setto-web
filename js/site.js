@@ -964,6 +964,20 @@
   // la maquinita ya no tiene página propia: /maquinita y /?maquinita abren el pop up
   let maqAlCargar = new URLSearchParams(location.search).has("maquinita"); // se abre cuando llegan los ajustes
   if (maqAlCargar) { try { history.replaceState(null, "", location.pathname + (PAGE !== "home" ? "?p=" + PAGE : "") + location.hash); } catch (_) {} }
+  // link directo a un producto para anuncios y WhatsApp: /?producto=set-yoru o /?producto=spooky-set (id o nombre). Abre su ficha cuando llega la carta.
+  let prodAlCargar = PAGE === "home" ? String(new URLSearchParams(location.search).get("producto") || "").trim().toLowerCase().slice(0, 60) : "";
+  const slugProd = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  function abrirProductoDelLink() {
+    if (!prodAlCargar) return;
+    const todos = [...SETS, ...DIRTY, ...MOCHIS, ...ESP, ...PROMOS], p = todos.find((x) => x.id === prodAlCargar) || todos.find((x) => slugProd(x.nombre) === prodAlCargar);
+    if (!p) return; // puede llegar en la carta nueva (la guardada es vieja): se prueba de nuevo
+    prodAlCargar = "";
+    try { history.replaceState(null, "", location.pathname + location.search.replace(/([?&])producto=[^&]*&?/, "$1").replace(/[?&]$/, "") + location.hash); } catch (_) {} // el origen ya se guardó (js/origen.js corre antes)
+    const sec = p.categoria === "set" ? "#sets" : p.categoria === "especial" ? "#especial" : "#carta";
+    if (sec === "#carta" && ["dirty", "mochi", "promo"].includes(p.categoria)) { tab = p.categoria; renderCarta(); }
+    const el = $(sec); if (el) el.scrollIntoView({ block: "start" });
+    if (!p.agotado) setTimeout(() => openSheet(p.id), 250);
+  }
   // gift cards abiertas desde /listo: el "volver" vuelve a /listo
   if (PAGE === "gift-cards" && new URLSearchParams(location.search).get("desde") === "listo") {
     const v = document.querySelector("#regalo .volver"); if (v) { v.href = "/?p=listo"; v.textContent = "← Volver"; }
@@ -1875,6 +1889,7 @@
   function pintar(settings, products) {
     S = settings; adapt(products); syncCart();
     renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); renderFooter(); renderBadge();
+    abrirProductoDelLink();
     if (pintado) return;
     pintado = true;
     verSeguimiento(); renderResenas(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo);

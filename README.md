@@ -89,6 +89,11 @@ El premio se entrega **en el mismo pedido que completa la tarjeta**. Ejemplo con
 Sin elegir, la web no deja enviar. El panel muestra 🎁 *Completa la tarjeta* con el premio elegido, y al tocar **Entregado** se canjea solo (la tarjeta vuelve a 0).
 En **Ajustes → Setto Club** definís los sellos de la tarjeta, el texto del premio, si se ofrece el set, el % de descuento (0 = no se ofrece), un tope en $ para el descuento (0 = sin tope) y un pedido mínimo opcional para sumar sello.
 
+### Sumar al Club a mano y campañas
+En **Club → Sumar sellos a mano** hay dos casillas: *Aceptó recibir novedades por WhatsApp* y *Aceptó anuncios de Meta*. Vienen destildadas: tildalas solo si el cliente te dijo que sí. Con la casilla tildada queda el permiso (origen *panel*, con quién lo cargó) y el cliente entra en las campañas de WhatsApp y en los públicos de Meta. Sin la casilla, suma sellos pero no entra en campañas.
+En la ficha del cliente, **Anotar que aceptó** hace lo mismo para alguien que ya estaba. Si el cliente se había dado de baja, el panel no lo vuelve a dar de alta: tiene que escribir ALTA al WhatsApp.
+Quien solo tiene sellos cargados a mano (sin pedidos de la web entregados) cae en el segmento **Todos**; los demás segmentos se arman con las compras de la web. Requiere la migración `050_consentimiento_panel.sql`.
+
 ### Personalización de bebidas
 En los dirty y en los sets el cliente elige la leche (con recargo) y puede marcar "Sin cold foam", "Sin endulzante" o "Sin hielo". El recargo se suma al precio y se calcula en la base. En el WhatsApp y en el panel cada bebida muestra lo que eligió.
 En **Ajustes → Personalización de bebidas** cambiás las leches (una por línea, `Nombre | recargo`, la primera es la de base) y las opciones para sacar.
@@ -122,7 +127,8 @@ Se publican solas apenas el cliente la deja, sin filtro previo (para no mostrar 
 - **Todas las reseñas:** botón "Ver todas las reseñas" y link "Reseñas" en el menú: promedio, barras por estrellas, filtros (con foto, con comentario, por estrellas) e incluye las que son solo puntaje.
 
 ### Avisos en tu celu (panel)
-Tocá la campanita 🔔 del panel y **Activar avisos**. Ese dispositivo recibe una notificación con cada pedido nuevo, gift card pedida, cliente que responde un cambio y reseña para aprobar y tarea nueva en la caja (menos las que carga Isa), aunque el panel esté cerrado. Solo le llega a quien la active en su dispositivo; se apaga desde el mismo lugar.
+Tocá la campanita 🔔 del panel y **Activar avisos**. Ese dispositivo recibe una notificación con cada pedido nuevo, gift card pedida, cliente que responde un cambio y reseña para aprobar y tarea nueva en la caja, aunque el panel esté cerrado. Solo le llega a quien la active en su dispositivo; se apaga desde el mismo lugar.
+En la misma cajita se elige de quién es el dispositivo (Isa, Alan o Lucas): la tarea nueva le llega a todos menos a quien la cargó. Un dispositivo sin nombre recibe todas (migración `050_aviso_tareas_a_todos.sql`).
 En iPhone funciona solo con el panel agregado a la pantalla de inicio (Safari → Compartir → Agregar a inicio, iOS 16.4 o más) y activando desde ese ícono.
 Usa la tabla `staff_push_subs` y la misma Edge Function `push-pedido` (migración `027_avisos_equipo.sql`). En producción, crear cada trigger por separado con `set lock_timeout`.
 

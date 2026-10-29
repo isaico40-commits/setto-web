@@ -16,7 +16,7 @@ main.pmain{padding-block:24px 80px}
 .ph1{font-size:clamp(1.8rem,4vw,2.4rem);margin-bottom:6px}
 .sub{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 18px;align-items:center}
 .sub .ptab{border-color:color-mix(in srgb,var(--turquesa) 35%,transparent);color:var(--turquesa)}
-.sub input{margin-left:auto;min-width:200px;flex:0 1 260px}
+.sub input{margin-left:auto;min-width:200px;flex:0 1 320px}
 .inp,.sub input,.pcard input,.pcard select,.pcard textarea,.loginbox input{font:inherit;font-size:.92rem;color:var(--ink);background:var(--card);border:1.5px solid color-mix(in srgb,var(--turquesa) 45%,transparent);border-radius:12px;padding:9px 11px;width:100%}
 .pcard textarea{min-height:60px;resize:vertical}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;align-items:start}
@@ -88,6 +88,7 @@ main.pmain{padding-block:24px 80px}
 .stamps.sm{max-width:460px}
 .modo-tag{font-size:.74rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:3px 10px;background:var(--bg-2)}
 .modo-tag.env{background:var(--turquesa);color:#fff}
+.res-tag{font-size:.74rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:3px 10px;background:color-mix(in srgb,var(--turquesa) 16%,var(--card,#fff));color:var(--turquesa);border:1px solid var(--turquesa)}
 .premio-tag{font-size:.74rem;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--coral)}
 .dirbox{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border-radius:12px;padding:10px 12px;font-size:.92rem}
 .dirbox a{font-size:.82rem;font-weight:600;color:var(--turquesa)}
@@ -175,6 +176,10 @@ a.ptab{text-decoration:none}
 .avisos{margin:16px 0 4px;background:var(--card);border:var(--line);border-radius:18px;padding:14px 18px;display:grid;gap:10px;max-width:640px}
 .avisos p{margin:0;line-height:1.45}
 .avisos ol{margin:0;padding-left:20px;line-height:1.6}
+.avquien{display:grid;gap:6px}
+.avquien .chips{display:flex;flex-wrap:wrap;gap:6px}
+.avquien .chips button{border:1.5px solid var(--turquesa);background:var(--card);border-radius:999px;padding:7px 14px;font-size:.84rem;font-weight:600;color:var(--turquesa)}
+.avquien .chips button[aria-pressed="true"]{background:var(--turquesa);color:#fff}
 
 /* Selector Pedidos | Caja (mismo en el panel y en la caja) */
 .appsw{display:inline-flex;background:var(--bg-2);border-radius:999px;padding:3px;gap:2px}
@@ -333,3 +338,21 @@ a.ptab{text-decoration:none}
 .pcard label.chk input{width:auto;margin:0;accent-color:var(--turquesa)}
 #campVarsBox{display:grid;gap:10px}#campVarsBox .tplprev{position:static;max-width:380px}
 @media (max-width:520px){.tpled .row2{grid-template-columns:1fr}}
+/* filtros de pedidos: botón que abre grupos de chips compactos; en celu cada grupo scrollea de costado */
+.subtabs{display:flex;gap:8px;flex-wrap:wrap}
+.ofil{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:-6px 0 18px}
+.ofil[hidden]{display:none}
+.ofbtn{display:inline-flex;align-items:center;gap:6px;border:1.5px solid color-mix(in srgb,var(--turquesa) 35%,transparent);background:var(--card);border-radius:999px;padding:6px 13px;font-size:.86rem;font-weight:700;color:var(--turquesa)}
+.ofbtn i{font-style:normal;background:var(--turquesa);color:#fff;border-radius:999px;font-size:.72rem;padding:1px 7px}
+.ofbtn span{font-size:.7rem}
+.ofgs{flex:1 1 100%;min-width:0;max-width:100%;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end}
+.ofgs[hidden]{display:none}
+.ofg{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ofg small{font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2)}
+.ochips{display:flex;gap:6px}
+.ochips button{border:1.5px solid color-mix(in srgb,var(--turquesa) 35%,transparent);background:var(--card);border-radius:999px;padding:5px 11px;font-size:.82rem;font-weight:600;color:var(--turquesa);white-space:nowrap}
+.ochips button i{font-style:normal;font-weight:700;opacity:.6;margin-left:2px}
+.ochips button[aria-pressed="true"]{background:var(--turquesa);border-color:var(--turquesa);color:#fff}
+.ochips button[aria-pressed="true"] i{opacity:.85}
+@media (max-width:700px){.subtabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px;width:calc(100% + 32px)}.subtabs::-webkit-scrollbar{display:none}
+  .ofgs{flex-direction:column;align-items:stretch;gap:8px}.ofg{flex-direction:row;align-items:center;gap:8px;max-width:100%}.ofg small{flex:0 0 62px}.ochips{min-width:0;flex:1 1 auto;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}.ochips::-webkit-scrollbar{display:none}}

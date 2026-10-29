@@ -57,7 +57,9 @@ export async function firmaValida(cuerpo: string, firma: string | null, appSecre
   return d === 0;
 }
 
-export type Entrante = { phone: string; wa: string; wamid: string; texto: string }; // wa: el ID de WhatsApp tal cual, para responder
+// anuncio: si el chat empezó desde un anuncio de Meta que abre WhatsApp, de cuál vino (lo manda Meta en "referral")
+export type Anuncio = { anuncio_id: string | null; anuncio_tipo: string | null; anuncio_titulo: string | null; anuncio_url: string | null; ctwa_clid: string | null };
+export type Entrante = { phone: string; wa: string; wamid: string; texto: string; anuncio: Anuncio | null }; // wa: el ID de WhatsApp tal cual, para responder
 export type Estado = { wamid: string; estado: string; error?: string };
 const ESTADOS: Record<string, string> = { sent: "enviado", delivered: "entregado", read: "leido", failed: "fallo" };
 export function leerWebhook(body: any) {
@@ -66,7 +68,9 @@ export function leerWebhook(body: any) {
     const v = ch?.value ?? {};
     for (const m of v.messages ?? []) {
       const texto = m.text?.body ?? m.button?.text ?? m.button?.payload ?? m.interactive?.button_reply?.title ?? m.interactive?.list_reply?.title ?? `[${m.type}]`;
-      entrantes.push({ phone: soloDigitos(m.from), wa: soloDigitos(m.from), wamid: m.id, texto: String(texto).slice(0, 1000) });
+      const r = m.referral, corto = (x: unknown, n: number) => (x ? String(x).slice(0, n) : null);
+      const anuncio = r ? { anuncio_id: corto(r.source_id, 40), anuncio_tipo: corto(r.source_type, 20), anuncio_titulo: corto(r.headline, 200), anuncio_url: corto(r.source_url, 300), ctwa_clid: corto(r.ctwa_clid, 300) } : null;
+      entrantes.push({ phone: soloDigitos(m.from), wa: soloDigitos(m.from), wamid: m.id, texto: String(texto).slice(0, 1000), anuncio });
     }
     for (const s of v.statuses ?? []) {
       estados.push({ wamid: s.id, estado: ESTADOS[s.status] ?? s.status, error: s.errors?.[0] ? `${s.errors[0].code} ${s.errors[0].title ?? s.errors[0].message ?? ""}`.trim() : undefined });
