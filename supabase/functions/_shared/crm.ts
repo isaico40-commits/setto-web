@@ -163,3 +163,59 @@ export function diferencia(deseados: string[], actuales: string[]) {
   return { sumar: [...d].filter((x) => !a.has(x)), sacar: [...a].filter((x) => !d.has(x)) };
 }
 export const tandas = <T>(l: T[], n: number) => Array.from({ length: Math.ceil(l.length / n) }, (_, i) => l.slice(i * n, i * n + n));
+
+/* ---------------- Plantillas de WhatsApp (se arman en Panel → Campañas) ---------------- */
+// Lo mismo valida js/plantillas.js en el panel, mientras se escribe. Acá es la última palabra antes de mandarla a Meta.
+export const BOTON_BAJA = "No quiero más novedades"; // siempre va: el webhook lo lee como BAJA (intencion())
+export type PlantillaNueva = { nombre: string; idioma?: string; encabezado?: string; cuerpo: string; ejemplos?: string[]; pie?: string; respuesta?: string; link?: { texto: string; destino: "inicio" | "especial" } | null };
+export const variablesDe = (t: string) => [...String(t || "").matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map((m) => Number(m[1]));
+export function validarPlantilla(p: PlantillaNueva) {
+  const e: string[] = [];
+  const nombre = String(p?.nombre || ""), cuerpo = String(p?.cuerpo || "").trim(), ej = p?.ejemplos || [];
+  if (!/^[a-z0-9_]{3,60}$/.test(nombre)) e.push("El nombre va en minúsculas, sin espacios ni tildes (podés usar _), de 3 a 60 letras");
+  if (!cuerpo) e.push("Falta el texto del mensaje");
+  if (cuerpo.length > 1024) e.push("El texto pasa los 1024 caracteres");
+  const vs = variablesDe(cuerpo), unicas = [...new Set(vs)].sort((a, b) => a - b);
+  if (unicas.some((n, i) => n !== i + 1)) e.push("Las variables tienen que ir en orden: {{1}}, {{2}}, {{3}}…");
+  if (/^\{\{\s*\d+\s*\}\}/.test(cuerpo) || /\{\{\s*\d+\s*\}\}[\s.!?¡¿,]*$/.test(cuerpo)) e.push("Meta no deja una variable al principio ni al final del texto");
+  if (/\}\}\s*\{\{/.test(cuerpo)) e.push("Dos variables pegadas: poné texto entre medio");
+  if (unicas.length && cuerpo.replace(/\{\{\s*\d+\s*\}\}/g, "").split(/\s+/).filter(Boolean).length < unicas.length * 3 + 2) e.push("Hay muchas variables para lo corto del texto: Meta la rechaza. Sumá texto fijo");
+  unicas.forEach((n) => { if (!String(ej[n - 1] || "").trim()) e.push(`Falta el ejemplo de {{${n}}} (Meta lo pide para revisarla)`); });
+  const enc = String(p?.encabezado || "");
+  if (enc.length > 60) e.push("El título pasa los 60 caracteres");
+  if (/[\n*_~]|\{\{/.test(enc)) e.push("El título va en una línea, sin variables ni formato");
+  const pie = String(p?.pie || "");
+  if (pie.length > 60) e.push("El pie pasa los 60 caracteres");
+  if (/\{\{/.test(pie)) e.push("El pie no puede tener variables");
+  const r = String(p?.respuesta || "").trim();
+  if (r.length > 25) e.push("El botón de respuesta pasa los 25 caracteres");
+  if (r && quitarTildes(r).toLowerCase() === quitarTildes(BOTON_BAJA).toLowerCase()) e.push("Ese botón ya va siempre");
+  if (p?.link) {
+    if (!String(p.link.texto || "").trim() || p.link.texto.length > 25) e.push("El texto del botón a la web va de 1 a 25 caracteres");
+    if (!["inicio", "especial"].includes(p.link.destino)) e.push("Elegí a qué parte de la web lleva el botón");
+  }
+  return e;
+}
+// cuerpo para POST /{waba}/message_templates. El botón de baja va primero y siempre; el link lleva UTM con el nombre de la plantilla.
+export function componentesPlantilla(p: PlantillaNueva, sitio: string) {
+  const cuerpo = String(p.cuerpo).trim(), n = new Set(variablesDe(cuerpo)).size;
+  const comps: Record<string, unknown>[] = [];
+  if (String(p.encabezado || "").trim()) comps.push({ type: "HEADER", format: "TEXT", text: p.encabezado!.trim() });
+  comps.push({ type: "BODY", text: cuerpo, ...(n ? { example: { body_text: [(p.ejemplos || []).slice(0, n).map((x) => String(x).trim())] } } : {}) });
+  if (String(p.pie || "").trim()) comps.push({ type: "FOOTER", text: p.pie!.trim() });
+  const botones: Record<string, unknown>[] = [{ type: "QUICK_REPLY", text: BOTON_BAJA }];
+  if (String(p.respuesta || "").trim()) botones.push({ type: "QUICK_REPLY", text: p.respuesta!.trim() });
+  if (p.link && sitio) botones.push({ type: "URL", text: p.link.texto.trim(),
+    url: `${sitio.replace(/\/$/, "")}/?utm_source=whatsapp&utm_medium=campana&utm_campaign=${p.nombre}${p.link.destino === "especial" ? "#especial" : ""}` });
+  comps.push({ type: "BUTTONS", buttons: botones });
+  return { name: p.nombre, language: p.idioma || "es_AR", category: "MARKETING", components: comps };
+}
+// plantilla como la devuelve Meta → lo que muestra el panel (vista previa + estado)
+export function plantillaParaPanel(t: any) {
+  const c = (k: string) => (t?.components || []).find((x: any) => x.type === k) || {};
+  return {
+    nombre: t?.name, idioma: t?.language, estado: t?.status, categoria: t?.category, motivo: t?.rejected_reason && t.rejected_reason !== "NONE" ? t.rejected_reason : null,
+    encabezado: c("HEADER").format === "TEXT" ? c("HEADER").text || "" : "", cuerpo: c("BODY").text || "", ejemplos: c("BODY").example?.body_text?.[0] || [],
+    pie: c("FOOTER").text || "", botones: (c("BUTTONS").buttons || []).map((b: any) => ({ tipo: b.type, texto: b.text, url: b.url || null })),
+  };
+}

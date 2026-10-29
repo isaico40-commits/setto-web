@@ -454,6 +454,12 @@
     async listCampaigns() { return (dbLoad().campaigns || []).slice(0, 20); },
     async createCampaign(c) { const db = dbLoad(); db.campaigns = db.campaigns || []; const n = { id: "c" + Date.now(), estado: "borrador", total: 0, enviados: 0, fallidos: 0, created_at: new Date().toISOString(), ...c }; db.campaigns.unshift(n); dbSave(db); return n; },
     async sendCampaign() { throw new Error("En modo demo no se mandan mensajes de WhatsApp"); },
+    // plantillas de WhatsApp (Edge Function whatsapp-plantillas): en modo demo quedan "en revisión" en este navegador
+    async listTemplates() { const db = dbLoad(); return db.templates || (db.templates = [{ nombre: "aviso_drop", idioma: "es_AR", estado: "APPROVED", categoria: "MARKETING", motivo: null, encabezado: "", pie: "",
+      cuerpo: "Hola {{1}}, ya salió {{2}} de Setto, como te avisamos. Pedila en la web mientras dure el stock.", ejemplos: ["Isa", "la edición Halloween"],
+      botones: [{ tipo: "QUICK_REPLY", texto: "No quiero más avisos" }, { tipo: "URL", texto: "Ver la edición" }] }]); },
+    async createTemplate(p) { const db = dbLoad(); const l = await this.listTemplates(); if (l.some((t) => t.nombre === p.nombre)) throw new Error("Ya hay una plantilla con ese nombre. Usá otro (por ejemplo, sumale _v2)");
+      db.templates = [{ nombre: p.nombre, idioma: p.idioma || "es_AR", estado: "PENDING", categoria: "MARKETING", motivo: null, ...window.SettoPlantillas.desdeEditor(p) }, ...l]; dbSave(db); return { ok: true, estado: "PENDING" }; },
     async syncAudiencias() { throw new Error("En modo demo no hay conexión con Meta"); },
     async crmActividad() { return { mensajes: [], sync: [] }; },
     async consentimientos(phone) { const ph = normPhone(phone); return (dbLoad().consents || []).filter((x) => x.phone === ph); },
@@ -707,6 +713,8 @@
     async createCampaign(c) { const { data, error } = await sb.from("marketing_campaigns").insert({ ...c, estado: "borrador" }).select().single(); fail(error); return data; },
     // Edge Functions: las credenciales de Meta y WhatsApp viven solo ahí (secretos de Supabase)
     async sendCampaign(id, prueba) { return fn("whatsapp-campana", { campaign_id: id, prueba: prueba || null }); },
+    async listTemplates() { return (await fn("whatsapp-plantillas", { accion: "listar" })).plantillas || []; },
+    async createTemplate(p) { return fn("whatsapp-plantillas", { accion: "crear", plantilla: p }); },
     async syncAudiencias() { return fn("meta-audiencias", {}); },
     async crmActividad() {
       const [m, s] = await Promise.all([sb.from("message_logs").select("*").eq("direccion", "entrante").order("created_at", { ascending: false }).limit(15),
