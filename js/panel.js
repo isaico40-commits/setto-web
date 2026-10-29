@@ -864,9 +864,11 @@
     } catch (e) { P.tpls = null; $("#tplList").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
     campPlantillaCampo();
   }
-  // campo "Plantilla" de la campaña: lista de aprobadas si se pudieron leer de Meta; si no, nombre a mano como antes
-  function campPlantillaCampo() {
-    const box = $("#campTpl"); if (!box) return;
+  // campo "Plantilla" de una campaña o automática: lista de aprobadas si se pudieron leer de Meta; si no, nombre a mano como antes
+  const FORMS_TPL = ["#campForm", "#autoForm"];
+  function campPlantillaCampo(f) {
+    if (!f) { FORMS_TPL.forEach((q) => $(q) && campPlantillaCampo($(q))); return; }
+    const box = f.querySelector("[data-tplbox]");
     const elegida = (box.querySelector("[name=plantilla]") || {}).value || "";
     if (P.tpls) {
       const ok = P.tpls.filter((t) => t.estado === "APPROVED");
@@ -876,20 +878,52 @@
         <label>Idioma de la plantilla<input class="inp" name="idioma" value="es_AR"></label></div>
         <label>Variables del texto, una por línea, en orden ({nombre} = nombre del cliente)<textarea class="inp" name="variables" rows="3" placeholder="{nombre}&#10;Lemon pie"></textarea></label>`;
     }
-    campVars();
+    campVars(f);
   }
-  function campVars() {
-    const f = $("#campForm"), t = P.tpls && tplDe((f.elements.plantilla || {}).value), box = $("#campVarsBox");
+  function campVars(f) {
+    const t = P.tpls && tplDe((f.elements.plantilla || {}).value), box = f.querySelector("[data-varsbox]");
     if (!t) { box.innerHTML = ""; return; }
     const n = TP.cantidad(t.cuerpo), prev = [...box.querySelectorAll("[data-cvar]")].map((x) => x.value);
     box.innerHTML = `${n ? `<div class="tplvars">${Array.from({ length: n }, (_, i) => `<label>Qué va en {{${i + 1}}}<input class="inp" data-cvar="${i}" required value="${esc(prev[i] ?? (i === 0 && /^hola\b/i.test(t.cuerpo) ? "{nombre}" : ""))}" placeholder="${esc(t.ejemplos[i] || "")}"></label>`).join("")}</div>
       <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente.</span>` : ""}
-      <div class="tplprev"><span class="eyebrow">Así le llega</span><div id="campPrev"></div></div>`;
-    campPrev();
+      <div class="tplprev"><span class="eyebrow">Así le llega</span><div data-prev></div></div>`;
+    campPrev(f);
   }
-  function campPrev() {
-    const t = P.tpls && tplDe(($("#campForm").elements.plantilla || {}).value), el = $("#campPrev"); if (!t || !el) return;
-    el.innerHTML = TP.burbuja(t, [...document.querySelectorAll("[data-cvar]")].map((x) => x.value));
+  function campPrev(f) {
+    const t = P.tpls && tplDe((f.elements.plantilla || {}).value), el = f.querySelector("[data-prev]"); if (!t || !el) return;
+    el.innerHTML = TP.burbuja(t, [...f.querySelectorAll("[data-cvar]")].map((x) => x.value));
+  }
+  // plantilla + variables del formulario (con o sin la lista de Meta); null si falta algo
+  function leerTplForm(f) {
+    const d = Object.fromEntries(new FormData(f)), t = P.tpls && tplDe(d.plantilla);
+    const variables = t ? [...f.querySelectorAll("[data-cvar]")].map((x) => x.value.trim()) : (d.variables || "").split("\n").map((x) => x.trim()).filter(Boolean);
+    if (t && variables.some((v) => !v)) { toast("Completá qué va en cada variable"); return null; }
+    return { d, plantilla: (d.plantilla || "").trim(), idioma: t ? t.idioma || "es_AR" : (d.idioma || "es_AR").trim(), variables };
+  }
+  // formularios de campaña y automática: elegir plantilla, variables y vista previa
+  function enganchar(f, guardar) {
+    f.addEventListener("change", (e) => { if (e.target.name === "plantilla") campVars(f); });
+    f.addEventListener("input", (e) => { if (e.target.dataset.cvar !== undefined) campPrev(f); });
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault(); const v = leerTplForm(f); if (!v) return;
+      try { await guardar(v); f.reset(); campVars(f); } catch (err) { toast(err.message); }
+    });
+  }
+
+  /* ---- Campañas automáticas: salen solas X días después de la última compra ---- */
+  async function cargarAutomaticas() {
+    const box = $("#autoList"); if (!box) return;
+    try {
+      const [l, r] = await Promise.all([API.listAutomations(), API.automationsResumen().catch(() => ({}))]); P.autos = l;
+      box.innerHTML = l.length ? l.map((a) => { const x = r[a.id] || {}, t = tplDe(a.plantilla); return `<article class="pcard" data-auto="${esc(a.id)}">
+        <div class="ohead"><b>${esc(a.nombre)}</b><span class="st ${a.activa ? "entregado" : "pendiente"}">${a.activa ? "Prendida" : "Pausada"}</span></div>
+        <p class="hintp">${a.dias} ${a.dias === 1 ? "día" : "días"} después de la última compra · ${esc(segNom(a.segmento))} · plantilla <b>${esc(a.plantilla)}</b>${(a.variables || []).length ? " · " + a.variables.map(esc).join(" / ") : ""}</p>
+        <p class="num">${x.enviados || 0} enviados · ${x.semana || 0} esta semana${x.fallidos ? ` · ${x.fallidos} con error` : ""} · ${a.activa ? `próximo envío (11 h): ${x.hoy || 0} ${x.hoy === 1 ? "persona" : "personas"}` : "si la prendés, arranca con quienes cumplan desde ese día"}</p>
+        ${t ? `<details class="tplver"><summary>Así le llega</summary>${TP.burbuja(t, a.variables)}</details>` : ""}
+        <div class="row2"><label>Probar con un número<input class="inp" data-prueba inputmode="tel" placeholder="223 347-1277"></label></div>
+        <div class="acts"><button class="btn" data-aprobar>Mandar prueba</button><button class="btn ${a.activa ? "" : "solid"}" data-aonoff>${a.activa ? "Pausar" : "Prender"}</button><button class="linkbtn warn" data-aborrar>Borrar</button></div>
+      </article>`; }).join("") : '<p class="muted">Todavía no hay automáticas.</p>';
+    } catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
   }
   async function viewCampanas() {
     $("#view").innerHTML = `<h1 class="ph1">Campañas</h1>
@@ -905,29 +939,34 @@
         <form class="pcard" id="campForm">
           <div class="row2"><label>Nombre (para vos)<input class="inp" name="nombre" required placeholder="Ej: Lanzamiento Lemon pie"></label>
           <label>Segmento<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></label></div>
-          <div id="campTpl"><span class="muted">Cargando plantillas…</span></div>
-          <div id="campVarsBox"></div>
+          <div data-tplbox><span class="muted">Cargando plantillas…</span></div>
+          <div data-varsbox class="varsbox"></div>
           <button class="btn solid" type="submit">Guardar borrador</button></form></section>
       <section class="sec"><h2>Campañas</h2><div class="pgrid" id="campList"><p class="muted">Cargando…</p></div></section>
+      <section class="sec"><h2>Campañas automáticas</h2>
+        <p class="hintp" style="margin-bottom:12px">Salen solas todos los días a las 11 h a quien cumpla los días desde su última compra entregada. Le llega una sola vez por compra (si vuelve a comprar, el reloj arranca de nuevo) y nadie recibe dos mensajes de campaña en 7 días. Al prenderla no les escribe a los que compraron hace tiempo: arranca con quienes cumplan desde ese día.</p>
+        <form class="pcard" id="autoForm">
+          <div class="row2"><label>Nombre (para vos)<input class="inp" name="nombre" required placeholder="Ej: Segunda compra a los 7 días"></label>
+          <label>Días después de la última compra<input class="inp" name="dias" type="number" min="1" max="365" required value="7"></label></div>
+          <label>Solo a<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}"${k === "todos" ? " selected" : ""}>${n}</option>`).join("")}</select></label>
+          <div data-tplbox><span class="muted">Cargando plantillas…</span></div>
+          <div data-varsbox class="varsbox"></div>
+          <button class="btn solid" type="submit">Guardar (queda pausada)</button></form>
+        <div class="pgrid" id="autoList" style="margin-top:16px"><p class="muted">Cargando…</p></div></section>
       <section class="sec"><h2>Respuestas y bajas por WhatsApp</h2><div class="pcard"><div class="hist" id="msgList"><span class="muted">Cargando…</span></div></div></section>
       <section class="sec"><h2>Envíos a Meta</h2><div class="pcard"><div class="hist" id="syncList"><span class="muted">Cargando…</span></div></div></section>${MACHETE}`;
     $("#tplNueva").addEventListener("click", tplAbrir);
     $("#tplRefresh").addEventListener("click", async (e) => { e.target.disabled = true; await cargarPlantillas(); e.target.disabled = false; toast("Estado actualizado"); });
     $("#tplList").addEventListener("click", (e) => {
       const b = e.target.closest("[data-tpl-usar]"); if (!b) return;
-      const f = $("#campForm"); f.elements.plantilla.value = b.dataset.tplUsar; campVars();
+      const f = $("#campForm"); f.elements.plantilla.value = b.dataset.tplUsar; campVars(f);
       f.scrollIntoView({ behavior: "smooth", block: "start" }); f.elements.nombre.focus({ preventScroll: true });
     });
-    $("#campForm").addEventListener("change", (e) => { if (e.target.name === "plantilla") campVars(); });
-    $("#campForm").addEventListener("input", (e) => { if (e.target.dataset.cvar !== undefined) campPrev(); });
-    $("#campForm").addEventListener("submit", async (e) => {
-      e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)), t = P.tpls && tplDe(f.plantilla);
-      const variables = t ? [...document.querySelectorAll("[data-cvar]")].map((x) => x.value.trim()) : (f.variables || "").split("\n").map((x) => x.trim()).filter(Boolean);
-      if (t && variables.some((v) => !v)) { toast("Completá qué va en cada variable"); return; }
-      try { await API.createCampaign({ nombre: f.nombre.trim(), segmento: f.segmento, plantilla: f.plantilla.trim(), idioma: t ? t.idioma || "es_AR" : (f.idioma || "es_AR").trim(), variables });
-        toast("Borrador guardado"); e.target.reset(); campVars(); cargarCampanas(); } catch (err) { toast(err.message); }
-    });
-    cargarPlantillas().then(() => cargarCampanas());
+    enganchar($("#campForm"), async (v) => { await API.createCampaign({ nombre: v.d.nombre.trim(), segmento: v.d.segmento, plantilla: v.plantilla, idioma: v.idioma, variables: v.variables });
+      toast("Borrador guardado"); cargarCampanas(); });
+    enganchar($("#autoForm"), async (v) => { await API.createAutomation({ nombre: v.d.nombre.trim(), segmento: v.d.segmento, dias: Math.max(1, Math.min(365, +v.d.dias || 7)), plantilla: v.plantilla, idioma: v.idioma, variables: v.variables });
+      toast("Guardada. Revisala y tocá Prender"); cargarAutomaticas(); });
+    cargarPlantillas().then(() => { cargarCampanas(); cargarAutomaticas(); });
   }
   async function cargarCampanas() {
     try {
@@ -1590,6 +1629,18 @@
       if (!prueba && !confirm(`¿Mandar "${c.nombre}" a ${(P.segs && P.segs[c.segmento] || {}).whatsapp || 0} cliente(s) con permiso? No se puede deshacer.`)) return;
       b.disabled = true;
       try { const r = await API.sendCampaign(id, prueba); toast(prueba ? "Prueba enviada" : `Listo: ${r.enviados} enviados, ${r.fallidos} con error`); cargarCampanas(); } catch (err) { toast(err.message); b.disabled = false; }
+    }
+    if (b.dataset.aprobar !== undefined || b.dataset.aonoff !== undefined || b.dataset.aborrar !== undefined) {
+      const card = b.closest("[data-auto]"), id = card.dataset.auto, a = (P.autos || []).find((x) => x.id === id); if (!a) return;
+      if (b.dataset.aprobar !== undefined) {
+        const ph = card.querySelector("[data-prueba]").value.trim(); if (!ph) { toast("Poné el número para la prueba"); return; }
+        b.disabled = true; try { await API.testAutomation(id, ph); toast("Prueba enviada"); } catch (err) { toast(err.message); } b.disabled = false; return;
+      }
+      if (b.dataset.aborrar !== undefined && !confirm(`¿Borrar "${a.nombre}"? Deja de mandarse; lo que ya salió queda registrado.`)) return;
+      if (b.dataset.aonoff !== undefined && !a.activa && !confirm(`¿Prender "${a.nombre}"? Desde mañana a las 11 le llega sola a quien cumpla ${a.dias} ${a.dias === 1 ? "día" : "días"} desde su última compra.`)) return;
+      b.disabled = true;
+      try { if (b.dataset.aborrar !== undefined) await API.deleteAutomation(id); else await API.updateAutomation(id, { activa: !a.activa });
+        toast(b.dataset.aborrar !== undefined ? "Borrada" : a.activa ? "Pausada" : "Prendida"); cargarAutomaticas(); } catch (err) { toast(err.message); b.disabled = false; }
     }
     if (b.dataset.clientGo) { P.client = b.dataset.clientGo; go("club"); }
     if (b.dataset.alta) { if (!confirm("¿El cliente te dijo que acepta? Anotalo solo si te lo pidió: desde ahora entra en las campañas.")) return; try { const r = await API.consentimientoPanel(P.client, [b.dataset.alta]); toast(permisoTxt(r).replace(" · ", "") || "Listo"); openClient(P.client); } catch (err) { toast(err.message); } }
