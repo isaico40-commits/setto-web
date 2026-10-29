@@ -336,7 +336,7 @@ a.ptab{text-decoration:none}
 .wabtn{background:#fff;border-radius:10px;padding:8px;text-align:center;color:#027eb5;font-size:.86rem;font-weight:500;box-shadow:0 1px .5px #0002}
 .tplcard .wapre{max-width:360px}
 .pcard label.chk input{width:auto;margin:0;accent-color:var(--turquesa)}
-#campVarsBox{display:grid;gap:10px}#campVarsBox .tplprev{position:static;max-width:380px}
+.varsbox{display:grid;gap:10px}.varsbox .tplprev{position:static;max-width:380px}
 @media (max-width:520px){.tpled .row2{grid-template-columns:1fr}}
 /* filtros de pedidos: botón que abre grupos de chips compactos; en celu cada grupo scrollea de costado */
 .subtabs{display:flex;gap:8px;flex-wrap:wrap}

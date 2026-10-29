@@ -458,6 +458,13 @@
     async listTemplates() { const db = dbLoad(); return db.templates || (db.templates = [{ nombre: "aviso_drop", idioma: "es_AR", estado: "APPROVED", categoria: "MARKETING", motivo: null, encabezado: "", pie: "",
       cuerpo: "Hola {{1}}, ya salió {{2}} de Setto, como te avisamos. Pedila en la web mientras dure el stock.", ejemplos: ["Isa", "la edición Halloween"],
       botones: [{ tipo: "QUICK_REPLY", texto: "No quiero más avisos" }, { tipo: "URL", texto: "Ver la edición" }] }]); },
+    // campañas automáticas (migración 051): en modo demo se arman y se prenden, pero no sale nada
+    async listAutomations() { return dbLoad().automations || []; },
+    async createAutomation(a) { const db = dbLoad(); db.automations = db.automations || []; const n = { id: "a" + Date.now(), activa: false, created_at: new Date().toISOString(), ...a }; db.automations.unshift(n); dbSave(db); return n; },
+    async updateAutomation(id, c) { const db = dbLoad(); const a = (db.automations || []).find((x) => x.id === id); if (a) Object.assign(a, c, c.activa && !a.activa ? { activa_desde: new Date().toISOString() } : {}); dbSave(db); return a; },
+    async deleteAutomation(id) { const db = dbLoad(); db.automations = (db.automations || []).filter((x) => x.id !== id); dbSave(db); },
+    async automationsResumen() { return {}; },
+    async testAutomation() { throw new Error("En modo demo no se mandan mensajes de WhatsApp"); },
     async createTemplate(p) { const db = dbLoad(); const l = await this.listTemplates(); if (l.some((t) => t.nombre === p.nombre)) throw new Error("Ya hay una plantilla con ese nombre. Usá otro (por ejemplo, sumale _v2)");
       db.templates = [{ nombre: p.nombre, idioma: p.idioma || "es_AR", estado: "PENDING", categoria: "MARKETING", motivo: null, ...window.SettoPlantillas.desdeEditor(p) }, ...l]; dbSave(db); return { ok: true, estado: "PENDING" }; },
     async syncAudiencias() { throw new Error("En modo demo no hay conexión con Meta"); },
@@ -715,6 +722,12 @@
     async sendCampaign(id, prueba) { return fn("whatsapp-campana", { campaign_id: id, prueba: prueba || null }); },
     async listTemplates() { return (await fn("whatsapp-plantillas", { accion: "listar" })).plantillas || []; },
     async createTemplate(p) { return fn("whatsapp-plantillas", { accion: "crear", plantilla: p }); },
+    async listAutomations() { const { data, error } = await sb.from("marketing_automations").select("*").order("created_at", { ascending: false }); fail(error); return data || []; },
+    async createAutomation(a) { const { data, error } = await sb.from("marketing_automations").insert({ ...a, activa: false }).select().single(); fail(error); return data; },
+    async updateAutomation(id, c) { const { data, error } = await sb.from("marketing_automations").update(c).eq("id", id).select().single(); fail(error); return data; },
+    async deleteAutomation(id) { const { error } = await sb.from("marketing_automations").delete().eq("id", id); fail(error); },
+    async automationsResumen() { const { data, error } = await sb.rpc("automaticas_resumen"); fail(error); return data || {}; },
+    async testAutomation(id, prueba) { return fn("whatsapp-automaticas", { automation_id: id, prueba }); },
     async syncAudiencias() { return fn("meta-audiencias", {}); },
     async crmActividad() {
       const [m, s] = await Promise.all([sb.from("message_logs").select("*").eq("direccion", "entrante").order("created_at", { ascending: false }).limit(15),
