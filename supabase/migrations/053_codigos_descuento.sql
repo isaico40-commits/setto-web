@@ -1,4 +1,4 @@
--- 052 · Códigos de descuento: se arman en Panel → Campañas, se usan en el carrito y se pueden mandar en campañas de WhatsApp.
+-- 053 · Códigos de descuento: se arman en Panel → Campañas, se usan en el carrito y se pueden mandar en campañas de WhatsApp.
 --   - promos: el incentivo (qué da, desde cuánto, hasta cuándo, cuántas veces y si se suma a otros premios).
 --       tipo 'porcentaje' → valor% off en los productos (con tope opcional)
 --       tipo 'monto'      → $valor de descuento
