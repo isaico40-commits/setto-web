@@ -719,7 +719,8 @@
     async listCampaigns() { const { data, error } = await sb.from("marketing_campaigns").select("*").order("created_at", { ascending: false }).limit(20); fail(error); return data || []; },
     async createCampaign(c) { const { data, error } = await sb.from("marketing_campaigns").insert({ ...c, estado: "borrador" }).select().single(); fail(error); return data; },
     // Edge Functions: las credenciales de Meta y WhatsApp viven solo ahí (secretos de Supabase)
-    async sendCampaign(id, prueba) { return fn("whatsapp-campana", { campaign_id: id, prueba: prueba || null }); },
+    // la prueba viaja con el número normalizado (549223…), igual que en la base: así encuentra el nombre del cliente
+    async sendCampaign(id, prueba) { return fn("whatsapp-campana", { campaign_id: id, prueba: prueba ? normPhone(prueba) || prueba : null }); },
     async listTemplates() { return (await fn("whatsapp-plantillas", { accion: "listar" })).plantillas || []; },
     async createTemplate(p) { return fn("whatsapp-plantillas", { accion: "crear", plantilla: p }); },
     async listAutomations() { const { data, error } = await sb.from("marketing_automations").select("*").order("created_at", { ascending: false }); fail(error); return data || []; },
@@ -727,7 +728,7 @@
     async updateAutomation(id, c) { const { data, error } = await sb.from("marketing_automations").update(c).eq("id", id).select().single(); fail(error); return data; },
     async deleteAutomation(id) { const { error } = await sb.from("marketing_automations").delete().eq("id", id); fail(error); },
     async automationsResumen() { const { data, error } = await sb.rpc("automaticas_resumen"); fail(error); return data || {}; },
-    async testAutomation(id, prueba) { return fn("whatsapp-automaticas", { automation_id: id, prueba }); },
+    async testAutomation(id, prueba) { return fn("whatsapp-automaticas", { automation_id: id, prueba: normPhone(prueba) || prueba }); },
     async syncAudiencias() { return fn("meta-audiencias", {}); },
     async crmActividad() {
       const [m, s] = await Promise.all([sb.from("message_logs").select("*").eq("direccion", "entrante").order("created_at", { ascending: false }).limit(15),
