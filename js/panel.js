@@ -910,6 +910,24 @@
     });
   }
 
+  /* ---- Gasto de WhatsApp: lo que cobra Meta, leído de su reporte (pricing analytics) ---- */
+  const CAT_WA = { MARKETING: "Marketing (campañas y automáticas)", UTILITY: "Utilidad (avisos del pedido)", SERVICE: "Servicio (respuestas a clientes)", AUTHENTICATION: "Autenticación", MARKETING_LITE: "Marketing liviano" };
+  async function cargarGasto() {
+    const box = $("#gastoBox"); if (!box) return;
+    const atras = P.gastoAtras || 0;
+    try {
+      const g = await API.waGasto(atras);
+      const plata = (n) => `${g.moneda === "USD" ? "US$" : g.moneda + " "}${Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const cats = Object.entries(g.categorias || {}).sort((a, b) => b[1].costo - a[1].costo || b[1].volumen - a[1].volumen);
+      const max = Math.max(0.01, ...(g.dias || []).map((d) => d.costo));
+      box.innerHTML = `<div class="sub" style="margin:0">${[[0, "Este mes"], [1, "Mes pasado"]].map(([k, l]) => `<button class="ptab" data-gmes="${k}" aria-selected="${atras === k}">${l}</button>`).join("")}</div>
+        <div class="gasto"><b class="num">${plata(g.total)}</b><span class="hintp">${g.volumen} ${g.volumen === 1 ? "mensaje" : "mensajes"} · ${g.gratis} gratis${g.demo ? " · datos de ejemplo (modo demo)" : ""}</span></div>
+        ${cats.length ? `<div class="hist">${cats.map(([k, x]) => `<div><span>${esc(CAT_WA[k] || k)} <span class="muted">${x.volumen} ${x.volumen === 1 ? "mensaje" : "mensajes"}</span></span><span class="num">${x.costo ? plata(x.costo) : "gratis"}</span></div>`).join("")}</div>` : '<p class="muted">Sin mensajes en este período.</p>'}
+        ${(g.dias || []).some((d) => d.costo) ? `<div class="gbar" aria-label="Gasto por día">${g.dias.map((d) => `<i style="height:${Math.max(4, Math.round((d.costo / max) * 100))}%" title="${d.fecha.slice(8)}/${d.fecha.slice(5, 7)}: ${plata(d.costo)} · ${d.volumen} mensajes"></i>`).join("")}</div>` : ""}
+        <span class="hintp">Lo que cobra Meta, según su propio reporte (puede tardar unas horas en actualizarse). Marketing se paga siempre; las respuestas a quien te escribió en las últimas 24 h son gratis. Ya no hay un cupo de mensajes gratis por mes: lo gratis depende del tipo de mensaje.</span>`;
+    } catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+  }
+
   /* ---- Campañas automáticas: salen solas X días después de la última compra ---- */
   async function cargarAutomaticas() {
     const box = $("#autoList"); if (!box) return;
@@ -928,6 +946,7 @@
   async function viewCampanas() {
     $("#view").innerHTML = `<h1 class="ph1">Campañas</h1>
       <p class="muted">Solo le llega a quien aceptó en la web o escribió ALTA. Quien toca "No quiero más novedades" (o escribe BAJA) sale solo de todo. Las plantillas se arman acá abajo y Meta las aprueba.</p>
+      <section class="sec"><h2>Gasto de WhatsApp</h2><div class="pcard" id="gastoBox"><span class="muted">Cargando…</span></div></section>
       <section class="sec"><h2>Segmentos</h2><div class="pcard"><div class="hist" id="segList"><span class="muted">Cargando…</span></div>
         <div class="acts"><button class="btn" id="syncAud">Actualizar públicos de Meta</button></div><span class="hintp">Crea o actualiza un público "Setto · segmento" por cada uno, solo con quienes aceptaron anuncios.</span></div></section>
       <section class="sec"><h2>Plantillas de WhatsApp</h2>
@@ -966,6 +985,8 @@
       toast("Borrador guardado"); cargarCampanas(); });
     enganchar($("#autoForm"), async (v) => { await API.createAutomation({ nombre: v.d.nombre.trim(), segmento: v.d.segmento, dias: Math.max(1, Math.min(365, +v.d.dias || 7)), plantilla: v.plantilla, idioma: v.idioma, variables: v.variables });
       toast("Guardada. Revisala y tocá Prender"); cargarAutomaticas(); });
+    $("#gastoBox").addEventListener("click", (e) => { const b = e.target.closest("[data-gmes]"); if (b) { P.gastoAtras = +b.dataset.gmes; cargarGasto(); } });
+    cargarGasto();
     cargarPlantillas().then(() => { cargarCampanas(); cargarAutomaticas(); });
   }
   async function cargarCampanas() {

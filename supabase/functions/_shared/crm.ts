@@ -219,3 +219,32 @@ export function plantillaParaPanel(t: any) {
     pie: c("FOOTER").text || "", botones: (c("BUTTONS").buttons || []).map((b: any) => ({ tipo: b.type, texto: b.text, url: b.url || null })),
   };
 }
+
+/* ---------------- Gasto de WhatsApp (reporte pricing_analytics de Meta) ---------------- */
+// Meta cobra por mensaje entregado según categoría: marketing siempre se paga; utilidad dentro de las 24 h y servicio son gratis.
+// Rango del mes en curso (o anteriores, con atras = 1, 2…) en hora de Argentina (UTC-3), en segundos Unix.
+export function rangoMes(ahora: Date, atras = 0) {
+  const ar = new Date(ahora.getTime() - 3 * 3600e3);
+  const ini = Date.UTC(ar.getUTCFullYear(), ar.getUTCMonth() - atras, 1) + 3 * 3600e3;
+  const fin = atras ? Date.UTC(ar.getUTCFullYear(), ar.getUTCMonth() - atras + 1, 1) + 3 * 3600e3 : ahora.getTime();
+  return { start: Math.floor(ini / 1000), end: Math.floor(fin / 1000) };
+}
+export function resumenGasto(pa: any) {
+  const cats: Record<string, { volumen: number; costo: number }> = {};
+  const dias: Record<string, { volumen: number; costo: number }> = {};
+  let total = 0, volumen = 0, gratis = 0;
+  for (const bloque of pa?.data ?? []) for (const p of bloque?.data_points ?? []) {
+    const v = Number(p.volume) || 0, c = Number(p.cost) || 0, cat = String(p.pricing_category || "OTRA");
+    total += c; volumen += v;
+    if (String(p.pricing_type || "").startsWith("FREE")) gratis += v;
+    (cats[cat] ??= { volumen: 0, costo: 0 }).volumen += v; cats[cat].costo += c;
+    const dia = new Date((Number(p.start) - 3 * 3600) * 1000).toISOString().slice(0, 10); // día en hora de Argentina
+    (dias[dia] ??= { volumen: 0, costo: 0 }).volumen += v; dias[dia].costo += c;
+  }
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  return {
+    total: r2(total), volumen, gratis,
+    categorias: Object.fromEntries(Object.entries(cats).map(([k, x]) => [k, { volumen: x.volumen, costo: r2(x.costo) }])),
+    dias: Object.entries(dias).sort(([a], [b]) => a.localeCompare(b)).map(([fecha, x]) => ({ fecha, volumen: x.volumen, costo: r2(x.costo) })),
+  };
+}
