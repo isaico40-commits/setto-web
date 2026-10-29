@@ -21,7 +21,7 @@
     return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" }) + " · " + hh;
   };
 
-  const P = { falta: {}, user: null, view: "pedidos", sub: "pendiente", q: "", settings: {}, products: [], orders: [], pendCount: 0, drafts: {}, confirm: {}, client: null, cancelArm: null };
+  const P = { falta: {}, user: null, view: "pedidos", sub: "pendiente", q: "", fil: {}, settings: {}, products: [], orders: [], pendCount: 0, drafts: {}, confirm: {}, client: null, cancelArm: null };
 
   /* =================== LOGIN =================== */
   function drawLogin(msg) {
@@ -70,7 +70,7 @@
     if (!VISTAS.includes(v)) return false;
     P.view = v;
     if (v === "ajustes") P.ajSec = AJ_SEC.some((x) => x.k === a) ? a : null;
-    if (v === "pedidos" && ["pendiente", "entregado", "cancelado"].includes(a)) { P.sub = a; P.q = b || ""; }
+    if (v === "pedidos" && ["pendiente", "reserva", "entregado", "cancelado"].includes(a)) { P.sub = a; P.q = b || ""; }
     return true;
   }
   function drawShell() {
@@ -242,21 +242,22 @@
     try {
       const pend = await API.listOrders("pendiente");
       const prev = P.pendCount; P.pendCount = pend.length;
-      const n = $("#pendN"); if (n) { n.textContent = pend.length; n.hidden = !pend.length; }
-      document.title = (pend.length ? `(${pend.length}) ` : "") + "Panel Setto";
+      // el contador cuenta lo de hoy: las reservas para otros días esperan en su pestaña
+      const hoyN = pend.filter((o) => !enReservas(o)).length, n = $("#pendN"); if (n) { n.textContent = hoyN; n.hidden = !hoyN; }
+      document.title = (hoyN ? `(${hoyN}) ` : "") + "Panel Setto";
       if (notify && pend.length > prev) toast("Entró un pedido nuevo");
-      if (P.view === "pedidos") { P.orders = P.sub === "pendiente" ? pend : await API.listOrders(P.sub); drawOrders(); cargarOcupados(); }
+      if (P.view === "pedidos") { P.pend = pend; P.orders = P.sub === "pendiente" || P.sub === "reserva" ? pend : await API.listOrders(P.sub); drawOrders(); cargarOcupados(); }
       if (P.view === "dashboard" && notify) cargarDash();
     } catch (e) { console.error(e); }
   }
   function viewPedidos() {
     $("#view").innerHTML = `<h1 class="ph1">Pedidos</h1>
-      <p class="muted">Cuando llega el WhatsApp, buscá el código, revisá que el número del chat sea el mismo y tocá <b>Entregado</b> cuando lo retiran o lo reciben.</p>
-      <div class="sub">
-        ${[["pendiente", "Pendientes"], ["entregado", "Entregados (7 días)"], ["cancelado", "Cancelados"]].map(([k, l]) => `<button class="ptab" data-sub="${k}" aria-selected="${P.sub === k}">${l}</button>`).join("")}
-        <input id="oq" placeholder="Buscar código, nombre o celular" value="${esc(P.q)}">
+      <div class="sub"><div class="subtabs">
+        ${[["pendiente", "Pendientes"], ["reserva", "Reservas"], ["entregado", "Entregados (7 días)"], ["cancelado", "Cancelados"]].map(([k, l]) => `<button class="ptab" data-sub="${k}" aria-selected="${P.sub === k}">${l}${k === "pendiente" || k === "reserva" ? ` <span class="n" id="subN-${k}" hidden>0</span>` : ""}</button>`).join("")}</div>
+        <input id="oq" type="search" placeholder="Buscar código, nombre, celular o producto" value="${esc(P.q)}">
       </div>
-      <section class="horcard" id="horCard"></section>
+      <div class="ofil" id="ofil"></div>
+      ${P.sub === "pendiente" ? `<section class="horcard" id="horCard"></section>` : ""}
       <div class="justdel" id="justDel" hidden></div>
       <div class="pgrid" id="olist"><p class="muted">Cargando…</p></div>`;
     drawHorarios();
@@ -519,12 +520,76 @@
   }
   // reserva = el cliente eligió un día con nombre ("sábado 31 · 14:45 hs"), no Hoy ni Mañana
   const esReserva = (o) => /^[^\s·]+ \d{1,2} · \d{1,2}:\d{2} hs$/.test(o.retiro || "");
+  // fecha de retiro o entrega a partir del texto ("Hoy · 15:00 hs", "Mañana · …", "sábado 31 · …") y del día en que se hizo el pedido.
+  // Mismo cálculo que turnos_ocupados. Devuelve { k: "2026-10-31", h: "15:00" } o null si no se puede leer.
+  function fechaRetiro(o) {
+    const m = (o.retiro || "").match(/^(.+?) · (\d{1,2}:\d{2}) hs$/); if (!m) return null;
+    const base = new Date(o.created_at); let f = null;
+    if (m[1] === "Hoy") f = base; else if (m[1] === "Mañana") { f = new Date(base); f.setDate(f.getDate() + 1); }
+    else { const n = +(m[1].match(/(\d+)$/) || [])[1]; for (let i = 0; i < 8 && n; i++) { const g = new Date(base); g.setDate(g.getDate() + i); if (g.getDate() === n) { f = g; break; } } }
+    return f ? { k: fechaKey(f), h: m[2].padStart(5, "0") } : null;
+  }
+  // va a Reservas mientras falte para su día; el día del retiro o envío pasa sola a Pendientes
+  const enReservas = (o) => { if (!esReserva(o)) return false; const f = fechaRetiro(o); return !!f && f.k > hoyKey(); };
+  const diaChip = (k) => { const h = hoyKey(); if (k === h) return "Hoy"; if (k === fechaKey(diaMas(1))) return "Mañana"; if (k === fechaKey(diaMas(-1))) return "Ayer";
+    return new Date(k + "T12:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric" }).replace(".", ""); };
+  // día que importa en cada pestaña: el del retiro en pendientes y reservas, el del cierre en entregados y cancelados
+  const diaDe = (o) => { if (o.status === "pendiente") { const f = fechaRetiro(o); return f ? (f.k < hoyKey() ? "atras" : f.k) : "sin"; } return fechaKey(new Date(o.closed_at || o.created_at)); };
+  const pagoDe = (o) => /transfer/i.test(o.pago || "") ? "transfer" : /efectivo/i.test(o.pago || "") ? "efectivo" : /tarjeta|cr[eé]dito|d[eé]bito/i.test(o.pago || "") ? "tarjeta" : "otro";
+  // filtros: cada grupo elige una opción; "" = todos. Se arman con lo que hay en la pestaña y muestran cuántos hay de cada uno.
+  const FIL = [
+    { k: "etapa", t: "Estado", subs: ["pendiente", "reserva"], de: (o) => o.etapa || "recibido", ops: [["recibido", "Recibido"], ["preparando", "En preparación"], ["listo", "Listo / en camino"]] },
+    { k: "aviso", t: "Aviso", subs: ["pendiente", "reserva"], de: (o) => faltaAvisar(o) ? "falta" : "ok", ops: [["falta", "💬 Falta avisar"], ["ok", "Ya avisado"]] },
+    { k: "pagado", t: "Cobro", subs: ["pendiente", "reserva"], de: (o) => !conPago(o) ? "" : o.pagado_at ? "si" : "no", ops: [["no", "💸 Sin pagar"], ["si", "✓ Pagado"]] },
+    { k: "pago", t: "Pago", de: pagoDe, ops: [["transfer", "Transferencia"], ["efectivo", "Efectivo"], ["tarjeta", "Tarjeta"], ["otro", "Otro"]] },
+    { k: "modo", t: "Entrega", de: (o) => o.modo === "envio" ? "envio" : "retiro", ops: [["retiro", "Retiro"], ["envio", "Envío"]] },
+    { k: "dia", t: "Día", de: diaDe, ops: null },
+  ];
+  const filtrosSub = () => FIL.filter((g) => !g.subs || g.subs.includes(P.sub));
+  const pasa = (o, salvo) => filtrosSub().every((g) => g.k === salvo || !P.fil[g.k] || g.de(o) === P.fil[g.k]);
+  const buscar = (o, q) => { if (!q) return true; const t = (o.code + o.nombre + o.phone + (o.items || []).map((i) => i.nombre).join("")).toLowerCase().replace(/\s/g, ""); return t.includes(q.replace(/^stt-?/, "")) || o.code.toLowerCase().includes(q); };
+  function drawFiltros(base) {
+    const el = $("#ofil"); if (!el) return;
+    const grupos = filtrosSub().map((g) => {
+      let ops = g.ops;
+      if (!ops) { // días: los que aparecen en la pestaña, en orden
+        const pos = (k) => (k === "atras" ? "0" : k === "sin" ? "z" : k), desc = P.sub === "entregado" || P.sub === "cancelado"; // lo cerrado: lo último primero
+        const ks = [...new Set(base.map(g.de))].sort((a, b) => pos(a).localeCompare(pos(b)) * (desc ? -1 : 1));
+        ops = ks.map((k) => [k, k === "atras" ? "Atrasados" : k === "sin" ? "Sin horario" : diaChip(k)]);
+      }
+      const cnt = (v) => base.filter((o) => pasa(o, g.k) && g.de(o) === v).length;
+      ops = ops.map(([v, l]) => [v, l, cnt(v)]).filter(([v, , n]) => n || P.fil[g.k] === v);
+      if (ops.length < 2 && !P.fil[g.k]) return ""; // si todos son iguales no hace falta filtrar
+      return `<div class="ofg"><small>${g.t}</small><div class="ochips">${ops.map(([v, l, n]) => `<button data-fil="${g.k}" data-fv="${esc(v)}" aria-pressed="${P.fil[g.k] === v}">${esc(l)} <i>${n}</i></button>`).join("")}</div></div>`;
+    }).join("");
+    const activos = filtrosSub().filter((g) => P.fil[g.k]).length;
+    if (P.filOpen == null) P.filOpen = matchMedia("(min-width:701px)").matches; // en celu arrancan cerrados para no tapar los pedidos
+    el.innerHTML = `<button class="ofbtn" data-filt aria-expanded="${P.filOpen}">Filtros${activos ? ` <i>${activos}</i>` : ""}<span>${P.filOpen ? "▴" : "▾"}</span></button>
+      ${activos ? `<button class="linkbtn ofx" data-filx>Limpiar filtros</button>` : ""}
+      <div class="ofgs" ${P.filOpen ? "" : "hidden"}>${grupos}</div>`;
+    el.hidden = !grupos && !activos;
+  }
   function drawOrders() {
     drawJust();
     const box = $("#olist"); if (!box) return;
     const q = P.q.trim().toLowerCase().replace(/\s/g, "");
-    const list = P.orders.filter((o) => !q || (o.code + o.nombre + o.phone).toLowerCase().replace(/\s/g, "").includes(q.replace(/^stt-?/, "")) || o.code.toLowerCase().includes(q));
-    if (!list.length) { box.innerHTML = `<div class="empty-p" style="grid-column:1/-1"><img src="img/mochito-lie.png" alt=""><b>${P.sub === "pendiente" ? "No hay pedidos pendientes" : "Nada por acá"}</b><span>${P.sub === "pendiente" ? "Cuando alguien pida desde la web, aparece acá al instante." : ""}</span></div>`; return; }
+    if (P.pend) {
+      const res = P.pend.filter(enReservas), hoy = P.pend.filter((o) => !enReservas(o));
+      [["pendiente", hoy], ["reserva", res]].forEach(([k, l]) => { const n = $("#subN-" + k); if (n) { n.textContent = l.length; n.hidden = !l.length; } });
+    }
+    // pendientes: primero el que hay que entregar antes; reservas: por día; entregados y cancelados: lo último arriba
+    const ordenRet = (o) => { const f = fechaRetiro(o); return (f ? f.k + " " + f.h : "0000") + o.created_at; };
+    const base = P.sub === "pendiente" ? P.orders.filter((o) => !enReservas(o)).sort((a, b) => ordenRet(a).localeCompare(ordenRet(b)))
+      : P.sub === "reserva" ? P.orders.filter(enReservas).sort((a, b) => ordenRet(a).localeCompare(ordenRet(b))) : P.orders;
+    drawFiltros(base);
+    const list = base.filter((o) => pasa(o) && buscar(o, q));
+    if (!list.length) {
+      // si buscó un código que está en la otra pestaña de pendientes, se lo decimos
+      const otra = q && (P.sub === "pendiente" || P.sub === "reserva") ? P.orders.filter((o) => enReservas(o) === (P.sub === "pendiente") && buscar(o, q)).length : 0;
+      const filtrado = base.length && !otra;
+      box.innerHTML = `<div class="empty-p" style="grid-column:1/-1"><img src="img/mochito-lie.png" alt=""><b>${otra ? `Está en ${P.sub === "pendiente" ? "Reservas" : "Pendientes"}` : filtrado ? "Ningún pedido con esos filtros" : P.sub === "pendiente" ? "No hay pedidos pendientes" : P.sub === "reserva" ? "No hay reservas para otros días" : "Nada por acá"}</b><span>${otra ? `<button class="btn" data-sub="${P.sub === "pendiente" ? "reserva" : "pendiente"}">Ver ${otra === 1 ? "el pedido" : "los pedidos"}</button>` : filtrado ? `<button class="linkbtn" data-filx>Limpiar filtros</button>` : P.sub === "pendiente" ? "Cuando alguien pida desde la web, aparece acá al instante." : P.sub === "reserva" ? "Los pedidos reservados para otro día esperan acá y el día del retiro pasan solos a Pendientes." : ""}</span></div>`;
+      return;
+    }
     const club = P.settings.club || {};
     box.innerHTML = list.map((o) => {
       const prodTotal = (o.items || []).filter((i) => i.id !== "envio").reduce((a, i) => a + (i.subtotal || 0), 0);
@@ -1287,7 +1352,10 @@
     const b = e.target.closest("button, a"); if (!b) return;
     if (b.id === "logout") { await API.signOut(); location.reload(); return; }
     if (b.dataset.view) go(b.dataset.view);
-    if (b.dataset.sub) { P.sub = b.dataset.sub; viewPedidos(); }
+    if (b.dataset.sub) { P.sub = b.dataset.sub; P.fil = {}; viewPedidos(); }
+    if (b.dataset.fil) { P.fil[b.dataset.fil] = P.fil[b.dataset.fil] === b.dataset.fv ? "" : b.dataset.fv; drawOrders(); return; }
+    if (b.hasAttribute("data-filt")) { P.filOpen = !P.filOpen; drawOrders(); return; }
+    if (b.hasAttribute("data-filx")) { P.fil = {}; drawOrders(); return; }
     if (b.id === "resetDemo") { API.resetDemo(); location.reload(); }
     if (b.dataset.client) openClient(b.dataset.client);
 
