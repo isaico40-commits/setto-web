@@ -485,6 +485,8 @@
     async equipoPushSuscribir() { throw new Error("En modo demo no hay notificaciones"); },
     async equipoPushDesuscribir() {},
     async equipoPushActivo() { return false; },
+    async equipoPushQuien() { return null; },
+    async equipoSocios() { return []; },
     async createReviewTrack(track, rating, texto, foto, instagram) { const o = dbLoad().orders.find((x) => x.track === track); if (!o) throw new Error("No encontramos ese pedido"); return this.createReview(o.code, o.phone, rating, texto, foto, instagram); },
     async uploadReviewPhoto(blob) { return await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); }); },
     async productRatings() {
@@ -731,9 +733,11 @@
     async dropAvisos() { const { data, error } = await sb.rpc("drop_avisos_info"); fail(error); return data; },
     async dropAvisar() { const { data, error } = await sb.rpc("drop_avisar"); fail(error); return data; },
     /* avisos al equipo en el panel: pedido nuevo, gift card, cambio resuelto, reseña (migración 027) */
-    async equipoPushSuscribir(sub) { const k = sub.toJSON().keys || {}; const { error } = await sb.rpc("staff_push_suscribir", { p_endpoint: sub.endpoint, p_p256dh: k.p256dh, p_auth: k.auth }); fail(error); },
+    async equipoPushSuscribir(sub, quien) { const k = sub.toJSON().keys || {}; const { error } = await sb.rpc("staff_push_suscribir", { p_endpoint: sub.endpoint, p_p256dh: k.p256dh, p_auth: k.auth, p_quien: quien || null }); fail(error); },
     async equipoPushDesuscribir(endpoint) { const { error } = await sb.rpc("staff_push_desuscribir", { p_endpoint: endpoint }); fail(error); },
     async equipoPushActivo(endpoint) { const { data, error } = await sb.rpc("staff_push_activo", { p_endpoint: endpoint }); fail(error); return !!data; },
+    async equipoPushQuien(endpoint) { const { data, error } = await sb.rpc("staff_push_quien", { p_endpoint: endpoint }); fail(error); return data; }, // null = apagado, "" = sin nombre
+    async equipoSocios() { const { data, error } = await sb.from("caja_socios").select("nombre").eq("activo", true).order("nombre"); fail(error); return (data || []).map((x) => x.nombre); },
     async createReviewTrack(track, rating, texto, foto, instagram) { const { error } = await sb.rpc("create_review_track", { p_track: track, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); },
     async createReview(code, phone, rating, texto, foto, instagram) { const { error } = await sb.rpc("create_review_v2", { p_code: code, p_phone: phone, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); },
     async uploadReviewPhoto(blob) {
