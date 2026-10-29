@@ -25,6 +25,7 @@ main.pmain{padding-block:24px 80px}
 .pcard.dirty{border-color:var(--coral);box-shadow:0 0 0 3px color-mix(in srgb,var(--coral) 40%,transparent)}
 .pcard.oculto{opacity:.65}
 .pcard label{display:grid;gap:4px;font-size:.78rem;font-weight:600;color:var(--ink-2)}
+.pcard label[hidden]{display:none}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 @media (max-width:420px){.row3{grid-template-columns:1fr 1fr}}

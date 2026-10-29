@@ -89,9 +89,13 @@ export function intencion(texto: string): "baja" | "alta" | null {
 }
 
 const primerNombre = (n: string | null) => String(n || "").trim().split(/\s+/)[0] || "";
+// variables de una campaña: "{nombre}" = nombre del cliente; "extra" suma otras (ej. {codigo}, {premio}, {vence} del premio de la maquinita)
+export function valoresCampana(variables: string[], nombre: string | null, extra: Record<string, string> = {}) {
+  return (variables || []).map((v) => String(v).replace(/\{(\w+)\}/g, (m, k) => k === "nombre" ? primerNombre(nombre) || "¡hola!" : k in extra ? extra[k] : m).slice(0, 1000));
+}
 // cuerpo de una plantilla aprobada: variables en orden, "{nombre}" se reemplaza por el nombre del cliente
-export function mensajePlantilla(to: string, plantilla: string, idioma: string, variables: string[], nombre: string | null) {
-  const params = (variables || []).map((v) => ({ type: "text", text: String(v).replace(/\{nombre\}/g, primerNombre(nombre) || "¡hola!").slice(0, 1000) }));
+export function mensajePlantilla(to: string, plantilla: string, idioma: string, variables: string[], nombre: string | null, extra: Record<string, string> = {}) {
+  const params = valoresCampana(variables, nombre, extra).map((text) => ({ type: "text", text }));
   return {
     messaging_product: "whatsapp", to: soloDigitos(to), type: "template",
     template: { name: plantilla, language: { code: idioma || "es_AR" }, ...(params.length ? { components: [{ type: "body", parameters: params }] } : {}) },
@@ -105,6 +109,19 @@ export function nombreDrop(E: { wa_nombre?: string; titulo?: string }) {
   const t = String(E?.titulo || "").replace(/[¡!]+/g, "").trim();
   if (!t) return "la edición especial";
   return (/^(la |el |los |las )/i.test(t) ? t : /^edici[oó]n /i.test(t) ? t.replace(/^edici[oó]n /i, "la edición ") : "la edición " + t).slice(0, 60);
+}
+
+/* ---------------- Premio de la maquinita por vencer ---------------- */
+// "el jueves 30/10 a las 18:40" en hora de Argentina (UTC-3, sin horario de verano)
+const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+export function venceTexto(iso: string) {
+  const d = new Date(new Date(iso).getTime() - 3 * 3600e3), dos = (n: number) => String(n).padStart(2, "0");
+  return `el ${DIAS[d.getUTCDay()]} ${d.getUTCDate()}/${d.getUTCMonth() + 1} a las ${dos(d.getUTCHours())}:${dos(d.getUTCMinutes())}`;
+}
+// mismo mensaje que la plantilla pero como texto libre: sale gratis si la persona nos escribió en las últimas 24 h
+export function textoLibre(cuerpo: string, valores: string[]) {
+  const t = String(cuerpo || "").replace(/\{\{(\d+)\}\}/g, (m, n) => valores[+n - 1] ?? m).trim();
+  return t ? `${t}\n\nSi no querés más novedades, respondé BAJA.` : "";
 }
 
 /* ---------------- Avisos del pedido por WhatsApp ---------------- */

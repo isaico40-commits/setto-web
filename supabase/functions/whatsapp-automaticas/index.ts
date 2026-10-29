@@ -1,20 +1,53 @@
 // Edge Function · whatsapp-automaticas
-//   La llama pg_cron todos los días (automaticas_tick, migración 051, con x-setto-hook): manda cada automática prendida
-//   a quienes les toca hoy según automatica_destinatarios() (permiso, días desde la última compra, una vez por compra, 7 días entre mensajes).
+//   La llama pg_cron (automaticas_tick, migraciones 051 y 052, con x-setto-hook) con { disparador }:
+//   · "compra" (todos los días a las 11 h): a quienes les toca según automatica_destinatarios() (días desde la última compra, una vez por compra).
+//   · "premio" (cada hora de 10 a 20 h): ganadores de la maquinita con el premio sin usar que vence pronto, según
+//     automatica_premio_destinatarios() (un aviso por premio). Variables extra: {premio}, {codigo}, {vence}.
+//     Si la persona nos escribió en las últimas 23,5 h va como texto libre (gratis); si no, con la plantilla aprobada (se paga).
+//   En los dos: permiso vigente y nadie recibe dos mensajes de campaña o automática en 7 días.
 //   Desde el panel (sesión del equipo): { automation_id, prueba: "223…" } manda solo a ese número, si también aceptó.
-// Secretos: META_ACCESS_TOKEN, WA_PHONE_NUMBER_ID.
-import { env, sb, esEquipo, hookValido, json, CORS, VERSION } from "../_shared/supa.ts";
-import { mensajePlantilla, soloDigitos } from "../_shared/crm.ts";
+// Secretos: META_ACCESS_TOKEN, WA_PHONE_NUMBER_ID. WA_WABA_ID es opcional (por defecto la cuenta de Setto).
+import { env, sb, esEquipo, hookValido, graph, json, CORS, VERSION } from "../_shared/supa.ts";
+import { mensajePlantilla, valoresCampana, soloDigitos, textoLibre, venceTexto } from "../_shared/crm.ts";
 
 const TOPE = 300; // por automática y por día: lo que entra cómodo en una ejecución
 
-async function mandar(to: string, nombre: string | null, a: any) {
+const WABA = () => env("WA_WABA_ID").replace(/\D/g, "") || "1427186512680891";
+
+async function enviar(body: unknown) {
   const r = await fetch(`https://graph.facebook.com/${VERSION}/${env("WA_PHONE_NUMBER_ID")}/messages`, {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${env("META_ACCESS_TOKEN")}` },
-    body: JSON.stringify(mensajePlantilla(to, a.plantilla, a.idioma, a.variables, nombre)) });
+    body: JSON.stringify(body) });
   const d = await r.json().catch(() => ({}));
   if (!r.ok || d.error) return { error: `${d.error?.code ?? r.status} ${d.error?.error_data?.details || d.error?.message || ""}`.trim() };
   return { wamid: d.messages?.[0]?.id as string };
+}
+const mandar = (to: string, nombre: string | null, a: any, extra: Record<string, string> = {}) =>
+  enviar(mensajePlantilla(to, a.plantilla, a.idioma, a.variables, nombre, extra));
+
+// texto de la plantilla (encabezado + cuerpo + link) para mandarlo libre dentro de las 24 h; "" si no se pudo leer
+async function cuerpoPlantilla(nombre: string, idioma: string) {
+  try {
+    const d = await graph(`${WABA()}/message_templates?name=${encodeURIComponent(nombre)}&fields=name,language,components&limit=20`, "GET");
+    const t = (d.data || []).find((x: any) => x.name === nombre && x.language === idioma) || (d.data || [])[0];
+    const c = (k: string) => (t?.components || []).find((x: any) => x.type === k) || {};
+    const url = (c("BUTTONS").buttons || []).find((b: any) => b.type === "URL");
+    return [c("HEADER").format === "TEXT" ? `*${c("HEADER").text}*` : "", c("BODY").text || "", url ? `${url.text}: ${url.url}` : ""].filter(Boolean).join("\n\n");
+  } catch { return ""; }
+}
+async function escribioHace24(phone: string) {
+  const desde = new Date(Date.now() - 23.5 * 3600e3).toISOString();
+  const { count } = await sb.from("message_logs").select("id", { count: "exact", head: true }).eq("phone", phone).eq("direccion", "entrante").gte("created_at", desde);
+  return !!count;
+}
+const extraPremio = (p: { titulo: string; code: string; vence_at: string }) => ({ premio: p.titulo, codigo: p.code, vence: venceTexto(p.vence_at) });
+// aviso del premio: gratis como texto libre si nos escribió hace poco; si no, plantilla
+async function mandarPremio(d: { phone: string; nombre: string | null }, a: any, extra: Record<string, string>, cuerpo: string) {
+  if (cuerpo && (await escribioHace24(d.phone))) {
+    const t = textoLibre(cuerpo, valoresCampana(a.variables, d.nombre, extra));
+    if (t) return { ...(await enviar({ messaging_product: "whatsapp", to: d.phone, type: "text", text: { body: t, preview_url: true } })), libre: true };
+  }
+  return { ...(await mandar(d.phone, d.nombre, a, extra)), libre: false };
 }
 
 Deno.serve(async (req) => {
@@ -22,7 +55,7 @@ Deno.serve(async (req) => {
   const cron = await hookValido(req);
   if (!cron && !(await esEquipo(req))) return json({ error: "Solo el equipo puede hacer esto" }, 401);
   if (!env("META_ACCESS_TOKEN") || !env("WA_PHONE_NUMBER_ID")) return json({ error: "Faltan las credenciales de WhatsApp en los secretos de Supabase" }, 400);
-  const { automation_id, prueba } = await req.json().catch(() => ({}));
+  const { automation_id, prueba, disparador } = await req.json().catch(() => ({}));
 
   if (!cron) { // el panel solo manda pruebas; el envío real es el del cron
     const { data: a } = await sb.from("marketing_automations").select("*").eq("id", automation_id).maybeSingle();
@@ -32,13 +65,33 @@ Deno.serve(async (req) => {
     const { data: ok } = await sb.rpc("puede_contactar", { p_phone: ph, p_canal: "whatsapp" });
     if (!ok) return json({ error: "Ese número no aceptó novedades por WhatsApp. Marcá la casilla en un pedido o escribí ALTA al WhatsApp de Setto." }, 400);
     const { data: cli } = await sb.from("customers").select("nombre").eq("phone", ph).maybeSingle();
-    const r = await mandar(ph, cli?.nombre ?? null, a);
+    // la prueba de la de premio usa el último premio de ese número, o uno de ejemplo
+    const { data: mp } = a.disparador === "premio" ? await sb.from("maq_premios").select("titulo,code,vence_at").eq("phone", ph).order("created_at", { ascending: false }).limit(1).maybeSingle() : { data: null };
+    const extra = a.disparador === "premio" ? extraPremio(mp?.vence_at ? mp : { titulo: "10% off", code: "MAQ-PRUE-BA00", vence_at: new Date(Date.now() + 24 * 3600e3).toISOString() }) : {};
+    const r = await mandar(ph, cli?.nombre ?? null, a, extra);
     await sb.from("message_logs").insert({ automation_id: a.id, phone: ph, wamid: r.wamid ?? null, estado: r.wamid ? "enviado" : "fallo", error: r.error ?? null, texto: "[prueba]" });
     return r.error ? json({ error: r.error }, 502) : json({ ok: true, prueba: true });
   }
 
-  const { data: autos } = await sb.from("marketing_automations").select("*").eq("activa", true);
+  const tipo = disparador === "premio" ? "premio" : "compra";
+  const { data: autos } = await sb.from("marketing_automations").select("*").eq("activa", true).eq("disparador", tipo);
   const res: Record<string, unknown> = {};
+  if (tipo === "premio") {
+    for (const a of autos ?? []) {
+      const { data: lista, error } = await sb.rpc("automatica_premio_destinatarios", { p_id: a.id });
+      if (error) { res[a.nombre] = { error: error.message }; continue; }
+      const cuerpo = (lista ?? []).length ? await cuerpoPlantilla(a.plantilla, a.idioma) : "";
+      let enviados = 0, gratis = 0, fallidos = 0;
+      for (const d of ((lista ?? []) as { phone: string; nombre: string | null; premio: string; code: string; titulo: string; vence_at: string }[]).slice(0, TOPE)) {
+        const r = await mandarPremio(d, a, extraPremio(d), cuerpo);
+        if (r.wamid) { enviados++; if (r.libre) gratis++; } else fallidos++;
+        await sb.from("message_logs").insert({ automation_id: a.id, maq_premio_id: d.premio, phone: d.phone, wamid: r.wamid ?? null, estado: r.wamid ? "enviado" : "fallo", error: r.error ?? null, texto: r.libre ? "[libre] aviso de premio" : null });
+        await new Promise((ok) => setTimeout(ok, 120));
+      }
+      res[a.nombre] = { enviados, gratis, fallidos };
+    }
+    return json({ ok: true, automaticas: res });
+  }
   for (const a of autos ?? []) {
     const { data: lista, error } = await sb.rpc("automatica_destinatarios", { p_id: a.id });
     if (error) { res[a.nombre] = { error: error.message }; continue; }
