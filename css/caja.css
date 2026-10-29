@@ -162,6 +162,14 @@ main.cmain{padding-block:18px 30px}
 .addrow{display:flex;gap:8px;margin-bottom:10px}
 .addrow input{flex:1;font:inherit;font-size:.95rem;background:var(--card);border:1.5px solid color-mix(in srgb,var(--turquesa) 45%,transparent);border-radius:14px;padding:10px 12px;min-width:0}
 .addrow button{flex:none}
+.addrow .mic{padding:0 12px;display:grid;place-items:center}
+.addrow .mic svg{width:20px;height:20px}
+.vozlive{font-size:1.05rem;line-height:1.4;min-height:3em;color:var(--ink-2);margin:6px 0 14px}
+.vozit{display:grid;grid-template-columns:112px 1fr auto;gap:8px;align-items:center;padding:12px 0;border-top:1px solid color-mix(in srgb,var(--turquesa) 14%,transparent)}
+.vozit:first-child{border-top:0;padding-top:0}
+.vozit input:not([type=checkbox]){font:inherit;font-size:.9rem;background:var(--card);border:1.5px solid color-mix(in srgb,var(--turquesa) 35%,transparent);border-radius:12px;padding:8px 10px;min-width:0;width:100%}
+.vozit input[name^=i]{grid-column:1/-1;font-weight:600}
+.vozit .checks{display:flex;align-items:center;gap:6px;font-size:.85rem;font-weight:600;margin:0}
 .items{background:var(--card);border-radius:18px;border:1.5px solid color-mix(in srgb,var(--turquesa) 22%,transparent);overflow:hidden}
 .it{display:flex;align-items:center;gap:12px;padding:11px 14px;border-top:1px solid color-mix(in srgb,var(--turquesa) 12%,transparent)}
 .it:first-child{border-top:0}

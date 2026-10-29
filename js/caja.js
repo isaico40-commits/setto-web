@@ -60,7 +60,7 @@
   /* ---------- estado ---------- */
   const S = {
     me: localStorage.getItem("setto-caja-yo") || "",
-    view: (location.hash.slice(1) || "inicio"),
+    view: (location.hash.slice(1).split("/")[0] || "inicio"),
     mes: mesDe(hoy()),
     cuentas: [], socios: [], cats: [], saldos: [], deudas: [], movs: [], stock: [], tareas: [], compras: [],
     f: { tipo: "todos", cuenta: "todas", q: "", anul: false },
@@ -159,6 +159,7 @@
     }
     drawShell(); render();
     if (!S.socios.some((s) => s.nombre === S.me)) whoSheet(true);
+    else if (location.hash === "#compras/voz") { history.replaceState(null, "", "#compras"); escuchar(); } // atajo "Anotar compra" del ícono
     sb.channel("caja-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "caja_movimientos" }, softReload)
       .on("postgres_changes", { event: "*", schema: "public", table: "caja_stock_mov" }, softReload)
@@ -848,7 +849,7 @@
     const orden = Object.keys(grupos).sort((a, b) => (!a) - (!b) || grupos[b].length - grupos[a].length);
     const nsel = S.csel.size;
     $("#view").innerHTML = `<h1 class="h1">Lista de compras</h1>
-      <form class="addrow" id="cadd"><input id="cIt" placeholder="¿Qué falta? Ej: crema x2" maxlength="100" value="${esc(S.cdraft || "")}"><button class="btn solid" type="submit">Agregar</button></form>
+      <form class="addrow" id="cadd"><input id="cIt" placeholder="¿Qué falta? Ej: crema x2" maxlength="100" value="${esc(S.cdraft || "")}">${Rec ? `<button class="btn mic" type="button" data-cvoz aria-label="Dictar lo que falta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>` : ""}<button class="btn solid" type="submit">Agregar</button></form>
       <div class="fl cluga"><span>Dónde se compra</span>${lugChips(S.clug, S.cnuevo, "cLugN")}</div>
       <h2 class="h2">Falta comprar <small>${pend.length}</small></h2>
       ${pend.length ? `<p class="hintp" style="margin:-4px 0 10px">Tocá el círculo de lo que compraste (podés elegir varios) y cargá el total en un solo gasto.</p>
@@ -890,6 +891,39 @@
         e.preventDefault();
         const donde = L.nuevo ? lugNombre(sh.querySelector("#ceLN").value) : L.sel;
         try { fail(await sb.from("caja_compras").update({ item: sh.querySelector("#ceI").value.trim(), cantidad: sh.querySelector("#ceC").value.trim() || null, donde: donde.trim() || null, urgente: sh.querySelector("#ceU").checked }).eq("id", id)); closeSheet(); await loadAll(); render(); } catch (err) { toast(err.message); }
+      };
+    });
+  }
+  /* por voz: el micrófono del navegador (Chrome de Android) dicta, SettoVoz lo separa en ítems y se confirman antes de cargar */
+  const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function escuchar() {
+    if (!Rec) return toast("Este navegador no dicta: usá el micrófono del teclado");
+    if (!needMe()) return;
+    const r = new Rec(); r.lang = "es-AR"; r.interimResults = true; r.maxAlternatives = 1;
+    let fin = "";
+    openSheet(`<div class="sh"><h3>Te escucho…</h3><button class="x" data-close aria-label="Cerrar">×</button></div>
+      <p class="vozlive" id="vozT">Decí lo que falta. Ej: "crema por dos y azúcar en Makro, urgente"</p>`);
+    r.onresult = (e) => { fin = [...e.results].map((x) => x[0].transcript).join(" "); const t = $("#vozT"); if (t) t.textContent = fin; };
+    r.onerror = (e) => { if ($("#vozT")) { closeSheet(); toast(e.error === "not-allowed" ? "Dale permiso al micrófono para dictar" : e.error === "no-speech" ? "No escuché nada, probá de nuevo" : "No pude escuchar (" + e.error + ")"); } };
+    r.onend = () => { if (!$("#vozT")) return; if (!fin.trim()) return closeSheet(); vozSheet(fin); };
+    $("#sheet").querySelector("[data-close]").addEventListener("click", () => { try { r.abort(); } catch (_) {} });
+    try { r.start(); } catch (_) { closeSheet(); toast("Tocá el micrófono para dictar"); }
+  }
+  function vozSheet(texto) {
+    const its = SettoVoz.parse(texto, lugares()).map((x) => ({ ...x, donde: x.donde || S.clug }));
+    if (!its.length) { closeSheet(); return toast("No entendí qué falta, probá de nuevo"); }
+    openSheet(`<div class="sh"><h3>¿Lo anoto así?</h3><button class="x" data-close aria-label="Cerrar">×</button></div>
+      <p class="hintp" style="margin:0 0 10px">Escuché: "${esc(texto)}". Corregí lo que haga falta.</p>
+      <form class="form" id="vozf">${its.map((x, i) => `<div class="vozit"><input name="i${i}" value="${esc(x.item)}" maxlength="100" aria-label="Qué">
+        <input name="c${i}" value="${esc(x.cantidad || "")}" maxlength="30" placeholder="Cant." aria-label="Cantidad">
+        <input name="d${i}" value="${esc(x.donde)}" maxlength="40" placeholder="Dónde" aria-label="Dónde">
+        <label class="checks"><input type="checkbox" name="u${i}" ${x.urgente ? "checked" : ""} style="width:auto"> Urgente</label></div>`).join("")}
+      <button class="btn solid big" type="submit">Agregar ${its.length > 1 ? its.length + " cosas" : "a la lista"}</button><button type="button" class="btn" data-cvoz>Dictar de nuevo</button></form>`, (sh) => {
+      sh.onsubmit = async (e) => {
+        e.preventDefault(); const f = e.target;
+        const rows = its.map((_, i) => ({ item: f["i" + i].value.trim(), cantidad: f["c" + i].value.trim() || null, donde: f["d" + i].value.trim() ? lugNombre(f["d" + i].value) : null, urgente: f["u" + i].checked, creada_por: S.me })).filter((x) => x.item);
+        if (!rows.length) return closeSheet();
+        try { fail(await sb.from("caja_compras").insert(rows)); closeSheet(); await loadAll(); render(); toast(rows.length > 1 ? `Anoté ${rows.length} cosas` : "Anotado"); } catch (err) { toast(err.message); }
       };
     });
   }
@@ -983,6 +1017,7 @@
     if (d.copen) return compraSheet(d.copen);
     if (d.cquit) { try { fail(await sb.from("caja_compras").update({ estado: "quitada" }).eq("id", d.cquit)); closeSheet(); await loadAll(); render(); toast("Quitado de la lista"); } catch (err) { toast(err.message); } return; }
     if (d.vercomp !== undefined) { S.verComp = !S.verComp; return render(); }
+    if (d.cvoz !== undefined) return escuchar();
   });
   document.addEventListener("input", (e) => { if (e.target.id === "mq") { S.f.q = e.target.value; const p = e.target.selectionStart; render(); const i = $("#mq"); i.focus(); i.setSelectionRange(p, p); } });
   document.addEventListener("submit", async (e) => {
@@ -1018,6 +1053,6 @@
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#sheet").hidden && $("#sheet").querySelector("[data-close]")) { closeSheet(); } });
 
-  window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (v && v !== S.view) { S.view = v; render(); } });
+  window.addEventListener("hashchange", () => { const v = location.hash.slice(1).split("/")[0]; if (v && v !== S.view) { S.view = v; render(); } });
   start();
 })();
