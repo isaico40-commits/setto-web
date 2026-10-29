@@ -1,7 +1,7 @@
 // Edge Function · whatsapp-webhook (se publica sin verificar JWT: Meta no manda uno; se valida con la firma)
 // GET: verificación del webhook en la app de Meta (hub.verify_token = WA_VERIFY_TOKEN).
 // POST: mensajes entrantes y estados de los enviados. Firma X-Hub-Signature-256 con WA_APP_SECRET.
-//   - Guarda respuestas y estados en message_logs.
+//   - Guarda respuestas y estados en message_logs. Si el chat vino de un anuncio de Meta, guarda de cuál (migración 050).
 //   - Si el mensaje es un pedido de la web ("Te paso mi pedido STT-1234…"), le responde el aviso de "Recibido".
 //     Lo busca por el link de seguimiento: si tipeó mal su número en la web, guarda en orders.wa_phone el número real.
 //   - "BAJA" (o "stop", "no quiero recibir…", o los botones "No quiero más novedades" / "No quiero más avisos" de las plantillas) revoca el permiso de WhatsApp y saca de los avisos de drops; "ALTA" lo vuelve a dar. Responde confirmando.
@@ -33,7 +33,9 @@ Deno.serve(async (req) => {
     const i = intencion(m.texto);
     const { data: norm } = await sb.rpc("norm_phone", { p: m.phone }); // mismo formato que pedidos y permisos
     m.phone = norm || m.phone;
-    await sb.from("message_logs").insert({ phone: m.phone, direccion: "entrante", wamid: m.wamid, estado: i === "baja" ? "baja" : i === "alta" ? "alta" : "recibido", texto: m.texto });
+    const fila = { phone: m.phone, direccion: "entrante", wamid: m.wamid, estado: i === "baja" ? "baja" : i === "alta" ? "alta" : "recibido", texto: m.texto };
+    const { error: errAd } = await sb.from("message_logs").insert(m.anuncio ? { ...fila, ...m.anuncio } : fila);
+    if (errAd && m.anuncio) await sb.from("message_logs").insert(fila); // sin la migración 050 igual se guarda el mensaje
     const cod = !i && codigoPedido(m.texto), tr = !i && trackPedido(m.texto);
     let o: { id: string; phone: string; wa_phone: string | null } | null = null;
     if (tr) o = (await sb.from("orders").select("id,phone,wa_phone").eq("track", tr).eq("status", "pendiente").maybeSingle()).data;
