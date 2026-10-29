@@ -134,6 +134,7 @@
     async getSetting(key) { return dbLoad().settings[key]; },
     // Dashboard: en modo demo solo hay pedidos web (la Caja necesita Supabase)
     async dashboard(desde) { return { orders: dbLoad().orders.filter((o) => new Date(o.created_at) >= desde), caja: null, stock: null }; },
+    async maqStats() { return null; },
     async turnosOcupados() { // mismo cálculo que la función turnos_ocupados de Supabase
       const k = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`, hoy = k(new Date()), cnt = {};
       dbLoad().orders.filter((o) => o.status === "pendiente" && (o.etapa || "recibido") !== "listo" && /· \d{1,2}:\d{2} hs$/.test(o.retiro || "")).forEach((o) => {
@@ -615,6 +616,16 @@
       ]);
       fail(o.error);
       return { orders: o.data || [], caja: m.error ? null : { movs: m.data || [], cats: c.data || [] }, stock: s.error ? null : { movs: s.data || [], items: it.data || [] } };
+    },
+    // Dashboard → Maquinita: todas las tiradas y premios (desde que arrancó). null si no hay acceso a las tablas.
+    async maqStats() {
+      const [t, p, u] = await Promise.all([
+        sb.from("maq_tiradas").select("created_at, resultado, gratis, dev, phone").order("created_at").limit(20000),
+        sb.from("maq_premios").select("id, titulo, estado, vence_at, created_at").limit(10000),
+        sb.from("maq_premio_usos").select("premio_id, monto, devuelto").eq("devuelto", false).limit(10000),
+      ]);
+      if (t.error || p.error) return null;
+      return { tiradas: t.data || [], premios: p.data || [], usos: u.error ? [] : u.data || [] };
     },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift, maq }) {
       const { data, error } = await sb.rpc("create_order_v6", {

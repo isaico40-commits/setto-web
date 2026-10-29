@@ -354,7 +354,7 @@
     cargarDash();
   }
   async function cargarDash() {
-    try { P.dash = await API.dashboard(new Date(diaMas(-13).setHours(0, 0, 0, 0))); P.dashAt = new Date(); }
+    try { [P.dash, P.maq] = await Promise.all([API.dashboard(new Date(diaMas(-13).setHours(0, 0, 0, 0))), API.maqStats().catch(() => null)]); P.dashAt = new Date(); }
     catch (err) { const el = $("#dash"); if (el && !P.dash) el.innerHTML = `<p class="err">No se pudo cargar el dashboard: ${esc(err.message)}</p>`; return; }
     drawDash();
   }
@@ -467,7 +467,45 @@
           ${S.webN ? `<div class="dcard"><b>Formas de pago (web)</b>${barras(orden(S.pagos), money)}</div>` : ""}
         </div>
       </section>
+      ${maqSec(sem, semAnt)}
       <p class="hintp">Actualizado ${P.dashAt ? P.dashAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""} · <button type="button" class="linkbtn" data-dre>Actualizar</button>${S.canc ? ` · ${S.canc} pedido${S.canc > 1 ? "s" : ""} web cancelado${S.canc > 1 ? "s" : ""} en la semana (no suman)` : ""}</p>`;
+  }
+  // Maquinita: tiradas reales (maq_tiradas) y qué pasó con cada premio (maq_premios). Siempre la semana actual, no depende del día elegido arriba.
+  function maqSec(sem, semAnt) {
+    const M = P.maq; if (!M) return "";
+    const hoy = fechaKey(new Date()), ks = new Set(sem), ksA = new Set(semAnt), ahora = Date.now();
+    const dia = (x) => fechaKey(new Date(x.created_at)), quien = (x) => x.dev || x.phone;
+    const T = M.tiradas, S = T.filter((x) => ks.has(dia(x))), Sa = T.filter((x) => ksA.has(dia(x))), H = T.filter((x) => dia(x) === hoy);
+    const gano = (x) => x.resultado && x.resultado !== "nada", ganS = S.filter(gano).length;
+    const jug = new Set(S.map(quien).filter(Boolean)).size, compra = S.filter((x) => !x.gratis).length;
+    const vencido = (p) => p.vence_at && new Date(p.vence_at).getTime() <= ahora;
+    // pendiente = ganó pero no dejó el celular; activo = lo guardó con su celular y todavía no lo usó
+    const ESTADO = (p) => p.estado === "usado" ? "Usado" : p.estado === "anulado" ? "Anulado"
+      : p.estado === "pendiente" ? (vencido(p) ? "Vencido sin reclamar" : "Sin reclamar")
+      : vencido(p) ? "Vencido sin usar" : "Reclamado, sin usar";
+    const est = {}, tipos = {}; M.premios.forEach((p) => { const e = ESTADO(p); est[e] = (est[e] || 0) + 1; tipos[p.titulo] = (tipos[p.titulo] || 0) + 1; });
+    const usados = new Set(M.usos.map((u) => u.premio_id)).size, desc = M.usos.reduce((a, u) => a + (+u.monto || 0), 0);
+    const desde = T.length ? new Date(T[0].created_at).toLocaleDateString("es-AR", { day: "numeric", month: "short" }) : "";
+    const n = (v, a, b) => v + " " + (v === 1 ? a : b);
+    return `<section class="dsec">
+        <div class="dhead"><h2 class="dh2">Maquinita</h2><span class="hintp">Últimos 7 días${desde ? ` · funciona desde el ${esc(desde)}` : ""}</span></div>
+        <div class="kpis">
+          ${tile("Tiradas hoy", String(H.length), H.length ? n(H.filter(gano).length, "premio", "premios") : "ninguna")}
+          ${tile("Tiradas 7 días", String(S.length), "vs. semana anterior", Sa.length > 0 ? pct(S.length, Sa.length) : null)}
+          ${tile("Jugaron", String(jug), "dispositivos distintos")}
+          ${tile("Premios dados", String(ganS), S.length ? `${Math.round((ganS / S.length) * 1000) / 10}% de las tiradas` : "")}
+          ${compra ? tile("Con fichas de compra", String(compra), "tiradas que no eran la gratis") : ""}
+        </div>
+        <div class="dcols">
+          <div class="dcard wide2"><b>Tiradas por día</b>
+            <div class="dleg"><span><i class="s0"></i>Sin premio</span><span><i class="s1"></i>Con premio</span></div>
+            ${columnas(sem.map((k) => { const d = new Date(k + "T12:00"), x = S.filter((t) => dia(t) === k), g = x.filter(gano).length;
+              return { l: d.toLocaleDateString("es-AR", { weekday: "short" }).replace(".", "") + " " + d.getDate(), on: k === hoy, v: [x.length - g, g],
+                tip: `${d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}: ${n(x.length, "tirada", "tiradas")}, ${n(g, "premio", "premios")}` }; }), String)}</div>
+          <div class="dcard"><b>Premios por tipo</b>${barras(orden(tipos), String, "Todavía no salió ningún premio.")}<p class="hintp">Desde que arrancó: ${n(T.length, "tirada", "tiradas")}, ${n(M.premios.length, "premio", "premios")}.</p></div>
+          <div class="dcard"><b>Qué pasó con los premios</b>${barras(orden(est), String, "Todavía no salió ningún premio.")}<p class="hintp">${usados ? `${n(usados, "premio usado", "premios usados")} en pedidos web, ${money(desc)} de descuento en total.` : "Ningún premio se usó todavía en un pedido."} Reclamado = dejó su celular para guardarlo. Vencen a las 48 hs.</p></div>
+        </div>
+      </section>`;
   }
   document.addEventListener("click", (e) => {
     const b = e.target.closest("#dash [data-dd]"); if (b) { P.dashDia = Math.max(0, Math.min(6, (P.dashDia || 0) + +b.dataset.dd)); drawDash(); return; }
