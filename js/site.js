@@ -568,7 +568,7 @@
   if (maqVencido()) { MAQ = null; try { localStorage.removeItem("setto-maq-usar"); } catch (_) {} }
   function usarMaq(p) { MAQ = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.saldo, vence_at: p.vence_at || null, tel: form.tel }; try { localStorage.setItem("setto-maq-usar", JSON.stringify(MAQ)); } catch (_) {} }
   function quitarMaq() { MAQ = null; try { localStorage.removeItem("setto-maq-usar"); } catch (_) {} }
-  /* código de descuento (Panel → Campañas → Códigos, migración 052): va después del premio del Club y antes de la maquinita, igual que create_order_v7 */
+  /* código de descuento (Panel → Campañas → Códigos, migración 053): va después del premio del Club y antes de la maquinita, igual que create_order_v7 */
   let CUPON = null; try { CUPON = JSON.parse(localStorage.getItem("setto-codigo") || "null"); } catch (_) {}
   if (CUPON && CUPON.vence_at && new Date(CUPON.vence_at) <= new Date()) { CUPON = null; try { localStorage.removeItem("setto-codigo"); } catch (_) {} }
   function usarCupon(p) { CUPON = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, regalo: p.regalo, tope: p.tope || 0, minimo: p.minimo || 0, acumula: !!p.acumula, vence_at: p.vence_at || null }; try { localStorage.setItem("setto-codigo", JSON.stringify(CUPON)); } catch (_) {} }

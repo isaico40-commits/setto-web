@@ -1,4 +1,4 @@
-// Códigos de descuento en campañas y automáticas (migración 052).
+// Códigos de descuento en campañas y automáticas (migración 053).
 // En las variables de la plantilla: {codigo} = código personal de cada destinatario, {vence} = hasta qué día vale (ej. "5/11").
 import { sb } from "./supa.ts";
 

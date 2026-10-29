@@ -115,7 +115,7 @@
     if (!c) { c = { phone: o.phone, nombre: o.nombre, sellos: 0, canjes: 0, created_at: new Date().toISOString() }; db.customers.push(c); }
     c.sellos += 1; db.events.unshift({ phone: o.phone, delta: 1, motivo: "Reseña de " + o.code + " (primera compra)", created_at: new Date().toISOString() });
   }
-  // códigos de descuento (migración 052): mismas reglas que promo_problema() de la base
+  // códigos de descuento (migración 053): mismas reglas que promo_problema() de la base
   const promoCod = (db, code) => (db.promo_codigos || []).find((x) => x.code === String(code || "").trim().toUpperCase());
   const promoVence = (c, p) => [c.vence_at, p.vence_at].filter(Boolean).sort()[0] || null;
   const promoPub = (c, p, error) => ({ code: c.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, regalo: p.regalo || null, tope: p.tope || 0, minimo: p.minimo || 0, acumula: !!p.acumula, vence_at: promoVence(c, p), personal: !!c.phone, error: error || null });
@@ -488,7 +488,7 @@
     async listCampaigns() { return (dbLoad().campaigns || []).slice(0, 20); },
     async createCampaign(c) { const db = dbLoad(); db.campaigns = db.campaigns || []; const n = { id: "c" + Date.now(), estado: "borrador", total: 0, enviados: 0, fallidos: 0, created_at: new Date().toISOString(), ...c }; db.campaigns.unshift(n); dbSave(db); return n; },
     async sendCampaign() { throw new Error("En modo demo no se mandan mensajes de WhatsApp"); },
-    // códigos de descuento (migración 052)
+    // códigos de descuento (migración 053)
     async promoCheck(code, phone) { const db = dbLoad(), c = promoCod(db, code), err = promoProblema(db, code, normPhone(phone)); return c ? promoPub(c, db.promos.find((x) => x.id === c.promo_id), err) : { error: err }; },
     async listPromos() { const db = dbLoad(); return { promos: db.promos || [], codigos: (db.promo_codigos || []).filter((c) => !c.campaign_id && !c.automation_id).slice(0, 200) }; },
     async createPromo(p, code) {
@@ -720,7 +720,7 @@
       return { tiradas: t.data || [], premios: p.data || [], usos: u.error ? [] : u.data || [] };
     },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift, maq, codigo }) {
-      // con código de descuento va por la v7 (migración 052); sin código, la v6 de siempre
+      // con código de descuento va por la v7 (migración 053); sin código, la v6 de siempre
       const { data, error } = await sb.rpc(codigo ? "create_order_v7" : "create_order_v6", {
         p_nombre: nombre, p_phone: phone, p_items: items.map((i) => ({ id: i.id, size: i.size || null, qty: i.qty, leche: i.leche || null, sin: i.sin || [], bebida: i.bebida || null, ...(i.mochis ? { mochis: i.mochis } : {}) })),
         p_retiro: retiro, p_pago: pago, p_nota: nota || null, p_modo: modo || "retiro", p_direccion: direccion || null, p_premio: premio || null, p_gift: gift || null, p_maq: maq || null,
@@ -787,12 +787,12 @@
     async createCampaign(c) { const { data, error } = await sb.from("marketing_campaigns").insert({ ...c, estado: "borrador" }).select().single(); fail(error); return data; },
     // Edge Functions: las credenciales de Meta y WhatsApp viven solo ahí (secretos de Supabase)
     // la prueba viaja con el número normalizado (549223…), igual que en la base: así encuentra el nombre del cliente
-    // códigos de descuento (migración 052)
+    // códigos de descuento (migración 053)
     async promoCheck(code, phone) { const { data, error } = await sb.rpc("promo_check", { p_code: code, p_phone: phone || null }); fail(error); return data; },
     async listPromos() {
       const [p, c] = await Promise.all([sb.from("promos").select("*").order("created_at", { ascending: false }),
         sb.from("promo_codigos").select("code, promo_id, phone, usos, vence_at, created_at").is("campaign_id", null).is("automation_id", null).order("created_at", { ascending: false }).limit(200)]);
-      if (p.error && /promos/.test(p.error.message || "")) throw new Error("Falta activar los códigos en Supabase (migración 052)");
+      if (p.error && /promos/.test(p.error.message || "")) throw new Error("Falta activar los códigos en Supabase (migración 053)");
       fail(p.error); fail(c.error); return { promos: p.data || [], codigos: c.data || [] };
     },
     async createPromo(p, code) {
