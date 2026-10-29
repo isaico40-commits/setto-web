@@ -700,28 +700,154 @@
       </ul>
     </details>
   </section>`;
+  /* ---- Plantillas de WhatsApp: se arman acá, se ven como llegan y se mandan a Meta para aprobar ---- */
+  const TP = window.SettoPlantillas;
+  const MOTIVO = { INVALID_FORMAT: "formato inválido (revisá variables y botones)", TAG_CONTENT_MISMATCH: "el texto no coincide con la categoría", PROMOTIONAL: "contenido promocional no permitido",
+    ABUSIVE_CONTENT: "contenido no permitido", INCORRECT_CATEGORY: "categoría incorrecta", SCAM: "parece engañoso" };
+  const tplDe = (nombre) => (P.tpls || []).find((t) => t.nombre === nombre);
+  function tplEditorHTML() {
+    return `<form class="pcard wide tpled" id="tplForm" novalidate><div class="tplgrid"><div class="tplcampos">
+      <div class="row2"><label>Nombre para Meta<input class="inp" name="nombre" required placeholder="lanzamiento_lemon_pie" autocomplete="off" spellcheck="false"></label>
+        <label>Título (opcional)<input class="inp" name="encabezado" maxlength="60" placeholder="Sabor nuevo 🍋" autocomplete="off"></label></div>
+      <span class="hintp">Minúsculas y guion bajo. Un nombre que ya borraste en Meta no se puede volver a usar.</span>
+      <label>Mensaje<textarea class="inp" name="cuerpo" rows="6" maxlength="1024" placeholder="Hola {{1}}, ya salió el mochi de Lemon pie: crema de limón y merengue. Lo pedís en la web desde hoy."></textarea></label>
+      <div class="acts tplins"><button class="btn" type="button" data-tpl-ins="nombre">+ Nombre del cliente</button><button class="btn" type="button" data-tpl-ins="var">+ Otra variable</button><button class="btn" type="button" data-tpl-ins="b">*Negrita*</button></div>
+      <div id="tplVars" class="tplvars"></div>
+      <label>Pie (opcional, letra chica gris)<input class="inp" name="pie" maxlength="60" placeholder="Setto · Mar del Plata" autocomplete="off"></label>
+      <fieldset class="tplbtns"><legend>Botones</legend>
+        <p class="hintp"><b>${esc(TP.BAJA)}</b> va siempre: quien lo toca sale de las campañas solo.</p>
+        <label>Respuesta rápida (opcional)<input class="inp" name="respuesta" maxlength="25" placeholder="Info"></label>
+        <span class="hintp">Si lo tocan, te llega como mensaje y tenés 24 h para responderle gratis desde WhatsApp.</span>
+        <label class="chk"><input type="checkbox" name="conlink"> Botón a la web</label>
+        <div class="row2" id="tplLink" hidden><label>Texto del botón<input class="inp" name="linktexto" maxlength="25" value="Ver la carta"></label>
+          <label>Lleva a<select class="inp" name="destino"><option value="inicio">La carta (inicio)</option><option value="especial">Edición especial</option></select></label></div>
+      </fieldset>
+      <p class="hintp">Categoría <b>marketing</b> · español (Argentina). Meta la revisa: de minutos a 1 día.</p>
+      <ul class="err tplerr" id="tplErr"></ul>
+      <div class="acts"><button class="btn solid" type="submit" id="tplMandar">Mandar a Meta para aprobar</button><button class="btn" type="button" id="tplCancelar">Cancelar</button></div>
+    </div><div class="tplprev"><span class="eyebrow">Así le llega</span><div id="tplPrev"></div><span class="hintp">Los valores resaltados cambian en cada campaña.</span></div></div></form>`;
+  }
+  function tplLeer() {
+    const f = $("#tplForm"), v = (k) => f.elements[k].value;
+    return { nombre: v("nombre").trim(), idioma: "es_AR", encabezado: v("encabezado").trim(), cuerpo: v("cuerpo"), ejemplos: P.tplEj.slice(0, TP.cantidad(v("cuerpo"))),
+      pie: v("pie").trim(), respuesta: v("respuesta").trim(), link: f.elements.conlink.checked ? { texto: v("linktexto").trim(), destino: v("destino") } : null };
+  }
+  function tplPintar() {
+    const p = tplLeer(), n = TP.cantidad(p.cuerpo), box = $("#tplVars");
+    if (box.children.length !== n) box.innerHTML = Array.from({ length: n }, (_, i) => `<label>{{${i + 1}}} · ejemplo para Meta<input class="inp" data-tpl-ej="${i}" value="${esc(P.tplEj[i] || "")}" placeholder="${i === 0 ? "Isa" : "Lemon pie"}"></label>`).join("");
+    $("#tplLink").hidden = !p.link;
+    $("#tplPrev").innerHTML = TP.burbuja(TP.desdeEditor(p));
+    const errs = TP.validar(p); P.tplErrs = errs;
+    $("#tplErr").innerHTML = P.tplTocado ? errs.map((e) => `<li>${esc(e)}</li>`).join("") : "";
+  }
+  function tplAbrir() {
+    const ed = $("#tplEditor"); P.tplEj = []; P.tplTocado = false;
+    ed.innerHTML = tplEditorHTML(); ed.hidden = false; $("#tplNueva").hidden = true;
+    const f = $("#tplForm");
+    f.addEventListener("input", (e) => {
+      if (e.target.dataset.tplEj !== undefined) P.tplEj[+e.target.dataset.tplEj] = e.target.value;
+      if (e.target.name === "encabezado" && !f.elements.nombre.dataset.propio && !f.elements.nombre.value) f.elements.nombre.placeholder = TP.slug(e.target.value) || "lanzamiento_lemon_pie";
+      if (e.target.name === "nombre") { f.elements.nombre.dataset.propio = "1"; const s = TP.slug(e.target.value); if (s !== e.target.value && /[A-ZÁÉÍÓÚÑ ]/.test(e.target.value)) e.target.value = s; }
+      tplPintar();
+    });
+    f.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-tpl-ins]"); if (!b) return;
+      const ta = f.elements.cuerpo, a = ta.selectionStart ?? ta.value.length, z = ta.selectionEnd ?? a;
+      let ins;
+      if (b.dataset.tplIns === "b") ins = "*" + (ta.value.slice(a, z) || "texto") + "*";
+      else { const k = Math.max(0, ...TP.variables(ta.value)) + 1; ins = `{{${k}}}`; if (b.dataset.tplIns === "nombre") P.tplEj[k - 1] = P.tplEj[k - 1] || "Isa"; }
+      ta.value = ta.value.slice(0, a) + ins + ta.value.slice(z); ta.focus(); ta.selectionStart = ta.selectionEnd = a + ins.length;
+      tplPintar();
+    });
+    $("#tplCancelar").addEventListener("click", () => { ed.hidden = true; ed.innerHTML = ""; $("#tplNueva").hidden = false; });
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault(); P.tplTocado = true;
+      const p = tplLeer(); if (!p.nombre) p.nombre = f.elements.nombre.placeholder !== "lanzamiento_lemon_pie" ? f.elements.nombre.placeholder : "";
+      f.elements.nombre.value = p.nombre; tplPintar();
+      if (P.tplErrs.length) { toast("Revisá lo marcado en rojo"); return; }
+      if (!confirm(`¿Mandar "${p.nombre}" a Meta para aprobar? Después no se puede editar: para cambiarla hay que hacer otra con otro nombre.`)) return;
+      const b = $("#tplMandar"); b.disabled = true;
+      try { await API.createTemplate(p); toast("Listo: Meta la está revisando"); ed.hidden = true; ed.innerHTML = ""; $("#tplNueva").hidden = false; cargarPlantillas(); }
+      catch (err) { toast(err.message); b.disabled = false; }
+    });
+    tplPintar(); f.elements.encabezado.focus();
+  }
+  async function cargarPlantillas() {
+    try {
+      P.tpls = await API.listTemplates();
+      $("#tplList").innerHTML = P.tpls.length ? P.tpls.map((t) => { const [lbl, cls] = TP.estado(t.estado); return `<article class="pcard tplcard">
+        <div class="ohead"><b>${esc(t.nombre)}</b><span class="st ${cls}">${lbl}</span></div>
+        ${t.motivo ? `<p class="err">Motivo: ${esc(MOTIVO[t.motivo] || t.motivo)}</p>` : ""}
+        ${TP.burbuja(t)}
+        ${t.estado === "APPROVED" ? `<div class="acts"><button class="btn" data-tpl-usar="${esc(t.nombre)}">Usar en campaña</button></div>` : t.estado === "PENDING" ? '<span class="hintp">Meta la está revisando. Tocá "Actualizar estado" en un rato.</span>' : ""}
+      </article>`; }).join("") : '<p class="muted">Todavía no hay plantillas. Armá la primera con "+ Nueva plantilla".</p>';
+    } catch (e) { P.tpls = null; $("#tplList").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+    campPlantillaCampo();
+  }
+  // campo "Plantilla" de la campaña: lista de aprobadas si se pudieron leer de Meta; si no, nombre a mano como antes
+  function campPlantillaCampo() {
+    const box = $("#campTpl"); if (!box) return;
+    const elegida = (box.querySelector("[name=plantilla]") || {}).value || "";
+    if (P.tpls) {
+      const ok = P.tpls.filter((t) => t.estado === "APPROVED");
+      box.innerHTML = `<label>Plantilla aprobada<select class="inp" name="plantilla" required><option value="">${ok.length ? "Elegí una…" : "Todavía no hay aprobadas"}</option>${ok.map((t) => `<option value="${esc(t.nombre)}"${t.nombre === elegida ? " selected" : ""}>${esc(t.nombre)}</option>`).join("")}</select></label>`;
+    } else {
+      box.innerHTML = `<div class="row2"><label>Plantilla aprobada (nombre exacto)<input class="inp" name="plantilla" required placeholder="lanzamiento_sabor" value="${esc(elegida)}"></label>
+        <label>Idioma de la plantilla<input class="inp" name="idioma" value="es_AR"></label></div>
+        <label>Variables del texto, una por línea, en orden ({nombre} = nombre del cliente)<textarea class="inp" name="variables" rows="3" placeholder="{nombre}&#10;Lemon pie"></textarea></label>`;
+    }
+    campVars();
+  }
+  function campVars() {
+    const f = $("#campForm"), t = P.tpls && tplDe((f.elements.plantilla || {}).value), box = $("#campVarsBox");
+    if (!t) { box.innerHTML = ""; return; }
+    const n = TP.cantidad(t.cuerpo), prev = [...box.querySelectorAll("[data-cvar]")].map((x) => x.value);
+    box.innerHTML = `${n ? `<div class="tplvars">${Array.from({ length: n }, (_, i) => `<label>Qué va en {{${i + 1}}}<input class="inp" data-cvar="${i}" required value="${esc(prev[i] ?? (i === 0 && /^hola\b/i.test(t.cuerpo) ? "{nombre}" : ""))}" placeholder="${esc(t.ejemplos[i] || "")}"></label>`).join("")}</div>
+      <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente.</span>` : ""}
+      <div class="tplprev"><span class="eyebrow">Así le llega</span><div id="campPrev"></div></div>`;
+    campPrev();
+  }
+  function campPrev() {
+    const t = P.tpls && tplDe(($("#campForm").elements.plantilla || {}).value), el = $("#campPrev"); if (!t || !el) return;
+    el.innerHTML = TP.burbuja(t, [...document.querySelectorAll("[data-cvar]")].map((x) => x.value));
+  }
   async function viewCampanas() {
     $("#view").innerHTML = `<h1 class="ph1">Campañas</h1>
-      <p class="muted">Solo le llega a quien aceptó en la web o escribió ALTA. Quien toca "No quiero más novedades" (o escribe BAJA) sale solo de todo. Los mensajes usan plantillas aprobadas en WhatsApp Manager.</p>
+      <p class="muted">Solo le llega a quien aceptó en la web o escribió ALTA. Quien toca "No quiero más novedades" (o escribe BAJA) sale solo de todo. Las plantillas se arman acá abajo y Meta las aprueba.</p>
       <section class="sec"><h2>Segmentos</h2><div class="pcard"><div class="hist" id="segList"><span class="muted">Cargando…</span></div>
         <div class="acts"><button class="btn" id="syncAud">Actualizar públicos de Meta</button></div><span class="hintp">Crea o actualiza un público "Setto · segmento" por cada uno, solo con quienes aceptaron anuncios.</span></div></section>
+      <section class="sec"><h2>Plantillas de WhatsApp</h2>
+        <p class="hintp" style="margin-bottom:12px">Armá el mensaje, mirá cómo llega y mandalo a Meta para aprobar. Solo las aprobadas se pueden usar en una campaña.</p>
+        <div class="acts" style="margin-bottom:14px"><button class="btn solid" id="tplNueva">+ Nueva plantilla</button><button class="btn" id="tplRefresh">Actualizar estado</button></div>
+        <div id="tplEditor" hidden></div>
+        <div class="pgrid" id="tplList"><p class="muted">Cargando…</p></div></section>
       <section class="sec"><h2>Nueva campaña de WhatsApp</h2>
         <form class="pcard" id="campForm">
           <div class="row2"><label>Nombre (para vos)<input class="inp" name="nombre" required placeholder="Ej: Lanzamiento Lemon pie"></label>
           <label>Segmento<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></label></div>
-          <div class="row2"><label>Plantilla aprobada (nombre exacto)<input class="inp" name="plantilla" required placeholder="lanzamiento_sabor"></label>
-          <label>Idioma de la plantilla<input class="inp" name="idioma" value="es_AR"></label></div>
-          <label>Variables del texto, una por línea, en orden ({nombre} = nombre del cliente)<textarea class="inp" name="variables" rows="3" placeholder="{nombre}&#10;Lemon pie"></textarea></label>
+          <div id="campTpl"><span class="muted">Cargando plantillas…</span></div>
+          <div id="campVarsBox"></div>
           <button class="btn solid" type="submit">Guardar borrador</button></form></section>
       <section class="sec"><h2>Campañas</h2><div class="pgrid" id="campList"><p class="muted">Cargando…</p></div></section>
       <section class="sec"><h2>Respuestas y bajas por WhatsApp</h2><div class="pcard"><div class="hist" id="msgList"><span class="muted">Cargando…</span></div></div></section>
       <section class="sec"><h2>Envíos a Meta</h2><div class="pcard"><div class="hist" id="syncList"><span class="muted">Cargando…</span></div></div></section>${MACHETE}`;
-    $("#campForm").addEventListener("submit", async (e) => {
-      e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
-      try { await API.createCampaign({ nombre: f.nombre.trim(), segmento: f.segmento, plantilla: f.plantilla.trim(), idioma: (f.idioma || "es_AR").trim(), variables: (f.variables || "").split("\n").map((x) => x.trim()).filter(Boolean) });
-        toast("Borrador guardado"); e.target.reset(); cargarCampanas(); } catch (err) { toast(err.message); }
+    $("#tplNueva").addEventListener("click", tplAbrir);
+    $("#tplRefresh").addEventListener("click", async (e) => { e.target.disabled = true; await cargarPlantillas(); e.target.disabled = false; toast("Estado actualizado"); });
+    $("#tplList").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-tpl-usar]"); if (!b) return;
+      const f = $("#campForm"); f.elements.plantilla.value = b.dataset.tplUsar; campVars();
+      f.scrollIntoView({ behavior: "smooth", block: "start" }); f.elements.nombre.focus({ preventScroll: true });
     });
-    cargarCampanas();
+    $("#campForm").addEventListener("change", (e) => { if (e.target.name === "plantilla") campVars(); });
+    $("#campForm").addEventListener("input", (e) => { if (e.target.dataset.cvar !== undefined) campPrev(); });
+    $("#campForm").addEventListener("submit", async (e) => {
+      e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)), t = P.tpls && tplDe(f.plantilla);
+      const variables = t ? [...document.querySelectorAll("[data-cvar]")].map((x) => x.value.trim()) : (f.variables || "").split("\n").map((x) => x.trim()).filter(Boolean);
+      if (t && variables.some((v) => !v)) { toast("Completá qué va en cada variable"); return; }
+      try { await API.createCampaign({ nombre: f.nombre.trim(), segmento: f.segmento, plantilla: f.plantilla.trim(), idioma: t ? t.idioma || "es_AR" : (f.idioma || "es_AR").trim(), variables });
+        toast("Borrador guardado"); e.target.reset(); campVars(); cargarCampanas(); } catch (err) { toast(err.message); }
+    });
+    cargarPlantillas().then(() => cargarCampanas());
   }
   async function cargarCampanas() {
     try {
@@ -733,6 +859,7 @@
       $("#campList").innerHTML = l.length ? l.map((c) => `<article class="pcard" data-camp="${esc(c.id)}">
         <div class="ohead"><b>${esc(c.nombre)}</b><span class="ago">${ago(c.created_at)}</span><span class="st ${EST_C[c.estado] || "pendiente"}">${c.estado}</span></div>
         <p class="hintp">${esc(segNom(c.segmento))} · plantilla <b>${esc(c.plantilla)}</b> (${esc(c.idioma)})${(c.variables || []).length ? " · " + c.variables.map(esc).join(" / ") : ""}</p>
+        ${tplDe(c.plantilla) ? `<details class="tplver"><summary>Así le llega</summary>${TP.burbuja(tplDe(c.plantilla), c.variables)}</details>` : ""}
         ${c.estado === "borrador" ? `<div class="row2"><label>Probar con un número<input class="inp" data-prueba inputmode="tel" placeholder="223 347-1277"></label></div>
           <div class="acts"><button class="btn" data-cprobar>Mandar prueba</button><button class="btn solid wa" data-cenviar>Mandar a ${(P.segs && P.segs[c.segmento] || {}).whatsapp || 0}</button></div>`
           : `<p class="num">${c.enviados} enviados · ${c.fallidos} con error${c.enviada_at ? " · " + ago(c.enviada_at) : ""}</p>`}
