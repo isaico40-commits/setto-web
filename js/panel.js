@@ -1205,8 +1205,11 @@
   }
 
   /* =================== AVISOS PUSH AL EQUIPO =================== */
-  // Este dispositivo recibe una notificación cuando entra un pedido, una gift card, un cambio resuelto o una reseña (migración 027).
-  const AV = { open: false, estado: "cargando", busy: false };
+  // Este dispositivo recibe una notificación cuando entra un pedido, una gift card, un cambio resuelto, una reseña (migración 027)
+  // o una tarea nueva en la caja (050). Cada dispositivo dice de quién es, así no le llegan las tareas que cargó esa misma persona.
+  const AV = { open: false, estado: "cargando", busy: false, quien: "", socios: [] };
+  const AVYO = "setto-caja-yo"; // el mismo "¿Quién sos?" de la caja
+  const avYo = () => { try { return localStorage.getItem(AVYO) || ""; } catch (_) { return ""; } };
   const AVX = "setto-avisos-equipo-visto";
   const vapidKey = (window.SETTO_CONFIG || {}).vapidPublicKey;
   const avSoporte = () => !!vapidKey && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -1219,9 +1222,14 @@
     if (!avSoporte()) return esIOS && !instalada ? "ios" : "nosoporta";
     if (Notification.permission === "denied") return "bloqueado";
     if (Notification.permission !== "granted") return "apagado";
-    try { const sub = await avSub(); return sub && (await API.equipoPushActivo(sub.endpoint)) ? "activo" : "apagado"; } catch (_) { return "apagado"; }
+    try {
+      const sub = await avSub(); const q = sub ? await API.equipoPushQuien(sub.endpoint) : null;
+      if (q == null) return "apagado";
+      AV.quien = q; return "activo";
+    } catch (_) { return "apagado"; }
   }
   async function avisosInit() {
+    try { AV.socios = await API.equipoSocios(); } catch (_) {}
     AV.estado = await avEstado();
     let visto = false; try { visto = !!localStorage.getItem(AVX); } catch (_) {}
     if (AV.estado === "apagado" && !visto) AV.open = true; // la primera vez se muestra solo, después queda en la campanita
@@ -1234,6 +1242,9 @@
     box.hidden = !AV.open; if (!AV.open) return;
     const qué = "pedido nuevo, gift card, cliente que responde un cambio, reseña para aprobar y tarea nueva en la caja";
     const x = `<button class="linkbtn" data-avx>Cerrar</button>`;
+    const elegido = AV.estado === "activo" ? AV.quien : AV.quien || avYo();
+    const quien = AV.socios.length ? `<div class="avquien"><span class="hintp">¿De quién es este dispositivo? Así no te avisa las tareas que cargás vos.</span>
+      <div class="chips">${AV.socios.map((n) => `<button class="chip${n === elegido ? " on" : ""}" data-avquien="${esc(n)}" aria-pressed="${n === elegido}" ${AV.busy ? "disabled" : ""}>${esc(n)}</button>`).join("")}</div></div>` : "";
     const body = {
       cargando: `<p>Revisando los avisos…</p>`,
       demo: `<p>En modo demo no hay avisos.</p>${x}`,
@@ -1243,14 +1254,25 @@
       bloqueado: `<p><b>Las notificaciones del panel están bloqueadas</b> en este navegador. Si las querés, activalas en los ajustes del sitio y volvé a entrar.</p>${x}`,
       apagado: `<p><b>Avisos en este dispositivo</b><br>Te llega una notificación con cada ${qué}, aunque tengas el panel cerrado.</p>
         ${esIOS ? `<span class="hintp">En iPhone funciona solo con el panel agregado a inicio (iOS 16.4 o más).</span>` : ""}
+        ${quien}
         <div class="acts"><button class="btn solid" data-avon ${AV.busy ? "disabled" : ""}>${AV.busy ? "Activando…" : "Activar avisos"}</button>${x}</div>`,
-      activo: `<p><b>✓ Este dispositivo recibe avisos</b><br>Con cada ${qué}.</p>
+      activo: `<p><b>✓ Este dispositivo recibe avisos${AV.quien ? ` · ${esc(AV.quien)}` : ""}</b><br>Con cada ${qué}.</p>
+        ${quien}
         <div class="acts"><button class="btn" data-avtest>Probar</button><button class="linkbtn" data-avoff ${AV.busy ? "disabled" : ""}>Apagar en este dispositivo</button>${x}</div>`,
     }[AV.estado];
     box.innerHTML = body;
   }
   document.addEventListener("click", async (e) => {
-    const b = e.target.closest("#avisosBtn,[data-avx],[data-avon],[data-avoff],[data-avtest]"); if (!b) return;
+    const b = e.target.closest("#avisosBtn,[data-avx],[data-avon],[data-avoff],[data-avtest],[data-avquien]"); if (!b) return;
+    if (b.dataset.avquien !== undefined) {
+      AV.quien = b.dataset.avquien; try { localStorage.setItem(AVYO, AV.quien); } catch (_) {}
+      if (AV.estado !== "activo") return drawAvisos();
+      AV.busy = true; drawAvisos();
+      try { const sub = await avSub(); if (sub) await API.equipoPushSuscribir(sub, AV.quien); toast(`Listo: este dispositivo es de ${AV.quien}`); }
+      catch (err) { toast(err.message || "No se pudo guardar"); }
+      finally { AV.busy = false; drawAvisos(); }
+      return;
+    }
     if (b.id === "avisosBtn" || b.dataset.avx !== undefined) {
       AV.open = b.id === "avisosBtn" ? !AV.open : false;
       if (!AV.open) { try { localStorage.setItem(AVX, "1"); } catch (_) {} }
@@ -1269,12 +1291,13 @@
         if (perm !== "granted") { AV.estado = perm === "denied" ? "bloqueado" : "apagado"; return; }
         const reg = await navigator.serviceWorker.register("/sw.js"); await navigator.serviceWorker.ready;
         const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: claveVapid(vapidKey) }));
-        await API.equipoPushSuscribir(sub);
+        AV.quien = AV.quien || avYo();
+        await API.equipoPushSuscribir(sub, AV.quien);
         AV.estado = "activo"; toast("Listo: este dispositivo recibe avisos");
       } else {
         const sub = await avSub();
         if (sub) await API.equipoPushDesuscribir(sub.endpoint); // la suscripción del navegador queda: la puede usar el seguimiento o los drops
-        AV.estado = "apagado"; toast("Avisos apagados en este dispositivo");
+        AV.estado = "apagado"; AV.quien = ""; toast("Avisos apagados en este dispositivo");
       }
     } catch (err) { toast(err.message || "No se pudieron cambiar los avisos"); }
     finally { AV.busy = false; drawAvisos(); }

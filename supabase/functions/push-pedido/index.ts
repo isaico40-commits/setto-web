@@ -1,7 +1,8 @@
 // Edge Function · push-pedido
 // La llama el trigger orders_push (migración 025) cuando un pedido cambia: busca las suscripciones del pedido y manda la notificación.
 // Con tipo "drop" (migración 026) avisa el lanzamiento de la edición especial a todos los anotados en drop_subs.
-// Con tipo "equipo" (migraciones 027 y 028) avisa al equipo: pedido nuevo, gift card, cambio resuelto, reseña o tarea nueva en la caja. Sin JWT: se valida con x-setto-hook.
+// Con tipo "equipo" (migraciones 027, 028 y 050) avisa al equipo: pedido nuevo, gift card, cambio resuelto, reseña o tarea nueva en la caja
+// (la tarea no le llega al dispositivo de quien la cargó). Sin JWT: se valida con x-setto-hook.
 // Las claves (hook y VAPID) se leen de Vault con push_config(); SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY ya vienen.
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -69,6 +70,7 @@ const plata = (n: number) => "$" + Number(n || 0).toLocaleString("es-AR");
 // aviso para el panel: arma el texto según el evento y lo manda a todos los navegadores del equipo
 async function avisarEquipo(evento: string, id: string) {
   let n: { title: string; body: string; url: string; tag: string } | null = null;
+  let menos = ""; // dispositivo que no recibe el aviso (quien cargó la tarea)
   if (evento === "pedido" || evento === "cambio") {
     const { data: o } = await sb.from("orders").select("code,nombre,total,modo,retiro,cambio").eq("id", id).maybeSingle();
     if (o && evento === "pedido") n = { title: `🛎️ Pedido nuevo · ${o.code}`, body: `${o.nombre} · ${plata(o.total)} · ${o.modo === "envio" ? "envío" : "retira"}${o.retiro ? " " + o.retiro : ""}`, url: "/panel", tag: `pedido-${o.code}` };
@@ -82,12 +84,14 @@ async function avisarEquipo(evento: string, id: string) {
   } else if (evento === "tarea") {
     const { data: t } = await sb.from("caja_tareas").select("titulo,asignada,prioridad,creada_por").eq("id", id).maybeSingle();
     if (t) n = { title: `${t.prioridad === "alta" ? "🔴" : "📝"} Tarea nueva de ${t.creada_por}`, body: `${t.titulo}${t.asignada && t.asignada !== "Cualquiera" ? ` · para ${t.asignada}` : ""}`, url: "/caja#tareas", tag: `tarea-${id}` };
+    if (t) menos = t.creada_por || "";
   }
   if (!n) return new Response("sin aviso", { status: 200 });
-  const { data: subs } = await sb.from("staff_push_subs").select("endpoint,p256dh,auth");
-  const { ok, muertas } = await enviar(subs ?? [], JSON.stringify(n), 24 * 3600);
+  const { data: todas } = await sb.from("staff_push_subs").select("endpoint,p256dh,auth,quien");
+  const subs = (todas ?? []).filter((s) => !menos || s.quien !== menos);
+  const { ok, muertas } = await enviar(subs, JSON.stringify(n), 24 * 3600);
   if (muertas.length) await sb.from("staff_push_subs").delete().in("endpoint", muertas);
-  return Response.json({ enviadas: ok, de: subs?.length ?? 0 });
+  return Response.json({ enviadas: ok, de: subs.length });
 }
 
 Deno.serve(async (req) => {

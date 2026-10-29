@@ -175,6 +175,10 @@ a.ptab{text-decoration:none}
 .avisos{margin:16px 0 4px;background:var(--card);border:var(--line);border-radius:18px;padding:14px 18px;display:grid;gap:10px;max-width:640px}
 .avisos p{margin:0;line-height:1.45}
 .avisos ol{margin:0;padding-left:20px;line-height:1.6}
+.avquien{display:grid;gap:6px}
+.avquien .chips{display:flex;flex-wrap:wrap;gap:6px}
+.avquien .chips button{border:1.5px solid var(--turquesa);background:var(--card);border-radius:999px;padding:7px 14px;font-size:.84rem;font-weight:600;color:var(--turquesa)}
+.avquien .chips button[aria-pressed="true"]{background:var(--turquesa);color:#fff}
 
 /* Selector Pedidos | Caja (mismo en el panel y en la caja) */
 .appsw{display:inline-flex;background:var(--bg-2);border-radius:999px;padding:3px;gap:2px}
