@@ -419,6 +419,17 @@
     },
     // solo demo: fichas de prueba para este dispositivo
     async maqSumarDemo(dev, n) { const db = dbLoad(), d = maqDev(db, dev); d.gratis_usadas -= n; dbSave(db); },
+    // el equipo anota que el cliente aceptó (migración 050). Si se había dado de baja, no se toca: tiene que escribir ALTA
+    async consentimientoPanel(phone, canales) {
+      const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("Número de celular inválido");
+      db.consents = db.consents || []; const ok = [], baja = [];
+      canales.filter((c) => ["whatsapp", "meta_ads"].includes(c)).forEach((c) => {
+        const u = db.consents.find((x) => x.phone === ph && x.canal === c);
+        if (u && u.estado === "otorgado") return; if (u) { baja.push(c); return; }
+        db.consents.unshift({ phone: ph, canal: c, finalidad: c === "whatsapp" ? "novedades" : "publicidad", estado: "otorgado", origen: "panel", aviso_version: "panel-dicho", created_at: new Date().toISOString() }); ok.push(c);
+      });
+      dbSave(db); return { phone: ph, otorgados: ok, dados_de_baja: baja };
+    },
     async bajaMarketing(phone, canal) {
       const db = dbLoad(), ph = normPhone(phone); if (!ph) throw new Error("Revisá el número: código de área + número, por ejemplo 223 347-1277.");
       db.consents = db.consents || [];
@@ -684,6 +695,7 @@
     async registrarConsentimiento(code, phone, canales, version) { const { error } = await sb.rpc("registrar_consentimiento", { p_code: code, p_phone: phone, p_canales: canales, p_version: version }); fail(error); },
     async consentimientoMaquinita(phone, version) { const { error } = await sb.rpc("consentimiento_maquinita", { p_phone: phone, p_version: version }); fail(error); },
     async consentimientoMaquinita2(dev, phone, canales, version) { const { error } = await sb.rpc("consentimiento_maquinita_v2", { p_dev: dev, p_phone: phone, p_canales: canales, p_version: version }); fail(error); },
+    async consentimientoPanel(phone, canales) { const { data, error } = await sb.rpc("consentimiento_panel", { p_phone: phone, p_canales: canales }); fail(error); return data; },
     async bajaMarketing(phone, canal) { const { error } = await sb.rpc("baja_marketing", { p_phone: phone, p_canal: canal || null }); fail(error); },
     async registrarOrigen(code, phone, origen) { const { error } = await sb.rpc("registrar_origen", { p_code: code, p_phone: phone, p_origen: origen }); fail(error); },
     async crmCliente(phone) { const { data, error } = await sb.from("crm_clientes").select("*").eq("phone", normPhone(phone)).maybeSingle(); fail(error); return data; },

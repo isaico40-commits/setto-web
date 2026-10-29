@@ -567,6 +567,8 @@
           <div class="row2"><label>Celular<input class="inp" id="cmPhone" inputmode="tel" required></label><label>Nombre (opcional)<input class="inp" id="cmName"></label></div>
           <div class="row2"><label>Sellos (usá − para restar)<input class="inp" id="cmN" type="number" value="1" min="-20" max="20"></label>
           <label>Motivo<select class="inp" id="cmWhy"><option>WhatsApp directo</option><option>PedidosYa</option><option>Rappi</option><option>Uber Eats</option><option>Corrección</option><option>Otro</option></select></label></div>
+          <div class="checks"><label><input type="checkbox" id="cmWa"> Aceptó recibir novedades por WhatsApp</label><label><input type="checkbox" id="cmAds"> Aceptó anuncios de Meta</label></div>
+          <span class="hintp">Tildalo solo si el cliente te dijo que sí: así entra en las campañas. Si se había dado de baja, tiene que escribir ALTA al WhatsApp.</span>
           <button class="btn" type="submit">Sumar</button></form>
       </div>
       <div id="cResult"></div>
@@ -574,7 +576,16 @@
     $("#cSearch").addEventListener("submit", (e) => { e.preventDefault(); openClient($("#csPhone").value); });
     $("#cManual").addEventListener("submit", async (e) => {
       e.preventDefault();
-      try { const r = await API.addStamps($("#cmPhone").value, $("#cmName").value, parseInt($("#cmN").value, 10), $("#cmWhy").value); toast(`Listo: ahora tiene ${r.sellos} sello(s)`); openClient(r.phone); listClients(); e.target.reset(); }
+      const canales = [$("#cmWa").checked && "whatsapp", $("#cmAds").checked && "meta_ads"].filter(Boolean);
+      try {
+        const r = await API.addStamps($("#cmPhone").value, $("#cmName").value, parseInt($("#cmN").value, 10), $("#cmWhy").value);
+        let extra = "";
+        if (canales.length) {
+          try { extra = permisoTxt(await API.consentimientoPanel(r.phone, canales)); }
+          catch (_) { extra = " · No se pudo anotar el permiso (falta la migración 050)"; }
+        }
+        toast(`Listo: ahora tiene ${r.sellos} sello(s)${extra}`); openClient(r.phone); listClients(); e.target.reset();
+      }
       catch (err) { toast(err.message); }
     });
     listClients();
@@ -622,13 +633,15 @@
       ${c.last_touch_source ? `<div><span>Último origen</span><span>${esc(origenTxt(c.last_touch_source, c.last_touch_campaign))}</span></div>` : ""}
     </div>`;
   }
-  // permisos de marketing: vale el último registro de cada canal. El equipo solo puede dar de baja, nunca autorizar.
+  // permisos de marketing: vale el último registro de cada canal. El equipo puede dar de baja y anotar un sí que dijo el cliente,
+  // pero no volver a dar de alta a quien se dio de baja (eso solo con ALTA por WhatsApp).
   const CANALES = [["whatsapp", "Novedades por WhatsApp"], ["meta_ads", "Anuncios de Meta"]];
   const ORIGEN = { checkout_web: "al pedir en la web", preferencias_web: "desde la web", panel: "desde el panel", whatsapp: "por WhatsApp", maquinita: "desde la maquinita" };
+  const permisoTxt = (r) => (r.otorgados || []).length ? " · Ya entra en las campañas" : (r.dados_de_baja || []).length ? " · Se había dado de baja: tiene que escribir ALTA al WhatsApp" : "";
   function consentHtml(l) {
     return `<b style="margin-top:6px">Permisos de marketing</b><div class="hist">${CANALES.map(([k, nom]) => {
       const u = l.find((x) => x.canal === k), si = u && u.estado === "otorgado";
-      return `<div><span>${nom} · ${si ? "<b>Sí</b>" : u ? "Se dio de baja" : "No"} <span class="muted">${u ? `${ORIGEN[u.origen] || u.origen} · ${ago(u.created_at)}` : "nunca lo aceptó"}</span></span>${si ? `<button class="linkbtn" data-baja="${k}">Dar de baja</button>` : ""}</div>`;
+      return `<div><span>${nom} · ${si ? "<b>Sí</b>" : u ? "Se dio de baja" : "No"} <span class="muted">${u ? `${ORIGEN[u.origen] || u.origen} · ${ago(u.created_at)}` : "nunca lo aceptó"}</span></span>${si ? `<button class="linkbtn" data-baja="${k}">Dar de baja</button>` : u ? "" : `<button class="linkbtn" data-alta="${k}">Anotar que aceptó</button>`}</div>`;
     }).join("")}</div>`;
   }
 
@@ -643,7 +656,7 @@
     <p class="muted">Para tener a mano. Los números marcados con ≈ son referencias para arrancar: ajustalos con tus propios datos.</p>
     <details class="pcard" open><summary>Cómo encaja todo</summary>
       <ol>
-        <li>El cliente arma el pedido en la web y lo manda por WhatsApp. Si dejó las casillas tildadas, queda con permiso para <b>novedades por WhatsApp</b> y/o <b>anuncios de Meta</b>.</li>
+        <li>El cliente arma el pedido en la web y lo manda por WhatsApp. Si dejó las casillas tildadas, queda con permiso para <b>novedades por WhatsApp</b> y/o <b>anuncios de Meta</b>. Si lo sumás al Club a mano, tildá "Aceptó…" solo si el cliente te dijo que sí.</li>
         <li>Al tocar <b>Entregado</b>, la compra viaja a Meta (aparece como "Compra STT-…" en Envíos a Meta). Así Meta aprende quién compra de verdad.</li>
         <li>Con cada compra entregada el cliente cae en un <b>segmento</b> (nuevos, recurrentes, fans de los mochis…). Los números de la tabla de arriba son "con permiso de WhatsApp · con permiso de anuncios".</li>
         <li>Con esos segmentos hacés dos cosas: <b>campañas de WhatsApp</b> (le escribís directo) y <b>públicos de Meta</b> (para anuncios en Instagram/Facebook).</li>
@@ -1356,6 +1369,7 @@
       try { const r = await API.sendCampaign(id, prueba); toast(prueba ? "Prueba enviada" : `Listo: ${r.enviados} enviados, ${r.fallidos} con error`); cargarCampanas(); } catch (err) { toast(err.message); b.disabled = false; }
     }
     if (b.dataset.clientGo) { P.client = b.dataset.clientGo; go("club"); }
+    if (b.dataset.alta) { if (!confirm("¿El cliente te dijo que acepta? Anotalo solo si te lo pidió: desde ahora entra en las campañas.")) return; try { const r = await API.consentimientoPanel(P.client, [b.dataset.alta]); toast(permisoTxt(r).replace(" · ", "") || "Listo"); openClient(P.client); } catch (err) { toast(err.message); } }
     if (b.dataset.baja) { if (!confirm("¿Dar de baja este permiso? Las automatizaciones dejan de usar este número para eso.")) return; try { await API.bajaMarketing(P.client, b.dataset.baja); toast("Listo, quedó dado de baja"); openClient(P.client); } catch (err) { toast(err.message); } }
     if (b.dataset.redeem !== undefined) { try { await API.redeem(P.client); toast("Premio canjeado"); openClient(P.client); listClients(); } catch (err) { toast(err.message); } }
 
