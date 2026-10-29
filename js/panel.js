@@ -957,8 +957,9 @@
             const sim = MQ_SIM.map(([n, img], i) => { const c = (m.simbolos || [])[i] || {}, v = c.img || "", ver = v || img; return `<div class="slrow"><span class="upprev" data-prevfor="mi${i}">${ver ? `<img src="${esc(ver)}" alt="" style="object-fit:contain">` : "Estrella<br>(dibujada)"}</span><div class="slf"><input type="hidden" name="mi${i}" value="${esc(v)}">
               <label>${i ? `Símbolo ${i + 1}` : "Símbolo especial (5 iguales = premio mayor)"}<input class="inp" name="mn${i}" maxlength="30" value="${esc(c.nombre || n)}"></label>
               <span class="acts" style="gap:6px"><label class="btn">Subir imagen<input type="file" accept="image/*" data-upimg="mi${i}" data-upmax="400" hidden></label>${v ? `<button type="button" class="linkbtn warn" data-upx="mi${i}">Volver a la original</button>` : ""}</span></div></div>`; }).join("");
-            const prem = MQ_PREM.map(([id, cuando, t, ch, tipo, valor]) => { const c = (m.premios || []).find((x) => x.id === id), tp = (c && c.tipo) || tipo, vl = c && c.valor != null ? +c.valor || 0 : valor;
-              return `<div class="row2"><label>${cuando}: premio (vacío = sin premio)<input class="inp" name="pt_${id}" maxlength="40" value="${esc(c ? c.titulo || "" : t)}"></label><label>Probabilidad (%)<input class="inp" name="pc_${id}" type="number" min="0" max="100" step="0.1" value="${c ? +c.chance || 0 : ch}"></label></div>
+            const prem = MQ_PREM.map(([id, cuando, t, ch, tipo, valor]) => { const c = (m.premios || []).find((x) => x.id === id), tp = (c && c.tipo) || tipo, vl = c && c.valor != null ? +c.valor || 0 : valor, on = c ? c.activo !== false : !!t;
+              return `<label class="chk" style="margin-top:6px"><input type="checkbox" name="pa_${id}" ${on ? "checked" : ""}> Activo: ${cuando}</label>
+              <div class="row2"><label>${cuando}: premio (vacío = sin premio)<input class="inp" name="pt_${id}" maxlength="40" value="${esc(c ? c.titulo || "" : t)}"></label><label>Probabilidad (%)<input class="inp" name="pc_${id}" type="number" min="0" max="100" step="0.1" value="${c ? +c.chance || 0 : ch}"></label></div>
               <div class="row2"><label>Qué se descuenta<select class="inp" name="pk_${id}">${MQ_TIPO.map(([v, l]) => `<option value="${v}" ${tp === v ? "selected" : ""}>${l}</option>`).join("")}</select></label><label>Valor ($ o %, no aplica al mochi)<input class="inp" name="pv_${id}" type="number" min="0" step="1" value="${vl}"></label></div>`; }).join("");
             return `<label class="chk"><input type="checkbox" name="activo" ${m.activo !== false ? "checked" : ""}> Mostrar la maquinita en la web (sección entre Sets y Carta y botón del carrito)</label>
           <div class="row2"><label>Tiradas gratis por día<input class="inp" name="fichas" type="number" min="1" max="5" value="${Math.max(1, +m.fichas_dia || 1)}"></label>
@@ -1058,7 +1059,7 @@
      a la derecha, con una sola barra de Guardar que avisa cuando hay cambios sin guardar. */
   /* maquinita: símbolos y premios por defecto (los mismos que usa maquinita.html si no hay ajustes) */
   const MQ_SIM = [["Mochito", "img/mochito-cup.png"], ["Mochi frutilla", "img/mochi-frutilla.webp"], ["Mochi oreo", "img/mochi-oreo.webp"], ["Dirty caramel", "img/dirty-caramel.webp"], ["Strawberry matcha", "img/dirty-strawberry.webp"], ["Estrella", ""]];
-  const MQ_PREM = [["gift", "5 especiales", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "5 iguales", "Mochi gratis", 0.5, "mochi", 0], ["off", "4 iguales", "10% off", 2, "porcentaje", 10]];
+  const MQ_PREM = [["gift", "5 especiales", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "5 iguales", "Mochi gratis", 0.5, "mochi", 0], ["off", "4 iguales", "10% off", 2, "porcentaje", 10], ["extra", "3 iguales", "", 0, "porcentaje", 0]];
   const MQ_TIPO = [["monto", "Descuento en $"], ["porcentaje", "Descuento en %"], ["mochi", "Un mochi gratis"]];
   const AJ_SEC = [
     { k: "contacto", g: "Pedidos", t: "Contacto", d: "El WhatsApp que recibe los pedidos, Instagram y tu link de links.", s: (S) => pretty(S.whatsapp) || "Sin WhatsApp" },
@@ -1145,9 +1146,11 @@
         premio_set: !!f.pset, premio_descuento: Math.max(0, Math.min(100, +f.pdesc || 0)), premio_tope: Math.max(0, +f.ptope || 0), regalo: !!f.regalo, sello_resena: !!f.sres });
       if (k === "maquinita") {
         const premios = MQ_PREM.map(([id, , , , tipo]) => { const tp = MQ_TIPO.some(([k]) => k === f["pk_" + id]) ? f["pk_" + id] : tipo;
-          return { id, titulo: (f["pt_" + id] || "").trim(), chance: Math.max(0, Math.min(100, +String(f["pc_" + id] || "0").replace(",", ".") || 0)), tipo: tp, valor: tp === "mochi" ? 0 : Math.max(0, Math.round(+f["pv_" + id] || 0)) }; });
-        if (premios.reduce((a, p) => a + (p.titulo ? p.chance : 0), 0) > 100) throw new Error("Las probabilidades suman más de 100%");
-        const malo = premios.find((p) => p.titulo && p.tipo !== "mochi" && (!p.valor || (p.tipo === "porcentaje" && p.valor > 100)));
+          return { id, activo: !!f["pa_" + id], titulo: (f["pt_" + id] || "").trim(), chance: Math.max(0, Math.min(100, +String(f["pc_" + id] || "0").replace(",", ".") || 0)), tipo: tp, valor: tp === "mochi" ? 0 : Math.max(0, Math.round(+f["pv_" + id] || 0)) }; });
+        const sinNombre = premios.find((p) => p.activo && !p.titulo);
+        if (sinNombre) throw new Error(`Ponele nombre al premio de ${MQ_PREM.find(([id]) => id === sinNombre.id)[1]} o destildá Activo`);
+        if (premios.reduce((a, p) => a + (p.activo && p.titulo ? p.chance : 0), 0) > 100) throw new Error("Las probabilidades suman más de 100%");
+        const malo = premios.find((p) => p.activo && p.titulo && p.tipo !== "mochi" && (!p.valor || (p.tipo === "porcentaje" && p.valor > 100)));
         if (malo) throw new Error(`Revisá el valor de “${malo.titulo}”`);
         await API.saveSetting("maquinita", { activo: !!f.activo, fichas_dia: Math.max(1, Math.min(5, Math.round(+f.fichas || 1))), fichas_compra: Math.max(0, Math.min(50, Math.round(+f.fcompra || 0))), premios,
           simbolos: MQ_SIM.map(([n], i) => ({ nombre: (f["mn" + i] || "").trim() || n, img: (f["mi" + i] || "").trim() })) });

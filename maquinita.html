@@ -242,13 +242,15 @@ body{margin:0}
   const N = 5; // rodillos
 
   // La tabla se edita desde el panel; el resultado de cada tirada lo decide la base (maq_tirar)
-  const DEF_PREM = { gift: ["Gift card $10.000", 0.1], mochi: ["Mochi gratis", 0.5], off: ["10% off", 2] };
+  const DEF_PREM = { gift: ["Gift card $10.000", 0.1], mochi: ["Mochi gratis", 0.5], off: ["10% off", 2], extra: ["", 0] };
   const puntos = (n) => "<i></i>".repeat(n) + '<i class="no"></i>'.repeat(5 - n);
-  const COMBO = { gift: [() => symHtml("mochito").repeat(5), "5 Mochitos"], mochi: [() => puntos(5), "5 iguales"], off: [() => puntos(4), "4 iguales"] };
-  const PREMIOS = ["gift", "mochi", "off"].map((id) => {
+  const COMBO = { gift: [() => symHtml("mochito").repeat(5), "5 Mochitos"], mochi: [() => puntos(5), "5 iguales"], off: [() => puntos(4), "4 iguales"], extra: [() => puntos(3), "3 iguales"] };
+  // un premio se muestra solo si está activo, tiene nombre y chance (la base aplica la misma regla al sortear)
+  const PREMIOS = ["gift", "mochi", "off", "extra"].map((id) => {
     const c = (CFG.premios || []).find((x) => x.id === id), d = DEF_PREM[id];
-    return { id, titulo: c ? String(c.titulo || "").trim() : d[0], chance: c ? Math.max(0, +c.chance || 0) : d[1], combo: COMBO[id] };
+    return { id, titulo: c ? String(c.titulo || "").trim() : d[0], chance: c && c.activo === false ? 0 : c ? Math.max(0, +c.chance || 0) : d[1], combo: COMBO[id] };
   }).filter((p) => p.titulo && p.chance > 0);
+  const CON3 = PREMIOS.some((p) => p.id === "extra");
   const fmt = (n) => n.toLocaleString("es-AR") + "%";
   $("#premios").innerHTML = `<div class="pz-h"><h2>Premios</h2><span>Chance por tirada</span></div>` + PREMIOS.map((p, i) => `<div class="pz ${i === 0 ? "top" : ""}"><span class="pz-combo" aria-hidden="true">${p.combo[0]()}</span><span class="pz-t"><b>${esc(p.titulo)}</b><small>${p.combo[1]}</small></span><span class="pz-pct">${fmt(p.chance)}</span></div>`).join("");
 
@@ -357,7 +359,8 @@ body{margin:0}
     if (res === "gift") return Array(N).fill("mochito");
     if (res === "mochi") return Array(N).fill(pick(otros));
     if (res === "off") { const s = pick(otros); return mezclar([s, s, s, s, pick(SIMBOLOS.filter((x) => x !== s))]); }
-    let t; do { t = Array.from({ length: N }, azar); } while (maxIguales(t) >= 4); // sin premio: al azar, nunca 4 o 5 iguales
+    if (res === "extra") { const s = pick(otros), r = mezclar(SIMBOLOS.filter((x) => x !== s)); return mezclar([s, s, s, r[0], r[1]]); }
+    let t; do { t = Array.from({ length: N }, azar); } while (maxIguales(t) >= (CON3 ? 3 : 4)); // sin premio: al azar, nunca la combinación de un premio
     return t;
   }
 
@@ -392,7 +395,7 @@ body{margin:0}
   function resultado(r0, fin) {
     const res = r0.resultado;
     if (res === "nada" || (!r0.code && !r0.pendiente)) { pintarFichas(); if (quedan() > 0) $("#msg").textContent = "¡Casi! Tirá de nuevo"; else if (!COMPRA) $("#msg").textContent = "¡Casi! Volvé mañana"; return; }
-    const top = SIMBOLOS.find((s) => fin.filter((x) => x === s).length >= 4);
+    const top = SIMBOLOS.find((s) => fin.filter((x) => x === s).length >= (res === "extra" ? 3 : 4));
     reels.forEach((r, i) => { if (fin[i] === top) r.classList.add("win"); });
     const html = `<span><b>¡${esc(r0.titulo)}!</b><small>Canjealo acá abajo: queda aplicado en tu pedido.</small></span>`;
     fanfarria(res === "gift"); confeti(res === "gift" ? 220 : res === "mochi" ? 140 : 70);
@@ -443,7 +446,7 @@ body{margin:0}
   }
 
   /* ---------- prueba ---------- */
-  const OPC = [["gift", "Gift card"], ["mochi", "Mochi"], ["off", "10% off"], ["nada", "Nada"]];
+  const OPC = [["gift", "Gift card"], ["mochi", "Mochi"], ["off", "10% off"], ["extra", "3 iguales"], ["nada", "Nada"]];
   $("#forzar").innerHTML = OPC.map(([k, l]) => `<button class="chip" type="button" data-f="${k}" aria-pressed="false">Próxima: ${l}</button>`).join("");
   function marcar() { document.querySelectorAll("[data-f]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === forzado)); }
   $("#forzar").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (!b) return; forzado = forzado === b.dataset.f ? null : b.dataset.f; marcar(); });

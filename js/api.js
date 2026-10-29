@@ -90,12 +90,13 @@
   const ordenRv = (l) => l.slice().sort((a, b) => (a.orden || 1e9) - (b.orden || 1e9) || String(b.created_at).localeCompare(String(a.created_at)));
 
   /* maquinita en modo demo */
-  const MAQ_DEF = [["gift", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "Mochi gratis", 0.5, "mochi", 0], ["off", "10% off", 2, "porcentaje", 10]];
+  const MAQ_DEF = [["gift", "Gift card $10.000", 0.1, "monto", 10000], ["mochi", "Mochi gratis", 0.5, "mochi", 0], ["off", "10% off", 2, "porcentaje", 10], ["extra", null, 0, "porcentaje", 0]];
   function maqPremiosCfg(cfg) {
     return MAQ_DEF.map(([id, titulo, chance, tipo, valor]) => {
       const c = Array.isArray(cfg.premios) ? cfg.premios.find((x) => x.id === id) : null;
       if (!c) return { id, titulo, chance, tipo, valor };
-      return { id, titulo: String(c.titulo || "").trim() || null, chance: Math.max(0, +c.chance || 0), tipo: c.tipo || tipo, valor: c.valor != null ? Math.max(0, +c.valor || 0) : valor };
+      const tp = c.tipo || tipo, vl = c.valor != null ? Math.max(0, +c.valor || 0) : valor;
+      return { id, titulo: String(c.titulo || "").trim() || null, chance: c.activo === false || (tp !== "mochi" && !vl) ? 0 : Math.max(0, +c.chance || 0), tipo: tp, valor: vl };
     });
   }
   const MAQ_VENCE = 48 * 3600e3; // el premio dura 48 hs (migración 040)
