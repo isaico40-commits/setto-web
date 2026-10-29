@@ -568,7 +568,49 @@
   if (maqVencido()) { MAQ = null; try { localStorage.removeItem("setto-maq-usar"); } catch (_) {} }
   function usarMaq(p) { MAQ = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.saldo, vence_at: p.vence_at || null, tel: form.tel }; try { localStorage.setItem("setto-maq-usar", JSON.stringify(MAQ)); } catch (_) {} }
   function quitarMaq() { MAQ = null; try { localStorage.removeItem("setto-maq-usar"); } catch (_) {} }
-  const antesMaq = () => total() + envioCosto() - (completes() ? premioOff() : 0);
+  /* código de descuento (Panel → Campañas → Códigos, migración 053): va después del premio del Club y antes de la maquinita, igual que create_order_v7 */
+  let CUPON = null; try { CUPON = JSON.parse(localStorage.getItem("setto-codigo") || "null"); } catch (_) {}
+  if (CUPON && CUPON.vence_at && new Date(CUPON.vence_at) <= new Date()) { CUPON = null; try { localStorage.removeItem("setto-codigo"); } catch (_) {} }
+  function usarCupon(p) { CUPON = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, regalo: p.regalo, tope: p.tope || 0, minimo: p.minimo || 0, acumula: !!p.acumula, vence_at: p.vence_at || null }; try { localStorage.setItem("setto-codigo", JSON.stringify(CUPON)); } catch (_) {} }
+  function quitarCupon() { CUPON = null; try { localStorage.removeItem("setto-codigo"); } catch (_) {} }
+  const esMochi = (p) => !!p && (p.categoria === "mochi" || (p.categoria === "especial" && (p.formato || "mochi") === "mochi"));
+  const esBebida = (p) => !!p && (p.categoria === "dirty" || (p.categoria === "especial" && p.formato === "dirty"));
+  const regaloMin = () => { const ps = cart.filter((c) => (CUPON.regalo === "bebida" ? esBebida : esMochi)(find(c.id))).map((c) => c.precio); return ps.length ? Math.min(...ps) : 0; };
+  // por qué el código no entra en este pedido (null = entra). Si no entra, el pedido sale sin código y el código queda guardado.
+  function cuponTraba() {
+    if (!CUPON) return null;
+    if (!CUPON.acumula && (completes() || MAQ)) return `no se suma con ${completes() ? "el premio del Setto Club" : "el premio de la maquinita"}`;
+    if (total() < (CUPON.minimo || 0)) return `es para compras desde ${money(CUPON.minimo)}`;
+    if (CUPON.tipo === "regalo" && !regaloMin()) return CUPON.regalo === "bebida" ? "sumá una bebida y te sale gratis" : "sumá un mochi y te sale gratis";
+    if (CUPON.tipo === "envio" && form.modo !== "envio") return "elegí envío a domicilio para usarlo";
+    return null;
+  }
+  function cuponOff() {
+    if (!CUPON || cuponTraba()) return 0;
+    const t = Math.max(total() + envioCosto() - (completes() ? premioOff() : 0), 0);
+    let d = CUPON.tipo === "porcentaje" ? Math.round((total() * CUPON.valor) / 100 / 10) * 10 : CUPON.tipo === "monto" ? CUPON.valor : CUPON.tipo === "regalo" ? regaloMin() : envioCosto();
+    if (CUPON.tipo === "porcentaje" && CUPON.tope > 0) d = Math.min(d, CUPON.tope);
+    return Math.max(0, Math.min(d, t));
+  }
+  const cuponDet = () => CUPON.tipo === "porcentaje" ? `${CUPON.valor}% off en tus productos${CUPON.tope > 0 ? ` (hasta ${money(CUPON.tope)})` : ""}.` : CUPON.tipo === "monto" ? `${money(CUPON.valor)} de descuento.`
+    : CUPON.tipo === "regalo" ? `Tu ${CUPON.regalo === "bebida" ? "bebida" : "mochi"} más barato sale gratis.` : "El envío sale gratis.";
+  // banner en el carrito, como el de la maquinita
+  function cuponCartHtml() {
+    if (!CUPON) return "";
+    const tr = cuponTraba(), v = CUPON.vence_at ? ` · vale hasta el ${new Date(CUPON.vence_at).toLocaleDateString("es-AR", { day: "numeric", month: "numeric" })}` : "";
+    return `<div class="maqon cupon"><span class="maqon-i" aria-hidden="true">🏷️</span><div><b>Código ${esc(CUPON.code)}: ${esc(CUPON.titulo)}</b><small>${tr ? tr[0].toUpperCase() + tr.slice(1) + "." : cuponDet()}${v}</small></div><button class="back" data-cdx>Quitar</button></div>`;
+  }
+  async function aplicarCupon(code, msg) {
+    if (msg) msg.textContent = "Revisando…";
+    try { const p = await API.promoCheck(code, form.tel);
+      if (!p || !p.code || p.error) { if (msg) msg.textContent = (p && p.error) || "No encontramos ese código."; return; }
+      usarCupon(p); drawDrawer(); toast(`Código ${p.code} aplicado`);
+    } catch (ex) { if (msg) msg.textContent = /function|schema|promo_check/i.test(ex.message || "") ? "No encontramos ese código." : ex.message; }
+  }
+  // link con ?codigo=XXXX (lo arma el panel al mandar un código a mano): queda guardado para el pedido
+  { const cu = new URLSearchParams(location.search).get("codigo");
+    if (cu && API.promoCheck) API.promoCheck(cu, null).then((p) => { if (p && p.code && !p.error) { usarCupon(p); toast(`Código ${p.code} guardado: se aplica en tu pedido`); } }).catch(() => {}); }
+  const antesMaq = () => total() + envioCosto() - (completes() ? premioOff() : 0) - cuponOff();
   const mochiMin = () => { const ms = cart.filter((c) => ["mochi", "especial"].includes((find(c.id) || {}).categoria)).map((c) => c.precio); return ms.length ? Math.min(...ms) : 0; };
   function maqOff() {
     if (!MAQ) return 0; const t = Math.max(antesMaq(), 0);
@@ -608,8 +650,10 @@
   };
   function giftBox() {
     const maqLine = MAQ ? `<div class="gcon"><span>🎰 ${esc(MAQ.titulo)} <b>${esc(MAQ.code)}</b>${MAQ.tipo === "mochi" && !mochiMin() ? " · agregá un mochi para usarlo" : ""}</span><button class="back" data-maqx>Quitar</button></div>` : `<div class="maqsug" id="maqSug"></div>`;
-    return `<div class="f gcbox">${maqLine}${GIFT ? `<div class="gcon"><span>🎁 Gift card <b>${esc(GIFT.code)}</b> · saldo ${money(GIFT.saldo)}</span><button class="back" data-gcx>Quitar</button></div>`
-      : `<details><summary>¿Tenés una gift card o un código de la maquinita?</summary><div class="gcin"><input id="gcCode" placeholder="GIFT-XXXX-XXXX o MAQ-XXXX-XXXX" autocapitalize="characters"><button class="btn" data-gcok>Aplicar</button></div><span class="hintf" id="gcMsg"></span></details>`}</div>`;
+    const tr = cuponTraba(), cuponLine = CUPON ? `<div class="gcon"><span>🏷️ ${esc(CUPON.titulo)} <b>${esc(CUPON.code)}</b>${tr ? " · " + esc(tr) : ""}</span><button class="back" data-cdx>Quitar</button></div>` : "";
+    const giftLine = GIFT ? `<div class="gcon"><span>🎁 Gift card <b>${esc(GIFT.code)}</b> · saldo ${money(GIFT.saldo)}</span><button class="back" data-gcx>Quitar</button></div>` : "";
+    const ask = !(GIFT && CUPON && MAQ) ? `<details><summary>¿Tenés un código de descuento, una gift card o un premio de la maquinita?</summary><div class="gcin"><input id="gcCode" placeholder="Escribí tu código" autocapitalize="characters" spellcheck="false"><button class="btn" data-gcok>Aplicar</button></div><span class="hintf" id="gcMsg"></span></details>` : "";
+    return `<div class="f gcbox">${maqLine}${cuponLine}${giftLine}${ask}</div>`;
   }
   async function aplicarMaq(code, msg) {
     if (!API.normPhone(form.tel)) { if (msg) msg.textContent = "Completá tu celular: el premio es del número que tiró."; return; }
@@ -624,9 +668,12 @@
     if (e.target.closest("[data-maqx]")) { quitarMaq(); drawDrawer(); return; }
     const mu = e.target.closest("[data-maquse]"); if (mu) { aplicarMaq(mu.dataset.maquse, null); return; }
     if (e.target.closest("[data-gcx]")) { quitarGift(); drawDrawer(); return; }
+    if (e.target.closest("[data-cdx]")) { quitarCupon(); drawDrawer(); return; }
     if (!e.target.closest("[data-gcok]")) return;
     const code = ($("#gcCode").value || "").trim().toUpperCase(), msg = $("#gcMsg"); if (!code) return;
     if (code.startsWith("MAQ-")) { if (MAQ) { msg.textContent = "Ya tenés un premio de la maquinita en este pedido."; return; } return aplicarMaq(code, msg); }
+    if (!code.startsWith("GIFT-")) return aplicarCupon(code, msg); // las gift cards empiezan con GIFT-; lo demás es un código de descuento
+    if (GIFT) { msg.textContent = "Ya tenés una gift card en este pedido."; return; }
     msg.textContent = "Revisando…";
     try { const g = await API.giftcardCheck(code);
       if (!g) msg.textContent = "No encontramos ese código.";
@@ -1262,12 +1309,12 @@
     $("#dBack").hidden = view !== "checkout" && view !== "buscar";
     if (view === "cart") {
       $("#dTitle").textContent = "Tu pedido";
-      if (!cart.length) { body.innerHTML = `${trackHtml()}${maqCartHtml()}<div class="empty"><img src="img/sm/mochito-cup.webp" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><div class="empty-acts"><a class="btn" href="#sets" data-closedrawer>Ver sets</a><button class="btn" id="toBuscar">Consultar mi pedido</button></div></div>`; foot.innerHTML = ""; return; }
-      body.innerHTML = trackHtml() + maqCartHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(IMG(c.img, 96))}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
+      if (!cart.length) { body.innerHTML = `${trackHtml()}${maqCartHtml()}${cuponCartHtml()}<div class="empty"><img src="img/sm/mochito-cup.webp" alt=""><b>Todavía no sumaste nada</b><p class="muted" style="font-size:.9rem">Arrancá por un set: bebida + mochi.</p><div class="empty-acts"><a class="btn" href="#sets" data-closedrawer>Ver sets</a><button class="btn" id="toBuscar">Consultar mi pedido</button></div></div>`; foot.innerHTML = ""; return; }
+      body.innerHTML = trackHtml() + maqCartHtml() + cuponCartHtml() + cart.map((c, i) => `<div class="line"><span class="th"><img src="${esc(IMG(c.img, 96))}" alt=""></span><div><b>${esc(c.nombre)}</b>${c.detalle ? `<small class="det">${esc(c.detalle)}</small>` : ""}<small>${c.size ? c.size.toUpperCase() + " · " : ""}${money(c.precio)} c/u</small>
         <div class="qty"><button data-q="${i}" data-d="-1" aria-label="Restar uno">−</button><span class="num">${c.qty}</span><button data-q="${i}" data-d="1" aria-label="Sumar uno">+</button></div></div>
         <span class="lp num">${money(c.precio * c.qty)}</span></div>`).join("") + sugHtml() + `<div class="ctas">${giftCta()}</div>`;
-      const mOff = Math.min(maqOff(), total());
-      foot.innerHTML = `${clubLine(true)}${mOff > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Subtotal</span><span class="num">${money(total())}</span></div><div class="tot maqoff" style="font-weight:500;font-size:.9rem"><span>🎰 ${esc(MAQ.titulo)}</span><span class="num">${money(-mOff)}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(total() - mOff)}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>${extrasCart()}
+      const cOff = Math.min(cuponOff(), total()), mOff = Math.min(maqOff(), total() - cOff);
+      foot.innerHTML = `${clubLine(true)}${mOff > 0 || cOff > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Subtotal</span><span class="num">${money(total())}</span></div>` : ""}${cOff > 0 ? `<div class="tot maqoff" style="font-weight:500;font-size:.9rem"><span>🏷️ Código ${esc(CUPON.code)}</span><span class="num">${money(-cOff)}</span></div>` : ""}${mOff > 0 ? `<div class="tot maqoff" style="font-weight:500;font-size:.9rem"><span>🎰 ${esc(MAQ.titulo)}</span><span class="num">${money(-mOff)}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(total() - cOff - mOff)}</span></div><button class="btn solid big" id="toCheckout">Continuar</button>${extrasCart()}
         <p class="muted" style="font-size:.78rem;text-align:center">${envioOn() ? "Retiro o envío: lo elegís después." : "¿Querés delivery? Pedí por PedidosYa, Rappi o Uber Eats."}</p>`;
     }
     if (view === "buscar") { $("#dTitle").textContent = "Consultar pedido"; body.innerHTML = buscarDrawerHtml(); foot.innerHTML = ""; return; }
@@ -1296,7 +1343,7 @@
           <label><input type="checkbox" id="fOkAds" ${form.okAds ? "checked" : ""}> Pueden usar mi número para mostrarme anuncios de Setto en Instagram y Facebook.</label>
           <span class="hintf">Las dos son opcionales y te das de baja cuando quieras en <a href="/privacidad" target="_blank">Privacidad y bajas</a>.</span></div>
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>`;
-      foot.innerHTML = `${clubLine(true)}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${maqOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Maquinita: ${esc(MAQ.titulo)}</span><span class="num">${money(-maqOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><div id="fErr" class="err" role="alert" hidden></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
+      foot.innerHTML = `${clubLine(true)}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${cuponOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Código ${esc(CUPON.code)}</span><span class="num">${money(-cuponOff())}</span></div>` : ""}${maqOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Maquinita: ${esc(MAQ.titulo)}</span><span class="num">${money(-maqOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><div id="fErr" class="err" role="alert" hidden></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
       $("#fTel")?.addEventListener("input", (e) => { const h = $("#fTelOk"); if (h) h.innerHTML = telHint(e.target.value); });
       [["fNombre", "nombre"], ["fTel", "tel"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; const f = e.target.closest(".f"); if (f) f.classList.remove("inval"); }); });
       $("#fHora")?.addEventListener("change", (e) => {
@@ -1355,9 +1402,10 @@
     if (clubOn() && API.normPhone(form.tel)) await loadCard();
     if (completes() && !form.premio) { drawDrawer(); const e2 = $("#fErr"); e2.hidden = false; e2.textContent = "Completaste tu tarjeta: elegí tu premio antes de enviar."; $(".premio-pick")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
     sending = true; drawFootOnly();
+    const conCodigo = !!CUPON && !cuponTraba(); // si el código no entra en este pedido, sale sin él y queda guardado
     try {
       const isEnv = form.modo === "envio";
-      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [], bebida: c.beb || null, mochis: c.mochis || null })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null, gift: GIFT ? GIFT.code : null, maq: MAQ && maqOff() > 0 ? MAQ.code : null });
+      const o = await API.createOrder({ nombre: form.nombre.trim(), phone: form.tel, items: cart.map((c) => ({ id: c.id, size: c.size || null, qty: c.qty, leche: c.leche || null, sin: c.sin || [], bebida: c.beb || null, mochis: c.mochis || null })), retiro: form.hora, pago: form.pago, nota: form.nota.trim(), modo: isEnv ? "envio" : "retiro", direccion: isEnv ? fullDir() : null, premio: completes() ? form.premio : null, gift: GIFT ? GIFT.code : null, maq: MAQ && maqOff() > 0 ? MAQ.code : null, codigo: conCodigo ? CUPON.code : null });
       const pxPed = pxCarrito(); // para mandar Purchase con los mismos productos cuando el pedido se entregue
       if (window.SettoPixel) window.SettoPixel.once("order_created:" + o.code, () => window.SettoPixel.custom("order_created", { ...pxPed, value: Number(o.total) || 0 }, "creado-" + o.code));
       const ph = o.phone || API.normPhone(form.tel);
@@ -1375,6 +1423,7 @@
       refrescarStock();
       try { sessionStorage.setItem("setto-last-order", JSON.stringify(lastOrder)); localStorage.setItem("setto-form", JSON.stringify({ nombre: form.nombre, tel: form.tel, dir: form.dir, dirExtra: form.dirExtra })); } catch (_) {}
       if (GIFT && o.gift) { const rest = GIFT.saldo - o.gift; if (rest > 0) usarGift(GIFT.code, rest); else quitarGift(); }
+      if (conCodigo && o.codigo !== undefined) quitarCupon();
       if (MAQ && o.maquinita) { const rest = MAQ.tipo === "monto" ? MAQ.saldo - o.maquinita : 0; if (rest > 0) usarMaq({ ...MAQ, saldo: rest }); else quitarMaq(); }
       maqSug = { tel: null, premios: [] };
       cart = []; save(); form.hora = ""; form.res = ""; form.nota = ""; form.premio = ""; form.okWa = true; form.okAds = true; renderBadge();
