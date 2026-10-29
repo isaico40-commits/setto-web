@@ -885,10 +885,11 @@
     if (!t) { box.innerHTML = ""; return; }
     const n = TP.cantidad(t.cuerpo), prev = [...box.querySelectorAll("[data-cvar]")].map((x) => x.value);
     box.innerHTML = `${n ? `<div class="tplvars">${Array.from({ length: n }, (_, i) => `<label>Qué va en {{${i + 1}}}<input class="inp" data-cvar="${i}" required value="${esc(prev[i] ?? (i === 0 && /^hola\b/i.test(t.cuerpo) ? "{nombre}" : ""))}" placeholder="${esc(t.ejemplos[i] || "")}"></label>`).join("")}</div>
-      <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente.</span>` : ""}
+      <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente.${esPremio(f) ? " Para el premio: <b>{premio}</b> (ej. 10% off), <b>{codigo}</b> (MAQ-…) y <b>{vence}</b> (ej. el jueves 30/10 a las 18:40)." : ""}</span>` : ""}
       <div class="tplprev"><span class="eyebrow">Así le llega</span><div data-prev></div></div>`;
     campPrev(f);
   }
+  const esPremio = (f) => f.id === "autoForm" && (f.elements.disparador || {}).value === "premio";
   function campPrev(f) {
     const t = P.tpls && tplDe((f.elements.plantilla || {}).value), el = f.querySelector("[data-prev]"); if (!t || !el) return;
     el.innerHTML = TP.burbuja(t, [...f.querySelectorAll("[data-cvar]")].map((x) => x.value));
@@ -902,7 +903,7 @@
   }
   // formularios de campaña y automática: elegir plantilla, variables y vista previa
   function enganchar(f, guardar) {
-    f.addEventListener("change", (e) => { if (e.target.name === "plantilla") campVars(f); });
+    f.addEventListener("change", (e) => { if (e.target.name === "plantilla" || e.target.name === "disparador") campVars(f); });
     f.addEventListener("input", (e) => { if (e.target.dataset.cvar !== undefined) campPrev(f); });
     f.addEventListener("submit", async (e) => {
       e.preventDefault(); const v = leerTplForm(f); if (!v) return;
@@ -935,8 +936,8 @@
       const [l, r] = await Promise.all([API.listAutomations(), API.automationsResumen().catch(() => ({}))]); P.autos = l;
       box.innerHTML = l.length ? l.map((a) => { const x = r[a.id] || {}, t = tplDe(a.plantilla); return `<article class="pcard" data-auto="${esc(a.id)}">
         <div class="ohead"><b>${esc(a.nombre)}</b><span class="st ${a.activa ? "entregado" : "pendiente"}">${a.activa ? "Prendida" : "Pausada"}</span></div>
-        <p class="hintp">${a.dias} ${a.dias === 1 ? "día" : "días"} después de la última compra · ${esc(segNom(a.segmento))} · plantilla <b>${esc(a.plantilla)}</b>${(a.variables || []).length ? " · " + a.variables.map(esc).join(" / ") : ""}</p>
-        <p class="num">${x.enviados || 0} enviados · ${x.semana || 0} esta semana${x.fallidos ? ` · ${x.fallidos} con error` : ""} · ${a.activa ? `próximo envío (11 h): ${x.hoy || 0} ${x.hoy === 1 ? "persona" : "personas"}` : "si la prendés, arranca con quienes cumplan desde ese día"}</p>
+        <p class="hintp">${a.disparador === "premio" ? `Premio de la maquinita sin usar · ${a.horas} h antes de que venza` : `${a.dias} ${a.dias === 1 ? "día" : "días"} después de la última compra · ${esc(segNom(a.segmento))}`} · plantilla <b>${esc(a.plantilla)}</b>${(a.variables || []).length ? " · " + a.variables.map(esc).join(" / ") : ""}</p>
+        <p class="num">${x.enviados || 0} enviados${x.gratis ? ` (${x.gratis} gratis)` : ""} · ${x.semana || 0} esta semana${x.fallidos ? ` · ${x.fallidos} con error` : ""} · ${a.disparador === "premio" ? `${a.activa ? "ahora le toca a" : "si la prendés, le toca a"} ${x.hoy || 0} ${x.hoy === 1 ? "persona" : "personas"}` : a.activa ? `próximo envío (11 h): ${x.hoy || 0} ${x.hoy === 1 ? "persona" : "personas"}` : "si la prendés, arranca con quienes cumplan desde ese día"}</p>
         ${t ? `<details class="tplver"><summary>Así le llega</summary>${TP.burbuja(t, a.variables)}</details>` : ""}
         <div class="row2"><label>Probar con un número<input class="inp" data-prueba inputmode="tel" placeholder="223 347-1277"></label></div>
         <div class="acts"><button class="btn" data-aprobar>Mandar prueba</button><button class="btn ${a.activa ? "" : "solid"}" data-aonoff>${a.activa ? "Pausar" : "Prender"}</button><button class="linkbtn warn" data-aborrar>Borrar</button></div>
@@ -963,11 +964,13 @@
           <button class="btn solid" type="submit">Guardar borrador</button></form></section>
       <section class="sec"><h2>Campañas</h2><div class="pgrid" id="campList"><p class="muted">Cargando…</p></div></section>
       <section class="sec"><h2>Campañas automáticas</h2>
-        <p class="hintp" style="margin-bottom:12px">Salen solas todos los días a las 11 h a quien cumpla los días desde su última compra entregada. Le llega una sola vez por compra (si vuelve a comprar, el reloj arranca de nuevo) y nadie recibe dos mensajes de campaña en 7 días. Al prenderla no les escribe a los que compraron hace tiempo: arranca con quienes cumplan desde ese día.</p>
+        <p class="hintp" style="margin-bottom:12px">Las de compra salen solas todos los días a las 11 h a quien cumpla los días desde su última compra entregada: una sola vez por compra (si vuelve a comprar, el reloj arranca de nuevo) y al prenderla arranca con quienes cumplan desde ese día. Las de premio revisan cada hora de 10 a 20 h quién ganó en la maquinita, guardó el premio con su celular y todavía no lo usó: un solo aviso por premio, con el código y el vencimiento reales, y nunca con menos de 2 h por delante. Si esa persona nos escribió en las últimas 24 h va como mensaje común (gratis); si no, con la plantilla (se paga). En todas, nadie recibe dos mensajes de campaña en 7 días.</p>
         <form class="pcard" id="autoForm">
           <div class="row2"><label>Nombre (para vos)<input class="inp" name="nombre" required placeholder="Ej: Segunda compra a los 7 días"></label>
-          <label>Días después de la última compra<input class="inp" name="dias" type="number" min="1" max="365" required value="7"></label></div>
-          <label>Solo a<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}"${k === "todos" ? " selected" : ""}>${n}</option>`).join("")}</select></label>
+          <label>Cuándo sale<select class="inp" name="disparador"><option value="compra">Días después de la última compra</option><option value="premio">Premio de la maquinita por vencer</option></select></label></div>
+          <div class="row2"><label data-solo="compra">Días después de la última compra<input class="inp" name="dias" type="number" min="1" max="365" value="7"></label>
+          <label data-solo="premio" hidden>Horas antes de que venza<input class="inp" name="horas" type="number" min="3" max="46" value="24"></label>
+          <label data-solo="compra">Solo a<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}"${k === "todos" ? " selected" : ""}>${n}</option>`).join("")}</select></label></div>
           <div data-tplbox><span class="muted">Cargando plantillas…</span></div>
           <div data-varsbox class="varsbox"></div>
           <button class="btn solid" type="submit">Guardar (queda pausada)</button></form>
@@ -983,7 +986,12 @@
     });
     enganchar($("#campForm"), async (v) => { await API.createCampaign({ nombre: v.d.nombre.trim(), segmento: v.d.segmento, plantilla: v.plantilla, idioma: v.idioma, variables: v.variables });
       toast("Borrador guardado"); cargarCampanas(); });
-    enganchar($("#autoForm"), async (v) => { await API.createAutomation({ nombre: v.d.nombre.trim(), segmento: v.d.segmento, dias: Math.max(1, Math.min(365, +v.d.dias || 7)), plantilla: v.plantilla, idioma: v.idioma, variables: v.variables });
+    const af = $("#autoForm"), autoTipo = () => af.querySelectorAll("[data-solo]").forEach((el) => { el.hidden = el.dataset.solo !== af.elements.disparador.value; });
+    af.addEventListener("change", (e) => { if (e.target.name === "disparador") autoTipo(); });
+    af.addEventListener("reset", () => setTimeout(autoTipo));
+    enganchar(af, async (v) => { const premio = v.d.disparador === "premio";
+      await API.createAutomation({ nombre: v.d.nombre.trim(), disparador: premio ? "premio" : "compra", segmento: premio ? "todos" : v.d.segmento,
+        dias: premio ? null : Math.max(1, Math.min(365, +v.d.dias || 7)), horas: premio ? Math.max(3, Math.min(46, +v.d.horas || 24)) : null, plantilla: v.plantilla, idioma: v.idioma, variables: v.variables });
       toast("Guardada. Revisala y tocá Prender"); cargarAutomaticas(); });
     $("#gastoBox").addEventListener("click", (e) => { const b = e.target.closest("[data-gmes]"); if (b) { P.gastoAtras = +b.dataset.gmes; cargarGasto(); } });
     cargarGasto();
