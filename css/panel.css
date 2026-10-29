@@ -356,3 +356,5 @@ a.ptab{text-decoration:none}
 .ochips button[aria-pressed="true"] i{opacity:.85}
 @media (max-width:700px){.subtabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px;width:calc(100% + 32px)}.subtabs::-webkit-scrollbar{display:none}
   .ofgs{flex-direction:column;align-items:stretch;gap:8px}.ofg{flex-direction:row;align-items:center;gap:8px;max-width:100%}.ofg small{flex:0 0 62px}.ochips{min-width:0;flex:1 1 auto;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}.ochips::-webkit-scrollbar{display:none}}
+.gasto{display:grid;gap:2px}.gasto b{font-size:2rem;font-family:var(--display);color:var(--turquesa)}
+.gbar{display:flex;align-items:flex-end;gap:3px;height:56px;padding-top:4px}.gbar i{flex:1;min-width:3px;max-width:22px;background:color-mix(in srgb,var(--turquesa) 70%,transparent);border-radius:3px 3px 0 0}

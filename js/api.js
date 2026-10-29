@@ -465,6 +465,9 @@
     async deleteAutomation(id) { const db = dbLoad(); db.automations = (db.automations || []).filter((x) => x.id !== id); dbSave(db); },
     async automationsResumen() { return {}; },
     async testAutomation() { throw new Error("En modo demo no se mandan mensajes de WhatsApp"); },
+    async waGasto(atras) { return atras ? { moneda: "USD", total: 0, volumen: 0, gratis: 0, categorias: {}, dias: [] } : { moneda: "USD", total: 0.64, volumen: 23, gratis: 15, demo: true,
+      categorias: { MARKETING: { volumen: 8, costo: 0.64 }, SERVICE: { volumen: 12, costo: 0 }, UTILITY: { volumen: 3, costo: 0 } },
+      dias: [{ fecha: "2026-10-27", volumen: 9, costo: 0.24 }, { fecha: "2026-10-28", volumen: 6, costo: 0.16 }, { fecha: "2026-10-29", volumen: 8, costo: 0.24 }] }; },
     async createTemplate(p) { const db = dbLoad(); const l = await this.listTemplates(); if (l.some((t) => t.nombre === p.nombre)) throw new Error("Ya hay una plantilla con ese nombre. Usá otro (por ejemplo, sumale _v2)");
       db.templates = [{ nombre: p.nombre, idioma: p.idioma || "es_AR", estado: "PENDING", categoria: "MARKETING", motivo: null, ...window.SettoPlantillas.desdeEditor(p) }, ...l]; dbSave(db); return { ok: true, estado: "PENDING" }; },
     async syncAudiencias() { throw new Error("En modo demo no hay conexión con Meta"); },
@@ -719,7 +722,8 @@
     async listCampaigns() { const { data, error } = await sb.from("marketing_campaigns").select("*").order("created_at", { ascending: false }).limit(20); fail(error); return data || []; },
     async createCampaign(c) { const { data, error } = await sb.from("marketing_campaigns").insert({ ...c, estado: "borrador" }).select().single(); fail(error); return data; },
     // Edge Functions: las credenciales de Meta y WhatsApp viven solo ahí (secretos de Supabase)
-    async sendCampaign(id, prueba) { return fn("whatsapp-campana", { campaign_id: id, prueba: prueba || null }); },
+    // la prueba viaja con el número normalizado (549223…), igual que en la base: así encuentra el nombre del cliente
+    async sendCampaign(id, prueba) { return fn("whatsapp-campana", { campaign_id: id, prueba: prueba ? normPhone(prueba) || prueba : null }); },
     async listTemplates() { return (await fn("whatsapp-plantillas", { accion: "listar" })).plantillas || []; },
     async createTemplate(p) { return fn("whatsapp-plantillas", { accion: "crear", plantilla: p }); },
     async listAutomations() { const { data, error } = await sb.from("marketing_automations").select("*").order("created_at", { ascending: false }); fail(error); return data || []; },
@@ -727,7 +731,8 @@
     async updateAutomation(id, c) { const { data, error } = await sb.from("marketing_automations").update(c).eq("id", id).select().single(); fail(error); return data; },
     async deleteAutomation(id) { const { error } = await sb.from("marketing_automations").delete().eq("id", id); fail(error); },
     async automationsResumen() { const { data, error } = await sb.rpc("automaticas_resumen"); fail(error); return data || {}; },
-    async testAutomation(id, prueba) { return fn("whatsapp-automaticas", { automation_id: id, prueba }); },
+    async waGasto(atras) { return fn("whatsapp-plantillas", { accion: "gasto", atras: atras || 0 }); },
+    async testAutomation(id, prueba) { return fn("whatsapp-automaticas", { automation_id: id, prueba: normPhone(prueba) || prueba }); },
     async syncAudiencias() { return fn("meta-audiencias", {}); },
     async crmActividad() {
       const [m, s] = await Promise.all([sb.from("message_logs").select("*").eq("direccion", "entrante").order("created_at", { ascending: false }).limit(15),
