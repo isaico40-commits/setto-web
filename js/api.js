@@ -118,11 +118,12 @@
   // códigos de descuento (migración 053): mismas reglas que promo_problema() de la base
   const promoCod = (db, code) => (db.promo_codigos || []).find((x) => x.code === String(code || "").trim().toUpperCase());
   const promoVence = (c, p) => [c.vence_at, p.vence_at].filter(Boolean).sort()[0] || null;
-  const promoPub = (c, p, error) => ({ code: c.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, regalo: p.regalo || null, tope: p.tope || 0, minimo: p.minimo || 0, acumula: !!p.acumula, vence_at: promoVence(c, p), personal: !!c.phone, error: error || null });
+  const promoPub = (c, p, error) => ({ code: c.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, regalo: p.regalo || null, tope: p.tope || 0, minimo: p.minimo || 0, acumula: !!p.acumula, vence_at: promoVence(c, p), requiere: p.requiere || null, requiere_nombre: p.requiere ? ((dbLoad().products || []).find((x) => x.id === p.requiere) || {}).nombre || null : null, desde_at: p.desde_at || null, personal: !!c.phone, error: error || null });
   function promoProblema(db, code, ph) {
     const c = promoCod(db, code); if (!c) return "No encontramos ese código. Revisá que esté bien escrito.";
     const p = (db.promos || []).find((x) => x.id === c.promo_id), usos = (db.promo_usos || []).filter((u) => u.promo_id === p.id && !u.devuelto), v = promoVence(c, p);
     if (p.activa === false) return "Este código ya no está activo.";
+    if (p.desde_at && new Date(p.desde_at) > new Date()) return `Este código vale desde el ${new Date(p.desde_at).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} hs.`;
     if (v && new Date(v) <= new Date()) return `Este código venció el ${new Date(v).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" })}.`;
     if (p.usos_max && usos.length >= p.usos_max) return "Este código ya se usó todas las veces posibles.";
     if (!ph) return null;
@@ -237,11 +238,12 @@
         const err = promoProblema(db, codigo, ph); if (err) throw new Error(err);
         pc = promoCod(db, codigo); pp = db.promos.find((x) => x.id === pc.promo_id);
         if (!pp.acumula && (premio || (maq && String(maq).trim()))) throw new Error(`Este código no se suma con ${premio ? "el premio del Setto Club" : "el premio de la maquinita"}. Guardalo para tu próximo pedido.`);
+        if (pp.requiere && !lines.some((l) => l.id === pp.requiere)) throw new Error(`Este código es para pedidos con ${(((db.products.find((p) => p.id === pp.requiere) || {}).nombre) || "un producto de la carta").trim()}. Sumalo al carrito.`);
         if (sub < (pp.minimo || 0)) throw new Error("Este código es para compras desde $" + Number(pp.minimo).toLocaleString("es-AR"));
         if (pp.tipo === "porcentaje") { codOff = Math.round((sub * pp.valor) / 100 / 10) * 10; if (pp.tope > 0) codOff = Math.min(codOff, pp.tope); }
         else if (pp.tipo === "monto") codOff = pp.valor;
         else if (pp.tipo === "regalo") {
-          const ps = lines.filter((l) => { const pr = db.products.find((p) => p.id === l.id); return pr && (pp.regalo === "bebida" ? pr.categoria === "dirty" || (pr.categoria === "especial" && pr.formato === "dirty") : pr.categoria === "mochi" || (pr.categoria === "especial" && (pr.formato || "mochi") === "mochi")); }).map((l) => l.precio);
+          const ps = lines.filter((l) => { const pr = db.products.find((p) => p.id === l.id); return pr && (l.id !== pp.requiere || l.qty > 1) && (pp.regalo === "bebida" ? pr.categoria === "dirty" || (pr.categoria === "especial" && pr.formato === "dirty") : pr.categoria === "mochi" || (pr.categoria === "especial" && (pr.formato || "mochi") === "mochi")); }).map((l) => l.precio);
           if (!ps.length) throw new Error("Para usar este código agregá " + (pp.regalo === "bebida" ? "una bebida (dirty) al pedido" : "un mochi al pedido"));
           codOff = Math.min(...ps);
         } else { if (modo !== "envio") throw new Error("Este código es de envío gratis: elegí envío a domicilio"); codOff = costo; }
@@ -796,7 +798,9 @@
       fail(p.error); fail(c.error); return { promos: p.data || [], codigos: c.data || [] };
     },
     async createPromo(p, code) {
-      const { data, error } = await sb.from("promos").insert(p).select().single(); fail(error);
+      const { data, error } = await sb.from("promos").insert(p).select().single();
+      if (error && /requiere|desde_at/.test(error.message || "")) throw new Error("Falta activar \"Solo con la compra de\" y \"Vale desde\" en Supabase (migración 054)");
+      fail(error);
       if (code) {
         const r = await sb.from("promo_codigos").insert({ code, promo_id: data.id });
         if (r.error) { await sb.from("promos").delete().eq("id", data.id); throw new Error(/duplicate|unique/i.test(r.error.message || "") ? "Ese código ya existe: elegí otro" : cleanMsg(r.error.message)); }
