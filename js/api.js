@@ -489,6 +489,8 @@
     async segmentosResumen() { const db = dbLoad(), z = { whatsapp: 0, meta_ads: 0 }; return { nuevos: z, recurrentes: z, fans_mochis: z, bebidas: z, inactivos: z, todos: z, clientes: db.customers.length }; },
     async listCampaigns() { return (dbLoad().campaigns || []).slice(0, 20); },
     async createCampaign(c) { const db = dbLoad(); db.campaigns = db.campaigns || []; const n = { id: "c" + Date.now(), estado: "borrador", total: 0, enviados: 0, fallidos: 0, created_at: new Date().toISOString(), ...c }; db.campaigns.unshift(n); dbSave(db); return n; },
+    async updateCampaign(id, c) { const db = dbLoad(), x = (db.campaigns || []).find((y) => y.id === id); if (!x || x.estado !== "borrador") throw new Error("Esta campaña ya se mandó: no se puede editar"); Object.assign(x, c); dbSave(db); return x; },
+    async deleteCampaign(id) { const db = dbLoad(), x = (db.campaigns || []).find((y) => y.id === id); if (!x || x.estado !== "borrador") throw new Error("Esta campaña ya se mandó: no se puede borrar"); db.campaigns = db.campaigns.filter((y) => y.id !== id); dbSave(db); },
     async sendCampaign() { throw new Error("En modo demo no se mandan mensajes de WhatsApp"); },
     // códigos de descuento (migración 053)
     async promoCheck(code, phone) { const db = dbLoad(), c = promoCod(db, code), err = promoProblema(db, code, normPhone(phone)); return c ? promoPub(c, db.promos.find((x) => x.id === c.promo_id), err) : { error: err }; },
@@ -787,6 +789,17 @@
     async segmentosResumen() { const { data, error } = await sb.rpc("segmentos_resumen"); fail(error); return data; },
     async listCampaigns() { const { data, error } = await sb.from("marketing_campaigns").select("*").order("created_at", { ascending: false }).limit(20); fail(error); return data || []; },
     async createCampaign(c) { const { data, error } = await sb.from("marketing_campaigns").insert({ ...c, estado: "borrador" }).select().single(); fail(error); return data; },
+    // migración 055: solo borradores (una campaña mandada no se toca)
+    async updateCampaign(id, c) {
+      const { data, error } = await sb.from("marketing_campaigns").update(c).eq("id", id).eq("estado", "borrador").select();
+      if (error && /permission|denied/i.test(error.message || "")) throw new Error("Falta activar editar campañas en Supabase (migración 055)");
+      fail(error); if (!data || !data.length) throw new Error("Esta campaña ya se mandó o falta la migración 055: no se pudo editar"); return data[0];
+    },
+    async deleteCampaign(id) {
+      const { data, error } = await sb.from("marketing_campaigns").delete().eq("id", id).eq("estado", "borrador").select("id");
+      if (error && /permission|denied/i.test(error.message || "")) throw new Error("Falta activar borrar campañas en Supabase (migración 055)");
+      fail(error); if (!data || !data.length) throw new Error("Esta campaña ya se mandó o falta la migración 055: no se pudo borrar");
+    },
     // Edge Functions: las credenciales de Meta y WhatsApp viven solo ahí (secretos de Supabase)
     // la prueba viaja con el número normalizado (549223…), igual que en la base: así encuentra el nombre del cliente
     // códigos de descuento (migración 053)

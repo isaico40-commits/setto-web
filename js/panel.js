@@ -872,7 +872,8 @@
     const elegida = (box.querySelector("[name=plantilla]") || {}).value || "";
     if (P.tpls) {
       const ok = P.tpls.filter((t) => t.estado === "APPROVED");
-      box.innerHTML = `<label>Plantilla aprobada<select class="inp" name="plantilla" required><option value="">${ok.length ? "Elegí una…" : "Todavía no hay aprobadas"}</option>${ok.map((t) => `<option value="${esc(t.nombre)}"${t.nombre === elegida ? " selected" : ""}>${esc(t.nombre)}</option>`).join("")}</select></label>`;
+      const fuera = elegida && !ok.some((t) => t.nombre === elegida); // borrador que se edita con una plantilla que Meta todavía no aprobó
+      box.innerHTML = `<label>Plantilla aprobada<select class="inp" name="plantilla" required><option value="">${ok.length ? "Elegí una…" : "Todavía no hay aprobadas"}</option>${ok.map((t) => `<option value="${esc(t.nombre)}"${t.nombre === elegida ? " selected" : ""}>${esc(t.nombre)}</option>`).join("")}${fuera ? `<option value="${esc(elegida)}" selected>${esc(elegida)} · todavía no aprobada</option>` : ""}</select></label>`;
     } else {
       box.innerHTML = `<div class="row2"><label>Plantilla aprobada (nombre exacto)<input class="inp" name="plantilla" required placeholder="lanzamiento_sabor" value="${esc(elegida)}"></label>
         <label>Idioma de la plantilla<input class="inp" name="idioma" value="es_AR"></label></div>
@@ -882,6 +883,8 @@
   }
   function campVars(f) {
     const t = P.tpls && tplDe((f.elements.plantilla || {}).value), box = f.querySelector("[data-varsbox]");
+    if (!t && P.tpls && f.dataset.edit) { // la plantilla no está en Meta (todavía): las variables se editan a mano
+      box.innerHTML = `<label>Variables del texto, una por línea, en orden ({nombre} = nombre del cliente)<textarea class="inp" name="variables" rows="3">${esc((f._vars || []).join("\n"))}</textarea></label>`; return; }
     if (!t) { box.innerHTML = ""; return; }
     const n = TP.cantidad(t.cuerpo), prev = [...box.querySelectorAll("[data-cvar]")].map((x) => x.value);
     box.innerHTML = `${n ? `<div class="tplvars">${Array.from({ length: n }, (_, i) => `<label>Qué va en {{${i + 1}}}<input class="inp" data-cvar="${i}" required value="${esc(prev[i] ?? (i === 0 && /^hola\b/i.test(t.cuerpo) ? "{nombre}" : ""))}" placeholder="${esc(t.ejemplos[i] || "")}"></label>`).join("")}</div>
@@ -1116,7 +1119,7 @@
           <div data-tplbox><span class="muted">Cargando plantillas…</span></div>
           <div data-varsbox class="varsbox"></div>
           <div data-promobox class="varsbox"></div>
-          <button class="btn solid" type="submit">Guardar borrador</button></form></section>
+          <div class="acts"><button class="btn solid" type="submit">Guardar borrador</button><button class="btn" type="reset" data-cancelar hidden>Cancelar edición</button></div></form></section>
       <section class="sec"><h2>Campañas</h2><div class="pgrid" id="campList"><p class="muted">Cargando…</p></div></section>
       <section class="sec"><h2>Campañas automáticas</h2>
         <p class="hintp" style="margin-bottom:12px">Las de compra salen solas todos los días a las 11 h a quien cumpla los días desde su última compra entregada: una sola vez por compra (si vuelve a comprar, el reloj arranca de nuevo) y al prenderla arranca con quienes cumplan desde ese día. Las de premio revisan cada hora de 10 a 20 h quién ganó en la maquinita, guardó el premio con su celular y todavía no lo usó: un solo aviso por premio, con el código y el vencimiento reales, y nunca con menos de 2 h por delante. Si esa persona nos escribió en las últimas 24 h va como mensaje común (gratis); si no, con la plantilla (se paga). En todas, nadie recibe dos mensajes de campaña en 7 días.</p>
@@ -1140,8 +1143,12 @@
       const f = $("#campForm"); f.elements.plantilla.value = b.dataset.tplUsar; campVars(f);
       f.scrollIntoView({ behavior: "smooth", block: "start" }); f.elements.nombre.focus({ preventScroll: true });
     });
-    enganchar($("#campForm"), async (v) => { await API.createCampaign({ nombre: v.d.nombre.trim(), segmento: v.d.segmento, plantilla: v.plantilla, idioma: v.idioma, variables: v.variables, ...v.promo });
-      toast("Borrador guardado"); cargarCampanas(); });
+    const cf = $("#campForm");
+    enganchar(cf, async (v) => { const datos = { nombre: v.d.nombre.trim(), segmento: v.d.segmento, plantilla: v.plantilla, idioma: v.idioma, variables: v.variables, ...v.promo };
+      if (cf.dataset.edit) { await API.updateCampaign(cf.dataset.edit, { promo_id: null, ...datos }); toast("Cambios guardados"); }
+      else { await API.createCampaign(datos); toast("Borrador guardado"); }
+      cargarCampanas(); });
+    cf.addEventListener("reset", () => setTimeout(() => campEditarFin(cf)));
     const af = $("#autoForm"), autoTipo = () => af.querySelectorAll("[data-solo]").forEach((el) => { el.hidden = el.dataset.solo !== af.elements.disparador.value; });
     af.addEventListener("change", (e) => { if (e.target.name === "disparador") autoTipo(); });
     af.addEventListener("reset", () => setTimeout(autoTipo));
@@ -1153,6 +1160,27 @@
     cargarGasto(); engancharPromos();
     cargarPlantillas().then(() => { cargarCampanas(); cargarAutomaticas(); cargarPromos(); });
   }
+  // editar un borrador: se carga en el formulario de "Nueva campaña" y se guarda encima
+  function campEditar(c) {
+    const f = $("#campForm"); f.dataset.edit = c.id; f._vars = c.variables || [];
+    f.elements.nombre.value = c.nombre; f.elements.segmento.value = c.segmento;
+    const pl = f.querySelector("[name=plantilla]"); if (pl) { if (pl.tagName === "SELECT") pl.innerHTML = `<option value="${esc(c.plantilla)}" selected></option>`; pl.value = c.plantilla; }
+    campPlantillaCampo(f);
+    if (f.elements.idioma) f.elements.idioma.value = c.idioma || "es_AR";
+    if (f.elements.variables) f.elements.variables.value = (c.variables || []).join("\n");
+    f.querySelectorAll("[data-cvar]").forEach((x) => { x.value = (c.variables || [])[+x.dataset.cvar] ?? ""; }); campPrev(f);
+    if (f.elements.promo_id) f.elements.promo_id.value = c.promo_id || "";
+    f.closest(".sec").querySelector("h2").textContent = `Editar campaña: ${c.nombre}`;
+    f.querySelector("[type=submit]").textContent = "Guardar cambios"; f.querySelector("[data-cancelar]").hidden = false;
+    f.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function campEditarFin(f) {
+    if (!f.dataset.edit) return;
+    delete f.dataset.edit; f._vars = null;
+    f.closest(".sec").querySelector("h2").textContent = "Nueva campaña de WhatsApp";
+    f.querySelector("[type=submit]").textContent = "Guardar borrador"; f.querySelector("[data-cancelar]").hidden = true;
+    campPlantillaCampo(f); promoCampo(f);
+  }
   function pintarCampanas() {
     const l = P.camps || [];
     $("#campList").innerHTML = l.length ? l.map((c) => `<article class="pcard" data-camp="${esc(c.id)}">
@@ -1161,7 +1189,7 @@
         ${c.promo_id ? `<p class="hintp">🏷️ Código: <b>${esc(promoNom(c.promo_id))}</b> · ${promoNums(((P.presu || {}).campana || {})[c.id])}</p>` : ""}
         ${tplDe(c.plantilla) ? `<details class="tplver"><summary>Así le llega</summary>${TP.burbuja(tplDe(c.plantilla), c.variables)}</details>` : ""}
         ${c.estado === "borrador" ? `<div class="row2"><label>Probar con un número<input class="inp" data-prueba inputmode="tel" placeholder="223 347-1277"></label></div>
-          <div class="acts"><button class="btn" data-cprobar>Mandar prueba</button><button class="btn solid wa" data-cenviar>Mandar a ${(P.segs && P.segs[c.segmento] || {}).whatsapp || 0}</button></div>`
+          <div class="acts"><button class="btn" data-cprobar>Mandar prueba</button><button class="btn solid wa" data-cenviar>Mandar a ${(P.segs && P.segs[c.segmento] || {}).whatsapp || 0}</button><button class="btn" data-ceditar>Editar</button><button class="linkbtn warn" data-cborrar>Borrar</button></div>`
           : `<p class="num">${c.enviados} enviados · ${c.fallidos} con error${c.enviada_at ? " · " + ago(c.enviada_at) : ""}</p>`}
       </article>`).join("") : '<p class="muted">Todavía no hay campañas.</p>';
   }
@@ -1811,6 +1839,12 @@
     }
     if (b.dataset.cadd) { try { const r = await API.addStamps(P.client, "", +b.dataset.cadd, b.dataset.cadd > 0 ? "Manual" : "Corrección"); toast(`Ahora tiene ${r.sellos} sello(s)`); openClient(P.client); listClients(); } catch (err) { toast(err.message); } }
     if (b.id === "syncAud") { b.disabled = true; toast("Actualizando públicos…"); try { const r = await API.syncAudiencias(); const t = Object.entries(r.segmentos || {}).map(([k, v]) => v.error ? `${segNom(k)}: error` : `${segNom(k)} +${v.sumados} −${v.sacados}`).join(" · "); toast(t || "Listo"); cargarCampanas(); } catch (err) { toast(err.message); } b.disabled = false; }
+    if (b.dataset.ceditar !== undefined) { const c = (P.camps || []).find((x) => x.id === b.closest("[data-camp]").dataset.camp); if (c) campEditar(c); return; }
+    if (b.dataset.cborrar !== undefined) {
+      const c = (P.camps || []).find((x) => x.id === b.closest("[data-camp]").dataset.camp); if (!c || !confirmar(b)) return;
+      try { await API.deleteCampaign(c.id); if ($("#campForm").dataset.edit === c.id) $("#campForm").reset(); toast("Borrador borrado"); cargarCampanas(); } catch (err) { toast(err.message); b.disabled = false; }
+      return;
+    }
     if (b.dataset.cprobar !== undefined || b.dataset.cenviar !== undefined) {
       const card = b.closest("[data-camp]"), id = card.dataset.camp, c = (P.camps || []).find((x) => x.id === id);
       const prueba = b.dataset.cprobar !== undefined ? card.querySelector("[data-prueba]").value.trim() : null;
