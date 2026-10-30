@@ -964,7 +964,9 @@
       : t === "regalo:bebida" ? `la bebida más barata del pedido${uno ? ` (hoy desde ${money(uno)} en 12 oz)` : ""}` : uno ? `el envío (${money(uno)})` : "el envío (hoy el costo se coordina por WhatsApp)";
     return `Cada uso cuesta ${que}.${max && uno ? `${max}: hasta ${money(uno * p.usos_max)} en total.` : max ? max + "." : ""}`;
   }
-  const condTxt = (p) => [p.minimo > 0 && `compra mínima ${money(p.minimo)}`, p.vence_at && `vale hasta el ${diaCorto(p.vence_at)}`, p.dias && `los personales duran ${p.dias} ${p.dias === 1 ? "día" : "días"}`,
+  const prodNom = (id) => String((P.products.find((x) => x.id === id) || {}).nombre || "un producto borrado").trim();
+  const horaCorta = (iso) => new Date(iso).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+  const condTxt = (p) => [p.requiere && `solo con ${prodNom(p.requiere)} en el pedido`, p.desde_at && `vale desde el ${horaCorta(p.desde_at)} hs`, p.minimo > 0 && `compra mínima ${money(p.minimo)}`, p.vence_at && `vale hasta el ${diaCorto(p.vence_at)}`, p.dias && `los personales duran ${p.dias} ${p.dias === 1 ? "día" : "días"}`,
     `${p.por_cliente || 1} ${(p.por_cliente || 1) === 1 ? "vez" : "veces"} por persona`, p.usos_max && `${p.usos_max} en total`, p.acumula ? "se suma al Club y la maquinita" : "no se suma al Club ni a la maquinita"].filter(Boolean).join(" · ");
   const promoEstado = (p) => (p.activa === false ? ["Pausado", "pendiente"] : p.vence_at && new Date(p.vence_at) <= new Date() ? ["Vencido", "cancelado"] : ["Activo", "entregado"]);
   const promoVigente = (p) => promoEstado(p)[0] === "Activo";
@@ -983,6 +985,9 @@
       <div class="row3"><label>Vale hasta (opcional)<input class="inp" name="vence" type="date"></label>
         <label>Los personales duran (días)<input class="inp" name="dias" type="number" min="1" max="365" inputmode="numeric" value="7"></label>
         <label>Compra mínima en $<input class="inp" name="minimo" type="number" min="0" inputmode="numeric" value="0"></label></div>
+      <div class="row2"><label>Solo con la compra de (opcional)<select class="inp" name="requiere"><option value="">Cualquier pedido</option>${P.products.filter((x) => x.activo !== false).map((x) => `<option value="${esc(x.id)}">${esc(String(x.nombre).trim())}</option>`).join("")}</select></label>
+        <label>Vale desde (opcional)<input class="inp" name="desde" type="datetime-local"></label></div>
+      <span class="hintp">"Solo con la compra de": el código entra únicamente si el pedido lleva ese producto (ej. mochi de regalo con un Spooky Set). Ese producto no cuenta como el regalo. "Vale desde": antes de esa hora el código no se puede usar.</span>
       <div class="row3"><label>Usos en total (opcional)<input class="inp" name="usos_max" type="number" min="1" inputmode="numeric" placeholder="Sin límite"></label>
         <label>Usos por persona<input class="inp" name="por_cliente" type="number" min="1" max="50" inputmode="numeric" value="1"></label></div>
       <label class="chk"><input type="checkbox" name="acumula"> Se suma al premio del Setto Club y al de la maquinita</label>
@@ -995,6 +1000,7 @@
       valor: ["porcentaje", "monto"].includes(t) ? num("valor") || 0 : 0, tope: t === "porcentaje" ? num("tope") || 0 : 0,
       titulo: (d.titulo || "").trim() || tituloDe(t, num("valor")), minimo: num("minimo") || 0, usos_max: num("usos_max") || null, por_cliente: Math.min(50, Math.max(1, num("por_cliente") || 1)),
       dias: num("dias") ? Math.min(365, num("dias")) : null, vence_at: d.vence ? `${d.vence}T23:59:59-03:00` : null, acumula: !!d.acumula,
+      ...(d.requiere ? { requiere: d.requiere } : {}), ...(d.desde ? { desde_at: `${d.desde}:00-03:00` } : {}), // solo si se usan: sin la migración 054 el resto sigue andando
       prefijo: (d.prefijo || "SETTO").trim().toUpperCase() || "SETTO", code: (d.code || "").trim().toUpperCase() };
   };
   function promoPintar(f) {
@@ -1011,6 +1017,7 @@
     if (p.code && (!/^[A-Z0-9][A-Z0-9-]{2,19}$/.test(p.code) || /^(GIFT|MAQ|STT)-/.test(p.code))) return "El código va con letras y números (3 a 20, sin espacios) y no puede empezar con GIFT-, MAQ- ni STT-";
     if (!/^[A-Z0-9]{2,10}$/.test(p.prefijo) || ["GIFT", "MAQ", "STT"].includes(p.prefijo)) return "El inicio de los personales va con 2 a 10 letras o números (no GIFT, MAQ ni STT)";
     if (p.vence_at && new Date(p.vence_at) <= new Date()) return "La fecha de vencimiento ya pasó";
+    if (p.desde_at && p.vence_at && new Date(p.desde_at) >= new Date(p.vence_at)) return "El \"vale desde\" tiene que ser antes del vencimiento";
     return null;
   }
   async function cargarPromos() {
