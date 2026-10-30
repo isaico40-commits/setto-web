@@ -1343,7 +1343,7 @@
           <label><input type="checkbox" id="fOkAds" ${form.okAds ? "checked" : ""}> Pueden usar mi número para mostrarme anuncios de Setto en Instagram y Facebook.</label>
           <span class="hintf">Las dos son opcionales y te das de baja cuando quieras en <a href="/privacidad" target="_blank">Privacidad y bajas</a>.</span></div>
         <label class="f" for="fNota">Nota (opcional)<textarea id="fNota" placeholder="Ej: tocar timbre 2">${esc(form.nota)}</textarea></label>`;
-      foot.innerHTML = `${clubLine(true)}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${cuponOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Código ${esc(CUPON.code)}</span><span class="num">${money(-cuponOff())}</span></div>` : ""}${maqOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Maquinita: ${esc(MAQ.titulo)}</span><span class="num">${money(-maqOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><div id="fErr" class="err" role="alert" hidden></div><button class="btn wa big" id="toWA">${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
+      foot.innerHTML = `${clubLine(true)}${envioCosto() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Envío</span><span class="num">${money(envioCosto())}</span></div>` : ""}${premioOff() > 0 && completes() ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Premio ${premioDesc()}% off</span><span class="num">${money(-premioOff())}</span></div>` : ""}${cuponOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Código ${esc(CUPON.code)}</span><span class="num">${money(-cuponOff())}</span></div>` : ""}${maqOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Maquinita: ${esc(MAQ.titulo)}</span><span class="num">${money(-maqOff())}</span></div>` : ""}${giftOff() > 0 ? `<div class="tot" style="font-weight:500;font-size:.9rem"><span>Gift card</span><span class="num">${money(-giftOff())}</span></div>` : ""}<div class="tot"><span>Total</span><span class="num">${money(antesGift() - giftOff())}</span></div><div id="fErr" class="err" role="alert" hidden></div><button class="btn wa big" id="toWA" ${sending ? "disabled" : ""}>${sending ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>`;
       $("#fTel")?.addEventListener("input", (e) => { const h = $("#fTelOk"); if (h) h.innerHTML = telHint(e.target.value); });
       [["fNombre", "nombre"], ["fTel", "tel"], ["fNota", "nota"], ["fDir", "dir"], ["fDir2", "dirExtra"]].forEach(([id, k]) => { const el = $("#" + id); if (el) el.addEventListener("input", (e) => { form[k] = e.target.value; const f = e.target.closest(".f"); if (f) f.classList.remove("inval"); }); });
       $("#fHora")?.addEventListener("change", (e) => {
@@ -1397,11 +1397,12 @@
       return;
     }
     if (sending) return;
-    await refrescarHorarios();
-    if (!slots().includes(form.hora)) { form.hora = ""; drawDrawer(); const e2 = $("#fErr"); e2.hidden = false; e2.textContent = "Ese horario ya no está disponible. Elegí otro."; $("#fHora")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
-    if (clubOn() && API.normPhone(form.tel)) await loadCard();
-    if (completes() && !form.premio) { drawDrawer(); const e2 = $("#fErr"); e2.hidden = false; e2.textContent = "Completaste tu tarjeta: elegí tu premio antes de enviar."; $(".premio-pick")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+    // se traba antes de las consultas previas: si no, cada toque extra mientras cargan horarios o tarjeta mandaba otro pedido igual
     sending = true; drawFootOnly();
+    await refrescarHorarios();
+    if (!slots().includes(form.hora)) { sending = false; form.hora = ""; drawDrawer(); const e2 = $("#fErr"); e2.hidden = false; e2.textContent = "Ese horario ya no está disponible. Elegí otro."; $("#fHora")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+    if (clubOn() && API.normPhone(form.tel)) await loadCard();
+    if (completes() && !form.premio) { sending = false; drawDrawer(); const e2 = $("#fErr"); e2.hidden = false; e2.textContent = "Completaste tu tarjeta: elegí tu premio antes de enviar."; $(".premio-pick")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
     const conCodigo = !!CUPON && !cuponTraba(); // si el código no entra en este pedido, sale sin él y queda guardado
     try {
       const isEnv = form.modo === "envio";
