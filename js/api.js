@@ -671,6 +671,34 @@
     },
     async deleteProduct(id) { const db = dbLoad(); db.products = db.products.filter((p) => p.id !== id); dbSave(db); },
     async saveSetting(key, value) { const db = dbLoad(); db.settings[key] = value; dbSave(db); },
+    // PedidosYa Envíos en modo demo: siempre simulado (mismas formas que la Edge Function pedidosya-envio)
+    async pyaConfig() { const db = dbLoad(); return db.pya_cfg || { activo: false, simulado: true, prueba: true, nombre: "Setto", ciudad: "Mar del Plata", peso_kg: 1.5, volumen_cm3: 6000 }; },
+    async savePyaConfig(c) { const db = dbLoad(); db.pya_cfg = { ...(db.pya_cfg || {}), ...c, simulado: true }; dbSave(db); },
+    async pyaEnvio(accion, id, offerId) {
+      const db = dbLoad(), o = db.orders.find((x) => x.id === id), c = db.pya_cfg || {}, now = Date.now(), iso = (m) => new Date(now + m * 60000).toISOString();
+      if (!o) throw new Error("No encontramos el pedido");
+      if (!c.activo) throw new Error("PedidosYa Envíos está apagado. Prendelo en Ajustes → PedidosYa Envíos");
+      const e = o.pya || null, PASOS = ["CONFIRMED", "IN_PROGRESS", "PICKED_UP", "COMPLETED"];
+      const hist = (st) => [...((e && e.historial) || []), { status: st, at: new Date(now).toISOString() }];
+      if (accion === "cotizar") {
+        if (!c.direccion || !c.telefono) throw new Error("Falta cargar la dirección y el teléfono de retiro en Ajustes → PedidosYa Envíos");
+        if (e && e.estado === "confirmado") throw new Error("Este pedido ya tiene un envío pedido");
+        const total = 2400 + ((o.direccion || "").length % 7) * 350;
+        o.pya = { estado: "cotizado", simulado: true, prueba: !!c.prueba, estimate_id: "SIM-" + o.code, cotizado_at: iso(0),
+          ofertas: [{ id: "SIM-EXP-" + o.code, modo: "EXPRESS", total, moneda: "ARS", desde: iso(30), hasta: iso(50), retiro: iso(12), limite: iso(10) }] };
+      } else if (!e) throw new Error("Primero cotizá el envío");
+      else if (accion === "confirmar") {
+        const of = (e.ofertas || []).find((x) => x.id === offerId) || (e.ofertas || [])[0];
+        o.pya = { ...e, estado: "confirmado", offer_id: of.id, precio: of.total, moneda: of.moneda, desde: of.desde, hasta: of.hasta, confirmado_at: iso(0),
+          shipping_id: "SIM-" + o.code, codigo: String(100000 + (parseInt(o.code.replace(/\D/g, "") || "0", 10) % 900000)), status: "CONFIRMED", historial: hist("CONFIRMED"), actualizado: iso(0) };
+      } else if (accion === "estado") {
+        if (e.status !== "CANCELLED") { const st = PASOS[Math.min(3, Math.floor((now - Date.parse(e.confirmado_at)) / 120000))]; o.pya = { ...e, status: st, historial: st !== e.status ? hist(st) : e.historial, actualizado: iso(0) }; }
+      } else if (accion === "cancelar") {
+        if (["IN_PROGRESS", "NEAR_PICKUP", "PICKED_UP", "NEAR_DROPOFF"].includes(e.status)) throw new Error("El repartidor ya está en camino: para cancelar hay que hablar con soporte de PedidosYa");
+        o.pya = e.estado === "cotizado" ? { ...e, estado: "cancelado" } : { ...e, estado: "cancelado", status: "CANCELLED", historial: hist("CANCELLED"), actualizado: iso(0) };
+      }
+      dbSave(db); return o.pya;
+    },
     async uploadPhoto(blob) {
       return await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
     },
@@ -907,6 +935,9 @@
     },
     async deleteProduct(id) { const { error } = await sb.from("products").delete().eq("id", id); fail(error); },
     async saveSetting(key, value) { const { error } = await sb.from("settings").upsert({ key, value, updated_at: new Date().toISOString() }); fail(error); },
+    async pyaConfig() { const { data, error } = await sb.from("pedidosya_config").select("*").eq("id", 1).maybeSingle(); fail(error); return data || {}; },
+    async savePyaConfig(c) { const { error } = await sb.from("pedidosya_config").update({ ...c, updated_at: new Date().toISOString() }).eq("id", 1); fail(error); },
+    async pyaEnvio(accion, id, offerId) { return (await fn("pedidosya-envio", { accion, order_id: id, offer_id: offerId || null })).pya; },
     async uploadMedia(file, id) {
       const ext = ((file.name || "").split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "") || (file.type.includes("webm") ? "webm" : "mp4");
       const path = `${id}-${Date.now()}.${ext}`;

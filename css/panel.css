@@ -367,3 +367,10 @@ a.ptab{text-decoration:none}
 .pnuevo .ocode{color:#126b69;letter-spacing:.04em}
 @media (max-width:520px){#promoForm .row2,#promoForm .row3{grid-template-columns:1fr}}
 .pstat{margin:0;font-size:.86rem;font-weight:600}
+/* PedidosYa Envíos (migración 056) */
+.pyabox{display:grid;gap:8px;border:1.5px dashed color-mix(in srgb,var(--turquesa) 45%,transparent);border-radius:12px;padding:10px 12px;font-size:.9rem}
+.pyabox.ok{border-style:solid;background:color-mix(in srgb,var(--menta) 35%,transparent)}
+.pya-h{display:flex;align-items:center;gap:8px}
+.pya-sim{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--bg);color:var(--ink-2)}
+.pya-st,.pya-of>span{display:grid;gap:2px}.pya-st small,.pya-of small{font-size:.78rem;color:var(--ink-2)}
+.pya-of{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
