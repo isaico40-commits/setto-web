@@ -259,18 +259,25 @@ body{margin:0}
   $("#letra").innerHTML = `<li>🎟️ <span><b>${FICHAS === 1 ? "1 tirada gratis" : FICHAS + " tiradas gratis"}</b> por día</span></li>${COMPRA ? `<li>🛍️ <span><b>+${COMPRA} fichas</b> por compra</span></li>` : ""}<li>✨ <span>No apostás nada</span></li>`;
   // Para jugar no se pide el celular: la tirada gratis va por este dispositivo (y la base pone un tope por red).
   // Las fichas de compra van con el celular de los pedidos hechos en este celu. Si gana sin celular, lo pide para guardar el premio.
+  // Un número solo cuenta si este dispositivo tiene el link de un pedido de ese número (migración 056): un número
+  // escrito en el Club o en el checkout de un celu prestado no alcanza para usar fichas ni premios de otra persona.
   const TEL = "setto-maq-tel", DEV = "setto-maq-dev";
   const nuevoDev = () => (crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join(""));
   let dev = null;
   try { dev = localStorage.getItem(DEV); if (!/^[A-Za-z0-9-]{16,64}$/.test(dev || "")) { dev = nuevoDev(); localStorage.setItem(DEV, dev); } } catch (_) { dev = dev || nuevoDev(); }
-  function telConocido() {
+  let vinculados = []; // números que este dispositivo puede usar (los confirma la base)
+  async function telConocido() {
     const l = [];
+    let tracks = [];
     try { l.push(localStorage.getItem(TEL)); } catch (_) {}
-    try { l.push(...JSON.parse(localStorage.getItem("setto-mis-pedidos") || "[]").map((x) => x.phone)); } catch (_) {}
+    try { const ps = JSON.parse(localStorage.getItem("setto-mis-pedidos") || "[]"); l.push(...ps.map((x) => x.phone)); tracks = ps.map((x) => x.track).filter(Boolean); } catch (_) {}
     try { l.push(JSON.parse(localStorage.getItem("setto-form") || "{}").tel); } catch (_) {}
-    return l.find((x) => x && API.normPhone(x)) || null;
+    try { vinculados = ((API.maqVincular && (await API.maqVincular(dev, tracks))) || []).map((x) => API.normPhone(x)).filter(Boolean); } catch (_) { vinculados = []; }
+    return l.map((x) => API.normPhone(x)).find((x) => x && vinculados.includes(x)) || vinculados[0] || null;
   }
-  let tel = telConocido();
+  let tel = null;
+  // el número no se muestra completo: solo los últimos 4
+  const telCorto = (n) => { const d = API.normPhone(n) || ""; return d ? "terminado en " + d.slice(-4) : ""; };
   let est = null, forzado = null, girando = false, sonidoOn = true; // el sonido arranca prendido (se puede silenciar)
   const quedan = () => (est ? est.gratis + est.fichas : 0);
   const pesos = (n) => "$" + Math.round(n).toLocaleString("es-AR");
@@ -278,7 +285,7 @@ body{margin:0}
   function pintarJugador() {
     const j = $("#jugador");
     j.hidden = !tel; if (!tel) { j.innerHTML = ""; return; }
-    j.innerHTML = `<div class="linea"><span class="jug-info"><small>Tus fichas van con</small><b>${esc(API.prettyPhone(tel))}</b></span><button class="btn-sec" id="cambiar" type="button">No soy yo</button></div>`;
+    j.innerHTML = `<div class="linea"><span class="jug-info"><small>Tus fichas van con tu celu</small><b>${esc(telCorto(tel))}</b></span><button class="btn-sec" id="cambiar" type="button">No soy yo</button></div>`;
     $("#cambiar").addEventListener("click", async () => { tel = null; canje = null; try { localStorage.removeItem(TEL); } catch (_) {} pintarJugador(); await cargarEstado(); });
   }
   // Ganó: se canjea en la misma visita. Pide el celular (si no lo sabemos), ofrece las casillas y lo deja aplicado en el carrito.
@@ -291,14 +298,14 @@ body{margin:0}
   // lo deja aplicado en el carrito de la web (misma pestaña)
   function aplicarEnCarrito(p, numero) {
     const m = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, saldo: p.saldo, vence_at: p.vence_at || null, tel: numero };
-    try { localStorage.setItem("setto-maq-usar", JSON.stringify(m)); const f = JSON.parse(localStorage.getItem("setto-form") || "{}") || {}; if (API.normPhone(f.tel) !== API.normPhone(numero)) localStorage.setItem("setto-form", JSON.stringify({ ...f, tel: numero })); } catch (_) {}
+    try { localStorage.setItem("setto-maq-usar", JSON.stringify(m)); const f = JSON.parse(localStorage.getItem("setto-form") || "{}") || {}; if (numero && API.normPhone(f.tel) !== API.normPhone(numero)) localStorage.setItem("setto-form", JSON.stringify({ ...f, tel: numero })); } catch (_) {}
     try { if (window.parent !== window && window.parent.SettoCanjeMaq) { window.parent.SettoCanjeMaq(m); return true; } } catch (_) {}
     return false;
   }
   function pintarReclamo() {
     const r = $("#reclamo"), p = (est && est.pendiente) || canje;
     r.hidden = !p; if (!p) { r.innerHTML = ""; return; }
-    const pend = !!(est && est.pendiente), v = pend ? tel || "" : tel;
+    const pend = !!(est && est.pendiente), v = tel || ""; // solo se precarga un número vinculado a este dispositivo
     r.innerHTML = `<p><b>¡Ganaste ${esc(p.titulo)}!</b> Canjealo ahora y queda aplicado en tu pedido.<br><span class="vence">${esc(venceTxt(p.vence_at) || "Vence en 48 h")}</span></p>
       <form id="telForm" class="chk" novalidate>
         <label class="f" for="tel">Tu celular (WhatsApp)<input id="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 555-1234" value="${esc(v ? API.prettyPhone(v) : "")}" ${pend ? "" : "disabled"} required></label>
@@ -314,7 +321,7 @@ body{margin:0}
       b.disabled = true; $("#telErr").textContent = "";
       try {
         const g = pend ? await API.maqReclamar(dev, n) : p;
-        tel = n; try { localStorage.setItem(TEL, n); } catch (_) {}
+        if (vinculados.includes(API.normPhone(n))) { tel = n; try { localStorage.setItem(TEL, n); } catch (_) {} }
         const canales = [$("#okWa").checked && "whatsapp", $("#okAds").checked && "meta_ads"].filter(Boolean);
         if (canales.length && API.consentimientoMaquinita2) API.consentimientoMaquinita2(dev, n, canales, VERSION).catch(() => {});
         canje = null; pintarJugador(); await cargarEstado();
@@ -327,7 +334,7 @@ body{margin:0}
     const ps = (est && est.premios) || [], m = $("#mios");
     m.hidden = !ps.length; if (!ps.length) { m.innerHTML = ""; return; }
     m.innerHTML = `<h2>Tus premios</h2>` + ps.map((p) => `<div class="mio"><span class="dato"><span><b>${esc(p.titulo)}</b>${p.tipo === "monto" && p.saldo !== p.valor ? ` · te quedan ${pesos(p.saldo)}` : ""}</span><small><code>${esc(p.code)}</code>${p.vence_at ? " · " + esc(venceTxt(p.vence_at).toLowerCase()) : ""}</small></span><button class="usar" type="button" data-usar="${esc(p.code)}">Usar ahora</button></div>`).join("") +
-      `<p class="letra">Se usan pidiendo en la web con este mismo número.</p>`;
+      `<p class="letra">Se usan pidiendo en la web con el número con el que guardaste el premio.</p>`;
     m.querySelectorAll("[data-usar]").forEach((b) => b.addEventListener("click", () => {
       const p = ps.find((x) => x.code === b.dataset.usar); if (!p) return;
       const ok = aplicarEnCarrito(p, tel); $("#msg").innerHTML = `<span><b>¡Listo!</b>${ok ? "Ya está aplicado en tu pedido." : `Usalo con tu código <code>${esc(p.code)}</code>`}</span>`;
@@ -335,7 +342,7 @@ body{margin:0}
     try { localStorage.setItem("setto-maq", JSON.stringify({ tel, premios: ps })); } catch (_) {}
   }
   async function cargarEstado() {
-    try { est = await API.maqEstado2(dev, tel); } catch (e) { est = null; pintarFichas(); pintarMios(); pintarReclamo(); $("#msg").textContent = e.message; return; }
+    try { est = await API.maqEstado2(dev, tel); if (tel && !est.vinculado) { tel = null; pintarJugador(); } } catch (e) { est = null; pintarFichas(); pintarMios(); pintarReclamo(); $("#msg").textContent = e.message; return; }
     pintarFichas(); pintarMios(); pintarReclamo();
   }
   function pintarFichas() {
@@ -456,7 +463,7 @@ body{margin:0}
     await API.maqSumarDemo(dev, 5); // fichas de prueba para este dispositivo, con o sin número
     await cargarEstado(); $("#msg").textContent = "¡Probá suerte!";
   });
-  pintarJugador(); pintarFichas(); cargarEstado();
+  pintarFichas(); tel = await telConocido(); pintarJugador(); cargarEstado();
 })();
 </script>
 </body>

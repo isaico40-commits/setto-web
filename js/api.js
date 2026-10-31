@@ -320,15 +320,21 @@
       dbSave(db);
       return { resultado: p ? p.id : "nada", titulo: p ? p.titulo : null, code, gratis: Math.max(0, maqDia(db) - j.gratis_usadas), fichas: j.fichas };
     },
+    // migración 056: un número solo cuenta en el dispositivo que tiene el link (track) de un pedido de ese número
+    async maqVincular(dev, tracks) {
+      const db = dbLoad(), d = maqDev(db, dev); d.tels = d.tels || [];
+      (db.orders || []).filter((o) => o.track && (tracks || []).slice(0, 10).includes(o.track) && normPhone(o.phone)).forEach((o) => { if (!d.tels.includes(o.phone)) d.tels.unshift(o.phone); });
+      dbSave(db); return d.tels.slice();
+    },
     // migración 036: la gratis del día va por dispositivo; las fichas de compra, por número; sin número el premio queda pendiente
     async maqEstado2(dev, phone) {
-      const db = dbLoad(), ph = normPhone(phone), d = maqDev(db, dev); dbSave(db);
+      const db = dbLoad(), d = maqDev(db, dev), ph = (d.tels || []).includes(normPhone(phone)) ? normPhone(phone) : null; dbSave(db);
       const pend = db.maq.premios.find((x) => x.dev === dev && x.estado === "pendiente" && maqVigente(x));
-      return { gratis: Math.max(0, maqDia(db) - d.gratis_usadas), fichas: ph && db.maq.jug[ph] ? db.maq.jug[ph].fichas : 0,
-        premios: ph ? db.maq.premios.filter((x) => x.phone === ph && x.estado === "activo" && maqVigente(x)).map(maqPub) : [], pendiente: pend ? maqPub(pend) : null };
+      return { vinculado: !!ph, gratis: Math.max(0, maqDia(db) - d.gratis_usadas), fichas: ph && db.maq.jug[ph] ? db.maq.jug[ph].fichas : 0,
+        premios: db.maq.premios.filter((x) => x.estado === "activo" && maqVigente(x) && (x.dev === dev || (ph && x.phone === ph))).map(maqPub), pendiente: pend ? maqPub(pend) : null };
     },
     async maqTirar2(dev, phone, forzar) {
-      const db = dbLoad(), ph = normPhone(phone), cfg = db.settings.maquinita || {};
+      const db = dbLoad(), cfg = db.settings.maquinita || {}, ph = ((db.maq && db.maq.dev && db.maq.dev[dev] && db.maq.dev[dev].tels) || []).includes(normPhone(phone)) ? normPhone(phone) : null;
       if (cfg.activo === false) throw new Error("La maquinita está apagada por ahora");
       const d = maqDev(db, dev);
       if (d.gratis_usadas < maqDia(db)) d.gratis_usadas++;
@@ -735,6 +741,7 @@
     async getCard(phone) { const { data, error } = await sb.rpc("get_card", { p_phone: phone }); fail(error); return data; },
     async maqEstado(phone) { const { data, error } = await sb.rpc("maq_estado", { p_phone: phone }); fail(error); return data; },
     async maqTirar(phone) { const { data, error } = await sb.rpc("maq_tirar", { p_phone: phone }); fail(error); return data; },
+    async maqVincular(dev, tracks) { const { data, error } = await sb.rpc("maq_vincular", { p_dev: dev, p_tracks: (tracks || []).slice(0, 10) }); fail(error); return data || []; },
     async maqEstado2(dev, phone) { const { data, error } = await sb.rpc("maq_estado_v2", { p_dev: dev, p_phone: phone || null }); fail(error); return data; },
     async maqTirar2(dev, phone) { const { data, error } = await sb.rpc("maq_tirar_v2", { p_dev: dev, p_phone: phone || null }); fail(error); return data; },
     async maqReclamar(dev, phone) { const { data, error } = await sb.rpc("maq_reclamar", { p_dev: dev, p_phone: phone }); fail(error); return data; },
