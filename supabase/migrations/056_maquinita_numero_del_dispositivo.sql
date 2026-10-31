@@ -37,7 +37,7 @@ begin
   if v_dev is null then raise exception 'Recargá la página y probá de nuevo'; end if;
   insert into maq_dev_tel (dev, phone)
     select distinct v_dev, o.phone from orders o
-    where o.track = any(coalesce(p_tracks, '{}')[1:10]) and public.norm_phone(o.phone) is not null
+    where o.track = any((coalesce(p_tracks, '{}'::text[]))[1:10]) and public.norm_phone(o.phone) is not null
   on conflict do nothing;
   return coalesce((select jsonb_agg(phone order by created_at desc) from maq_dev_tel where dev = v_dev), '[]'::jsonb);
 end $$;
