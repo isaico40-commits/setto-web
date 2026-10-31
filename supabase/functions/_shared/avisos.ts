@@ -10,10 +10,10 @@ const MARCA: Record<string, string> = { recibido: "recibido", preparando: "prepa
 
 export async function avisarPedido(order_id: string, tipo: string) {
   if (!env("META_ACCESS_TOKEN") || !env("WA_PHONE_NUMBER_ID")) return { omitido: "faltan credenciales" };
-  const { data: st } = await sb.from("settings").select("key,value").in("key", ["mensajes", "wa_avisos", "club"]);
+  const { data: st } = await sb.from("settings").select("key,value").in("key", ["mensajes", "wa_avisos", "club", "transferencia"]);
   const cfg = Object.fromEntries((st ?? []).map((r: any) => [r.key, r.value]));
   if (cfg.wa_avisos?.activo === false) return { omitido: "avisos apagados" };
-  const { data: o } = await sb.from("orders").select("id,code,nombre,phone,wa_phone,track,modo,sellos,cambio,avisos,primera_compra").eq("id", order_id).maybeSingle();
+  const { data: o } = await sb.from("orders").select("id,code,nombre,phone,wa_phone,track,modo,sellos,cambio,avisos,primera_compra,pago,total").eq("id", order_id).maybeSingle();
   if (!o) return { omitido: "no existe" };
   const marca = MARCA[tipo];
   if (!marca) return { omitido: "sin aviso" };
@@ -32,7 +32,7 @@ export async function avisarPedido(order_id: string, tipo: string) {
       sb.from("sellos_resena").select("phone", { count: "exact", head: true }).eq("phone", o.phone)]);
     sello_resena = !rv && !ya;
   }
-  const texto = textoAviso(tipo, { ...o, sello_resena }, cfg.mensajes ?? null, env("SITE_URL"));
+  const texto = textoAviso(tipo, { ...o, sello_resena }, cfg.mensajes ?? null, env("SITE_URL"), cfg.transferencia);
   if (!texto) return { omitido: "sin texto" };
   const r = await fetch(`https://graph.facebook.com/${VERSION}/${env("WA_PHONE_NUMBER_ID")}/messages`, {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${env("META_ACCESS_TOKEN")}` },

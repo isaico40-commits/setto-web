@@ -124,7 +124,12 @@
   }
   function avisoTxt(o) {
     const e = o.etapa || "recibido", key = e === "listo" ? (o.modo === "envio" ? "aviso_camino" : "aviso_listo") : e === "preparando" ? "aviso_preparando" : "aviso_recibido";
-    return M.render(key, { nombre: primerNombre(o), codigo: o.code, link: linkSeguir(o) }, P.settings);
+    const txt = M.render(key, { nombre: primerNombre(o), codigo: o.code, link: linkSeguir(o) }, P.settings);
+    // pedido por transferencia: el "Recibido" lleva el alias (igual que el aviso automático)
+    const t = M.transferencia(P.settings);
+    if (key !== "aviso_recibido" || !/transfer/i.test(o.pago || "") || !t.alias) return txt;
+    const extra = M.render("aviso_transferencia", { alias: t.alias, titular: t.titular, total: o.total != null ? "$" + Number(o.total).toLocaleString("es-AR") : "" }, P.settings);
+    return extra ? `${txt}\n\n${extra}` : txt;
   }
   const avisoBase = (o) => avisoTxt(o).split("\n")[0];
   // qué aviso de WhatsApp ya se mandó por etapa: en la base (orders.avisos, lo ven todos) o, si falta la migración, en este navegador
@@ -1509,6 +1514,9 @@
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="pagos"><b>Formas de pago</b>
           <label>Una por línea<textarea class="inp" name="pagos">${esc((S.pagos || []).join("\n"))}</textarea></label>
+          <label>Alias para transferencias<input class="inp" name="alias" maxlength="60" value="${esc(window.SettoMSG.transferencia(S).alias)}" placeholder="ej: setto.mdp"></label>
+          <label>Titular de la cuenta (opcional)<input class="inp" name="titular" maxlength="80" value="${esc(window.SettoMSG.transferencia(S).titular)}"></label>
+          <span class="hintp">Solo si el cliente elige una forma de pago con "transferencia": le mostramos alias, titular y total, y van en su primer mensaje de WhatsApp. Efectivo y tarjeta no cambian. Si borrás el alias, no se muestra nada.</span>
           <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="apps"><b>Apps de delivery</b>
           ${[0, 1, 2, 3].map((i) => { const a = (S.apps || [])[i] || {}; return `<div class="row2"><label>Nombre<input class="inp" name="an${i}" value="${esc(a.nombre || "")}"></label><label>Link<input class="inp" name="au${i}" value="${esc(a.url || "")}"></label></div>
@@ -1528,7 +1536,7 @@
     { k: "contacto", g: "Pedidos", t: "Contacto", d: "El WhatsApp que recibe los pedidos, Instagram y tu link de links.", s: (S) => pretty(S.whatsapp) || "Sin WhatsApp" },
     { k: "retiro", g: "Pedidos", t: "Horarios de retiro", d: "Qué días y en qué franjas pueden elegir retirar.", s: (S) => { const r = S.retiro || {}, off = r.apagadas || []; return (r.dias || []).length ? `${r.dias.length} días · ${(r.rangos || []).filter((x) => !off.includes(x.join("-"))).map((x) => x.join("–")).join(", ") || "sin franjas activas"}${off.length ? ` · ${off.length} apagada${off.length > 1 ? "s" : ""}` : ""}${(r.cupoTurno ?? 3) > 0 ? ` · tope ${r.cupoTurno ?? 3} por turno` : ""}` : "Sin días"; } },
     { k: "envio", g: "Pedidos", t: "Envío a domicilio", d: "Si ofrecés envío, cuánto cuesta y cómo se paga.", s: (S) => ((S.envio || {}).activo ? ((S.envio || {}).costo ? "Activo · " + money((S.envio || {}).costo) : "Activo · a coordinar") : "Apagado") },
-    { k: "pagos", g: "Pedidos", t: "Formas de pago", d: "Las opciones que ve el cliente al pedir.", s: (S) => `${(S.pagos || []).length} formas` },
+    { k: "pagos", g: "Pedidos", t: "Formas de pago", d: "Las opciones que ve el cliente al pedir.", s: (S) => `${(S.pagos || []).length} formas · ${window.SettoMSG.transferencia(S).alias ? "alias " + window.SettoMSG.transferencia(S).alias : "sin alias"}` },
     { k: "personalizacion", g: "Pedidos", t: "Personalizar bebidas", d: "Leches con recargo y lo que se puede sacar.", s: (S) => ((S.personalizacion || {}).activo !== false ? `Activo · ${((S.personalizacion || {}).leches || []).length} leches` : "Apagado") },
     { k: "stock_web", g: "Pedidos", t: "Stock en la web", d: "Cuántos mochis se ven disponibles y si se frena al llegar a 0.", s: (S) => ((S.stock_web || {}).activo !== false ? ((S.stock_web || {}).bloquear !== false ? "Visible · frena en 0" : "Visible · no frena") : "Oculto") },
     { k: "mensajes", g: "Pedidos", t: "Mensajes de WhatsApp", d: "Los textos que se arman solos para el cliente y para ustedes.", s: (S) => { const n = Object.keys(S.mensajes || {}).length; return n ? `${n} cambiados` : "Los originales"; } },
@@ -1663,7 +1671,7 @@
         items: (f.items || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const [t, ...d] = s.split("|"); return { titulo: t.trim(), detalle: d.join("|").trim() }; }) });
       if (k === "envio") await API.saveSetting("envio", { activo: !!f.activo, costo: Math.max(0, +f.costo || 0), aviso: (f.aviso || "").trim(), pago: f.pago || "Transferencia / Mercado Pago" });
       if (k === "stock_web") await API.saveSetting("stock_web", { activo: !!f.activo, bloquear: !!f.bloquear, umbral: Math.max(1, Math.min(50, +f.umbral || 3)) });
-      if (k === "pagos") await API.saveSetting("pagos", (f.pagos || "").split("\n").map((s) => s.trim()).filter(Boolean));
+      if (k === "pagos") { await API.saveSetting("pagos", (f.pagos || "").split("\n").map((s) => s.trim()).filter(Boolean)); await API.saveSetting("transferencia", { alias: (f.alias || "").trim(), titular: (f.titular || "").trim() }); }
       if (k === "apps") await API.saveSetting("apps", [0, 1, 2, 3].map((i) => ({ nombre: (f["an" + i] || "").trim(), url: (f["au" + i] || "").trim(), logo: (f["al" + i] || "").trim() })).filter((a) => a.nombre));
       await loadBase(); toast("Guardado"); viewAjustes();
       const ok = $(".ajbar .ajst"); if (ok) { ok.textContent = "✓ Guardado"; }

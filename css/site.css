@@ -401,6 +401,9 @@ div.f#fHora{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .msg{white-space:pre-wrap;font-size:.84rem;background:var(--card);border:1.5px dashed color-mix(in srgb,var(--turquesa) 55%,transparent);border-radius:14px;padding:12px 14px;line-height:1.5;max-height:260px;overflow:auto}
 .ok{border-radius:20px;background:var(--bg-2);padding:18px;display:grid;gap:8px;text-align:center;justify-items:center}
 .ok img{width:110px}
+.transf{display:grid;gap:4px;margin-top:8px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,var(--turquesa) 8%,var(--card));border:1.5px solid color-mix(in srgb,var(--turquesa) 35%,transparent);font-size:.86rem;text-align:left}
+.transf-al{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:1rem}.transf-al b{color:var(--turquesa);word-break:break-all}
+.transf small{color:var(--ink-2);font-size:.8rem}
 
 /* hoja de producto */
 /* centrada con margin:auto y sin transform al quedar abierta: un translate(-50%) con medio píxel hace que la foto se vea borrosa */

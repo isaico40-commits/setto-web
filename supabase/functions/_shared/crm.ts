@@ -136,6 +136,8 @@ export const AVISOS: Record<string, string> = {
   pedir_resena: "¡Gracias por tu pedido, {nombre}! 🙌 {sellos}\n\n{sello_resena}\n\nAcá ves cómo armar tu bebida, tus sellos y, si te gustó, podés dejar tu reseña (con foto si querés):\n{link}",
   pedir_cambio: "¡Hola {nombre}! Perdón, nos quedamos sin {faltan} para tu pedido {codigo} 😕\n\nElegí acá con qué lo reemplazamos o si preferís sacarlo (el total se ajusta solo):\n{link}",
   aviso_cancelado: "Hola {nombre}, cancelamos tu pedido {codigo} de Setto. Si tenés alguna duda, respondé este mensaje.",
+  // va al final del "Recibido" solo si el pedido es por transferencia y hay alias (Panel → Ajustes → Formas de pago)
+  aviso_transferencia: "💸 Para pagar por transferencia:\nAlias: {alias}\nA nombre de: {titular}\nTotal: {total}\n\nCuando transfieras, mandanos el comprobante por acá.",
   gift_activa: "¡Listo! 🎁 Tu gift card de Setto para {para} ya está activa ({monto}).\n\nMandale este link para que la vea y la use:\n{link}",
 };
 // gift card activada → texto para el comprador con el link de regalo (mismo link que arma el panel)
@@ -146,7 +148,14 @@ export function textoGift(g: { para: string | null; monto: number; token: string
     link: `${String(sitio || "").replace(/\/$/, "")}/gift-cards?regalo=${g.token}`,
   });
 }
-export type PedidoAviso = { code: string; nombre: string | null; track: string | null; modo: string | null; sellos?: number | null; sello_resena?: boolean; cambio?: { faltan?: { qty: number; nombre: string; size?: string }[] } | null };
+// datos de transferencia: settings.transferencia; mientras no se guarden valen estos (lo mismo en js/mensajes.js)
+export const TRANSF_DEF = { alias: "setto.mdp", titular: "Isaias Martin Garcia" };
+export function transferencia(v: unknown) {
+  const t = v && typeof v === "object" ? v as { alias?: string; titular?: string } : TRANSF_DEF;
+  return { alias: String(t.alias || "").trim(), titular: String(t.titular || "").trim() };
+}
+export const esTransf = (pago: unknown) => /transfer/i.test(String(pago || ""));
+export type PedidoAviso = { code: string; nombre: string | null; track: string | null; modo: string | null; pago?: string | null; total?: number | null; sellos?: number | null; sello_resena?: boolean; cambio?: { faltan?: { qty: number; nombre: string; size?: string }[] } | null };
 // igual que render() de js/mensajes.js: rellena {variables}, borra líneas "Etiqueta: {var}" vacías y espacios de más
 export function rellenar(t: string, vars: Record<string, unknown>) {
   t = t.split("\n").filter((ln) => { const m = ln.match(/^[^{}]*:\s*\{(\w+)\}\s*$/); return !(m && !String(vars[m[1]] ?? "").trim()); }).join("\n");
@@ -154,7 +163,7 @@ export function rellenar(t: string, vars: Record<string, unknown>) {
   return t.replace(/[ \t]+\n/g, "\n").replace(/ {2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 }
 // tipo: recibido | preparando | listo | entregado | cambio | cancelado → texto listo para mandar (o null si no hay aviso)
-export function textoAviso(tipo: string, o: PedidoAviso, mensajes: Record<string, string> | null, sitio: string) {
+export function textoAviso(tipo: string, o: PedidoAviso, mensajes: Record<string, string> | null, sitio: string, transf?: unknown) {
   const key = ({ recibido: "aviso_recibido", preparando: "aviso_preparando", listo: o.modo === "envio" ? "aviso_camino" : "aviso_listo",
     entregado: "pedir_resena", cambio: "pedir_cambio", cancelado: "aviso_cancelado" } as Record<string, string>)[tipo];
   if (!key) return null;
@@ -162,12 +171,18 @@ export function textoAviso(tipo: string, o: PedidoAviso, mensajes: Record<string
   const s = Number(o.sellos) || 0;
   const faltan = (o.cambio?.faltan || []).map((f) => `${f.qty} ${String(f.nombre).replace(/^Mochi /, "mochi ")}${f.size ? ` (${f.size})` : ""}`).join(" y ");
   const propio = String(mensajes?.[key] ?? "").trim();
-  return rellenar(propio || AVISOS[key], {
+  const texto = rellenar(propio || AVISOS[key], {
     nombre: String(o.nombre || "").trim().split(/\s+/)[0] || "", codigo: o.code, faltan,
     link: tipo === "entregado" ? `${base}/listo${q}` : `${base}/${q}`,
     sellos: s > 0 ? `Sumaste ${s === 1 ? "1 sello" : s + " sellos"} al Setto Club.` : "",
     sello_resena: tipo === "entregado" && o.sello_resena ? SELLO_RESENA : "",
   });
+  // pedido por transferencia: el "Recibido" ya lleva el alias, así no hay que escribirle aparte
+  const t = transferencia(transf);
+  if (tipo !== "recibido" || !esTransf(o.pago) || !t.alias) return texto;
+  const extra = rellenar(String(mensajes?.aviso_transferencia ?? "").trim() || AVISOS.aviso_transferencia,
+    { alias: t.alias, titular: t.titular, total: o.total != null ? "$" + Number(o.total).toLocaleString("es-AR") : "" });
+  return extra ? `${texto}\n\n${extra}` : texto;
 }
 // el mensaje con el pedido que manda el cliente desde la web trae el código: "Te paso mi pedido STT-1234 …"
 export const codigoPedido = (texto: string) => (String(texto || "").toUpperCase().match(/\bSTT-\d{3,6}\b/) || [""])[0] || null;
