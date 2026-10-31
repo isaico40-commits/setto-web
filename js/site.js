@@ -625,10 +625,19 @@
   const antesGift = () => antesMaq() - maqOff();
   const giftOff = () => (GIFT ? Math.min(GIFT.saldo, Math.max(antesGift(), 0)) : 0);
   let maqSug = { tel: null, premios: [] }; // premios activos del celular del formulario
+  // Solo los premios que este dispositivo puede usar: los que ganó acá o los de un número de sus pedidos (migración 056).
+  // Escribir un celular ajeno en el formulario no muestra sus premios.
+  let maqVinc = null;
   async function cargarMaqSug() {
-    const ph = API.normPhone(form.tel); if (!ph || !API.maqEstado || ph === maqSug.tel) return pintarMaqSug();
+    const ph = API.normPhone(form.tel); if (!ph || !API.maqEstado2 || ph === maqSug.tel) return pintarMaqSug();
+    let dev = null; try { dev = localStorage.getItem("setto-maq-dev"); } catch (_) {}
+    if (!dev) return pintarMaqSug(); // nunca abrió la maquinita en este dispositivo
     maqSug = { tel: ph, premios: [] };
-    try { maqSug.premios = (await API.maqEstado(ph)).premios || []; } catch (_) {}
+    try {
+      if (!maqVinc && API.maqVincular) maqVinc = API.maqVincular(dev, (() => { try { return JSON.parse(localStorage.getItem("setto-mis-pedidos") || "[]").map((x) => x.track).filter(Boolean); } catch (_) { return []; } })()).catch(() => []);
+      await maqVinc;
+      maqSug.premios = (await API.maqEstado2(dev, ph)).premios || [];
+    } catch (_) {}
     pintarMaqSug();
   }
   function pintarMaqSug() {
