@@ -14,6 +14,8 @@
       texto: "¡Hola Setto! Quiero comprar una gift card 🎁\n\nCódigo: {codigo}\nDiseño: {diseno}\nMonto: {monto}\nPara: {para}\nDe: {de}\n\nLa pago por transferencia." },
     aviso_recibido: { grupo: "Lo que mandan ustedes", titulo: "Aviso · Recibido", vars: ["nombre", "codigo", "link"],
       texto: "¡Hola {nombre}! Recibimos tu pedido {codigo} de Setto. Te avisamos cuando esté listo.\n\nSeguí tu pedido acá: {link}" },
+    aviso_transferencia: { grupo: "Lo que mandan ustedes", titulo: "Aviso · Recibido, pago por transferencia (va al final del Recibido)", vars: ["alias", "titular", "total"],
+      texto: "💸 Para pagar por transferencia:\nAlias: {alias}\nA nombre de: {titular}\nTotal: {total}\n\nCuando transfieras, mandanos el comprobante por acá." },
     aviso_preparando: { grupo: "Lo que mandan ustedes", titulo: "Aviso · En preparación", vars: ["nombre", "codigo", "link"],
       texto: "¡Hola {nombre}! Ya estamos preparando tu pedido {codigo} de Setto.\n\nSeguí tu pedido acá: {link}" },
     aviso_listo: { grupo: "Lo que mandan ustedes", titulo: "Aviso · Listo para retirar", vars: ["nombre", "codigo", "link"],

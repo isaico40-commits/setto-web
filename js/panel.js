@@ -124,7 +124,12 @@
   }
   function avisoTxt(o) {
     const e = o.etapa || "recibido", key = e === "listo" ? (o.modo === "envio" ? "aviso_camino" : "aviso_listo") : e === "preparando" ? "aviso_preparando" : "aviso_recibido";
-    return M.render(key, { nombre: primerNombre(o), codigo: o.code, link: linkSeguir(o) }, P.settings);
+    const txt = M.render(key, { nombre: primerNombre(o), codigo: o.code, link: linkSeguir(o) }, P.settings);
+    // pedido por transferencia: el "Recibido" lleva el alias (igual que el aviso automático)
+    const t = M.transferencia(P.settings);
+    if (key !== "aviso_recibido" || !/transfer/i.test(o.pago || "") || !t.alias) return txt;
+    const extra = M.render("aviso_transferencia", { alias: t.alias, titular: t.titular, total: o.total != null ? "$" + Number(o.total).toLocaleString("es-AR") : "" }, P.settings);
+    return extra ? `${txt}\n\n${extra}` : txt;
   }
   const avisoBase = (o) => avisoTxt(o).split("\n")[0];
   // qué aviso de WhatsApp ya se mandó por etapa: en la base (orders.avisos, lo ven todos) o, si falta la migración, en este navegador
