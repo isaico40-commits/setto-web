@@ -1090,17 +1090,27 @@
   let sheetState = null;
   function openSheet(id) {
     const p = find(id); if (!p) return;
-    sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1, leche: persOn(p) ? (leches()[0] || {}).nombre || "" : "", sin: [], beb: bebOpts(p).length === 1 ? bebOpts(p)[0].id : "", mochis: {}, rvOpen: false };
+    sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1, leche: persOn(p) ? (leches()[0] || {}).nombre || "" : "", sin: [], beb: bebOpts(p).length === 1 ? bebOpts(p)[0].id : "", mochis: {}, rvOpen: false, sinOpen: false };
     drawSheet();
     px("ViewContent", { content_type: "product", content_ids: [p.id], content_name: nameOf(p), value: Number(priceOf(p, sheetState.sz)) || 0 });
     $("#sheet").classList.add("on"); $("#scrim").classList.add("on"); renderBadge();
     setTimeout(() => $("#sheet .x").focus(), 60);
   }
+  // "sacar ingredientes": opcional y cerrado por defecto. Se guarda igual que antes ("Sin hielo"…); en la web se muestra "Hielo" tachado
+  // para que nadie lea "Sin endulzante" como algo que se agrega.
+  const sinLabel = (x) => { const t = String(x).replace(/^\s*sin\s+/i, ""); return t.charAt(0).toUpperCase() + t.slice(1); };
+  function sinHtml(sin) {
+    const open = sheetState.sinOpen, el = sin.filter((x) => sinOpts().includes(x));
+    return `<div class="sacar${open ? " on" : ""}">
+      <button type="button" class="sacar-q" data-sintoggle aria-expanded="${open}" aria-controls="sSin"><span><b>¿Querés sacarle algún ingrediente a tu bebida?</b><small>${el.length ? esc(el.join(" · ")) : "Opcional · viene como figura en la carta"}</small></span><i aria-hidden="true">${open ? "▴" : "▾"}</i></button>
+      <div id="sSin" ${open ? "" : "hidden"}><p class="sacar-h">No hace falta elegir nada. Tocá solo lo que no quieras que lleve.</p>
+      <div class="chips sacar-c">${sinOpts().map((x) => `<button data-sin="${esc(x)}" aria-pressed="${sin.includes(x)}" aria-label="${esc(x)}"><i aria-hidden="true">${sin.includes(x) ? "✕" : "−"}</i>${esc(sinLabel(x))}</button>`).join("")}</div></div></div>`;
+  }
   function drawSheet() {
     const { p, sz, qty, leche, sin, beb } = sheetState, k = kind(p);
     const bebSel = eligeBeb(p) ? `<div id="sBeb"><span class="eyebrow">Elegí la bebida</span><div class="chips" style="margin-top:8px">${bebOpts(p).map((x) => `<button data-beb="${esc(x.id)}" aria-pressed="${x.id === beb}">${esc(x.nombre.trim())}</button>`).join("")}</div></div>` : "";
     const custom = persOn(p) ? `${leches().length ? `<div><span class="eyebrow">Leche${fmt(p) === "set" ? " de la bebida" : ""}</span><div class="chips lechas" style="margin-top:8px">${leches().map((l) => `<button data-leche="${esc(l.nombre)}" aria-pressed="${l.nombre === leche}">${esc(l.nombre)}${Number(l.precio) > 0 ? ` <span class="num">+${money(l.precio)}</span>` : ""}</button>`).join("")}</div></div>` : ""}
-      ${sinOpts().length ? `<div><span class="eyebrow">¿Algo para sacar?</span><div class="chips" style="margin-top:8px">${sinOpts().map((x) => `<button data-sin="${esc(x)}" aria-pressed="${sin.includes(x)}">${esc(x)}</button>`).join("")}</div></div>` : ""}` : "";
+      ${sinOpts().length ? sinHtml(sin) : ""}` : "";
     const opts = unit(p) ? "" : `<div><span class="eyebrow">Tamaño</span><div class="opts" style="margin-top:8px">${["12 oz", "16 oz"].map((oz) => {
       const sv = k === "set" ? suelto(p, oz) : 0, pv = p.precios[oz];
       const pr = k === "set" && sv > pv ? `<s>${money(sv)}</s>${money(pv)} <em class="pct">−${Math.round(((sv - pv) / sv) * 100)}%</em>` : money(pv);
@@ -1481,6 +1491,7 @@
     else if (b.id === "sheetAdd") { if (addItem(sheetState.p, sheetState.sz, sheetState.qty, sheetState.leche, sheetState.sin, sheetState.beb, boxList())) { closeSheet(); if (view === "cart" && $("#drawer").classList.contains("on")) drawDrawer(); } }
     if (b.dataset.beb !== undefined && sheetState) { sheetState.beb = b.dataset.beb; drawSheet(); }
     if (b.dataset.leche !== undefined && sheetState) { sheetState.leche = b.dataset.leche; drawSheet(); }
+    if (b.dataset.sintoggle !== undefined && sheetState) { sheetState.sinOpen = !sheetState.sinOpen; drawSheet(); const q = $("#sheet [data-sintoggle]"); if (q) q.focus(); return; }
     if (b.dataset.sin !== undefined && sheetState) { const x = b.dataset.sin, s = sheetState.sin; sheetState.sin = s.includes(x) ? s.filter((y) => y !== x) : [...s, x]; drawSheet(); }
     if (b.id === "tab-dirty" || b.id === "tab-mochi" || b.id === "tab-promo") { tab = b.id.slice(4); renderCarta(); }
     if (b.dataset.goto) { tab = b.dataset.goto; renderCarta(); $(".switch").scrollIntoView({ behavior: "smooth", block: "center" }); }
