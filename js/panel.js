@@ -60,7 +60,7 @@
     API.onOrders(() => { refreshOrders(true); });
     setInterval(() => refreshOrders(false), 30000);
   }
-  async function loadBase() { const { settings, products } = await API.loadAll(); P.settings = settings; P.products = products; }
+  async function loadBase() { const { settings, products } = await API.loadAll(); P.settings = settings; P.products = products; P.pya = await API.pyaConfig().catch(() => null); }
 
   /* =================== ESTRUCTURA =================== */
   const VISTAS = ["pedidos", "dashboard", "club", "campanas", "carta", "resenas", "gift", "ajustes"]; // también sirven como #hash (lo usan los avisos push)
@@ -161,6 +161,38 @@
       ${av ? `<div class="aviso ok"><span class="aviso-t"><b>✓ Ya le avisamos por WhatsApp</b><small>“${esc(etapaNom(o, et))}” · ${ago(av)}</small></span><a class="linkbtn" target="_blank" rel="noopener" data-aviso="${et}" href="${wa}">Reenviar</a></div>`
         : `<div class="aviso pend"><span class="aviso-t"><b>💬 Falta avisarle: “${esc(etapaNom(o, et))}”</b><small>Sale solo si te escribió en las últimas 24 h. Si no, mandalo vos.</small></span><a class="btn solid wa" target="_blank" rel="noopener" data-aviso="${et}" href="${wa}">Enviar WhatsApp</a></div>`}
     </div>`;
+  }
+
+  /* PedidosYa Envíos: cotizar, pedir el repartidor y seguirlo (Edge Function pedidosya-envio, migración 056) */
+  const PYA_ST = { PREORDER: "Reservado", CONFIRMED: "Buscando repartidor", IN_PROGRESS: "Repartidor asignado, va a buscarlo", NEAR_PICKUP: "Llegando a buscarlo", PICKED_UP: "Lo retiró, va en camino", NEAR_DROPOFF: "Llegando al cliente", COMPLETED: "Entregado", DELIVERED: "Entregado", CANCELLED: "Cancelado" };
+  const hm = (iso) => (iso ? new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) : "");
+  const pyaTrackTxt = (o, e) => `Hola ${(o.nombre || "").split(" ")[0]}! Tu pedido ${o.code} ya va con un repartidor de PedidosYa. Lo podés seguir acá: ${e.tracking_url}`;
+  function pyaBox(o) {
+    const cfg = P.pya || {};
+    if (o.modo !== "envio" || (!cfg.activo && !o.pya)) return "";
+    const e = o.pya || {}, sim = e.simulado || (!e.estado && cfg.simulado) ? `<span class="pya-sim">Simulado</span>` : "", err = e.error ? `<p class="err">${esc(e.error)}</p>` : "";
+    const head = `<div class="pya-h"><b>🛵 PedidosYa Envíos</b>${sim}</div>`;
+    if (e.estado === "confirmado") {
+      const fin = ["COMPLETED", "DELIVERED", "CANCELLED"].includes(e.status), armed = P.pyaArm === o.id;
+      return `<div class="pyabox ok">${head}
+        <div class="pya-st"><b>${esc(PYA_ST[e.status] || e.status || "Pedido")}</b><small>Envío #${esc(e.codigo || e.shipping_id || "")} · ${money(e.precio)}${e.desde ? ` · llega ${hm(e.desde)}–${hm(e.hasta)}` : ""}${e.actualizado ? ` · actualizado ${ago(e.actualizado)}` : ""}</small></div>
+        ${err}
+        ${e.tracking_url ? `<div class="acts"><a class="btn solid wa" target="_blank" rel="noopener" href="https://wa.me/${esc(o.wa_phone || o.phone)}?text=${encodeURIComponent(pyaTrackTxt(o, e))}">Mandarle el seguimiento</a><a class="linkbtn" target="_blank" rel="noopener" href="${esc(e.tracking_url)}">Ver mapa</a>${e.soporte_url ? `<a class="linkbtn" target="_blank" rel="noopener" href="${esc(e.soporte_url)}">Soporte</a>` : ""}</div>` : ""}
+        ${fin ? "" : `<div class="acts"><button class="btn" data-pya="estado">Actualizar estado</button>${["IN_PROGRESS", "NEAR_PICKUP", "PICKED_UP", "NEAR_DROPOFF"].includes(e.status) ? `<span class="hintp">Ya hay repartidor: para cancelar, desde Soporte de PedidosYa.</span>` : `<button class="linkbtn warn" data-pya="cancelar">${armed ? "¿Seguro? Tocá de nuevo para cancelar el envío" : "Cancelar envío"}</button>`}</div>`}
+      </div>`;
+    }
+    if (e.estado === "cotizado" && (e.ofertas || []).length) {
+      const vencida = (x) => x.limite && Date.parse(x.limite) < Date.now();
+      return `<div class="pyabox">${head}
+        ${(e.ofertas || []).map((x) => `<div class="pya-of"><span><span><b>${money(x.total)}</b> · ${esc(x.modo === "EXPRESS" ? "Lo antes posible" : x.modo === "SCHEDULE" ? "Programado" : x.modo)}</span><small>${x.desde ? `Llega entre ${hm(x.desde)} y ${hm(x.hasta)}` : ""}${x.retiro ? ` · lo buscan ${hm(x.retiro)}` : ""}${x.limite ? ` · ${vencida(x) ? "cotización vencida" : `confirmá antes de las ${hm(x.limite)}`}` : ""}</small></span>
+          ${vencida(x) ? "" : `<button class="btn solid" data-pya="confirmar" data-pyaof="${esc(x.id)}">Pedir repartidor</button>`}</div>`).join("")}
+        ${err}
+        <p class="hintp">Al pedirlo, PedidosYa manda un repartidor y te cobra el envío. Pedilo cuando el pedido esté casi listo.</p>
+        <div class="acts"><button class="linkbtn" data-pya="cotizar">Cotizar de nuevo</button><button class="linkbtn" data-pya="cancelar">Descartar</button></div>
+      </div>`;
+    }
+    return `<div class="pyabox">${head}${err}${e.estado === "cancelado" ? `<p class="hintp">Envío cancelado.</p>` : ""}
+      <div class="acts"><button class="btn" data-pya="cotizar">Cotizar envío</button></div></div>`;
   }
 
   /* =================== GIFT CARDS =================== */
@@ -603,6 +635,7 @@
         ${o.wa_phone && o.status === "pendiente" ? `<div class="aviso pend"><span class="aviso-t"><b>📱 Escribió desde otro número</b><small>Cargó ${esc(pretty(o.phone))} en la web pero mandó el pedido desde ${esc(pretty(o.wa_phone))}. Los avisos van a ese.</small></span><button class="btn solid" data-usarwa>Usar ese número</button></div>` : ""}
         <div class="acts"><span class="modo-tag ${env ? "env" : ""}">${env ? "Envío a domicilio" : "Retiro"}</span>${esReserva(o) ? `<span class="res-tag">📅 Reservado</span>` : ""}${o.premio && o.status === "pendiente" ? `<span class="premio-tag">🎁 Completa la tarjeta</span>` : ""}${faltaAvisar(o) ? `<span class="falta-tag">💬 Falta avisar</span>` : ""}${pagoTag(o)}</div>
         ${env ? `<div class="dirbox"><b>${esc(o.direccion || "")}</b><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((o.direccion || "") + ", Mar del Plata")}" target="_blank" rel="noopener">Ver en Maps</a></div>` : ""}
+        ${env && (o.status === "pendiente" || o.pya) ? pyaBox(o) : ""}
         ${o.premio && o.status === "pendiente" ? `<div class="premiobox">Este pedido completa la tarjeta del Club. Premio elegido: <b>${esc(o.premio_txt || "a confirmar con el cliente")}</b>${/off/.test(o.premio_txt || "") ? " (ya descontado del total)" : ""}. Al tocar Entregado se canjea solo.</div>` : ""}
         <div class="meta"><span>${env ? "Entrega" : "Retiro"}: <b>${esc(o.retiro || "—")}</b></span><span>${pagoEdit(o)}</span>${o.nota ? `<span>Nota: <b>${esc(o.nota)}</b></span>` : ""}${o.last_touch_source ? `<span>Llegó por: <b>${esc(origenTxt(o.last_touch_source, o.last_touch_campaign))}</b></span>` : ""}</div>
         <div class="olines">${(o.items || []).map((i) => `<div><span>${i.qty}× ${esc(i.nombre)}${i.size ? ` (${esc(i.size)})` : ""}${i.detalle ? `<small class="det">${esc(i.detalle)}</small>` : ""}</span><span class="num">${money(i.subtotal)}</span></div>`).join("")}</div>
@@ -1500,6 +1533,22 @@
           <label>Única forma de pago con envío<select class="inp" name="pago">${(S.pagos || []).map((p) => `<option ${p === ((S.envio || {}).pago || "Transferencia / Mercado Pago") ? "selected" : ""}>${esc(p)}</option>`).join("")}</select></label>
           <label>Aviso para el cliente<textarea class="inp" name="aviso">${esc((S.envio || {}).aviso || "")}</textarea></label>
           <button class="btn solid">Guardar</button></form>
+        <form class="pcard" data-set="pedidosya"><b>PedidosYa Envíos</b>
+          ${P.pya ? `<div class="checks"><label><input type="checkbox" name="activo" ${P.pya.activo ? "checked" : ""}> Mostrar "Cotizar envío" en los pedidos con envío</label>
+            <label><input type="checkbox" name="simulado" ${P.pya.simulado !== false ? "checked" : ""} ${API.DEMO ? "disabled" : ""}> Modo simulado (no llama a PedidosYa, inventa precio y estados)</label>
+            <label><input type="checkbox" name="prueba" ${P.pya.prueba !== false ? "checked" : ""}> Envíos de prueba (sandbox)</label></div>
+          <span class="hintp">El token de PedidosYa no va acá: se carga en Supabase → Edge Functions → Secrets como PEDIDOSYA_TOKEN. Sin token, siempre funciona en simulado.</span>
+          <b style="margin-top:6px">Dónde lo retira el repartidor</b>
+          <span class="hintp">Esto no se muestra en la web: solo lo ve el equipo y se le pasa a PedidosYa.</span>
+          <div class="row2"><label>Nombre<input class="inp" name="nombre" value="${esc(P.pya.nombre || "Setto")}"></label><label>Teléfono<input class="inp" name="telefono" inputmode="tel" value="${esc(P.pya.telefono || "")}" placeholder="223 347-1277"></label></div>
+          <label>Calle y número<input class="inp" name="direccion" value="${esc(P.pya.direccion || "")}"></label>
+          <div class="row2"><label>Piso, timbre o referencia<input class="inp" name="referencia" value="${esc(P.pya.referencia || "")}"></label><label>Ciudad<input class="inp" name="ciudad" value="${esc(P.pya.ciudad || "Mar del Plata")}"></label></div>
+          <div class="row2"><label>Latitud (opcional)<input class="inp" name="lat" inputmode="decimal" value="${P.pya.lat ?? ""}" placeholder="-38.0"></label><label>Longitud (opcional)<input class="inp" name="lng" inputmode="decimal" value="${P.pya.lng ?? ""}" placeholder="-57.5"></label></div>
+          <label>Instrucciones para el repartidor<textarea class="inp" name="instrucciones" rows="2" maxlength="200">${esc(P.pya.instrucciones || "")}</textarea></label>
+          <b style="margin-top:6px">Paquete típico</b>
+          <div class="row2"><label>Peso (kg, máx. 8)<input class="inp" name="peso_kg" type="number" min="0.1" max="8" step="0.1" value="${P.pya.peso_kg || 1.5}"></label><label>Volumen (cm³)<input class="inp" name="volumen_cm3" type="number" min="100" step="100" value="${P.pya.volumen_cm3 || 6000}"></label></div>`
+          : `<p class="err">Falta correr la migración 056 en Supabase (SQL Editor).</p>`}
+          <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="stock_web"><b>Stock en la web</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${(S.stock_web || {}).activo !== false ? "checked" : ""}> Mostrar cuántos mochis quedan</label></div>
           <label>Mostrar "¡Últimos!" cuando queden (o menos)<input class="inp" name="umbral" type="number" min="1" max="50" value="${(S.stock_web || {}).umbral || 3}"></label>
@@ -1528,6 +1577,7 @@
     { k: "contacto", g: "Pedidos", t: "Contacto", d: "El WhatsApp que recibe los pedidos, Instagram y tu link de links.", s: (S) => pretty(S.whatsapp) || "Sin WhatsApp" },
     { k: "retiro", g: "Pedidos", t: "Horarios de retiro", d: "Qué días y en qué franjas pueden elegir retirar.", s: (S) => { const r = S.retiro || {}, off = r.apagadas || []; return (r.dias || []).length ? `${r.dias.length} días · ${(r.rangos || []).filter((x) => !off.includes(x.join("-"))).map((x) => x.join("–")).join(", ") || "sin franjas activas"}${off.length ? ` · ${off.length} apagada${off.length > 1 ? "s" : ""}` : ""}${(r.cupoTurno ?? 3) > 0 ? ` · tope ${r.cupoTurno ?? 3} por turno` : ""}` : "Sin días"; } },
     { k: "envio", g: "Pedidos", t: "Envío a domicilio", d: "Si ofrecés envío, cuánto cuesta y cómo se paga.", s: (S) => ((S.envio || {}).activo ? ((S.envio || {}).costo ? "Activo · " + money((S.envio || {}).costo) : "Activo · a coordinar") : "Apagado") },
+    { k: "pedidosya", g: "Pedidos", t: "PedidosYa Envíos", d: "Pedir un repartidor de PedidosYa para los pedidos con envío.", s: () => { const c = P.pya; return !c ? "Falta la migración 056" : c.activo ? (c.simulado ? "Activo · simulado" : c.prueba ? "Activo · sandbox" : "Activo") : "Apagado"; } },
     { k: "pagos", g: "Pedidos", t: "Formas de pago", d: "Las opciones que ve el cliente al pedir.", s: (S) => `${(S.pagos || []).length} formas` },
     { k: "personalizacion", g: "Pedidos", t: "Personalizar bebidas", d: "Leches con recargo y lo que se puede sacar.", s: (S) => ((S.personalizacion || {}).activo !== false ? `Activo · ${((S.personalizacion || {}).leches || []).length} leches` : "Apagado") },
     { k: "stock_web", g: "Pedidos", t: "Stock en la web", d: "Cuántos mochis se ven disponibles y si se frena al llegar a 0.", s: (S) => ((S.stock_web || {}).activo !== false ? ((S.stock_web || {}).bloquear !== false ? "Visible · frena en 0" : "Visible · no frena") : "Oculto") },
@@ -1662,6 +1712,16 @@
       if (k === "ventajas") await API.saveSetting("ventajas", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "Pedir acá te conviene",
         items: (f.items || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const [t, ...d] = s.split("|"); return { titulo: t.trim(), detalle: d.join("|").trim() }; }) });
       if (k === "envio") await API.saveSetting("envio", { activo: !!f.activo, costo: Math.max(0, +f.costo || 0), aviso: (f.aviso || "").trim(), pago: f.pago || "Transferencia / Mercado Pago" });
+      if (k === "pedidosya") {
+        if (!P.pya) throw new Error("Falta correr la migración 056");
+        const num = (v) => { const n = parseFloat(String(v || "").replace(",", ".")); return Number.isFinite(n) ? n : null; };
+        if (f.activo && (!(f.direccion || "").trim() || !(f.telefono || "").trim())) throw new Error("Para prenderlo cargá la dirección y el teléfono de retiro");
+        const lat = num(f.lat), lng = num(f.lng);
+        if ((lat === null) !== (lng === null)) throw new Error("Cargá latitud y longitud juntas, o ninguna");
+        await API.savePyaConfig({ activo: !!f.activo, simulado: API.DEMO ? true : !!f.simulado, prueba: !!f.prueba, nombre: (f.nombre || "").trim() || "Setto", telefono: (f.telefono || "").trim(),
+          direccion: (f.direccion || "").trim(), referencia: (f.referencia || "").trim() || null, ciudad: (f.ciudad || "").trim() || "Mar del Plata", lat, lng,
+          instrucciones: (f.instrucciones || "").trim() || null, peso_kg: Math.min(8, Math.max(0.1, num(f.peso_kg) || 1.5)), volumen_cm3: Math.max(100, Math.round(num(f.volumen_cm3) || 6000)) });
+      }
       if (k === "stock_web") await API.saveSetting("stock_web", { activo: !!f.activo, bloquear: !!f.bloquear, umbral: Math.max(1, Math.min(50, +f.umbral || 3)) });
       if (k === "pagos") await API.saveSetting("pagos", (f.pagos || "").split("\n").map((s) => s.trim()).filter(Boolean));
       if (k === "apps") await API.saveSetting("apps", [0, 1, 2, 3].map((i) => ({ nombre: (f["an" + i] || "").trim(), url: (f["au" + i] || "").trim(), logo: (f["al" + i] || "").trim() })).filter((a) => a.nombre));
@@ -1794,6 +1854,20 @@
         const o = P.orders.find((x) => x.id === id), si = b.dataset.pagado === "1"; b.disabled = true;
         try { const at = await API.marcarPagado(id, si); if (o) o.pagado_at = si ? at || new Date().toISOString() : null; drawOrders(); toast(si ? `${o ? o.code : "Pedido"} marcado como pagado` : "Marcado como sin pagar"); }
         catch (err) { toast(err.message); b.disabled = false; }
+        return;
+      }
+      if (b.dataset.pya) {
+        const acc = b.dataset.pya, o = P.orders.find((x) => x.id === id);
+        if (acc === "cancelar" && o && (o.pya || {}).estado === "confirmado" && P.pyaArm !== id) { P.pyaArm = id; drawOrders(); return; }
+        P.pyaArm = null; b.disabled = true; const txt = b.textContent; b.textContent = acc === "cotizar" ? "Cotizando…" : acc === "confirmar" ? "Pidiendo…" : "…";
+        try {
+          const e = await API.pyaEnvio(acc, id, b.dataset.pyaof);
+          if (o) o.pya = e; drawOrders();
+          toast(acc === "cotizar" ? "Listo, elegí la opción" : acc === "confirmar" ? `Repartidor pedido · envío #${e.codigo || e.shipping_id}` : acc === "cancelar" ? "Envío cancelado" : `Estado: ${PYA_ST[e.status] || e.status}`);
+        } catch (err) {
+          toast(err.message); b.disabled = false; b.textContent = txt;
+          try { const l = await API.listOrders(o ? o.status : "pendiente"), n = l.find((x) => x.id === id); if (o && n) { o.pya = n.pya; drawOrders(); } } catch (_) {}
+        }
         return;
       }
       if (b.dataset.pagoedit !== undefined) { P.editPago = P.editPago === id ? null : id; drawOrders(); return; }
