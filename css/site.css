@@ -485,6 +485,18 @@ div.f#fHora{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .pp .pct{font-style:normal;font-size:.72rem;font-weight:700;color:var(--turquesa);margin-left:4px}
 .line small.det{display:block;color:var(--turquesa);font-weight:600;font-size:.76rem;margin-top:2px}
 .chips button .num{font-weight:500;opacity:.8}
+/* hoja de bebida: sacar ingredientes (opcional, cerrado) */
+.sacar{border:1.5px solid color-mix(in srgb,var(--turquesa) 22%,transparent);border-radius:16px;background:var(--card)}
+.sacar-q{display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:none;border:0;text-align:left;color:var(--ink);cursor:pointer;font:inherit}
+.sacar-q b{display:block;font-size:.92rem;font-weight:700}
+.sacar-q small{display:block;margin-top:2px;font-size:.8rem;color:var(--turquesa);opacity:.85}
+.sacar-q i{font-style:normal;color:var(--turquesa)}
+#sSin{padding:0 14px 14px}
+.sacar-h{margin:0 0 10px;font-size:.82rem;opacity:.75}
+.sacar-c button{display:inline-flex;align-items:center;gap:6px}
+.sacar-c button i{font-style:normal;font-weight:700}
+.sacar-c button[aria-pressed="true"]{background:color-mix(in srgb,var(--turquesa) 12%,var(--card));color:var(--turquesa);text-decoration:line-through;text-decoration-thickness:2px}
+.sacar-c button[aria-pressed="true"] i{text-decoration:none}
 
 /* WhatsApp en navbar */
 .top .wacta{margin-left:auto;padding:9px 16px;background:var(--card);color:var(--turquesa)}
