@@ -518,8 +518,6 @@
     el.innerHTML = `<div><b>Entregado ${esc(o.code)} · ${esc((o.nombre || "").split(" ")[0])}</b><span>Mandale el link para que deje su reseña y vea sus sellos. El cobro y los mochis ya se cargaron en la <a class="tocaja" href="caja.html#movs">Caja</a>.</span></div>
       ${((P.orders.find((x) => x.id === o.id) || o).avisos || {}).resena ? `<span class="hintp">✓ Le mandamos el link por WhatsApp</span><button class="linkbtn" data-justx>Listo</button>` : `<a class="btn solid" target="_blank" rel="noopener" data-justgo href="https://wa.me/${esc(o.wa_phone || o.phone)}?text=${encodeURIComponent(resenaTxt(o))}">Pedir reseña por WhatsApp</a><button class="linkbtn" data-justx>Ahora no</button>`}`;
   }
-  // reserva = el cliente eligió un día con nombre ("sábado 31 · 14:45 hs"), no Hoy ni Mañana
-  const esReserva = (o) => /^[^\s·]+ \d{1,2} · \d{1,2}:\d{2} hs$/.test(o.retiro || "");
   // fecha de retiro o entrega a partir del texto ("Hoy · 15:00 hs", "Mañana · …", "sábado 31 · …") y del día en que se hizo el pedido.
   // Mismo cálculo que turnos_ocupados. Devuelve { k: "2026-10-31", h: "15:00" } o null si no se puede leer.
   function fechaRetiro(o) {
@@ -529,8 +527,10 @@
     else { const n = +(m[1].match(/(\d+)$/) || [])[1]; for (let i = 0; i < 8 && n; i++) { const g = new Date(base); g.setDate(g.getDate() + i); if (g.getDate() === n) { f = g; break; } } }
     return f ? { k: fechaKey(f), h: m[2].padStart(5, "0") } : null;
   }
+  // reserva = pedido para otro día que no es el día en que se hizo (Mañana incluido, pedido de Isa)
+  const esReserva = (o) => { const f = fechaRetiro(o); return !!f && f.k > fechaKey(new Date(o.created_at)); };
   // va a Reservas mientras falte para su día; el día del retiro o envío pasa sola a Pendientes
-  const enReservas = (o) => { if (!esReserva(o)) return false; const f = fechaRetiro(o); return !!f && f.k > hoyKey(); };
+  const enReservas = (o) => { const f = fechaRetiro(o); return !!f && f.k > hoyKey(); };
   const diaChip = (k) => { const h = hoyKey(); if (k === h) return "Hoy"; if (k === fechaKey(diaMas(1))) return "Mañana"; if (k === fechaKey(diaMas(-1))) return "Ayer";
     return new Date(k + "T12:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric" }).replace(".", ""); };
   // día que importa en cada pestaña: el del retiro en pendientes y reservas, el del cierre en entregados y cancelados
