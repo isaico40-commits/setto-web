@@ -5,10 +5,11 @@
 import { env, sb, esEquipo, json, CORS, VERSION } from "../_shared/supa.ts";
 import { mensajePlantilla, soloDigitos } from "../_shared/crm.ts";
 import { usaCodigo, variablesConCodigo } from "../_shared/codigos.ts";
+import { variablesCliente } from "../_shared/cliente.ts";
 
 async function mandar(to: string, nombre: string | null, c: any, prueba = false) {
-  // {codigo} y {vence}: el código personal de la promo elegida, uno por destinatario (el de la prueba no suma a la campaña)
-  const v = await variablesConCodigo(c.variables, c.promo_id, to, prueba ? {} : { campaign_id: c.id });
+  // {favorito} y {ultimo}: según lo que pidió cada uno. {codigo} y {vence}: el código personal de la promo elegida, uno por destinatario (el de la prueba no suma a la campaña)
+  const v = await variablesConCodigo(await variablesCliente(c.variables, to), c.promo_id, to, prueba ? {} : { campaign_id: c.id });
   if (v.error) return { error: v.error };
   const r = await fetch(`https://graph.facebook.com/${VERSION}/${env("WA_PHONE_NUMBER_ID")}/messages`, {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${env("META_ACCESS_TOKEN")}` },

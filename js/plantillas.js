@@ -47,9 +47,9 @@
   const formato = (h) => h.replace(/```([^`]+)```/g, "<code>$1</code>").replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/(^|[\s(])_([^_\n]+)_/g, "$1<i>$2</i>").replace(/~([^~\n]+)~/g, "<s>$1</s>");
   // {vence} de ejemplo: dentro de una semana (los códigos personales duran 7 días si no se cambia)
   const venceEj = () => new Date(Date.now() + 7 * 864e5).toLocaleDateString("es-AR", { day: "numeric", month: "numeric" });
-  // valores: lo que va en cada {{n}} (en una campaña, {nombre} se muestra como el ejemplo "Isa"; {codigo} y {vence}, con uno de ejemplo)
+  // valores: lo que va en cada {{n}} (en una campaña, {nombre} se muestra como el ejemplo "Isa"; {codigo}, {vence}, {favorito} y {ultimo}, con uno de ejemplo)
   function burbuja(t, valores) {
-    const val = (n) => { const v = String((valores && valores[n - 1]) ?? (t.ejemplos || [])[n - 1] ?? "").trim(); return v.replace(/\{nombre\}/g, "Isa").replace(/\{codigo\}/g, "SETTO-7KQ2").replace(/\{vence\}/g, venceEj()); };
+    const val = (n) => { const v = String((valores && valores[n - 1]) ?? (t.ejemplos || [])[n - 1] ?? "").trim(); return v.replace(/\{nombre\}/g, "Isa").replace(/\{codigo\}/g, "SETTO-7KQ2").replace(/\{vence\}/g, venceEj()).replace(/\{favorito\}/g, "Dirty Classic").replace(/\{ultimo\}/g, "Mochi Sakura"); };
     const cuerpo = formato(esc(t.cuerpo || "")).replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => { const v = val(Number(n)); return v ? `<span class="wav">${esc(v)}</span>` : `<span class="wav vacia">{{${n}}}</span>`; }).replace(/\n/g, "<br>");
     const bot = (t.botones || []).map((b) => `<div class="wabtn">${b.tipo === "URL" ? "↗" : "↩"} ${esc(b.texto)}</div>`).join("");
     return `<div class="wapre" aria-label="Vista previa del mensaje de WhatsApp"><div class="wamsg">
