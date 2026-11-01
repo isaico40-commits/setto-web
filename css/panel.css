@@ -367,3 +367,18 @@ a.ptab{text-decoration:none}
 .pnuevo .ocode{color:#126b69;letter-spacing:.04em}
 @media (max-width:520px){#promoForm .row2,#promoForm .row3{grid-template-columns:1fr}}
 .pstat{margin:0;font-size:.86rem;font-weight:600}
+/* Ajustes → Ingredientes de la ficha */
+.ingh{margin:10px 0 0;font-size:1.05rem}
+.inglist{display:grid;gap:8px}
+.ingrow{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:10px;align-items:center;border-top:1px dashed #0002;padding-top:8px}
+.ingrow .upprev.ingprev{width:56px;height:56px;border-radius:50%;font-size:.6rem}
+.ingprods{display:grid;gap:10px}
+.ingprod{display:grid;gap:8px;border:1px solid #0001;border-radius:14px;padding:10px 12px;background:#fffdf8}
+.ingprod.oculto{opacity:.6}
+.ingchips{display:flex;flex-wrap:wrap;gap:6px}
+.ingchip{display:inline-flex!important;align-items:center;gap:0!important;cursor:pointer}
+.ingchip input{position:absolute;opacity:0;pointer-events:none}
+.ingchip span{border:1.5px solid #126b6933;border-radius:999px;padding:4px 11px;font-size:.82rem;background:#fff}
+.ingchip input:checked + span{background:#126b69;border-color:#126b69;color:#fff}
+.ingchip input:focus-visible + span{outline:2px solid #f8a29a;outline-offset:2px}
+@media (max-width:560px){.ingrow{grid-template-columns:48px minmax(0,1fr)}.ingrow .upprev.ingprev{width:48px;height:48px}.ingrow .acts{grid-column:2}}
