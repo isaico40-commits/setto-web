@@ -893,11 +893,12 @@
     if (!t) { box.innerHTML = ""; return; }
     const n = TP.cantidad(t.cuerpo), prev = [...box.querySelectorAll("[data-cvar]")].map((x) => x.value);
     box.innerHTML = `${n ? `<div class="tplvars">${Array.from({ length: n }, (_, i) => `<label>Qué va en {{${i + 1}}}<input class="inp" data-cvar="${i}" required value="${esc(prev[i] ?? (i === 0 && /^hola\b/i.test(t.cuerpo) ? "{nombre}" : ""))}" placeholder="${esc(t.ejemplos[i] || "")}"></label>`).join("")}</div>
-      <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente.${esPremio(f) ? " Para el premio: <b>{premio}</b> (ej. 10% off), <b>{codigo}</b> (MAQ-…) y <b>{vence}</b> (ej. el jueves 30/10 a las 18:40)." : " Con <b>{codigo}</b> le mandás un código de descuento personal (lo elegís abajo)."} <b>{favorito}</b> pone lo que más pidió cada uno y <b>{ultimo}</b>, lo último (si nunca pidió por la web, lo más vendido).</span>` : ""}
+      <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente.${esProducto(f) ? " <b>{producto}</b> pone el nombre del producto en promo." : ""}${esPremio(f) ? " Para el premio: <b>{premio}</b> (ej. 10% off), <b>{codigo}</b> (MAQ-…) y <b>{vence}</b> (ej. el jueves 30/10 a las 18:40)." : " Con <b>{codigo}</b> le mandás un código de descuento personal (lo elegís abajo)."} <b>{favorito}</b> pone lo que más pidió cada uno y <b>{ultimo}</b>, lo último (si nunca pidió por la web, lo más vendido).</span>` : ""}
       <div class="tplprev"><span class="eyebrow">Así le llega</span><div data-prev></div></div>`;
     campPrev(f);
   }
   const esPremio = (f) => f.id === "autoForm" && (f.elements.disparador || {}).value === "premio";
+  const esProducto = (f) => f.id === "autoForm" && (f.elements.disparador || {}).value === "producto";
   function campPrev(f) {
     const t = P.tpls && tplDe((f.elements.plantilla || {}).value), el = f.querySelector("[data-prev]"); if (!t || !el) return;
     el.innerHTML = TP.burbuja(t, [...f.querySelectorAll("[data-cvar]")].map((x) => x.value));
@@ -940,16 +941,34 @@
     } catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
   }
 
-  /* ---- Campañas automáticas: salen solas X días después de la última compra ---- */
+  /* ---- Campañas automáticas: después de la última compra, premio de la maquinita por vencer o promo de un producto ---- */
+  const AUD = { ultimos: "lo pidieron últimamente", favorito: "lo tienen de favorito", ambos: "lo pidieron últimamente o lo tienen de favorito" };
+  const personas = (n) => `${n || 0} ${n === 1 ? "persona" : "personas"}`;
+  function autoRegla(a) {
+    if (a.disparador === "premio") return `Premio de la maquinita sin usar · ${a.horas} h antes de que venza`;
+    if (a.disparador === "producto") return `Promo de <b>${esc(a.producto ? prodNom(a.producto) : "un producto borrado")}</b> · a quienes ${AUD[a.audiencia] || ""}${a.audiencia !== "favorito" ? ` (últimos ${a.dias} días)` : ""}`;
+    return `${a.dias} ${a.dias === 1 ? "día" : "días"} después de la última compra · ${esc(segNom(a.segmento))}`;
+  }
+  function autoProximo(a, x) {
+    if (a.disparador === "premio") return `${a.activa ? "ahora le toca a" : "si la prendés, le toca a"} ${personas(x.hoy)}`;
+    if (a.disparador === "producto") {
+      const p = (P.promos || []).find((y) => y.id === a.promo_id);
+      if (P.promos && (!p || !promoVigente(p))) return "el código no está activo: no sale nada";
+      if (p && p.desde_at && new Date(p.desde_at) > new Date()) return `arranca cuando empiece el código (${horaCorta(p.desde_at)} hs)`;
+      const det = x.hoy ? ` (${[x.ultimos && `${x.ultimos} lo pidieron`, x.favorito && `${x.favorito} de favorito`].filter(Boolean).join(", ")})` : "";
+      return `${a.activa ? "en la próxima hora le toca a" : "si la prendés, le toca a"} ${personas(x.hoy)}${det}`;
+    }
+    return a.activa ? `próximo envío (11 h): ${personas(x.hoy)}` : "si la prendés, arranca con quienes cumplan desde ese día";
+  }
   async function cargarAutomaticas() {
     const box = $("#autoList"); if (!box) return;
     try {
       const [l, r] = await Promise.all([API.listAutomations(), API.automationsResumen().catch(() => ({}))]); P.autos = l;
       box.innerHTML = l.length ? l.map((a) => { const x = r[a.id] || {}, t = tplDe(a.plantilla); return `<article class="pcard" data-auto="${esc(a.id)}">
         <div class="ohead"><b>${esc(a.nombre)}</b><span class="st ${a.activa ? "entregado" : "pendiente"}">${a.activa ? "Prendida" : "Pausada"}</span></div>
-        <p class="hintp">${a.disparador === "premio" ? `Premio de la maquinita sin usar · ${a.horas} h antes de que venza` : `${a.dias} ${a.dias === 1 ? "día" : "días"} después de la última compra · ${esc(segNom(a.segmento))}`} · plantilla <b>${esc(a.plantilla)}</b>${(a.variables || []).length ? " · " + a.variables.map(esc).join(" / ") : ""}</p>
+        <p class="hintp">${autoRegla(a)} · plantilla <b>${esc(a.plantilla)}</b>${(a.variables || []).length ? " · " + a.variables.map(esc).join(" / ") : ""}</p>
         ${a.promo_id && a.disparador !== "premio" ? `<p class="hintp">🏷️ Código: <b>${esc(promoNom(a.promo_id))}</b> · ${promoNums(((P.presu || {}).automatica || {})[a.id])}</p>` : ""}
-        <p class="num">${x.enviados || 0} enviados${x.gratis ? ` (${x.gratis} gratis)` : ""} · ${x.semana || 0} esta semana${x.fallidos ? ` · ${x.fallidos} con error` : ""} · ${a.disparador === "premio" ? `${a.activa ? "ahora le toca a" : "si la prendés, le toca a"} ${x.hoy || 0} ${x.hoy === 1 ? "persona" : "personas"}` : a.activa ? `próximo envío (11 h): ${x.hoy || 0} ${x.hoy === 1 ? "persona" : "personas"}` : "si la prendés, arranca con quienes cumplan desde ese día"}</p>
+        <p class="num">${x.enviados || 0} enviados${x.gratis ? ` (${x.gratis} gratis)` : ""} · ${x.semana || 0} esta semana${x.fallidos ? ` · ${x.fallidos} con error` : ""} · ${autoProximo(a, x)}</p>
         ${t ? `<details class="tplver"><summary>Así le llega</summary>${TP.burbuja(t, a.variables)}</details>` : ""}
         <div class="row2"><label>Probar con un número<input class="inp" data-prueba inputmode="tel" placeholder="223 347-1277"></label></div>
         <div class="acts"><button class="btn" data-aprobar>Mandar prueba</button><button class="btn ${a.activa ? "" : "solid"}" data-aonoff>${a.activa ? "Pausar" : "Prender"}</button><button class="linkbtn warn" data-aborrar>Borrar</button></div>
@@ -1053,14 +1072,15 @@
     const box = f.querySelector("[data-promobox]"); if (!box) return;
     if (!P.promos) { box.innerHTML = ""; return; }
     const elegida = (f.elements.promo_id || {}).value || "", ok = P.promos.filter(promoVigente);
-    box.innerHTML = `<label>Código de descuento (opcional)<select class="inp" name="promo_id"><option value="">Sin código</option>${ok.map((p) => `<option value="${esc(p.id)}"${p.id === elegida ? " selected" : ""}>${esc(p.nombre)} · ${esc(p.titulo)}</option>`).join("")}</select></label>
+    box.innerHTML = `<label>Código de descuento${esProducto(f) ? " (la automática sale mientras esté activo)" : " (opcional)"}<select class="inp" name="promo_id"><option value="">Sin código</option>${ok.map((p) => `<option value="${esc(p.id)}"${p.id === elegida ? " selected" : ""}>${esc(p.nombre)} · ${esc(p.titulo)}</option>`).join("")}</select></label>
       <span class="hintp">Si elegís uno, escribí <b>{codigo}</b> en una variable: cada persona recibe un código distinto que solo sirve con su celular. <b>{vence}</b> pone hasta qué día vale.</span>`;
   }
   // {codigo} sin promo, promo sin {codigo} o {vence} con un código que no vence: se avisa antes de guardar
   function promoChequeo(v) {
     const pid = v.d.promo_id || "", usa = (k) => v.variables.some((x) => x.includes(k)), p = pid && (P.promos || []).find((x) => x.id === pid);
     if ((usa("{codigo}") || usa("{vence}")) && !pid) return "Elegí qué código de descuento va en {codigo}";
-    if (pid && !usa("{codigo}")) return "Elegiste un código: escribí {codigo} en alguna variable para que le llegue";
+    // en la de promo de un producto el código es lo que la dispara: puede ir {codigo} (personal) o el código para todos escrito en el mensaje
+    if (pid && !usa("{codigo}") && v.d.disparador !== "producto") return "Elegiste un código: escribí {codigo} en alguna variable para que le llegue";
     if (p && usa("{vence}") && !p.dias && !p.vence_at) return "Ese código no vence: sacá {vence} del mensaje";
     return null;
   }
@@ -1127,16 +1147,20 @@
           <div class="acts"><button class="btn solid" type="submit">Guardar borrador</button><button class="btn" type="reset" data-cancelar hidden>Cancelar edición</button></div></form></section>
       <section class="sec"><h2>Campañas</h2><div class="pgrid" id="campList"><p class="muted">Cargando…</p></div></section>
       <section class="sec"><h2>Campañas automáticas</h2>
-        <p class="hintp" style="margin-bottom:12px">Las de compra salen solas todos los días a las 11 h a quien cumpla los días desde su última compra entregada: una sola vez por compra (si vuelve a comprar, el reloj arranca de nuevo) y al prenderla arranca con quienes cumplan desde ese día. Las de premio revisan cada hora de 10 a 20 h quién ganó en la maquinita, guardó el premio con su celular y todavía no lo usó: un solo aviso por premio, con el código y el vencimiento reales, y nunca con menos de 2 h por delante. Si esa persona nos escribió en las últimas 24 h va como mensaje común (gratis); si no, con la plantilla (se paga). En todas, nadie recibe dos mensajes de campaña en 7 días.</p>
+        <p class="hintp" style="margin-bottom:12px">Las de compra salen solas todos los días a las 11 h a quien cumpla los días desde su última compra entregada: una sola vez por compra (si vuelve a comprar, el reloj arranca de nuevo) y al prenderla arranca con quienes cumplan desde ese día. Las de premio revisan cada hora de 10 a 20 h quién ganó en la maquinita, guardó el premio con su celular y todavía no lo usó: un solo aviso por premio, con el código y el vencimiento reales, y nunca con menos de 2 h por delante. Si esa persona nos escribió en las últimas 24 h va como mensaje común (gratis); si no, con la plantilla (se paga). Las de promo de un producto revisan cada hora de 10 a 20 h mientras el código elegido esté activo, y le escriben a quienes pidieron ese producto últimamente y/o lo tienen de favorito: una sola vez por persona y por promo, y nunca a quien ya lo volvió a pedir desde que arrancó la promo. En todas, solo a quienes aceptaron novedades por WhatsApp y nadie recibe dos mensajes de campaña en 7 días.</p>
         <form class="pcard" id="autoForm">
           <div class="row2"><label>Nombre (para vos)<input class="inp" name="nombre" required placeholder="Ej: Segunda compra a los 7 días"></label>
-          <label>Cuándo sale<select class="inp" name="disparador"><option value="compra">Días después de la última compra</option><option value="premio">Premio de la maquinita por vencer</option></select></label></div>
+          <label>Cuándo sale<select class="inp" name="disparador"><option value="compra">Días después de la última compra</option><option value="premio">Premio de la maquinita por vencer</option><option value="producto">Promo de un producto</option></select></label></div>
           <div class="row2"><label data-solo="compra">Días después de la última compra<input class="inp" name="dias" type="number" min="1" max="365" value="7"></label>
           <label data-solo="premio" hidden>Horas antes de que venza<input class="inp" name="horas" type="number" min="3" max="46" value="24"></label>
           <label data-solo="compra">Solo a<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}"${k === "todos" ? " selected" : ""}>${n}</option>`).join("")}</select></label></div>
+          <div class="row2" data-solo="producto" hidden><label>Producto en promo<select class="inp" name="producto"><option value="">Elegí un producto</option>${P.products.filter((x) => x.activo !== false).map((x) => `<option value="${esc(x.id)}">${esc(String(x.nombre).trim())}</option>`).join("")}</select></label>
+          <label>A quién<select class="inp" name="audiencia"><option value="ambos">Lo pidieron últimamente o es su favorito</option><option value="ultimos">Lo pidieron últimamente</option><option value="favorito">Es su favorito</option></select></label></div>
+          <div class="row2" data-solo="producto" hidden><label data-ultimos>"Últimamente" = en los últimos (días)<input class="inp" name="dias_prod" type="number" min="1" max="365" value="60"></label></div>
+          <span class="hintp" data-solo="producto" hidden>Sale sola mientras el código de descuento que elijas abajo esté activo (si tiene "vale desde", arranca a esa hora). Elegí el código que tiene "solo con la compra de" este producto, o uno general. Favorito = lo que más pidió cada persona en la web.</span>
           <div data-tplbox><span class="muted">Cargando plantillas…</span></div>
           <div data-varsbox class="varsbox"></div>
-          <div data-promobox data-solo="compra" class="varsbox"></div>
+          <div data-promobox data-solo="compra producto" class="varsbox"></div>
           <button class="btn solid" type="submit">Guardar (queda pausada)</button></form>
         <div class="pgrid" id="autoList" style="margin-top:16px"><p class="muted">Cargando…</p></div></section>
       <section class="sec"><h2>Respuestas y bajas por WhatsApp</h2><div class="pcard"><div class="hist" id="msgList"><span class="muted">Cargando…</span></div></div></section>
@@ -1154,12 +1178,23 @@
       else { await API.createCampaign(datos); toast("Borrador guardado"); }
       cargarCampanas(); });
     cf.addEventListener("reset", () => setTimeout(() => campEditarFin(cf)));
-    const af = $("#autoForm"), autoTipo = () => af.querySelectorAll("[data-solo]").forEach((el) => { el.hidden = el.dataset.solo !== af.elements.disparador.value; });
-    af.addEventListener("change", (e) => { if (e.target.name === "disparador") autoTipo(); });
+    const af = $("#autoForm"), autoTipo = () => { af.querySelectorAll("[data-solo]").forEach((el) => { el.hidden = !el.dataset.solo.split(" ").includes(af.elements.disparador.value); });
+      af.querySelector("[data-ultimos]").hidden = af.elements.audiencia.value === "favorito"; promoCampo(af); };
+    af.addEventListener("change", (e) => {
+      if (e.target.name === "disparador" || e.target.name === "audiencia") autoTipo();
+      // al elegir un código "solo con la compra de", el producto se completa solo
+      if (e.target.name === "promo_id" && af.elements.disparador.value === "producto" && !af.elements.producto.value) {
+        const p = (P.promos || []).find((x) => x.id === e.target.value); if (p && p.requiere) af.elements.producto.value = p.requiere;
+      }
+    });
     af.addEventListener("reset", () => setTimeout(autoTipo));
-    enganchar(af, async (v) => { const premio = v.d.disparador === "premio";
-      await API.createAutomation({ nombre: v.d.nombre.trim(), disparador: premio ? "premio" : "compra", segmento: premio ? "todos" : v.d.segmento,
-        dias: premio ? null : Math.max(1, Math.min(365, +v.d.dias || 7)), horas: premio ? Math.max(3, Math.min(46, +v.d.horas || 24)) : null, plantilla: v.plantilla, idioma: v.idioma, variables: v.variables, ...(premio ? {} : v.promo) });
+    enganchar(af, async (v) => { const premio = v.d.disparador === "premio", prod = v.d.disparador === "producto";
+      if (prod && !v.d.producto) throw new Error("Elegí el producto en promo");
+      if (prod && !v.d.promo_id) throw new Error("Elegí el código de descuento: la automática sale mientras ese código esté activo");
+      await API.createAutomation({ nombre: v.d.nombre.trim(), disparador: v.d.disparador, segmento: premio || prod ? "todos" : v.d.segmento,
+        dias: premio ? null : prod ? (v.d.audiencia === "favorito" ? null : Math.max(1, Math.min(365, +v.d.dias_prod || 60))) : Math.max(1, Math.min(365, +v.d.dias || 7)),
+        horas: premio ? Math.max(3, Math.min(46, +v.d.horas || 24)) : null, plantilla: v.plantilla, idioma: v.idioma, variables: v.variables,
+        ...(prod ? { producto: v.d.producto, audiencia: v.d.audiencia } : {}), ...(premio ? {} : v.promo) });
       toast("Guardada. Revisala y tocá Prender"); cargarAutomaticas(); });
     $("#gastoBox").addEventListener("click", (e) => { const b = e.target.closest("[data-gmes]"); if (b) { P.gastoAtras = +b.dataset.gmes; cargarGasto(); } });
     cargarGasto(); engancharPromos();
