@@ -6,12 +6,13 @@
 //     Si la persona nos escribió en las últimas 23,5 h va como texto libre (gratis); si no, con la plantilla aprobada (se paga).
 //   En los dos: permiso vigente y nadie recibe dos mensajes de campaña o automática en 7 días.
 //   En las de compra, {codigo} y {vence} son el código de descuento personal de la promo elegida (migración 053);
-//   en las de premio siguen siendo el código MAQ y el vencimiento del premio.
+//   en las de premio siguen siendo el código MAQ y el vencimiento del premio. En todas: {favorito} y {ultimo} (_shared/cliente.ts).
 //   Desde el panel (sesión del equipo): { automation_id, prueba: "223…" } manda solo a ese número, si también aceptó.
 // Secretos: META_ACCESS_TOKEN, WA_PHONE_NUMBER_ID. WA_WABA_ID es opcional (por defecto la cuenta de Setto).
 import { env, sb, esEquipo, hookValido, graph, json, CORS, VERSION } from "../_shared/supa.ts";
 import { mensajePlantilla, valoresCampana, soloDigitos, textoLibre, venceTexto } from "../_shared/crm.ts";
 import { usaCodigo, variablesConCodigo } from "../_shared/codigos.ts";
+import { variablesCliente } from "../_shared/cliente.ts";
 
 const TOPE = 300; // por automática y por día: lo que entra cómodo en una ejecución
 
@@ -27,9 +28,9 @@ async function enviar(body: unknown) {
 }
 // ref: a qué automática se cuenta el código de descuento (la prueba no suma)
 async function mandar(to: string, nombre: string | null, a: any, extra: Record<string, string> = {}, ref: { automation_id?: string } = {}) {
-  let vars = a.variables;
+  let vars = await variablesCliente(a.variables, to); // {favorito} y {ultimo}
   if (a.disparador !== "premio") {
-    const v = await variablesConCodigo(a.variables, a.promo_id, to, ref);
+    const v = await variablesConCodigo(vars, a.promo_id, to, ref);
     if (v.error) return { error: v.error };
     vars = v.variables!;
   }
@@ -55,7 +56,7 @@ const extraPremio = (p: { titulo: string; code: string; vence_at: string }) => (
 // aviso del premio: gratis como texto libre si nos escribió hace poco; si no, plantilla
 async function mandarPremio(d: { phone: string; nombre: string | null }, a: any, extra: Record<string, string>, cuerpo: string) {
   if (cuerpo && (await escribioHace24(d.phone))) {
-    const t = textoLibre(cuerpo, valoresCampana(a.variables, d.nombre, extra));
+    const t = textoLibre(cuerpo, valoresCampana(await variablesCliente(a.variables, d.phone), d.nombre, extra));
     if (t) return { ...(await enviar({ messaging_product: "whatsapp", to: d.phone, type: "text", text: { body: t, preview_url: true } })), libre: true };
   }
   return { ...(await mandar(d.phone, d.nombre, a, extra)), libre: false };

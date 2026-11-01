@@ -893,7 +893,7 @@
     if (!t) { box.innerHTML = ""; return; }
     const n = TP.cantidad(t.cuerpo), prev = [...box.querySelectorAll("[data-cvar]")].map((x) => x.value);
     box.innerHTML = `${n ? `<div class="tplvars">${Array.from({ length: n }, (_, i) => `<label>Qué va en {{${i + 1}}}<input class="inp" data-cvar="${i}" required value="${esc(prev[i] ?? (i === 0 && /^hola\b/i.test(t.cuerpo) ? "{nombre}" : ""))}" placeholder="${esc(t.ejemplos[i] || "")}"></label>`).join("")}</div>
-      <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente.${esPremio(f) ? " Para el premio: <b>{premio}</b> (ej. 10% off), <b>{codigo}</b> (MAQ-…) y <b>{vence}</b> (ej. el jueves 30/10 a las 18:40)." : " Con <b>{codigo}</b> le mandás un código de descuento personal (lo elegís abajo)."}</span>` : ""}
+      <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente.${esPremio(f) ? " Para el premio: <b>{premio}</b> (ej. 10% off), <b>{codigo}</b> (MAQ-…) y <b>{vence}</b> (ej. el jueves 30/10 a las 18:40)." : " Con <b>{codigo}</b> le mandás un código de descuento personal (lo elegís abajo)."} <b>{favorito}</b> pone lo que más pidió cada uno y <b>{ultimo}</b>, lo último (si nunca pidió por la web, lo más vendido).</span>` : ""}
       <div class="tplprev"><span class="eyebrow">Así le llega</span><div data-prev></div></div>`;
     campPrev(f);
   }
