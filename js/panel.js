@@ -1360,6 +1360,36 @@
   const frRow = (i, a = "", b = "", on = true) => `<div class="frrow"><label class="frsw" title="Ofrecer esta franja"><input type="checkbox" name="fon${i}" ${on ? "checked" : ""}><span>${on ? "Activa" : "Apagada"}</span></label>
     <input class="inp" type="time" name="fa${i}" value="${esc(a)}" aria-label="Desde"><span>a</span><input class="inp" type="time" name="fb${i}" value="${esc(b)}" aria-label="Hasta">
     <button type="button" class="linkbtn warn" data-frx aria-label="Borrar franja">✕</button></div>`;
+  /* ingredientes de la ficha: una lista con foto por ingrediente y, por producto, cuáles lleva y qué contiene */
+  const ingRow = (k, x = {}) => `<div class="ingrow"><span class="upprev ingprev" data-prevfor="ii${k}">${x.img ? `<img src="${esc(x.img)}" alt="">` : "Sin foto"}</span>
+    <input type="hidden" name="ii${k}" value="${esc(x.img || "")}"><input type="hidden" name="iid${k}" value="${esc(x.id || "i" + Date.now().toString(36) + k)}">
+    <input class="inp" name="in${k}" maxlength="30" value="${esc(x.nombre || "")}" placeholder="Ej: Matcha" aria-label="Nombre del ingrediente">
+    <span class="acts" style="gap:6px"><label class="linkbtn">${x.img ? "Cambiar foto" : "Subir foto"}<input type="file" accept="image/*" data-upimg="ii${k}" data-upmax="600" hidden></label>${x.img ? `<button type="button" class="linkbtn warn" data-upx="ii${k}">Quitar foto</button>` : ""}<button type="button" class="linkbtn warn" data-ingx aria-label="Borrar ingrediente">✕</button></span></div>`;
+  const ingLeerLista = (form) => [...form.querySelectorAll(".ingrow")].map((r) => ({ id: r.querySelector("[name^=iid]").value, nombre: r.querySelector("[name^=in]").value.trim(), img: r.querySelector("[name^=ii]").value.trim() }));
+  const ingProds = () => P.products.filter((p) => !["set", "promo"].includes(p.categoria)).sort((a, b) => (a.activo === false) - (b.activo === false) || CATS.findIndex(([c]) => c === a.categoria) - CATS.findIndex(([c]) => c === b.categoria) || (a.orden || 0) - (b.orden || 0));
+  const ingChipsHtml = (pid, lista, sel) => lista.filter((x) => x.nombre).map((x) => `<label class="ingchip"><input type="checkbox" name="ip_${esc(pid)}" value="${esc(x.id)}" ${sel.includes(x.id) ? "checked" : ""}><span>${esc(x.nombre)}</span></label>`).join("") || `<span class="hintp">Primero cargá ingredientes arriba.</span>`;
+  function ingRepintar(form) { // al agregar, borrar o renombrar un ingrediente, los chips de cada producto se rearman sin perder lo tildado
+    const lista = ingLeerLista(form);
+    form.querySelectorAll("[data-ingchips]").forEach((el) => { const pid = el.dataset.ingchips, sel = [...el.querySelectorAll("input:checked")].map((i) => i.value); el.innerHTML = ingChipsHtml(pid, lista, sel); });
+  }
+  // completa solo los productos sin nada tildado, con la primera oración de la descripción cuando es una lista con comas (los dirtys)
+  function ingAuto(form) {
+    const norm = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    let nuevos = 0, prods = 0;
+    ingProds().forEach((p) => {
+      const box = form.querySelector(`[data-ingchips="${CSS.escape(p.id)}"]`); if (!box || box.querySelector("input:checked")) return;
+      const partes = String(p.descripcion || "").split(".")[0].split(/,|\sy\s/).map((t) => t.trim()).filter(Boolean);
+      if (partes.length < 3 || partes.some((t) => t.split(/\s+/).length > 5)) return; // no es una lista de ingredientes: se carga a mano
+      const ids = partes.map((t) => {
+        const nom = t.charAt(0).toUpperCase() + t.slice(1), ya = ingLeerLista(form).find((x) => norm(x.nombre) === norm(nom));
+        if (ya) return ya.id;
+        const k = Date.now().toString(36) + (nuevos++); form.querySelector(".inglist").insertAdjacentHTML("beforeend", ingRow(k, { nombre: nom }));
+        return form.querySelector(`[name="iid${k}"]`).value;
+      });
+      ingRepintar(form); box.querySelectorAll("input").forEach((i) => (i.checked = ids.includes(i.value))); prods++;
+    });
+    toast(prods ? `Listo: ${prods} producto${prods > 1 ? "s" : ""} completado${prods > 1 ? "s" : ""}${nuevos ? ` y ${nuevos} ingrediente${nuevos > 1 ? "s" : ""} nuevo${nuevos > 1 ? "s" : ""}` : ""}. Revisalo y tocá Guardar` : "No había descripciones con lista de ingredientes para usar");
+  }
   function ajustesHTML() {
     const S = P.settings, r = S.retiro || { dias: [], rangos: [] }, club = S.club || {};
     const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -1494,6 +1524,23 @@
           <span class="hintp">Aparecen al final de la web. Para un link escribí [texto](/armar) o [texto](https://…). Dejá vacía una pregunta para sacarla.</span>
           ${Array.from({ length: 10 }, (_, i) => { const x = (((S.faq || {}).items) || FAQ_DEF)[i] || {}; return `<div class="row2" style="align-items:start"><label>Pregunta ${i + 1}<input class="inp" name="fp${i}" maxlength="90" value="${esc(x.p || "")}"></label><label>Respuesta<textarea class="inp" name="fr${i}" rows="2" maxlength="500">${esc(x.r || "")}</textarea></label></div>`; }).join("")}
           <button class="btn solid">Guardar preguntas</button></form>
+        <form class="pcard" data-set="ingredientes"><b>Ingredientes de la ficha</b>
+          ${(() => { const c = S.ingredientes || {}, lista = c.lista || [], por = c.productos || {};
+            return `<div class="checks"><label><input type="checkbox" name="activo" ${c.activo !== false ? "checked" : ""}> Mostrar los ingredientes en la ficha de cada producto</label></div>
+          <div class="row2"><label>Título<input class="inp" name="titulo" maxlength="40" value="${esc(c.titulo || "Lo que lleva")}"></label><label>Texto debajo del título (opcional)<input class="inp" name="texto" maxlength="140" value="${esc(c.texto || "")}" placeholder="Vacío = no se muestra"></label></div>
+          <label>Aviso al final del desplegable (opcional)<textarea class="inp" name="aviso" rows="2" maxlength="300" placeholder="Vacío = no se muestra">${esc(c.aviso || "")}</textarea></label>
+          <span class="hintp">El aviso sirve, por ejemplo, para contar si todo se prepara en la misma cocina. Escribilo solo si lo tienen confirmado.</span>
+          <h3 class="ingh">Ingredientes</h3>
+          <span class="hintp">Foto cuadrada de la textura, bien de cerca (ej: el polvo del matcha, la espuma del cold foam). Con 600 × 600 alcanza. Sin foto, en la web se ve un círculo crema con el nombre.</span>
+          <div class="inglist">${lista.map((x, i) => ingRow(i, x)).join("")}</div>
+          <button type="button" class="linkbtn" data-ingadd>+ Agregar ingrediente</button>
+          <h3 class="ingh">Qué lleva cada producto</h3>
+          <span class="hintp">Tildá los ingredientes de cada uno. Los sets muestran solos los de su bebida y su mochi. <b>Contiene</b> es opcional: completalo solo con datos confirmados (por ejemplo, leche, gluten o frutos secos); vacío no se muestra.</span>
+          <button type="button" class="btn" data-ingauto style="justify-self:start;white-space:normal;text-align:center">Completar con las descripciones de la carta</button>
+          <div class="ingprods">${ingProds().map((p) => { const x = por[p.id] || {}; return `<div class="ingprod${p.activo === false ? " oculto" : ""}"><b>${esc(p.nombre)}${p.activo === false ? ' <small class="hintp">(oculto)</small>' : ""}</b>
+            <div class="ingchips" data-ingchips="${esc(p.id)}">${ingChipsHtml(p.id, lista, x.ids || [])}</div>
+            <label>Contiene (opcional)<input class="inp" name="ic_${esc(p.id)}" maxlength="160" value="${esc(x.contiene || "")}" placeholder="Ej: leche"></label></div>`; }).join("")}</div>`; })()}
+          <button class="btn solid">Guardar</button></form>
         <form class="pcard" data-set="ventajas"><b>Pedir acá te conviene</b>
           <div class="checks"><label><input type="checkbox" name="activo" ${(S.ventajas || {}).activo !== false ? "checked" : ""}> Mostrar en "Cómo pedir"</label></div>
           <label>Título<input class="inp" name="titulo" value="${esc((S.ventajas || {}).titulo || "Pedir acá te conviene")}"></label>
@@ -1545,6 +1592,7 @@
     { k: "maquinita", g: "Clientes", t: "Maquinita", d: "Premios, tiradas por día, imágenes de los rodillos y si se muestra en la web.", s: (S) => { const m = S.maquinita || {}, n = Math.max(1, +m.fichas_dia || 1); return (m.activo !== false ? "Visible" : "Oculta") + ` · ${n} ${n === 1 ? "tirada" : "tiradas"} por día`; } },
     { k: "votacion", g: "Clientes", t: "Votación", d: "Una pregunta con opciones para que voten en la web.", s: (S) => ((S.votacion || {}).activo ? "Abierta" : "Apagada") },
     { k: "hero", g: "Web", t: "Portada", d: "Las slides del inicio y sus botones.", s: (S) => `${((S.hero || {}).slides || []).length} slides` },
+    { k: "ingredientes", g: "Web", t: "Ingredientes de la ficha", d: "Los ingredientes que se ven en cada producto, con la foto de su textura y lo que contiene.", s: (S) => { const c = S.ingredientes || {}, n = (c.lista || []).length, f = (c.lista || []).filter((x) => x.img).length; return c.activo === false ? "Oculto" : n ? `${n} ingredientes · ${f} con foto` : "Sin cargar"; } },
     { k: "ventajas", g: "Web", t: "Pedir acá te conviene", d: "Los motivos para pedir por la web.", s: (S) => ((S.ventajas || {}).activo !== false ? `${((S.ventajas || {}).items || []).length} motivos` : "Oculto") },
     { k: "faq", g: "Web", t: "Preguntas frecuentes", d: "Las preguntas del final de la web.", s: (S) => `${(((S.faq || {}).items) || FAQ_DEF).length} preguntas` },
     { k: "apps", g: "Web", t: "Apps de delivery", d: "Links y logos de PedidosYa, Rappi y Uber Eats.", s: (S) => `${(S.apps || []).length} apps` },
@@ -1629,6 +1677,14 @@
       if (k === "personalizacion") {
         const leches = (f.leches || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const [n, pr] = s.split("|").map((x) => x.trim()); return { nombre: n, precio: Math.max(0, Math.round(+String(pr || "0").replace(/[^0-9.,]/g, "").replace(/\.(?=\d{3})/g, "").replace(",", ".")) || 0) }; }).filter((l) => l.nombre);
         await API.saveSetting("personalizacion", { activo: !!f.activo, leches, sin: (f.sin || "").split("\n").map((s) => s.trim()).filter(Boolean) });
+      }
+      if (k === "ingredientes") {
+        const lista = ingLeerLista(form).filter((x) => x.nombre);
+        if (new Set(lista.map((x) => x.nombre.toLowerCase())).size < lista.length) throw new Error("Hay dos ingredientes con el mismo nombre");
+        const productos = {};
+        ingProds().forEach((p) => { const ids = [...form.querySelectorAll(`[name="ip_${CSS.escape(p.id)}"]:checked`)].map((i) => i.value).filter((id) => lista.some((x) => x.id === id)), contiene = (f["ic_" + p.id] || "").trim();
+          if (ids.length || contiene) productos[p.id] = { ids, contiene }; });
+        await API.saveSetting("ingredientes", { activo: !!f.activo, titulo: (f.titulo || "").trim() || "Lo que lleva", texto: (f.texto || "").trim(), aviso: (f.aviso || "").trim(), lista, productos });
       }
       if (k === "hero") {
         const slides = [0, 1, 2, 3, 4, 5].map((i) => {
@@ -1996,6 +2052,13 @@
     if (e.target.closest("[data-fradd]")) { const l = e.target.closest("form").querySelector(".frlist"); l.insertAdjacentHTML("beforeend", frRow(Date.now().toString(36))); l.lastElementChild.querySelector("[name^=fa]").focus(); return; }
     const x = e.target.closest("[data-frx]"); if (x) x.closest(".frrow").remove();
   });
+  document.addEventListener("click", (e) => {
+    const form = e.target.closest('form[data-set="ingredientes"]'); if (!form) return;
+    if (e.target.closest("[data-ingadd]")) { const k = Date.now().toString(36); form.querySelector(".inglist").insertAdjacentHTML("beforeend", ingRow(k)); form.querySelector(`[name="in${k}"]`).focus(); return; }
+    if (e.target.closest("[data-ingx]")) { e.target.closest(".ingrow").remove(); ingRepintar(form); return; }
+    if (e.target.closest("[data-ingauto]")) ingAuto(form);
+  });
+  document.addEventListener("change", (e) => { if (e.target.matches('form[data-set="ingredientes"] .ingrow [name^=in]')) ingRepintar(e.target.closest("form")); });
   document.addEventListener("change", (e) => { if (e.target.matches(".frsw input")) e.target.nextElementSibling.textContent = e.target.checked ? "Activa" : "Apagada"; });
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-upx]"); if (!x) return; const n = x.dataset.upx, form = x.closest("form"); form.querySelector(`[name="${n}"]`).value = ""; const pv = form.querySelector(`[data-prevfor="${n}"]`); if (pv) pv.textContent = "—"; });
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-slx]"); if (!x) return; const r = x.closest(".slrow"), i = x.dataset.slx; ["si", "st", "sx"].forEach((p) => (r.querySelector(`[name=${p}${i}]`).value = "")); r.querySelector(".upprev").textContent = "Vacío · tocá Guardar"; x.remove(); });
