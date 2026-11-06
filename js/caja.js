@@ -181,7 +181,7 @@
   function drawShell() {
     app.innerHTML = `<header class="cbar"><div class="wrap">
         <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.svg" alt="Setto"></a>
-        <nav class="appsw" aria-label="Cambiar de app"><a href="panel.html">Pedidos<span class="n" data-pend hidden></span></a><a href="caja.html" aria-current="page">Caja</a></nav>
+        <nav class="appsw" aria-label="Cambiar de app"><a href="panel.html">Pedidos<span class="n" data-pend hidden></span></a><a href="caja.html" aria-current="page">Caja</a><a href="local.html">Local</a></nav>
         <span class="sp"></span>
         <button class="mebtn" data-who><i>${esc((S.me || "?")[0])}</i>${esc(S.me || "¿Quién sos?")}</button>
       </div></header>
