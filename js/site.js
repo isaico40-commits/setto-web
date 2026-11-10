@@ -821,6 +821,9 @@
     sec.classList.toggle("sin-cards", sinCards);
     const pv = $("#espPrev"); if (pv) pv.remove();
     if (VER_ESP && antesProg()) $("#espGrid").insertAdjacentHTML("beforebegin", '<p class="esp-prev" id="espPrev">Vista previa: así se ven las tarjetas. Los clientes las ven recién cuando sale el drop (o si las prendés en el panel).</p>');
+    // con 1 a 3 productos (una promo del día) la fila va centrada y sin "Deslizá"
+    const pocos = items.length < 4; $("#espGrid").classList.toggle("pocos", pocos); $("#espGrid").style.setProperty("--n", items.length);
+    if (pocos && items.length === 1 && dd) dd.closest(".hint").hidden = true;
     dots("espGrid"); tickDrop();
   }
   /* cuenta regresiva + avisame + agendar */
