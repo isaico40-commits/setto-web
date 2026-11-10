@@ -971,7 +971,7 @@
         <p class="num">${x.enviados || 0} enviados${x.gratis ? ` (${x.gratis} gratis)` : ""} · ${x.semana || 0} esta semana${x.fallidos ? ` · ${x.fallidos} con error` : ""} · ${autoProximo(a, x)}</p>
         ${t ? `<details class="tplver"><summary>Así le llega</summary>${TP.burbuja(t, a.variables)}</details>` : ""}
         <div class="row2"><label>Probar con un número<input class="inp" data-prueba inputmode="tel" placeholder="223 347-1277"></label></div>
-        <div class="acts"><button class="btn" data-aprobar>Mandar prueba</button><button class="btn ${a.activa ? "" : "solid"}" data-aonoff>${a.activa ? "Pausar" : "Prender"}</button><button class="linkbtn warn" data-aborrar>Borrar</button></div>
+        <div class="acts"><button class="btn" data-aprobar>Mandar prueba</button><button class="btn ${a.activa ? "" : "solid"}" data-aonoff>${a.activa ? "Pausar" : "Prender"}</button><button class="btn" data-aeditar>Editar</button><button class="linkbtn warn" data-aborrar>Borrar</button></div>
       </article>`; }).join("") : '<p class="muted">Todavía no hay automáticas.</p>';
     } catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
   }
@@ -1161,7 +1161,7 @@
           <div data-tplbox><span class="muted">Cargando plantillas…</span></div>
           <div data-varsbox class="varsbox"></div>
           <div data-promobox data-solo="compra producto" class="varsbox"></div>
-          <button class="btn solid" type="submit">Guardar (queda pausada)</button></form>
+          <div class="acts"><button class="btn solid" type="submit">Guardar (queda pausada)</button><button class="btn" type="reset" data-cancelar hidden>Cancelar edición</button></div></form>
         <div class="pgrid" id="autoList" style="margin-top:16px"><p class="muted">Cargando…</p></div></section>
       <section class="sec"><h2>Respuestas y bajas por WhatsApp</h2><div class="pcard"><div class="hist" id="msgList"><span class="muted">Cargando…</span></div></div></section>
       <section class="sec"><h2>Envíos a Meta</h2><div class="pcard"><div class="hist" id="syncList"><span class="muted">Cargando…</span></div></div></section>${MACHETE}`;
@@ -1187,18 +1187,48 @@
         const p = (P.promos || []).find((x) => x.id === e.target.value); if (p && p.requiere) af.elements.producto.value = p.requiere;
       }
     });
-    af.addEventListener("reset", () => setTimeout(autoTipo));
+    af.addEventListener("reset", () => setTimeout(() => { autoEditarFin(af); autoTipo(); }));
     enganchar(af, async (v) => { const premio = v.d.disparador === "premio", prod = v.d.disparador === "producto";
       if (prod && !v.d.producto) throw new Error("Elegí el producto en promo");
       if (prod && !v.d.promo_id) throw new Error("Elegí el código de descuento: la automática sale mientras ese código esté activo");
-      await API.createAutomation({ nombre: v.d.nombre.trim(), disparador: v.d.disparador, segmento: premio || prod ? "todos" : v.d.segmento,
+      const datos = { nombre: v.d.nombre.trim(), disparador: v.d.disparador, segmento: premio || prod ? "todos" : v.d.segmento,
         dias: premio ? null : prod ? (v.d.audiencia === "favorito" ? null : Math.max(1, Math.min(365, +v.d.dias_prod || 60))) : Math.max(1, Math.min(365, +v.d.dias || 7)),
         horas: premio ? Math.max(3, Math.min(46, +v.d.horas || 24)) : null, plantilla: v.plantilla, idioma: v.idioma, variables: v.variables,
-        ...(prod ? { producto: v.d.producto, audiencia: v.d.audiencia } : {}), ...(premio ? {} : v.promo) });
-      toast("Guardada. Revisala y tocá Prender"); cargarAutomaticas(); });
+        ...(prod ? { producto: v.d.producto, audiencia: v.d.audiencia } : {}), ...(premio ? {} : v.promo) };
+      // al editar se guarda encima (si estaba prendida, sigue prendida con los cambios); sin código elegido, se le saca el que tenía
+      if (af.dataset.edit) { await API.updateAutomation(af.dataset.edit, { promo_id: null, ...datos }); toast("Cambios guardados"); }
+      else { await API.createAutomation(datos); toast("Guardada. Revisala y tocá Prender"); }
+      cargarAutomaticas(); });
     $("#gastoBox").addEventListener("click", (e) => { const b = e.target.closest("[data-gmes]"); if (b) { P.gastoAtras = +b.dataset.gmes; cargarGasto(); } });
     cargarGasto(); engancharPromos();
     cargarPlantillas().then(() => { cargarCampanas(); cargarAutomaticas(); cargarPromos(); });
+  }
+  // editar una automática: se carga en su formulario y se guarda encima
+  function autoEditar(a) {
+    const f = $("#autoForm"); f.dataset.edit = a.id; f._vars = a.variables || [];
+    const E = f.elements, val = (k, v) => { if (E[k] && v !== null && v !== undefined) E[k].value = v; };
+    val("nombre", a.nombre); val("disparador", a.disparador || "compra"); val("segmento", a.segmento);
+    if (a.disparador === "producto") { val("producto", a.producto || ""); val("audiencia", a.audiencia || "ambos"); val("dias_prod", a.dias || 60); }
+    else if (a.disparador === "premio") val("horas", a.horas); else val("dias", a.dias);
+    E.disparador.dispatchEvent(new Event("change", { bubbles: true })); // muestra los campos del tipo y arma el código
+    if (E.promo_id) E.promo_id.value = a.promo_id || "";
+    const pl = f.querySelector("[name=plantilla]"); if (pl) { if (pl.tagName === "SELECT") pl.innerHTML = `<option value="${esc(a.plantilla)}" selected></option>`; pl.value = a.plantilla; }
+    campPlantillaCampo(f);
+    if (E.idioma) E.idioma.value = a.idioma || "es_AR";
+    if (E.variables) E.variables.value = (a.variables || []).join("\n");
+    f.querySelectorAll("[data-cvar]").forEach((x) => { x.value = (a.variables || [])[+x.dataset.cvar] ?? ""; }); campPrev(f);
+    if (E.promo_id) E.promo_id.value = a.promo_id || "";
+    f.closest(".sec").querySelector("h2").textContent = `Editar automática: ${a.nombre}`;
+    f.querySelector("[type=submit]").textContent = a.activa ? "Guardar cambios (sigue prendida)" : "Guardar cambios";
+    f.querySelector("[data-cancelar]").hidden = false;
+    f.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function autoEditarFin(f) {
+    if (!f.dataset.edit) return;
+    delete f.dataset.edit; f._vars = null;
+    f.closest(".sec").querySelector("h2").textContent = "Campañas automáticas";
+    f.querySelector("[type=submit]").textContent = "Guardar (queda pausada)"; f.querySelector("[data-cancelar]").hidden = true;
+    campPlantillaCampo(f); promoCampo(f);
   }
   // editar un borrador: se carga en el formulario de "Nueva campaña" y se guarda encima
   function campEditar(c) {
@@ -1952,14 +1982,18 @@
       b.disabled = true;
       try { const r = await API.sendCampaign(id, prueba); toast(prueba ? "Prueba enviada" : `Listo: ${r.enviados} enviados, ${r.fallidos} con error`); cargarCampanas(); } catch (err) { toast(err.message); b.disabled = false; }
     }
-    if (b.dataset.aprobar !== undefined || b.dataset.aonoff !== undefined || b.dataset.aborrar !== undefined) {
+    if (b.dataset.aprobar !== undefined || b.dataset.aonoff !== undefined || b.dataset.aborrar !== undefined || b.dataset.aeditar !== undefined) {
       const card = b.closest("[data-auto]"), id = card.dataset.auto, a = (P.autos || []).find((x) => x.id === id); if (!a) return;
+      if (b.dataset.aeditar !== undefined) { autoEditar(a); return; }
       if (b.dataset.aprobar !== undefined) {
         const ph = card.querySelector("[data-prueba]").value.trim(); if (!ph) { toast("Poné el número para la prueba"); return; }
         b.disabled = true; try { await API.testAutomation(id, ph); toast("Prueba enviada"); } catch (err) { toast(err.message); } b.disabled = false; return;
       }
       if (b.dataset.aborrar !== undefined && !confirm(`¿Borrar "${a.nombre}"? Deja de mandarse; lo que ya salió queda registrado.`)) return;
-      if (b.dataset.aonoff !== undefined && !a.activa && !confirm(`¿Prender "${a.nombre}"? Desde mañana a las 11 le llega sola a quien cumpla ${a.dias} ${a.dias === 1 ? "día" : "días"} desde su última compra.`)) return;
+      const cuando = a.disparador === "premio" ? "Revisa cada hora de 10 a 20 h quién tiene un premio de la maquinita por vencer."
+        : a.disparador === "producto" ? "Revisa cada hora de 10 a 20 h, mientras el código esté activo, quién pidió el producto o lo tiene de favorito."
+        : `Desde mañana a las 11 le llega sola a quien cumpla ${a.dias} ${a.dias === 1 ? "día" : "días"} desde su última compra.`;
+      if (b.dataset.aonoff !== undefined && !a.activa && !confirm(`¿Prender "${a.nombre}"? ${cuando}`)) return;
       b.disabled = true;
       try { if (b.dataset.aborrar !== undefined) await API.deleteAutomation(id); else await API.updateAutomation(id, { activa: !a.activa });
         toast(b.dataset.aborrar !== undefined ? "Borrada" : a.activa ? "Pausada" : "Prendida"); cargarAutomaticas(); } catch (err) { toast(err.message); b.disabled = false; }
