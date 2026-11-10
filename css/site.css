@@ -117,7 +117,7 @@ section.blk{padding-block:72px}
 
 /* carriles: grilla en desktop, carrusel en mobile */
 .rail{display:grid;gap:22px;grid-template-columns:repeat(var(--cols,3),minmax(0,1fr))}
-.rail.pocos{grid-template-columns:repeat(var(--n,1),minmax(0,272px));justify-content:center}
+.rail.pocos{grid-template-columns:repeat(var(--n,1),calc((100% - 44px) / 3));justify-content:center} /* mismo ancho que las tarjetas de Sets */
 .hint{display:none;font-size:.8rem;color:var(--ink-2);margin-top:12px}
 @media (max-width:760px){
   .rail{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:var(--w,80%);overflow-x:auto;scroll-snap-type:x mandatory;margin-inline:-20px;padding:6px 20px 14px;scroll-padding-inline:20px;scrollbar-width:none;gap:14px}
@@ -125,7 +125,7 @@ section.blk{padding-block:72px}
   .rail{overflow-y:hidden;overscroll-behavior-x:contain;touch-action:pan-x pan-y}
   .rail::-webkit-scrollbar{display:none}
   .rail>*{scroll-snap-align:start}
-  .rail.pocos{grid-template-columns:none;justify-content:center}
+  .rail.pocos{grid-template-columns:none;grid-auto-columns:84%;justify-content:center}
   .rail.pocos[style*="--n: 1"]{overflow-x:visible}
   .hint{display:flex;align-items:center;gap:10px}
   .dots{display:flex;gap:6px}
