@@ -45,11 +45,11 @@
   const umbral = () => Math.max(1, Number((S.stock_web || {}).umbral) || 3);
   const stockDe = (p) => {
     if (!STOCK || !p) return null;
-    const id = fmt(p) === "set" ? p.set_mochi : p.id;
+    const id = mochiDe(p);
     return Object.prototype.hasOwnProperty.call(STOCK, id) ? Number(STOCK[id]) : null;
   };
   // lo que ve el cliente = stock − lo que ya tiene en su carrito (contador en vivo)
-  const libreDe = (p) => { const n = stockDe(p); if (n === null) return null; const mid = fmt(p) === "set" ? p.set_mochi : p.id; return n - enCarrito(mid); };
+  const libreDe = (p) => { const n = stockDe(p); if (n === null) return null; return n - enCarrito(mochiDe(p)); };
   const badgeInner = (p) => { const n = stockDe(p), l = libreDe(p); if (n === null || p.agotado) return ""; return n <= 0 ? '<span class="badge">Sin stock hoy</span>' : l <= 0 ? '<span class="badge low">En tu pedido</span>' : l <= umbral() ? '<span class="badge low">¡Últimos!</span>' : ""; };
   const lineInner = (p) => {
     const n = stockDe(p), l = libreDe(p); if (n === null || p.agotado) return "";
@@ -69,7 +69,8 @@
   document.addEventListener("click", (e) => { const a = e.target.closest("[data-phnext]"); if (!a) return; e.preventDefault(); e.stopPropagation(); a.closest(".ph").classList.toggle("alt"); }, true);
 
   /* el stock frena: no se puede pedir más de lo que hay (la base también lo controla) */
-  const mochiDe = (p) => (!p ? null : fmt(p) === "set" ? p.set_mochi : fmt(p) === "mochi" ? p.id : null);
+  // un mochi en promo (Panel → Especial, "Es promo de") usa el stock del mochi de la carta
+  const mochiDe = (p) => (!p ? null : fmt(p) === "set" ? p.set_mochi : fmt(p) === "mochi" ? p.oferta_de || p.id : null);
   const sinStock = (p) => { const n = stockDe(p); return n !== null && n <= 0; };
   const enCarrito = (mid) => cart.reduce((a, c) => a + (mochiDe(find(c.id)) === mid ? c.qty : 0) + (c.mochis || []).filter((x) => x === mid).length * c.qty, 0);
   function frenoStock(p, extra) {
@@ -111,6 +112,10 @@
   const prog = () => ESPC().modo === "programado";
   const dropFase = () => API.dropEstado(ESPC(), ahora()); // "antes" | "abierto" | "terminado"
   const espOpen = () => dropFase() === "abierto";
+  const esPromoDia = () => ESPC().tipo === "promo";
+  // precio normal de un producto en promo: el de la carta (mismo tamaño); un set del Especial sin promo compara contra bebida + mochi
+  const baseDe = (p) => (p && p.categoria === "especial" && p.oferta_de ? [...SETS, ...DIRTY, ...MOCHIS].find((x) => x.id === p.oferta_de) || null : null);
+  const antesDe = (p, sz = "12 oz") => { const b = baseDe(p); if (b) return Number(bebida(b) ? b.precios[sz] : b.precio) || 0; return fmt(p) === "set" ? suelto(p, sz) : 0; };
   const antesProg = () => prog() && dropFase() === "antes";
   // la foto va esmerilada (solo en la edición especial): en un drop programado, hasta el lanzamiento; en modo manual, según cada producto
   const VER_ESP = new URLSearchParams(location.search).has("ver-especial"); // vista previa desde el panel: tarjetas destapadas
@@ -124,7 +129,7 @@
     return { b, m: [...MOCHIS, ...ESP].find((x) => x.id === s.mochi) };
   };
   const suelto = (s, sz) => { const { b, m } = setParts(s); return (b ? Number(b.precios[sz]) : 0) + (m ? Number(m.precio) : 0); };
-  const descOf = (p) => { if (p.categoria !== "set") return p.desc; const { b, m } = setParts(p); return (b ? b.nombre : "Bebida") + " + mochi " + (m ? m.nombre.toLowerCase() : ""); };
+  const descOf = (p) => { if (p.categoria !== "set" && !(p.categoria === "especial" && fmt(p) === "set" && p.bebida && !p.desc)) return p.desc; const { b, m } = setParts(p); return (b ? b.nombre : "Bebida") + " + mochi " + (m ? m.nombre.toLowerCase() : ""); };
 
   /* ---------- Setto Club: helpers ---------- */
   const club = () => S.club || {};
@@ -777,11 +782,13 @@
   function renderEspecial() {
     const E = ESPC(), items = on(ESP), fase = dropFase(), open = fase === "abierto", fin = fase === "terminado", P = prog();
     const sec = $("#especial"); renderDropBar();
-    if (items.length === 0 || (fin && E.al_terminar !== "mostrar")) { sec.hidden = true; return; }
+    if (items.length === 0 || fase === "apagado" || (fin && E.al_terminar !== "mostrar")) { sec.hidden = true; return; }
     sec.hidden = false; sec.classList.toggle("drop-antes", antesProg());
     // con la cuenta regresiva abajo, el cartel de arriba repite la fecha: se saca para que los sabores queden más cerca
     $("#espChip").hidden = antesProg() && !!E.lanzamiento;
-    $("#espChip").textContent = fin ? "Este drop terminó" : (open ? E.chip_post || (P ? "¡Ya salió!" : E.chip) : E.chip) || (open ? "Disponible ahora" : P && E.lanzamiento ? "Sale el " + fechaDrop(E.lanzamiento) : "Próxima edición");
+    $("#espChip").textContent = esPromoDia() ? (fin ? "Esta promo terminó" : E.chip || (!open && E.lanzamiento ? "Arranca el " + fechaDrop(E.lanzamiento) : E.fin ? "Vale hasta el " + fechaDrop(E.fin) : ""))
+      : fin ? "Este drop terminó" : (open ? E.chip_post || (P ? "¡Ya salió!" : E.chip) : E.chip) || (open ? "Disponible ahora" : P && E.lanzamiento ? "Sale el " + fechaDrop(E.lanzamiento) : "Próxima edición");
+    $("#espChip").hidden = $("#espChip").hidden || !$("#espChip").textContent;
     $("#t-esp").textContent = E.titulo || "Edición especial";
     document.querySelectorAll('a[href="#especial"]').forEach((a) => (a.textContent = E.titulo || "Edición especial"));
     $("#espIntro").textContent = (open && E.intro_post) || E.intro || "";
@@ -789,7 +796,7 @@
     // misma tarjeta que Sets (foto, título, descripción, línea fina, Desde $, +, estrellas, badges); el rosado la diferencia
     $("#espGrid").innerHTML = items.map((p, i) => {
       const beb = bebida(p), base = beb ? Number(p.precios["12 oz"]) : Number(p.precio);
-      const antes = fmt(p) === "set" ? suelto(p, "12 oz") : 0, ahorro = base > 0 && antes > base ? antes - base : 0, pct = ahorro ? Math.round((ahorro / antes) * 100) : 0;
+      const antes = antesDe(p), ahorro = base > 0 && antes > base ? antes - base : 0, pct = ahorro ? Math.round((ahorro / antes) * 100) : 0;
       const foto = !!p.img, canBuy = open && !p.agotado && !sinStock(p) && base > 0;
       const nom = hideN ? "Sabor sorpresa" + (items.length > 1 ? " #" + (i + 1) : "") : p.nombre;
       const pic = foto ? (tapado(p) || hideN ? `<img src="${esc(IMG(p.img, 300))}" alt="${esc(hideN ? nom : nameOf(p))}" loading="lazy">` : picsHtml(p, nameOf(p))) : `<span class="pend"><img src="${IMG("img/mochito-lie.png", 120)}" alt="">Foto en camino</span>`;
@@ -799,7 +806,7 @@
       const code = !hideN && (p.codigo || p.tema) ? `<p class="code">${esc(p.codigo || "")}${p.codigo && p.tema ? " ✦ " : ""}${esc(p.tema || "")}</p>` : "";
       return `<article class="set prem ${p.agotado || fin ? "agotado" : ""} ${tapado(p) ? "tapado" : ""}" style="--i:${i}">
         ${ph}${pct > 0 && !hideP ? `<span class="off num">${pct}% off</span>` : ""}${tag}
-        <h3>${esc(nom)}</h3>${code}<p class="combo">${esc(hideN ? "Se revela el día del drop." : p.desc)}</p>${!fin && !hideN ? stockLine(p) : ""}
+        <h3>${esc(nom)}</h3>${code}<p class="combo">${esc(hideN ? "Se revela el día del drop." : descOf(p))}</p>${!fin && !hideN ? stockLine(p) : ""}
         <div class="foot">${precio}
         ${canBuy ? `<button class="add" ${beb ? `data-open="${p.id}"` : `data-quick="${p.id}"`} aria-label="Sumar ${esc(nameOf(p))}">+</button>` : ""}</div>
       </article>`;
@@ -821,7 +828,7 @@
     const E = ESPC();
     return `<div class="drop-cd">
       ${E.cuenta !== false ? `<div class="cd" role="timer" aria-label="Falta para el lanzamiento">${[["d", "días"], ["h", "horas"], ["m", "min"], ["s", "seg"]].map(([u, l]) => `<span><b class="num" data-cd="${u}">00</b><small>${l}</small></span>`).join("")}</div>` : ""}
-      <p class="cd-when">Sale el <b>${esc(fechaDrop(E.lanzamiento))}</b></p>
+      <p class="cd-when">${esPromoDia() ? "Arranca el" : "Sale el"} <b>${esc(fechaDrop(E.lanzamiento))}</b></p>
       <div class="cd-acts">${E.avisame !== false ? dropAvHtml("Avisame cuando salga") : ""}${E.calendario !== false ? calHtml() : ""}</div>
     </div>`;
   }
@@ -1122,6 +1129,7 @@
     const c = ingCfg(), lista = c.lista || [], por = c.productos || {}, ids = [];
     const suma = (id) => ((por[id] || {}).ids || []).forEach((x) => { if (!ids.includes(x)) ids.push(x); });
     suma(p.id);
+    if (!ids.length && p.oferta_de) { const b = find(p.oferta_de); if (b && b !== p) return ingDe(b); }
     if (!ids.length && p.categoria === "set") { suma(p.set_bebida); suma(p.set_mochi); }
     const items = ids.map((x) => lista.find((i) => i.id === x)).filter((i) => i && i.nombre);
     const cont = [(por[p.id] || {}).contiene, ...(p.categoria === "set" && !((por[p.id] || {}).contiene || "").trim() ? [(por[p.set_bebida] || {}).contiene, (por[p.set_mochi] || {}).contiene] : [])]
@@ -1143,8 +1151,8 @@
     const custom = persOn(p) ? `${leches().length ? `<div><span class="eyebrow">Leche${fmt(p) === "set" ? " de la bebida" : ""}</span><div class="chips lechas" style="margin-top:8px">${leches().map((l) => `<button data-leche="${esc(l.nombre)}" aria-pressed="${l.nombre === leche}">${esc(l.nombre)}${Number(l.precio) > 0 ? ` <span class="num">+${money(l.precio)}</span>` : ""}</button>`).join("")}</div></div>` : ""}
       ${sinOpts().length ? sinHtml(sin) : ""}` : "";
     const opts = unit(p) ? "" : `<div><span class="eyebrow">Tamaño</span><div class="opts" style="margin-top:8px">${["12 oz", "16 oz"].map((oz) => {
-      const sv = k === "set" ? suelto(p, oz) : 0, pv = p.precios[oz];
-      const pr = k === "set" && sv > pv ? `<s>${money(sv)}</s>${money(pv)} <em class="pct">−${Math.round(((sv - pv) / sv) * 100)}%</em>` : money(pv);
+      const sv = k === "set" ? suelto(p, oz) : k === "premium" ? antesDe(p, oz) : 0, pv = p.precios[oz];
+      const pr = sv > pv ? `<s>${money(sv)}</s>${money(pv)} <em class="pct">−${Math.round(((sv - pv) / sv) * 100)}%</em>` : money(pv);
       return `<button class="opt" data-sz="${oz}" aria-pressed="${oz === sz}"><span class="rd"></span><b>${oz.toUpperCase()}</b><span class="pp num">${pr}</span></button>`;
     }).join("")}</div></div>`;
     const box = esPromo(p) ? promoPickHtml(p) : "", falta = esPromo(p) ? promoCant(p) - boxList().length : 0;
@@ -1152,7 +1160,7 @@
     const blocked = p.agotado || sinSt || (k === "premium" && (!espOpen() || !(Number(bebida(p) ? p.precios[sz || "12 oz"] : p.precio) > 0))) || (esPromo(p) && !(Number(p.precio) > 0));
     $("#sheet").innerHTML = `<div class="sph"><img src="${esc(IMG(tapado(p) ? "img/mochito-lie.png" : p.img || "img/mochito-lie.png", 600))}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
       <div class="sb">
-        ${k === "premium" ? `<span class="eyebrow">Edición especial${espOpen() ? "" : " · próximamente"}</span>` : esPromo(p) ? `<span class="eyebrow">Promo ✦ ${promoCant(p)} mochis en box</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
+        ${k === "premium" ? `<span class="eyebrow">${esPromoDia() ? esc(ESPC().titulo || "Promo") : "Edición especial"}${espOpen() ? "" : " · próximamente"}</span>${unit(p) && antesDe(p) > Number(p.precio) && Number(p.precio) > 0 ? `<p class="s-antes num">Precio normal <s>${money(antesDe(p))}</s> · hoy ${money(p.precio)} <em class="pct">−${Math.round(((antesDe(p) - p.precio) / antesDe(p)) * 100)}%</em></p>` : ""}` : esPromo(p) ? `<span class="eyebrow">Promo ✦ ${promoCant(p)} mochis en box</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
         <h3 id="sTitle">${esc(nameOf(p))}</h3>
         <div class="s-row">${sheetRate(p)}<div class="qty" style="margin:0" ${esPromo(p) ? "hidden" : ""}><button data-sq="-1" aria-label="Restar uno">−</button><span class="num" style="min-width:18px;text-align:center">${qty}</span><button data-sq="1" aria-label="Sumar uno">+</button></div></div>
         <div class="s-rv" id="sRv" ${sheetState.rvOpen ? "" : "hidden"}>${sheetState.rvOpen ? sheetRvHtml(p) : ""}</div>
