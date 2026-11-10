@@ -1348,7 +1348,8 @@
     return `<article class="pcard ${dirty ? "dirty" : ""} ${p.activo === false ? "oculto" : ""}" data-pid="${esc(p.id)}">
       <div class="ptop"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><div><b>${esc(p.nombre)}</b><br>
         <label class="up">${p.img ? "Cambiar foto" : "Subir foto"}<input type="file" accept="image/*" data-photo></label>
-        ${p.img && c === "especial" ? `<button class="linkbtn" data-nophoto>Quitar foto</button>` : ""}</div>
+        ${p.img && c === "especial" ? `<button class="linkbtn" data-nophoto>Quitar foto</button>` : ""}
+        ${p._new ? "" : `<br><button class="linkbtn" data-copylink title="Link que abre la ficha de este producto en la web">🔗 Copiar link</button>`}</div>
         ${p.img ? `<div class="p2">${p.img2 ? `<img src="${esc(p.img2)}" alt="">` : ""}<label class="up">${p.img2 ? "Cambiar 2ª foto" : "+ 2ª foto (opcional)"}<input type="file" accept="image/*" data-photo2></label>${p.img2 ? `<button class="linkbtn" data-nophoto2>Quitar</button>` : ""}</div>` : ""}</div>
       ${c === "especial" ? `<label>Es promo de (opcional)<select data-f="oferta_de"><option value="">— Producto propio de la sección —</option>${[["set", "Sets"], ["dirty", "Dirty lattes"], ["mochi", "Mochis"]].map(([k, l]) => `<optgroup label="${l}">${opts(k, p.oferta_de)}</optgroup>`).join("")}</select></label>
         <span class="hintp">Elegí un producto de la carta y se copian nombre, foto, descripción y tipo. Vos ponés el precio con descuento; la web muestra el precio normal tachado. Los mochis descuentan del stock del mochi de la carta.</span>` : ""}
@@ -2042,6 +2043,12 @@
       if (b.dataset.undo !== undefined) {
         delete P.drafts[id];
         if (base && base._new) { P.products = P.products.filter((x) => x.id !== id); viewCarta(); } else redrawCard(id);
+      }
+      if (b.dataset.copylink !== undefined) {
+        const url = `${location.origin}/?producto=${encodeURIComponent(id)}`, p = P.drafts[id] || base;
+        const aviso = p.activo === false ? " · Ojo: está oculto, el link abre la web sin la ficha" : p.categoria === "especial" && API.dropEstado(P.settings.especial || {}) !== "abierto" ? " · Ojo: la sección no está abierta ahora" : "";
+        try { await navigator.clipboard.writeText(url); toast("Link copiado" + aviso); } catch (_) { prompt("Copiá el link:", url); }
+        return;
       }
       if (b.dataset.pctgo !== undefined) {
         const pct = parseInt(pc.querySelector("[data-pctv]").value, 10), d = P.drafts[id] || (P.drafts[id] = { ...base }), n = espNormal(d);
