@@ -1475,7 +1475,7 @@
             return `<div class="slrow2" data-tipo="${tp}"><div class="slhead"><b class="sln">Slide ${i + 1}</b>
               <select class="inp" name="sk${i}" data-sltipo aria-label="Tipo de slide ${i + 1}">${opt([["texto", "Foto + texto de la web"], ["media", "Diseño propio (imagen o video)"]], tp)}</select>
               <label class="slord">Orden<input class="inp" name="so${i}" type="number" inputmode="numeric" min="1" max="6" value="${i + 1}" aria-label="Orden de la slide ${i + 1}"></label></div>
-              <div class="upgrid">${up("si", "Imagen compu", false, 2000)}${up("sm", "Imagen celu", false, 1350)}${up("sv", "Video compu", true, 0, "only-media")}${up("sw", "Video celu", true, 0, "only-media")}</div>
+              <div class="upgrid">${up("si", "Imagen compu", false, 2000, "fmt-pc")}${up("sm", "Imagen celu", false, 1350, "fmt-cel")}${up("sv", "Video compu", true, 0, "only-media fmt-pc")}${up("sw", "Video celu", true, 0, "only-media fmt-cel")}</div>
               <div class="slf3 only-texto"><label>Título<input class="inp" name="sti${i}" maxlength="40" value="${esc(x.titulo || "")}" placeholder="Ej: Mochis rellenos"></label>
                 <label>Texto<input class="inp" name="stx${i}" maxlength="90" value="${esc(x.texto || "")}" placeholder="Ej: Masa suave por fuera, crema por dentro."></label>
                 <label>La foto es<select class="inp" name="sa${i}">${opt([["foto", "Foto de fondo completo"], ["recorte", "Producto recortado sin fondo"]], x.ajuste === "recorte" ? "recorte" : "foto")}</select></label>
