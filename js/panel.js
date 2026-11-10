@@ -76,7 +76,7 @@
   function drawShell() {
     app.innerHTML = `<header class="pbar"><div class="wrap">
         <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.svg" alt="Setto"></a>
-        <nav class="appsw" aria-label="Cambiar de app"><a href="panel.html" aria-current="page">Pedidos</a><a href="caja.html">Caja</a></nav>
+        <nav class="appsw" aria-label="Cambiar de app"><a href="panel.html" aria-current="page">Pedidos</a><a href="caja.html">Caja</a><a href="local.html">Local</a></nav>
         <nav class="ptabs" role="tablist">
           ${[["pedidos", "Pedidos"], ["dashboard", "Dashboard"], ["club", "Club"], ["campanas", "Campañas"], ["carta", "Carta"], ["resenas", "Reseñas"], ["gift", "Gift cards"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : k === "resenas" ? ' <span class="n" id="resN" hidden>0</span>' : k === "gift" ? ' <span class="n" id="gcN" hidden>0</span>' : ""}</button>`).join("")}
         </nav>
