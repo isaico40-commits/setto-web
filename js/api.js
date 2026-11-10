@@ -47,10 +47,11 @@
     if (d.length === 7) d = "223" + d;
     return d.length === 10 ? "549" + d : null;
   }
-  /* Drop de la edición especial: en qué momento está ("antes", "abierto" o "terminado").
+  /* Drop de la edición especial: en qué momento está ("antes", "abierto", "terminado" o "apagado").
      Es la misma regla que especial_abierto() en la base, que es la que acepta o no los pedidos. */
   function dropEstado(E, now = Date.now()) {
     E = E || {};
+    if (E.visible === false) return "apagado"; // interruptor del panel: la sección no se ve y no se puede pedir
     if (E.modo !== "programado") return E.estado === "disponible" ? "abierto" : "antes";
     const ini = Date.parse(E.lanzamiento || ""), fin = Date.parse(E.fin || "");
     if (!ini || now < ini) return "antes";

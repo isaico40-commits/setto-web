@@ -382,3 +382,12 @@ a.ptab{text-decoration:none}
 .ingchip input:checked + span{background:#126b69;border-color:#126b69;color:#fff}
 .ingchip input:focus-visible + span{outline:2px solid #f8a29a;outline-offset:2px}
 @media (max-width:560px){.ingrow{grid-template-columns:48px minmax(0,1fr)}.ingrow .upprev.ingprev{width:48px;height:48px}.ingrow .acts{grid-column:2}}
+
+/* sección destacada: promo del día o drop */
+#espCfg[data-tipo="promo"] .esp-drop{display:none}
+#espCfg:not([data-tipo="promo"]) .esp-promo{display:none}
+.esp-promo{display:grid;gap:8px;padding:12px;border-radius:14px;background:color-mix(in srgb,#f8a29a 14%,transparent)}
+.esp-drop{display:grid;gap:12px}
+.espsw{display:flex!important;align-items:center;gap:8px;font-weight:700;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--turquesa) 8%,transparent)}
+.espsw input{width:20px;height:20px;accent-color:var(--turquesa)}
+.pctrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;font-size:.85rem}.pctrow input{width:64px;padding:6px 8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit}
