@@ -1099,7 +1099,7 @@
   let sheetState = null;
   function openSheet(id) {
     const p = find(id); if (!p) return;
-    sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1, leche: persOn(p) ? (leches()[0] || {}).nombre || "" : "", sin: [], beb: bebOpts(p).length === 1 ? bebOpts(p)[0].id : "", mochis: {}, rvOpen: false, sinOpen: false };
+    sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1, leche: persOn(p) ? (leches()[0] || {}).nombre || "" : "", sin: [], beb: bebOpts(p).length === 1 ? bebOpts(p)[0].id : "", mochis: {}, rvOpen: false, sinOpen: false, ingOpen: false };
     drawSheet();
     px("ViewContent", { content_type: "product", content_ids: [p.id], content_name: nameOf(p), value: Number(priceOf(p, sheetState.sz)) || 0 });
     $("#sheet").classList.add("on"); $("#scrim").classList.add("on"); renderBadge();
@@ -1114,6 +1114,28 @@
       <button type="button" class="sacar-q" data-sintoggle aria-expanded="${open}" aria-controls="sSin"><span><b>¿Querés sacarle algún ingrediente a tu bebida?</b><small>${el.length ? esc(el.join(" · ")) : "Opcional · viene como figura en la carta"}</small></span><i aria-hidden="true">${open ? "▴" : "▾"}</i></button>
       <div id="sSin" ${open ? "" : "hidden"}><p class="sacar-h">No hace falta elegir nada. Tocá solo lo que no quieras que lleve.</p>
       <div class="chips sacar-c">${sinOpts().map((x) => `<button data-sin="${esc(x)}" aria-pressed="${sin.includes(x)}" aria-label="${esc(x)}"><i aria-hidden="true">${sin.includes(x) ? "✕" : "−"}</i>${esc(sinLabel(x))}</button>`).join("")}</div></div></div>`;
+  }
+  /* ingredientes a la vista (Panel → Ajustes → Ingredientes de la ficha): círculos con la foto de la textura y un desplegable
+     cerrado con lo que contiene. Sin foto se ve un círculo crema con el nombre. Los sets suman los de su bebida y su mochi. */
+  const ingCfg = () => S.ingredientes || {};
+  function ingDe(p) {
+    const c = ingCfg(), lista = c.lista || [], por = c.productos || {}, ids = [];
+    const suma = (id) => ((por[id] || {}).ids || []).forEach((x) => { if (!ids.includes(x)) ids.push(x); });
+    suma(p.id);
+    if (!ids.length && p.categoria === "set") { suma(p.set_bebida); suma(p.set_mochi); }
+    const items = ids.map((x) => lista.find((i) => i.id === x)).filter((i) => i && i.nombre);
+    const cont = [(por[p.id] || {}).contiene, ...(p.categoria === "set" && !((por[p.id] || {}).contiene || "").trim() ? [(por[p.set_bebida] || {}).contiene, (por[p.set_mochi] || {}).contiene] : [])]
+      .map((x) => String(x || "").trim()).filter(Boolean);
+    return { items, contiene: [...new Set(cont)].join(" · ") };
+  }
+  function ingHtml(p) {
+    const c = ingCfg(); if (c.activo === false || tapado(p)) return "";
+    const { items, contiene } = ingDe(p); if (!items.length) return "";
+    const open = sheetState.ingOpen;
+    return `<section class="ing" aria-labelledby="ingT"><h4 id="ingT">${esc(c.titulo || "Lo que lleva")}</h4>${c.texto ? `<p class="ing-tx">${esc(c.texto)}</p>` : ""}
+      <ul class="ing-row">${items.map((i) => `<li>${i.img ? `<span class="ing-c"><img src="${esc(IMG(i.img, 160))}" alt="" loading="lazy"></span>` : `<span class="ing-c vacio" aria-hidden="true">${esc(i.nombre)}</span>`}<small>${esc(i.nombre)}</small></li>`).join("")}</ul>
+      <div class="ing-dd${open ? " on" : ""}"><button type="button" class="ing-q" data-ingtoggle aria-expanded="${open}" aria-controls="ingL"><b>¿Qué contiene?</b><i aria-hidden="true">${open ? "▴" : "▾"}</i></button>
+        <div id="ingL" ${open ? "" : "hidden"}><p><b>Ingredientes:</b> ${esc(items.map((i) => i.nombre).join(", "))}.</p>${contiene ? `<p><b>Contiene:</b> ${esc(contiene)}</p>` : ""}${c.aviso ? `<p class="ing-av">${esc(c.aviso)}</p>` : ""}</div></div></section>`;
   }
   function drawSheet() {
     const { p, sz, qty, leche, sin, beb } = sheetState, k = kind(p);
@@ -1140,6 +1162,7 @@
         ${box}
         ${opts}
         ${custom}
+        ${ingHtml(p)}
         ${clubOn() && !blocked ? `<span class="clubtag">Tu pedido suma ${sellosTxt(spp())} del Setto Club</span>` : ""}
         <div class="act">
         ${blocked ? `<span class="btn big" style="flex:1;opacity:.7;box-shadow:none;background:var(--bg-2);color:var(--ink);cursor:default">${p.agotado ? "Agotado" : sinSt ? "Sin stock hoy" : "Todavía no disponible"}</span>` : falta > 0 ? `<button class="btn solid big" id="sheetAdd">Elegí ${falta} ${falta === 1 ? "mochi" : "mochis"} más</button>` : `<button class="btn solid big" id="sheetAdd">Agregar · <span class="num">${money((priceOf(p, sz) + lechePrecio(leche)) * qty)}</span></button>`}</div>
@@ -1512,6 +1535,7 @@
     else if (b.id === "sheetAdd") { if (addItem(sheetState.p, sheetState.sz, sheetState.qty, sheetState.leche, sheetState.sin, sheetState.beb, boxList())) { closeSheet(); if (view === "cart" && $("#drawer").classList.contains("on")) drawDrawer(); } }
     if (b.dataset.beb !== undefined && sheetState) { sheetState.beb = b.dataset.beb; drawSheet(); }
     if (b.dataset.leche !== undefined && sheetState) { sheetState.leche = b.dataset.leche; drawSheet(); }
+    if (b.dataset.ingtoggle !== undefined && sheetState) { sheetState.ingOpen = !sheetState.ingOpen; drawSheet(); const q = $("#sheet [data-ingtoggle]"); if (q) { q.focus(); if (sheetState.ingOpen) $("#ingL").scrollIntoView({ behavior: "smooth", block: "center" }); } return; }
     if (b.dataset.sintoggle !== undefined && sheetState) { sheetState.sinOpen = !sheetState.sinOpen; drawSheet(); const q = $("#sheet [data-sintoggle]"); if (q) q.focus(); return; }
     if (b.dataset.sin !== undefined && sheetState) { const x = b.dataset.sin, s = sheetState.sin; sheetState.sin = s.includes(x) ? s.filter((y) => y !== x) : [...s, x]; drawSheet(); }
     if (b.id === "tab-dirty" || b.id === "tab-mochi" || b.id === "tab-promo") { tab = b.id.slice(4); renderCarta(); }
