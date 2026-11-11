@@ -1,4 +1,4 @@
--- 060 · Auditoría de seguridad (2026-11-10): cerrar funciones públicas que la web ya no usa.
+-- 061 · Auditoría de seguridad (2026-11-10): cerrar funciones públicas que la web ya no usa.
 -- La web llama create_order_v6 (sin código) y create_order_v7 (con código), y create_review_v2 / create_review_track.
 -- Las versiones viejas quedaban abiertas a cualquiera con la clave anon. No se borran: solo se les quita el permiso.
 -- Para deshacer: grant execute on function ... to anon, authenticated;
