@@ -79,6 +79,7 @@ Pedidos que no vienen de la web (WhatsApp directo, PedidosYa, Rappi, Uber Eats):
 ### Local (mostrador y barra)
 `local.html` (o `/local`, botón **Local** arriba en el panel y la caja). Usa el mismo usuario del equipo. Requiere la migración `058_local_comandas.sql`.
 - **Tickear:** tocás productos (los mochis se suman directo; las bebidas abren leche, "sacar", nota y el tamaño se elige con el mismo botón que agrega). Abajo: nombre, nota, descuento, **Cobrar** o **Mandar a barra sin cobrar**.
+- **Local** (categoría): lo que no está en la web (facturas, medialunas, agua…). **＋ Otro producto** carga nombre y precio a mano; tildando "Guardarlo" queda como botón para la próxima. **Editar precios u ocultar** para mantener la lista. Requiere `062_local_productos_propios.sql`. No descuentan stock de mochis; en la Caja figuran por nombre.
 - **Barra:** las comandas aparecen al instante, con minutos de espera. **Lista ✓** → **Entregada**. Ideal en una tablet con **Pantalla completa**.
 - **Hoy:** lo cobrado por efectivo / Mercado Pago, lo que falta cobrar, reimprimir, cambiar forma de pago y anular.
 - La base recalcula los precios. Cobrar crea la entrada "Venta en el local" en la Caja y descuenta los mochis del stock. Anular la comanda anula esa entrada.
