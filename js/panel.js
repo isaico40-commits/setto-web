@@ -1281,7 +1281,7 @@
   }
 
   /* =================== CARTA =================== */
-  const CATS = [["especial", "Edición especial"], ["set", "Sets"], ["promo", "Promos"], ["dirty", "Dirty lattes"], ["mochi", "Mochis"]];
+  const CATS = [["especial", "Sección destacada (promos del día o drops)"], ["set", "Sets"], ["promo", "Promos"], ["dirty", "Dirty lattes"], ["mochi", "Mochis"]];
   const byCat = (c) => P.products.filter((p) => p.categoria === c).sort((a, b) => (a.orden || 0) - (b.orden || 0));
   const draftOf = (p) => P.drafts[p.id] || p;
   function viewCarta() {
@@ -1292,7 +1292,7 @@
         ${c === "especial" ? espCfgHtml(E) : ""}
         ${c === "promo" ? `<p class="hintp" style="margin-bottom:12px">Una box de mochis a precio fijo: el cliente elige los sabores entre los mochis visibles de la carta. El cartel de ahorro se calcula solo con el precio del mochi suelto.</p>` : ""}
         <div class="pgrid">${byCat(c).map(cardP).join("")}</div>
-        <button class="btn" data-addp="${c}" style="margin-top:14px">+ Agregar ${l === "Sets" ? "set" : l === "Promos" ? "promo" : l === "Mochis" ? "mochi" : l === "Dirty lattes" ? "dirty" : "sabor especial"}</button>
+        <button class="btn" data-addp="${c}" style="margin-top:14px">+ Agregar ${l === "Sets" ? "set" : l === "Promos" ? "promo" : l === "Mochis" ? "mochi" : l === "Dirty lattes" ? "dirty" : "producto en promo"}</button>
       </section>`).join("")}`;
     loadDropInfo();
   }
@@ -1302,7 +1302,13 @@
   const faltaTxt = (ms) => { const d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24, m = Math.floor(ms / 6e4) % 60; return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`; };
   function dropStateTxt(E) {
     const f = API.dropEstado(E), visibles = byCat("especial").filter((x) => x.activo !== false).length;
-    const sinProd = visibles ? "" : " · <b>Ojo:</b> no hay sabores especiales marcados como Visible, la sección no se ve";
+    const sinProd = visibles ? "" : " · <b>Ojo:</b> no hay productos marcados como Visible abajo, la sección no se ve";
+    if (f === "apagado") return "⚫ Apagada: la sección no se ve en la web y no se puede pedir nada de acá";
+    if (E.tipo === "promo") {
+      if (f === "antes") return `⏳ Arranca el ${fechaTxt(E.lanzamiento)} (faltan ${faltaTxt(Date.parse(E.lanzamiento) - Date.now())})` + sinProd;
+      if (f === "abierto") return `🟢 Promo activa: se puede pedir${E.fin ? ` hasta el ${fechaTxt(E.fin)}` : " (sin fin: apagala a mano cuando termine)"}` + sinProd;
+      return `⏹ Terminó el ${fechaTxt(E.fin)}: la sección está oculta`;
+    }
     if (E.modo !== "programado") return (f === "abierto" ? "🟢 Abierta a mano: se puede pedir" : "⏸ Próximamente (a mano): no se puede pedir") + sinProd;
     if (!E.lanzamiento) return "⚠️ Falta la fecha de lanzamiento" + sinProd;
     const ini = Date.parse(E.lanzamiento);
@@ -1311,17 +1317,27 @@
     return `⏹ Terminó el ${fechaTxt(E.fin)}: ${E.al_terminar === "mostrar" ? "se muestra como terminado" : "la sección está oculta"}`;
   }
   function espCfgHtml(E) {
-    const prog = E.modo === "programado", modo = prog ? "programado" : E.estado === "disponible" ? "disponible" : "proximamente";
+    const prog = E.modo === "programado", modo = prog ? "programado" : E.estado === "disponible" ? "disponible" : "proximamente", promo = E.tipo === "promo";
     const t = (k, label, ph = "", max = 80) => `<label>${label}<input data-esp="${k}" value="${esc(E[k] || "")}" placeholder="${esc(ph)}" maxlength="${max}"></label>`;
     const si = (k, label, def = true) => `<label><input type="checkbox" data-esp="${k}" ${(def ? E[k] !== false : !!E[k]) ? "checked" : ""}> ${label}</label>`;
-    return `<div class="pcard" id="espCfg" style="margin-bottom:16px">
-      <b>Lanzamiento de la edición especial</b>
+    return `<div class="pcard" id="espCfg" data-tipo="${promo ? "promo" : "drop"}" style="margin-bottom:16px">
+      <b>Sección destacada (arriba de los Sets)</b>
       <p class="dropst" id="dropState">${dropStateTxt(E)}</p>
-      <div class="row2">${t("titulo", "Nombre del drop (título de la sección)", "Ej: Mochis Premium · Noviembre")}
+      <div class="row2"><label class="espsw"><input type="checkbox" data-esp="visible" ${E.visible !== false ? "checked" : ""}> <span>Mostrar la sección en la web</span></label>
+        <label>¿Para qué la usás?<select data-esp="tipo">
+          <option value="promo" ${promo ? "selected" : ""}>Promo del día: productos con descuento</option>
+          <option value="drop" ${promo ? "" : "selected"}>Drop: edición especial con lanzamiento</option></select></label></div>
+      ${t("titulo", "Título de la sección", "Ej: Promo del día")}
+      <div class="esp-promo">
+        <div class="row2"><label>Desde (vacío = ahora)<input type="datetime-local" data-esp="p_desde" value="${promo ? aLocal(E.lanzamiento) : ""}"></label>
+          <label>Hasta (opcional)<input type="datetime-local" data-esp="p_hasta" value="${promo ? aLocal(E.fin) : ""}"></label></div>
+        <span class="hintp"><button class="linkbtn" data-esphoy>Hasta hoy a las 23:59</button> · Al llegar el "Hasta" la sección se oculta sola. Sin fecha, queda prendida hasta que la apagues.</span>
+      </div>
+      <div class="esp-drop">
         <label>¿Cómo se abre la venta?<select data-esp="modo">
           <option value="programado" ${modo === "programado" ? "selected" : ""}>Drop programado: se abre sola en la fecha</option>
           <option value="proximamente" ${modo === "proximamente" ? "selected" : ""}>A mano: próximamente (no se puede pedir)</option>
-          <option value="disponible" ${modo === "disponible" ? "selected" : ""}>A mano: disponible ahora</option></select></label></div>
+          <option value="disponible" ${modo === "disponible" ? "selected" : ""}>A mano: disponible ahora</option></select></label>
       <div class="dropprog" ${prog ? "" : "hidden"}>
         <div class="row2"><label>Sale el (día y hora de Argentina)<input type="datetime-local" data-esp="lanzamiento" value="${aLocal(E.lanzamiento)}"></label>
           <label>Termina el (opcional)<input type="datetime-local" data-esp="fin" value="${aLocal(E.fin)}"></label></div>
@@ -1337,11 +1353,12 @@
         <div class="row2">${t("push_titulo", "Título", "¡Salió " + (E.titulo || "la edición especial") + "!", 60)}${t("push_texto", "Texto", "Ya se puede pedir. Entrá antes de que se agote.", 140)}</div></details>
         <div class="checks">${si("avisar_auto", "Mandar el aviso solo a la hora del lanzamiento")}</div>
         <div class="dropinfo" id="dropInfo"><span class="muted">Cargando avisos…</span></div>
-      </div>
-      <div class="row2">${t("chip", "Etiqueta de arriba (antes)", "Ej: Drop mensual · solo 3 días")}${t("chip_post", "Etiqueta de arriba (cuando sale)", "Ej: ¡Ya salió! Hasta agotar stock")}</div>
-      <label>Texto debajo del título (antes)<textarea data-esp="intro">${esc(E.intro || "")}</textarea></label>
-      <label>Texto debajo del título (cuando sale, opcional)<textarea data-esp="intro_post" placeholder="Si lo dejás vacío se usa el de arriba">${esc(E.intro_post || "")}</textarea></label>
-      <div class="savebar"><span class="hintp">Los sabores del drop son los de abajo marcados como Visible.</span><button class="btn solid" data-saveesp>Guardar lanzamiento</button></div></div>`;
+      </div></div>
+      <div class="row2">${t("chip", "Etiqueta de arriba", "Ej: Solo hoy · hasta agotar stock")}<span class="esp-drop">${t("chip_post", "Etiqueta de arriba (cuando sale el drop)", "Ej: ¡Ya salió! Hasta agotar stock")}</span></div>
+      <label>Texto debajo del título<textarea data-esp="intro" placeholder="Ej: Strawberry Matcha + mochi de frutilla a precio de set, solo por hoy.">${esc(E.intro || "")}</textarea></label>
+      <label class="esp-drop">Texto debajo del título (cuando sale, opcional)<textarea data-esp="intro_post" placeholder="Si lo dejás vacío se usa el de arriba">${esc(E.intro_post || "")}</textarea></label>
+      <div class="savebar"><button class="linkbtn warn" data-espocultar>Ocultar todos los productos</button><button class="btn solid" data-saveesp>Guardar sección</button></div>
+      <span class="hintp">Los productos de la sección son los de abajo marcados como Visible. Para una promo, tocá "+ Agregar producto en promo" y elegí de qué producto de la carta es.</span></div>`;
   }
   // mismo criterio que nombreDrop() en supabase/functions/_shared/crm.ts
   function waNombreDrop(E) {
@@ -1366,6 +1383,22 @@
     });
     return `<div class="calc ${rows.some((r) => r.bad) ? "bad" : ""}" data-calc>${rows.map((r) => r.txt).join("<br>")}</div>`;
   }
+  // producto de la sección destacada: precio normal (el de la carta, o bebida + mochi en un set) contra el de la promo
+  function espNormal(p) {
+    const F = p.formato || "mochi", b = p.oferta_de && P.products.find((x) => x.id === p.oferta_de);
+    if (b) return F === "mochi" ? { u: Number(b.precio) || 0 } : { "12": Number(b.precio_12) || 0, "16": Number(b.precio_16) || 0 };
+    if (F !== "set") return null;
+    const be = P.products.find((x) => x.id === p.set_bebida), m = P.products.find((x) => x.id === p.set_mochi), mp = m ? Number(m.precio) || 0 : 0;
+    if (!be || !m) return null;
+    return { "12": (Number(be.precio_12) || 0) + mp, "16": (Number(be.precio_16) || 0) + mp };
+  }
+  function espCalc(p) {
+    const n = espNormal(p); if (!n) return `<div data-calc></div>`;
+    const fila = (lab, sv, pr) => { const a = sv - pr; return `${lab}precio normal ${money(sv)} → promo ${money(pr)} · ${pr > 0 && a > 0 ? `${Math.round((a / sv) * 100)}% off (la web lo muestra tachado)` : "sin descuento"}`; };
+    const rows = n.u !== undefined ? [fila("", n.u, parseInt(p.precio, 10) || 0)] : [fila("12 OZ: ", n["12"], parseInt(p.precio_12, 10) || 0), fila("16 OZ: ", n["16"], parseInt(p.precio_16, 10) || 0)];
+    return `<div class="calc" data-calc>${rows.join("<br>")}
+      <span class="pctrow">Aplicar <input type="number" min="1" max="90" step="1" inputmode="numeric" data-pctv placeholder="%"> % off <button class="linkbtn" data-pctgo>Calcular precios</button></span></div>`;
+  }
   // promo: N mochis sueltos (al precio del más barato visible) contra el precio de la box
   function promoCalc(p) {
     const ms = P.products.filter((x) => x.categoria === "mochi" && x.activo !== false && Number(x.precio) > 0).map((x) => Number(x.precio));
@@ -1382,18 +1415,22 @@
     return `<article class="pcard ${dirty ? "dirty" : ""} ${p.activo === false ? "oculto" : ""}" data-pid="${esc(p.id)}">
       <div class="ptop"><img src="${esc(p.img || "img/mochito-lie.png")}" alt=""><div><b>${esc(p.nombre)}</b><br>
         <label class="up">${p.img ? "Cambiar foto" : "Subir foto"}<input type="file" accept="image/*" data-photo></label>
-        ${p.img && c === "especial" ? `<button class="linkbtn" data-nophoto>Quitar foto</button>` : ""}</div>
+        ${p.img && c === "especial" ? `<button class="linkbtn" data-nophoto>Quitar foto</button>` : ""}
+        ${p._new ? "" : `<br><button class="linkbtn" data-copylink title="Link que abre la ficha de este producto en la web">🔗 Copiar link</button>`}</div>
         ${p.img ? `<div class="p2">${p.img2 ? `<img src="${esc(p.img2)}" alt="">` : ""}<label class="up">${p.img2 ? "Cambiar 2ª foto" : "+ 2ª foto (opcional)"}<input type="file" accept="image/*" data-photo2></label>${p.img2 ? `<button class="linkbtn" data-nophoto2>Quitar</button>` : ""}</div>` : ""}</div>
+      ${c === "especial" ? `<label>Es promo de (opcional)<select data-f="oferta_de"><option value="">— Producto propio de la sección —</option>${[["set", "Sets"], ["dirty", "Dirty lattes"], ["mochi", "Mochis"]].map(([k, l]) => `<optgroup label="${l}">${opts(k, p.oferta_de)}</optgroup>`).join("")}</select></label>
+        <span class="hintp">Elegí un producto de la carta y se copian nombre, foto, descripción y tipo. Vos ponés el precio con descuento; la web muestra el precio normal tachado. Los mochis descuentan del stock del mochi de la carta.</span>` : ""}
       ${inp("nombre", "Nombre")}
       ${c === "especial" ? `<label>Tipo<select data-f="formato">${[["mochi", "Mochi (precio por unidad)"], ["dirty", "Dirty / latte (12 y 16 oz, leche y extras)"], ["set", "Set (bebida + mochi, 12 y 16 oz)"]].map(([v, l]) => `<option value="${v}" ${F === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
-      ${c === "especial" && F === "set" ? `<label>Mochi que incluye (para el stock)<select data-f="set_mochi"><option value="">—</option>${opts("mochi", p.set_mochi)}${P.products.filter((x) => x.categoria === "especial" && (x.formato || "mochi") === "mochi").map((x) => `<option value="${esc(x.id)}" ${x.id === p.set_mochi ? "selected" : ""}>${esc(x.nombre)} (especial)</option>`).join("")}</select></label><span class="hintp">La bebida la elige el cliente entre las dirty visibles del Especial.</span>` : ""}
+      ${c === "especial" && F === "set" ? `<label>Mochi que incluye (para el stock)<select data-f="set_mochi"><option value="">—</option>${opts("mochi", p.set_mochi)}${P.products.filter((x) => x.categoria === "especial" && (x.formato || "mochi") === "mochi").map((x) => `<option value="${esc(x.id)}" ${x.id === p.set_mochi ? "selected" : ""}>${esc(x.nombre)} (especial)</option>`).join("")}</select></label>
+        <label>Bebida<select data-f="set_bebida"><option value="">La elige el cliente (dirty visibles de esta sección)</option>${opts("dirty", p.set_bebida)}</select></label>` : ""}
       ${c === "set" ? `<div class="row2">${inp("codigo", "Código (ej: Set 04)")}${inp("tema", "Tema (ej: Matcha & cereza)")}</div>
         <div class="row2"><label>Bebida<select data-f="set_bebida">${opts("dirty", p.set_bebida)}</select></label><label>Mochi<select data-f="set_mochi">${opts("mochi", p.set_mochi)}</select></label></div>`
         : `<label>Descripción<textarea data-f="descripcion">${esc(p.descripcion || "")}</textarea></label>`}
       ${c === "promo" ? `<div class="row3">${inp("precio", "Precio de la promo", "number", money3)}${inp("promo_cant", "Mochis que trae", "number", 'min="2" max="20" step="1" inputmode="numeric"')}${inp("orden", "Orden", "number")}</div>`
         : c === "set" || c === "dirty" || (c === "especial" && F !== "mochi") ? `<div class="row3">${inp("precio_12", "Precio 12 oz", "number", money3)}${inp("precio_16", "Precio 16 oz", "number", money3)}${inp("orden", "Orden", "number")}</div>`
         : `<div class="row2">${inp("precio", c === "especial" ? "Precio (0 = a confirmar)" : "Precio por unidad", "number", money3)}${inp("orden", "Orden", "number")}</div>`}
-      ${c === "set" ? setCalc(p) : c === "promo" ? promoCalc(p) : ""}
+      ${c === "set" ? setCalc(p) : c === "promo" ? promoCalc(p) : c === "especial" ? espCalc(p) : ""}
       <div class="checks">${chk("activo", "Visible en la web")}${chk("agotado", "Agotado")}${c === "mochi" ? chk("rotativo", "Rotativo") : ""}${c === "especial" ? chk("esmerilado", "Esmerilado (tapa la foto)") : ""}</div>
       <div class="savebar"><button class="linkbtn warn" data-delp>${P.cancelArm === "del-" + p.id ? "¿Seguro? Tocá de nuevo" : "Eliminar"}</button>
         <span>${dirty ? `<button class="linkbtn" data-undo>Descartar</button> ` : ""}<button class="btn solid" data-savep>Guardar</button></span></div>
@@ -1505,7 +1542,7 @@
             return `<div class="slrow2" data-tipo="${tp}"><div class="slhead"><b class="sln">Slide ${i + 1}</b>
               <select class="inp" name="sk${i}" data-sltipo aria-label="Tipo de slide ${i + 1}">${opt([["texto", "Foto + texto de la web"], ["media", "Diseño propio (imagen o video)"]], tp)}</select>
               <label class="slord">Orden<input class="inp" name="so${i}" type="number" inputmode="numeric" min="1" max="6" value="${i + 1}" aria-label="Orden de la slide ${i + 1}"></label></div>
-              <div class="upgrid">${up("si", "Imagen compu", false, 2000)}${up("sm", "Imagen celu", false, 1350)}${up("sv", "Video compu", true, 0, "only-media")}${up("sw", "Video celu", true, 0, "only-media")}</div>
+              <div class="upgrid">${up("si", "Imagen compu", false, 2000, "fmt-pc")}${up("sm", "Imagen celu", false, 1350, "fmt-cel")}${up("sv", "Video compu", true, 0, "only-media fmt-pc")}${up("sw", "Video celu", true, 0, "only-media fmt-cel")}</div>
               <div class="slf3 only-texto"><label>Título<input class="inp" name="sti${i}" maxlength="40" value="${esc(x.titulo || "")}" placeholder="Ej: Mochis rellenos"></label>
                 <label>Texto<input class="inp" name="stx${i}" maxlength="90" value="${esc(x.texto || "")}" placeholder="Ej: Masa suave por fuera, crema por dentro."></label>
                 <label>La foto es<select class="inp" name="sa${i}">${opt([["foto", "Foto de fondo completo"], ["recorte", "Producto recortado sin fondo"]], x.ajuste === "recorte" ? "recorte" : "foto")}</select></label>
@@ -2009,15 +2046,37 @@
     if (b.dataset.saveesp !== undefined) {
       const box = $("#espCfg"), el = (k) => box.querySelector(`[data-esp="${k}"]`), v = (k) => el(k).value.trim(), on = (k) => el(k).checked;
       const modo = v("modo"), prog = modo === "programado", iso = (k) => (v(k) ? new Date(v(k)).toISOString() : "");
+      if (v("tipo") === "promo") {
+        // promo del día: un "drop" que arranca ya (o a la hora elegida), sin cuenta regresiva, avisos ni fotos tapadas; al terminar se oculta
+        const desde = iso("p_desde") || new Date().toISOString(), hasta = iso("p_hasta");
+        if (hasta && hasta <= desde) return toast('El "Hasta" tiene que ser después del "Desde"');
+        const E0 = P.settings.especial || {};
+        const E = { ...E0, tipo: "promo", visible: on("visible"), titulo: v("titulo"), chip: v("chip"), intro: v("intro"), intro_post: "", chip_post: "",
+          modo: "programado", lanzamiento: desde, fin: hasta, al_terminar: "ocultar",
+          cuenta: false, esmerilar: false, ocultar_nombres: false, ocultar_precios: false, tarjetas_antes: true, barra: false, calendario: false, avisame: false, avisar_auto: false };
+        try { await API.saveSetting("especial", E); await loadBase(); toast(E.visible ? "Promo guardada" : "Guardada: la sección quedó apagada"); viewCarta(); } catch (err) { toast(err.message); }
+        return;
+      }
       const lan = iso("lanzamiento"), fin = iso("fin");
       if (prog && !lan) return toast("Poné el día y la hora del lanzamiento");
       if (prog && fin && fin <= lan) return toast("La fecha de fin tiene que ser después del lanzamiento");
-      const E = { titulo: v("titulo"), modo: prog ? "programado" : "manual", estado: modo === "disponible" ? "disponible" : "proximamente",
+      const E = { tipo: "drop", visible: on("visible"), titulo: v("titulo"), modo: prog ? "programado" : "manual", estado: modo === "disponible" ? "disponible" : "proximamente",
         lanzamiento: lan, fin, al_terminar: v("al_terminar"),
         cuenta: on("cuenta"), esmerilar: on("esmerilar"), ocultar_nombres: on("ocultar_nombres"), ocultar_precios: on("ocultar_precios"), tarjetas_antes: on("tarjetas_antes"), barra: on("barra"), calendario: on("calendario"), avisame: on("avisame"),
         avisar_auto: on("avisar_auto"), push_titulo: v("push_titulo"), push_texto: v("push_texto"), wa_nombre: v("wa_nombre"),
         chip: v("chip"), chip_post: v("chip_post"), intro: v("intro"), intro_post: v("intro_post") };
-      try { await API.saveSetting("especial", E); await loadBase(); toast(prog && API.dropEstado(E) === "antes" ? "Drop programado" : "Lanzamiento guardado"); $("#dropState").innerHTML = dropStateTxt(E); } catch (err) { toast(err.message); }
+      try { await API.saveSetting("especial", E); await loadBase(); toast(!E.visible ? "Guardada: la sección quedó apagada" : prog && API.dropEstado(E) === "antes" ? "Drop programado" : "Guardado"); $("#dropState").innerHTML = dropStateTxt(E); } catch (err) { toast(err.message); }
+    }
+    if (b.dataset.esphoy !== undefined) {
+      const d = new Date(); d.setHours(23, 59, 0, 0); const i = $('#espCfg [data-esp="p_hasta"]'); if (i) i.value = aLocal(d.toISOString()); return;
+    }
+    if (b.dataset.espocultar !== undefined) {
+      const vis = byCat("especial").filter((x) => x.activo !== false);
+      if (!vis.length) return toast("No hay productos visibles en la sección");
+      if (!confirm(`¿Ocultar ${vis.length === 1 ? "el producto visible" : `los ${vis.length} productos visibles`} de la sección? No se borran: los volvés a prender con "Visible en la web".`)) return;
+      b.disabled = true;
+      try { for (const x of vis) await API.saveProduct({ ...x, activo: false }); vis.forEach((x) => delete P.drafts[x.id]); await loadBase(); viewCarta(); toast("Listo, quedaron ocultos"); } catch (err) { toast(err.message); b.disabled = false; }
+      return;
     }
     if (b.dataset.dropavisar !== undefined) {
       if (!confirmar(b)) return;
@@ -2043,6 +2102,9 @@
         const d = { ...(P.drafts[id] || base) }; delete d._new;
         if (!String(d.nombre || "").trim()) return toast("Falta el nombre");
         if (d.set_mochi === "") d.set_mochi = null;
+        if (d.set_bebida === "") d.set_bebida = null;
+        if (d.oferta_de === "" || d.categoria !== "especial") delete d.oferta_de;
+        if (d.categoria === "especial" && !("oferta_de" in d) && base && base.oferta_de) d.oferta_de = null;
         if (d.categoria === "promo" && !((parseInt(d.promo_cant, 10) || 0) >= 2 && parseInt(d.promo_cant, 10) <= 20)) return toast("Los mochis de la promo van de 2 a 20");
         ["precio", "precio_12", "precio_16", "orden", "promo_cant"].forEach((k) => { if (d[k] !== null && d[k] !== undefined && d[k] !== "") d[k] = parseInt(d[k], 10) || 0; });
         b.disabled = true;
@@ -2052,6 +2114,19 @@
       if (b.dataset.undo !== undefined) {
         delete P.drafts[id];
         if (base && base._new) { P.products = P.products.filter((x) => x.id !== id); viewCarta(); } else redrawCard(id);
+      }
+      if (b.dataset.copylink !== undefined) {
+        const url = `${location.origin}/?producto=${encodeURIComponent(id)}`, p = P.drafts[id] || base;
+        const aviso = p.activo === false ? " · Ojo: está oculto, el link abre la web sin la ficha" : p.categoria === "especial" && API.dropEstado(P.settings.especial || {}) !== "abierto" ? " · Ojo: la sección no está abierta ahora" : "";
+        try { await navigator.clipboard.writeText(url); toast("Link copiado" + aviso); } catch (_) { prompt("Copiá el link:", url); }
+        return;
+      }
+      if (b.dataset.pctgo !== undefined) {
+        const pct = parseInt(pc.querySelector("[data-pctv]").value, 10), d = P.drafts[id] || (P.drafts[id] = { ...base }), n = espNormal(d);
+        if (!(pct > 0 && pct < 91) || !n) return toast("Poné un % entre 1 y 90");
+        const r = (x) => Math.round((x * (100 - pct)) / 100 / 100) * 100; // redondeado a $100
+        if (n.u !== undefined) d.precio = r(n.u); else { d.precio_12 = r(n["12"]); d.precio_16 = r(n["16"]); }
+        redrawCard(id); return;
       }
       if (b.dataset.nophoto !== undefined) { P.drafts[id] = { ...(P.drafts[id] || base), img: "" }; redrawCard(id); }
       if (b.dataset.nophoto2 !== undefined) { P.drafts[id] = { ...(P.drafts[id] || base), img2: null }; redrawCard(id); }
@@ -2074,13 +2149,24 @@
     d[t.dataset.f] = t.type === "checkbox" ? t.checked : t.value;
     pc.classList.add("dirty");
     if (!pc.querySelector("[data-undo]")) { const sp = pc.querySelector("[data-savep]").parentElement; sp.insertAdjacentHTML("afterbegin", '<button class="linkbtn" data-undo>Descartar</button> '); }
-    if (d.categoria === "set" || d.categoria === "promo") { const c = pc.querySelector("[data-calc]"); if (c) c.outerHTML = d.categoria === "set" ? setCalc(d) : promoCalc(d); }
+    if (t.dataset.f === "oferta_de" && t.value) {
+      const b = P.products.find((x) => x.id === t.value);
+      if (b) {
+        d.formato = b.categoria === "set" ? "set" : b.categoria === "dirty" ? "dirty" : "mochi";
+        Object.assign(d, { nombre: b.categoria === "set" ? b.nombre : b.nombre.trim(), descripcion: b.descripcion || d.descripcion || "", img: b.img || d.img || "", img2: b.img2 || null,
+          set_bebida: b.categoria === "set" ? b.set_bebida : null, set_mochi: b.categoria === "set" ? b.set_mochi : null,
+          precio: d.formato === "mochi" ? b.precio : 0, precio_12: d.formato === "mochi" ? null : b.precio_12, precio_16: d.formato === "mochi" ? null : b.precio_16 });
+        redrawCard(id); toast("Copiado de la carta: ahora poné el precio con descuento"); return;
+      }
+    }
+    if (d.categoria === "set" || d.categoria === "promo" || d.categoria === "especial") { const c = pc.querySelector("[data-calc]"); if (c) c.outerHTML = d.categoria === "set" ? setCalc(d) : d.categoria === "promo" ? promoCalc(d) : espCalc(d); }
     if (t.dataset.f === "activo") pc.classList.toggle("oculto", !t.checked);
-    if (t.dataset.f === "formato") redrawCard(id);
+    if (t.dataset.f === "formato" || (t.dataset.f === "set_bebida" && d.categoria === "especial") || (t.dataset.f === "set_mochi" && d.categoria === "especial")) redrawCard(id);
   });
   document.addEventListener("change", async (e) => {
     const t = e.target;
     if (t.matches("[data-sltipo]")) { t.closest(".slrow2").dataset.tipo = t.value; return; }
+    if (t.matches('[data-esp="tipo"]')) { t.closest("#espCfg").dataset.tipo = t.value; return; }
     if (t.matches('[data-esp="modo"]')) { t.closest("#espCfg").querySelector(".dropprog").hidden = t.value !== "programado"; return; }
     if (t.matches("[data-fsel]")) { const id = t.closest("[data-oid]").dataset.oid, F = P.falta[id], ix = +t.dataset.fsel, o = P.orders.find((x) => x.id === id);
       if (t.checked) F.sel[ix] = o.items[ix].qty; else delete F.sel[ix]; drawOrders(); return; }
