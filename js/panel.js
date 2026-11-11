@@ -720,7 +720,9 @@
   /* =================== CAMPAÑAS (WhatsApp y públicos de Meta) =================== */
   const SEGS = [["nuevos", "Clientes nuevos", "1 compra: incentivo para la segunda"], ["recurrentes", "Recurrentes", "3 compras o más: acceso anticipado a sets"],
     ["fans_mochis", "Fans de los mochis", "3+ mochis y más mochis que bebidas: lanzamientos de sabores"], ["bebidas", "Compran bebidas", "Novedades de matcha y lattes"],
-    ["inactivos", "Inactivos", "Sin compras hace más de 45 días: campaña de regreso"], ["todos", "Todos", "Cualquiera con permiso"]];
+    ["inactivos", "Inactivos", "Sin compras hace más de 45 días: campaña de regreso"],
+    ["cerca_premio", "Cerca del premio del Club", "Les faltan 1 o 2 sellos: un empujón para completar la tarjeta"], ["premio_listo", "Premio del Club sin canjear", "Completaron la tarjeta y todavía no usaron el premio"],
+    ["todos", "Todos", "Cualquiera con permiso"]];
   const segNom = (k) => (SEGS.find((x) => x[0] === k) || [k, k])[1];
   const EST_C = { borrador: "pendiente", enviando: "pendiente", enviada: "entregado", error: "cancelado" };
   // Machete fijo al pie de Campañas: qué hace cada herramienta, qué estrategia conviene y qué mirar cuando haya datos
@@ -893,7 +895,7 @@
     if (!t) { box.innerHTML = ""; return; }
     const n = TP.cantidad(t.cuerpo), prev = [...box.querySelectorAll("[data-cvar]")].map((x) => x.value);
     box.innerHTML = `${n ? `<div class="tplvars">${Array.from({ length: n }, (_, i) => `<label>Qué va en {{${i + 1}}}<input class="inp" data-cvar="${i}" required value="${esc(prev[i] ?? (i === 0 && /^hola\b/i.test(t.cuerpo) ? "{nombre}" : ""))}" placeholder="${esc(t.ejemplos[i] || "")}"></label>`).join("")}</div>
-      <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente.${esProducto(f) ? " <b>{producto}</b> pone el nombre del producto en promo." : ""}${esPremio(f) ? " Para el premio: <b>{premio}</b> (ej. 10% off), <b>{codigo}</b> (MAQ-…) y <b>{vence}</b> (ej. el jueves 30/10 a las 18:40)." : " Con <b>{codigo}</b> le mandás un código de descuento personal (lo elegís abajo)."} <b>{favorito}</b> pone lo que más pidió cada uno y <b>{ultimo}</b>, lo último (si nunca pidió por la web, lo más vendido).</span>` : ""}
+      <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente.${esProducto(f) ? " <b>{producto}</b> pone el nombre del producto en promo." : ""}${esPremio(f) ? " Para el premio: <b>{premio}</b> (ej. 10% off), <b>{codigo}</b> (MAQ-…) y <b>{vence}</b> (ej. el jueves 30/10 a las 18:40)." : " Con <b>{codigo}</b> le mandás un código de descuento personal (lo elegís abajo)."} <b>{favorito}</b> pone lo que más pidió cada uno y <b>{ultimo}</b>, lo último (si nunca pidió por la web, lo más vendido). Del Club: <b>{sellos}</b> (cuántos tiene), <b>{faltan}</b> (cuántos le faltan) y <b>{meta}</b> (de cuántos es la tarjeta).</span>` : ""}
       <div class="tplprev"><span class="eyebrow">Así le llega</span><div data-prev></div></div>`;
     campPrev(f);
   }
