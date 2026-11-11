@@ -117,6 +117,7 @@ section.blk{padding-block:72px}
 
 /* carriles: grilla en desktop, carrusel en mobile */
 .rail{display:grid;gap:22px;grid-template-columns:repeat(var(--cols,3),minmax(0,1fr))}
+.rail.pocos{grid-template-columns:repeat(var(--n,1),calc((100% - 44px) / 3));justify-content:center} /* mismo ancho que las tarjetas de Sets */
 .hint{display:none;font-size:.8rem;color:var(--ink-2);margin-top:12px}
 @media (max-width:760px){
   .rail{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:var(--w,80%);overflow-x:auto;scroll-snap-type:x mandatory;margin-inline:-20px;padding:6px 20px 14px;scroll-padding-inline:20px;scrollbar-width:none;gap:14px}
@@ -124,6 +125,8 @@ section.blk{padding-block:72px}
   .rail{overflow-y:hidden;overscroll-behavior-x:contain;touch-action:pan-x pan-y}
   .rail::-webkit-scrollbar{display:none}
   .rail>*{scroll-snap-align:start}
+  .rail.pocos{grid-template-columns:none;grid-auto-columns:84%;justify-content:center}
+  .rail.pocos[style*="--n: 1"]{overflow-x:visible}
   .hint{display:flex;align-items:center;gap:10px}
   .dots{display:flex;gap:6px}
   .dots i{width:7px;height:7px;border-radius:50%;background:color-mix(in srgb,var(--turquesa) 30%,transparent);transition:.2s}
@@ -485,6 +488,7 @@ div.f#fHora{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .premio-pick{background:var(--coral-2);border-radius:14px;padding:12px}
 .premio-pick .chips button[aria-pressed="true"]{background:var(--turquesa);color:#fff}
 .hero .clubpill{margin-top:16px}
+.s-antes{margin:6px 0 0;font-size:.86rem;color:var(--ink-2,#5b544b)}.s-antes s{opacity:.7}.s-antes .pct{font-style:normal;font-weight:700;color:var(--turquesa);margin-left:4px}
 .pp .pct{font-style:normal;font-size:.72rem;font-weight:700;color:var(--turquesa);margin-left:4px}
 .line small.det{display:block;color:var(--turquesa);font-weight:600;font-size:.76rem;margin-top:2px}
 .chips button .num{font-weight:500;opacity:.8}
@@ -1009,7 +1013,7 @@ body>.mito{translate:var(--px,0px) var(--py,0px)}
 #especial .prem .ph{background:#f9d0ca;width:100%;box-sizing:border-box}
 #especial .prem .ph::before{background:var(--coral);opacity:.85}
 #especial .prem .ph.foto::before{display:none}
-#especial .prem .ph.foto img{width:100%;height:100%;max-height:none;object-fit:cover}
+#especial .prem .ph.foto img{width:100%;height:210px;max-height:none;object-fit:contain} /* igual que Sets: la foto entra entera, sin recorte */
 #especial .prem.tapado .ph::after{content:"";position:absolute;inset:0;z-index:1;background:rgba(253,227,223,.32);-webkit-backdrop-filter:blur(14px) saturate(1.25);backdrop-filter:blur(14px) saturate(1.25)}
 #especial .prem.tapado .ph::before{z-index:0}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){#especial .prem.tapado .ph img{filter:blur(14px)}}
