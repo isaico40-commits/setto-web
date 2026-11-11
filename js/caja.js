@@ -221,7 +221,9 @@
     return { ent: sum("entrada"), gas: sum("gasto"), ret: sum("retiro"), aju: sum("ajuste"), n: ms.length, gc: porCat("gasto"), ec: porCat("entrada"), vend: vendidos(ms.filter((m) => m.tipo === "entrada")) };
   }
   function vInicio() {
-    const cajas = S.saldos.filter((s) => !s.por_cobrar), apps = S.saldos.filter((s) => s.por_cobrar);
+    const cajas = S.saldos.filter((s) => !s.por_cobrar);
+    /* apps (PedidosYa, Rappi, Uber Eats): solo las que tienen algo a cobrar o ya liquidaron, así no ocupan lugar las que no se usan */
+    const apps = S.saldos.filter((s) => s.por_cobrar && (Math.abs(Number(s.saldo)) >= 1 || s.ultima_liquidacion));
     const total = cajas.reduce((a, s) => a + Number(s.saldo), 0);
     const aCobrar = apps.reduce((a, s) => a + Math.max(0, Number(s.saldo)), 0);
     const st = mesStats(S.mes), res = st.ent - st.gas;
@@ -236,10 +238,11 @@
           <button data-contar="${esc(s.id)}">Contar</button></div>`).join("")}
         <div class="saldo total"><span class="k">Total en caja</span><span class="v num">${money(total)}</span></div>
         ${apps.map((s) => { const p = s.comision_pct, v = Number(s.saldo);
-          return `<div class="saldo app"><span class="k">${esc(s.nombre)} · a cobrar</span><span class="v num">${money(v)}</span>
+          return `<div class="saldo app${apps.length === 1 ? " solo" : ""}"><span class="k">${esc(s.nombre)} · a cobrar</span><span class="v num">${money(v)}</span>
           <span class="c">${p == null ? "Poné el % de comisión en Liquidar para ver cuánto te va a quedar." : v > 0 ? `Te quedarían ~${fmt(Math.round(v * (1 - p / 100)))} (${pctTxt(p)} de comisión y promos${s.ultima_liquidacion ? ", según la última liquidación" : ""})` : `Comisión estimada: ${pctTxt(p)}`}${s.ultima_liquidacion ? ` · Última liquidación: ${esc(diaNombre(s.ultima_liquidacion))}` : ""}</span>
           <button data-liquidar="${esc(s.id)}">Liquidar</button></div>`; }).join("")}
       </div>
+      ${!apps.length && S.saldos.some((s) => s.por_cobrar) ? `<p class="kpinote">Las ventas de ${esc(S.saldos.filter((s) => s.por_cobrar).map((s) => s.nombre).join(", ").replace(/, ([^,]*)$/, " y $1"))} van aparte, como plata a cobrar: cargalas con su categoría y acá vas a ver cuánto te deben.</p>` : ""}
 
       <h2 class="h2">Socios <small>${deben.length ? "Setto les debe" : "Nadie tiene plata puesta"}</small><button class="more" data-go="retiros">Ver retiros</button></h2>
       <div class="deudas">${S.deudas.map((d) => `<div class="deuda"><span class="av">${esc(d.nombre[0])}</span>
@@ -475,8 +478,8 @@
       const cats = S.cats.filter((c) => c.tipo === t);
       const cChips = (k, sel, list) => `<div class="chips">${list.map(([v, l]) => `<button type="button" class="chip" data-set="${k}" data-v="${esc(v)}" aria-pressed="${sel === v}">${esc(l)}</button>`).join("")}</div>`;
       const ctasT = S.cuentas.filter((c) => c.activa).map((c) => [c.id, c.por_cobrar ? c.nombre + " (a cobrar)" : c.nombre]);
-      /* la cuenta de una app solo se usa para ventas (y para lo que ya la tenga, al editar) */
-      const ctas = t === "entrada" ? ctasT : ctasT.filter(([v]) => !esApp(v) || v === D.cuenta_id || v === D.cuenta_destino_id);
+      /* en una entrada solo aparece la app de la categoría elegida (o la que ya tiene), no las tres */
+      const ctas = ctasT.filter(([v]) => !esApp(v) || v === D.cuenta_id || v === D.cuenta_destino_id || (t === "entrada" && v === D.categoria_id));
       const app = t === "entrada" && esApp(D.cuenta_id) ? S.cuentas.find((c) => c.id === D.cuenta_id) : null;
       const socs = S.socios.filter((s) => s.activo).map((s) => [s.id, s.nombre]);
       let campos = "";

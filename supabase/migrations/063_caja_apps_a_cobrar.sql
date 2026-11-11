@@ -4,7 +4,7 @@
 -- Problema: el precio que figura en la app no es lo que entra. La app
 -- descuenta comisión y promos y liquida después.
 --
--- Solución: PedidosYa es una cuenta más de la caja, pero "a cobrar".
+-- Solución: cada app (PedidosYa, Rappi, Uber Eats) es una cuenta más de la caja, pero "a cobrar".
 --   · La venta se carga con el precio de la app (bruto) en esa cuenta.
 --     Stock y "qué se vendió" quedan bien, y no infla Mercado Pago ni Efectivo.
 --   · Cuando llega la liquidación, caja_liquidar pasa lo cobrado a la cuenta
@@ -20,7 +20,9 @@ alter table public.caja_cuentas add column if not exists comision_pct numeric(5,
 
 -- el id de la cuenta es el mismo que el de la categoría de entrada: así la caja las une sola
 insert into public.caja_cuentas (id, nombre, saldo_inicial, inicio, orden, por_cobrar)
-values ('pedidosya', 'PedidosYa', 0, current_date, 10, true)
+values ('pedidosya', 'PedidosYa', 0, current_date, 10, true),
+       ('rappi', 'Rappi', 0, current_date, 11, true),
+       ('ubereats', 'Uber Eats', 0, current_date, 12, true)
 on conflict (id) do update set por_cobrar = true;
 
 insert into public.caja_categorias (id, nombre, tipo, orden)

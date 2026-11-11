@@ -266,7 +266,8 @@ body.caja.consel{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 .vdet .hintp{margin:2px 0 0}
 
 /* cuenta a cobrar de una app (PedidosYa) */
-.saldo.app{grid-column:1/-1;background:var(--card);border-style:dashed}
+.saldo.app{background:var(--card);border-style:dashed}
+.saldo.app.solo{grid-column:1/-1}
 .saldo.app .v{font-size:clamp(1.3rem,5vw,1.6rem)}
 .pctrow{margin-top:14px;padding-top:14px;border-top:var(--line)}
 .pctin{display:flex;align-items:center;gap:8px}
