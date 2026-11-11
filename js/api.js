@@ -493,7 +493,7 @@
         favoritos: Object.values(q).sort((a, b) => b.qty - a.qty).slice(0, 3), first_touch_source: pri.first_touch_source || null, first_touch_campaign: pri.first_touch_campaign || null, last_touch_source: ult.last_touch_source || null, last_touch_campaign: ult.last_touch_campaign || null };
     },
     // campañas y Meta (migración 032): en modo demo se pueden armar borradores, pero no se manda nada
-    async segmentosResumen() { const db = dbLoad(), z = { whatsapp: 0, meta_ads: 0 }; return { nuevos: z, recurrentes: z, fans_mochis: z, bebidas: z, inactivos: z, todos: z, clientes: db.customers.length }; },
+    async segmentosResumen() { const db = dbLoad(), z = { whatsapp: 0, meta_ads: 0 }; return { nuevos: z, recurrentes: z, fans_mochis: z, bebidas: z, inactivos: z, cerca_premio: z, premio_listo: z, todos: z, clientes: db.customers.length }; },
     async listCampaigns() { return (dbLoad().campaigns || []).slice(0, 20); },
     async createCampaign(c) { const db = dbLoad(); db.campaigns = db.campaigns || []; const n = { id: "c" + Date.now(), estado: "borrador", total: 0, enviados: 0, fallidos: 0, created_at: new Date().toISOString(), ...c }; db.campaigns.unshift(n); dbSave(db); return n; },
     async updateCampaign(id, c) { const db = dbLoad(), x = (db.campaigns || []).find((y) => y.id === id); if (!x || x.estado !== "borrador") throw new Error("Esta campaña ya se mandó: no se puede editar"); Object.assign(x, c); dbSave(db); return x; },

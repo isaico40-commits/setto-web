@@ -4,7 +4,10 @@
 //   · "premio" (cada hora de 10 a 20 h): ganadores de la maquinita con el premio sin usar que vence pronto, según
 //     automatica_premio_destinatarios() (un aviso por premio). Variables extra: {premio}, {codigo}, {vence}.
 //     Si la persona nos escribió en las últimas 23,5 h va como texto libre (gratis); si no, con la plantilla aprobada (se paga).
-//   En los dos: permiso vigente y nadie recibe dos mensajes de campaña o automática en 7 días.
+//   · "producto" (cada hora de 10 a 20 h, migración 057): mientras un código de descuento está vigente, a quienes pidieron ese
+//     producto últimamente y/o lo tienen de favorito, según automatica_producto_destinatarios(). Una sola vez por persona y promo.
+//     Variable extra: {producto} (el nombre en la carta).
+//   En todas: permiso vigente y nadie recibe dos mensajes de campaña o automática en 7 días.
 //   En las de compra, {codigo} y {vence} son el código de descuento personal de la promo elegida (migración 053);
 //   en las de premio siguen siendo el código MAQ y el vencimiento del premio. En todas: {favorito} y {ultimo} (_shared/cliente.ts).
 //   Desde el panel (sesión del equipo): { automation_id, prueba: "223…" } manda solo a ese número, si también aceptó.
@@ -36,6 +39,11 @@ async function mandar(to: string, nombre: string | null, a: any, extra: Record<s
   }
   return enviar(mensajePlantilla(to, a.plantilla, a.idioma, vars, nombre, extra));
 }
+
+const extraProducto = async (a: any) => {
+  const { data } = a.producto ? await sb.from("products").select("nombre").eq("id", a.producto).maybeSingle() : { data: null };
+  return { producto: String(data?.nombre || "").trim() || "tu favorito" };
+};
 
 // texto de la plantilla (encabezado + cuerpo + link) para mandarlo libre dentro de las 24 h; "" si no se pudo leer
 async function cuerpoPlantilla(nombre: string, idioma: string) {
@@ -79,13 +87,13 @@ Deno.serve(async (req) => {
     const { data: cli } = await sb.from("customers").select("nombre").eq("phone", ph).maybeSingle();
     // la prueba de la de premio usa el último premio de ese número, o uno de ejemplo
     const { data: mp } = a.disparador === "premio" ? await sb.from("maq_premios").select("titulo,code,vence_at").eq("phone", ph).order("created_at", { ascending: false }).limit(1).maybeSingle() : { data: null };
-    const extra = a.disparador === "premio" ? extraPremio(mp?.vence_at ? mp : { titulo: "10% off", code: "MAQ-PRUE-BA00", vence_at: new Date(Date.now() + 24 * 3600e3).toISOString() }) : {};
+    const extra = a.disparador === "producto" ? await extraProducto(a) : a.disparador === "premio" ? extraPremio(mp?.vence_at ? mp : { titulo: "10% off", code: "MAQ-PRUE-BA00", vence_at: new Date(Date.now() + 24 * 3600e3).toISOString() }) : {};
     const r = await mandar(ph, cli?.nombre ?? null, a, extra);
     await sb.from("message_logs").insert({ automation_id: a.id, phone: ph, wamid: r.wamid ?? null, estado: r.wamid ? "enviado" : "fallo", error: r.error ?? null, texto: "[prueba]" });
     return r.error ? json({ error: r.error }, 502) : json({ ok: true, prueba: true });
   }
 
-  const tipo = disparador === "premio" ? "premio" : "compra";
+  const tipo = ["premio", "producto"].includes(disparador) ? disparador : "compra";
   const { data: autos } = await sb.from("marketing_automations").select("*").eq("activa", true).eq("disparador", tipo);
   const res: Record<string, unknown> = {};
   if (tipo === "premio") {
@@ -101,6 +109,24 @@ Deno.serve(async (req) => {
         await new Promise((ok) => setTimeout(ok, 120));
       }
       res[a.nombre] = { enviados, gratis, fallidos };
+    }
+    return json({ ok: true, automaticas: res });
+  }
+  if (tipo === "producto") {
+    for (const a of autos ?? []) {
+      if (!a.promo_id || !a.producto) { res[a.nombre] = { error: "le falta el código de descuento o el producto" }; continue; }
+      const { data: lista, error } = await sb.rpc("automatica_producto_destinatarios", { p_id: a.id });
+      if (error) { res[a.nombre] = { error: error.message }; continue; }
+      if (!(lista ?? []).length) { res[a.nombre] = { enviados: 0, fallidos: 0 }; continue; }
+      const extra = await extraProducto(a);
+      let enviados = 0, fallidos = 0;
+      for (const d of ((lista ?? []) as { phone: string; nombre: string | null; motivo: string }[]).slice(0, TOPE)) {
+        const r = await mandar(d.phone, d.nombre, a, extra, { automation_id: a.id });
+        if (r.wamid) enviados++; else fallidos++;
+        await sb.from("message_logs").insert({ automation_id: a.id, promo_id: a.promo_id, phone: d.phone, wamid: r.wamid ?? null, estado: r.wamid ? "enviado" : "fallo", error: r.error ?? null });
+        await new Promise((ok) => setTimeout(ok, 120));
+      }
+      res[a.nombre] = { enviados, fallidos };
     }
     return json({ ok: true, automaticas: res });
   }
