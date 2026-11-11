@@ -382,3 +382,35 @@ a.ptab{text-decoration:none}
 .ingchip input:checked + span{background:#126b69;border-color:#126b69;color:#fff}
 .ingchip input:focus-visible + span{outline:2px solid #f8a29a;outline-offset:2px}
 @media (max-width:560px){.ingrow{grid-template-columns:48px minmax(0,1fr)}.ingrow .upprev.ingprev{width:48px;height:48px}.ingrow .acts{grid-column:2}}
+/* Campañas guiadas: pestañas, pasos numerados, resumen y "qué falta" */
+.ctabs{margin:16px 0 4px}
+.cpasos{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;counter-reset:cp}
+.cpasos li{counter-increment:cp;background:var(--card);border:1.5px solid color-mix(in srgb,var(--turquesa) 30%,transparent);border-radius:18px;padding:14px 14px 14px 52px;position:relative;display:grid;gap:4px}
+.cpasos li::before{content:counter(cp);position:absolute;left:14px;top:14px;width:28px;height:28px;border-radius:50%;background:var(--turquesa);color:#fff;display:grid;place-items:center;font-weight:800;font-size:.9rem}
+.cpasos li span{font-size:.84rem;color:var(--ink-2);line-height:1.45}
+.cquiero{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cquiero button{text-align:left;font:inherit;color:var(--ink);cursor:pointer;gap:4px;transition:border-color .15s,transform .15s}
+.cquiero button:hover{border-color:var(--turquesa);transform:translateY(-1px)}
+.cquiero b{font-size:1.02rem}.cquiero span{font-size:.84rem;color:var(--ink-2)}
+.clista .pcard{gap:0;padding:4px 16px}
+.cfila{display:grid;gap:4px;padding:12px 0;border-top:1px dashed #0002}.cfila:first-child{border-top:0}
+.cfila .linkbtn{justify-self:start}
+.ctipo{font-size:.72rem;color:var(--ink-2);font-weight:600}
+.cform{gap:4px}
+.cpaso{border:0;border-top:1px dashed #0002;margin:0;padding:14px 0 12px;display:grid;gap:10px;min-width:0}
+.cpaso:first-of-type{border-top:0;padding-top:4px}
+.cpaso[hidden]{display:none}
+.cpaso legend{display:flex;align-items:center;gap:8px;font-weight:800;font-size:1.02rem;padding:0;float:left;width:100%;margin-bottom:2px}
+.cpaso legend+*{clear:both}
+.cpaso legend i{font-style:normal;width:26px;height:26px;border-radius:50%;background:var(--turquesa);color:#fff;display:grid;place-items:center;font-size:.85rem;flex:none}
+.cpaso legend small{font-weight:600;font-size:.74rem;color:var(--ink-2)}
+.cdato{margin:0;font-size:.86rem;background:#e6f0ef;border-radius:12px;padding:8px 12px}.cdato:empty{display:none}
+.cres{background:#f1e4ca;border-radius:14px;padding:12px 14px}
+.cresl{list-style:none;padding:0;margin:6px 0 8px;display:grid;gap:4px;font-size:.88rem}
+.cfalta{margin:0;font-size:.84rem;font-weight:600;color:#126b69}
+.cfalta.mal{color:#9a3b30}
+.cfalta .linkbtn{font-size:inherit}
+.cdest{margin:0;font-size:.86rem;line-height:1.6}
+.cflash{box-shadow:0 0 0 3px #f8a29a}
+.creglas summary{cursor:pointer;font-weight:700}.creglas ul{padding-left:18px;margin:8px 0 0;display:grid;gap:6px;font-size:.88rem;line-height:1.5}
+@media (max-width:700px){.cpasos,.cquiero{grid-template-columns:1fr}}
