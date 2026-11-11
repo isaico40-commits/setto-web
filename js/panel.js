@@ -869,7 +869,7 @@
         ${t.estado === "APPROVED" ? `<div class="acts"><button class="btn" data-tpl-usar="${esc(t.nombre)}">Usar en campaña</button></div>` : t.estado === "PENDING" ? '<span class="hintp">Meta la está revisando. Tocá "Actualizar estado" en un rato.</span>' : ""}
       </article>`; }).join("") : '<p class="muted">Todavía no hay plantillas. Armá la primera con "+ Nueva plantilla".</p>';
     } catch (e) { P.tpls = null; $("#tplList").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
-    campPlantillaCampo();
+    campPlantillaCampo(); campResumen($("#campForm")); campResumen($("#autoForm")); pintarInicio();
   }
   // campo "Plantilla" de una campaña o automática: lista de aprobadas si se pudieron leer de Meta; si no, nombre a mano como antes
   const FORMS_TPL = ["#campForm", "#autoForm"];
@@ -968,14 +968,16 @@
       const [l, r] = await Promise.all([API.listAutomations(), API.automationsResumen().catch(() => ({}))]); P.autos = l;
       box.innerHTML = l.length ? l.map((a) => { const x = r[a.id] || {}, t = tplDe(a.plantilla); return `<article class="pcard" data-auto="${esc(a.id)}">
         <div class="ohead"><b>${esc(a.nombre)}</b><span class="st ${a.activa ? "entregado" : "pendiente"}">${a.activa ? "Prendida" : "Pausada"}</span></div>
-        <p class="hintp">${autoRegla(a)} · plantilla <b>${esc(a.plantilla)}</b>${(a.variables || []).length ? " · " + a.variables.map(esc).join(" / ") : ""}</p>
+        <p class="cdest">📱 ${destinoTxt(a, "auto")}<br>🕒 ${a.disparador === "compra" || !a.disparador ? `${a.dias} ${a.dias === 1 ? "día" : "días"} después de la última compra` : autoRegla(a)}<br>✉️ <b>${esc(a.plantilla)}</b>${(a.variables || []).length ? ` <span class="muted">· ${a.variables.map(esc).join(" / ")}</span>` : ""}</p>
+        ${(() => { const [, cls, det] = estadoDe(a, "auto"); return det ? `<p class="cfalta${cls === "cancelado" ? " mal" : ""}">${det}</p>` : ""; })()}
         ${a.promo_id && a.disparador !== "premio" ? `<p class="hintp">🏷️ Código: <b>${esc(promoNom(a.promo_id))}</b> · ${promoNums(((P.presu || {}).automatica || {})[a.id])}</p>` : ""}
         <p class="num">${x.enviados || 0} enviados${x.gratis ? ` (${x.gratis} gratis)` : ""} · ${x.semana || 0} esta semana${x.fallidos ? ` · ${x.fallidos} con error` : ""} · ${autoProximo(a, x)}</p>
         ${t ? `<details class="tplver"><summary>Así le llega</summary>${TP.burbuja(t, a.variables)}</details>` : ""}
         <div class="row2"><label>Probar con un número<input class="inp" data-prueba inputmode="tel" placeholder="223 347-1277"></label></div>
         <div class="acts"><button class="btn" data-aprobar>Mandar prueba</button><button class="btn ${a.activa ? "" : "solid"}" data-aonoff>${a.activa ? "Pausar" : "Prender"}</button><button class="btn" data-aeditar>Editar</button><button class="linkbtn warn" data-aborrar>Borrar</button></div>
       </article>`; }).join("") : '<p class="muted">Todavía no hay automáticas.</p>';
-    } catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+    } catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; P.autos = P.autos || []; }
+    pintarInicio();
   }
   /* ---- Códigos de descuento (migración 053): uno para todos que escribís vos, o uno personal por persona (a mano o en campañas con {codigo}) ---- */
   const TIPOS_P = [["porcentaje", "% de descuento"], ["monto", "$ de descuento"], ["regalo:mochi", "Mochi de regalo"], ["regalo:bebida", "Bebida de regalo"], ["envio", "Envío gratis"]];
@@ -1068,6 +1070,7 @@
     } catch (e) { P.promos = null; box.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
     FORMS_TPL.forEach((q) => $(q) && promoCampo($(q)));
     if (P.camps) pintarCampanas(); if (P.autos) cargarAutomaticas();
+    campResumen($("#campForm")); campResumen($("#autoForm"));
   }
   // campo "Código de descuento" de una campaña o automática
   function promoCampo(f) {
@@ -1126,52 +1129,112 @@
 
   async function viewCampanas() {
     $("#view").innerHTML = `<h1 class="ph1">Campañas</h1>
-      <p class="muted">Solo le llega a quien aceptó en la web o escribió ALTA. Quien toca "No quiero más novedades" (o escribe BAJA) sale solo de todo. Las plantillas se arman acá abajo y Meta las aprueba.</p>
-      <section class="sec"><h2>Gasto de WhatsApp</h2><div class="pcard" id="gastoBox"><span class="muted">Cargando…</span></div></section>
-      <section class="sec"><h2>Segmentos</h2><div class="pcard"><div class="hist" id="segList"><span class="muted">Cargando…</span></div>
-        <div class="acts"><button class="btn" id="syncAud">Actualizar públicos de Meta</button></div><span class="hintp">Crea o actualiza un público "Setto · segmento" por cada uno, solo con quienes aceptaron anuncios.</span></div></section>
-      <section class="sec"><h2>Códigos de descuento</h2>
-        <p class="hintp" style="margin-bottom:12px">Un incentivo para tus campañas o para dar a mano: % off, monto, mochi o bebida de regalo, o envío gratis. El cliente lo escribe en el carrito y el descuento se ve antes de mandar el pedido. Si el pedido se cancela, el código vuelve a quedar disponible.</p>
-        ${promoFormHTML()}
-        <div class="pgrid" id="promoList" style="margin-top:16px"><p class="muted">Cargando…</p></div></section>
-      <section class="sec"><h2>Plantillas de WhatsApp</h2>
-        <p class="hintp" style="margin-bottom:12px">Armá el mensaje, mirá cómo llega y mandalo a Meta para aprobar. Solo las aprobadas se pueden usar en una campaña.</p>
-        <div class="acts" style="margin-bottom:14px"><button class="btn solid" id="tplNueva">+ Nueva plantilla</button><button class="btn" id="tplRefresh">Actualizar estado</button></div>
-        <div id="tplEditor" hidden></div>
-        <div class="pgrid" id="tplList"><p class="muted">Cargando…</p></div></section>
-      <section class="sec"><h2>Nueva campaña de WhatsApp</h2>
-        <form class="pcard" id="campForm">
-          <div class="row2"><label>Nombre (para vos)<input class="inp" name="nombre" required placeholder="Ej: Lanzamiento Lemon pie"></label>
-          <label>Segmento<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></label></div>
-          <div data-tplbox><span class="muted">Cargando plantillas…</span></div>
-          <div data-varsbox class="varsbox"></div>
-          <div data-promobox class="varsbox"></div>
-          <div class="acts"><button class="btn solid" type="submit">Guardar borrador</button><button class="btn" type="reset" data-cancelar hidden>Cancelar edición</button></div></form></section>
-      <section class="sec"><h2>Campañas</h2><div class="pgrid" id="campList"><p class="muted">Cargando…</p></div></section>
-      <section class="sec"><h2>Campañas automáticas</h2>
-        <p class="hintp" style="margin-bottom:12px">Las de compra salen solas todos los días a las 11 h a quien cumpla los días desde su última compra entregada: una sola vez por compra (si vuelve a comprar, el reloj arranca de nuevo) y al prenderla arranca con quienes cumplan desde ese día. Las de premio revisan cada hora de 10 a 20 h quién ganó en la maquinita, guardó el premio con su celular y todavía no lo usó: un solo aviso por premio, con el código y el vencimiento reales, y nunca con menos de 2 h por delante. Si esa persona nos escribió en las últimas 24 h va como mensaje común (gratis); si no, con la plantilla (se paga). Las de promo de un producto revisan cada hora de 10 a 20 h mientras el código elegido esté activo, y le escriben a quienes pidieron ese producto últimamente y/o lo tienen de favorito: una sola vez por persona y por promo, y nunca a quien ya lo volvió a pedir desde que arrancó la promo. En todas, solo a quienes aceptaron novedades por WhatsApp y nadie recibe dos mensajes de campaña en 7 días.</p>
-        <form class="pcard" id="autoForm">
-          <div class="row2"><label>Nombre (para vos)<input class="inp" name="nombre" required placeholder="Ej: Segunda compra a los 7 días"></label>
-          <label>Cuándo sale<select class="inp" name="disparador"><option value="compra">Días después de la última compra</option><option value="premio">Premio de la maquinita por vencer</option><option value="producto">Promo de un producto</option></select></label></div>
-          <div class="row2"><label data-solo="compra">Días después de la última compra<input class="inp" name="dias" type="number" min="1" max="365" value="7"></label>
-          <label data-solo="premio" hidden>Horas antes de que venza<input class="inp" name="horas" type="number" min="3" max="46" value="24"></label>
-          <label data-solo="compra">Solo a<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}"${k === "todos" ? " selected" : ""}>${n}</option>`).join("")}</select></label></div>
-          <div class="row2" data-solo="producto" hidden><label>Producto en promo<select class="inp" name="producto"><option value="">Elegí un producto</option>${P.products.filter((x) => x.activo !== false).map((x) => `<option value="${esc(x.id)}">${esc(String(x.nombre).trim())}</option>`).join("")}</select></label>
-          <label>A quién<select class="inp" name="audiencia"><option value="ambos">Lo pidieron últimamente o es su favorito</option><option value="ultimos">Lo pidieron últimamente</option><option value="favorito">Es su favorito</option></select></label></div>
-          <div class="row2" data-solo="producto" hidden><label data-ultimos>"Últimamente" = en los últimos (días)<input class="inp" name="dias_prod" type="number" min="1" max="365" value="60"></label></div>
-          <span class="hintp" data-solo="producto" hidden>Sale sola mientras el código de descuento que elijas abajo esté activo (si tiene "vale desde", arranca a esa hora). Elegí el código que tiene "solo con la compra de" este producto, o uno general. Favorito = lo que más pidió cada persona en la web.</span>
-          <div data-tplbox><span class="muted">Cargando plantillas…</span></div>
-          <div data-varsbox class="varsbox"></div>
-          <div data-promobox data-solo="compra producto" class="varsbox"></div>
-          <div class="acts"><button class="btn solid" type="submit">Guardar (queda pausada)</button><button class="btn" type="reset" data-cancelar hidden>Cancelar edición</button></div></form>
-        <div class="pgrid" id="autoList" style="margin-top:16px"><p class="muted">Cargando…</p></div></section>
-      <section class="sec"><h2>Respuestas y bajas por WhatsApp</h2><div class="pcard"><div class="hist" id="msgList"><span class="muted">Cargando…</span></div></div></section>
-      <section class="sec"><h2>Envíos a Meta</h2><div class="pcard"><div class="hist" id="syncList"><span class="muted">Cargando…</span></div></div></section>${MACHETE}`;
+      <p class="muted">Todo sale por <b>WhatsApp</b>, desde el número de Setto, y solo a quienes aceptaron novedades. Quien toca "No quiero más novedades" (o escribe BAJA) sale solo.</p>
+      <div class="sub subtabs ctabs" role="tablist">${CTABS.map(([k, l]) => `<button class="ptab" role="tab" data-ctab-go="${k}" aria-selected="false">${l}</button>`).join("")}</div>
+
+      <div data-ctab="inicio">
+        <section class="sec cflujo"><h2>Cómo sale una campaña</h2>
+          <ol class="cpasos">
+            <li><b>El mensaje</b><span>Lo armás en <i>Plantillas</i> y Meta lo aprueba (de minutos a 1 día). Sin mensaje aprobado no sale nada.</span></li>
+            <li><b>A quién</b><span>Elegís un grupo de clientes (nuevos, recurrentes, fans de los mochis…). Solo cuentan los que aceptaron WhatsApp.</span></li>
+            <li><b>Cuándo</b><span><b>Mensaje a un grupo:</b> lo mandás vos una vez, cuando quieras. <b>Automática:</b> sale sola cada vez que pasa algo (ej. 7 días después de una compra).</span></li>
+          </ol>
+        </section>
+        <section class="sec"><h2>¿Qué querés hacer?</h2>
+          <div class="cquiero">
+            <button class="pcard" data-ctab-go="unico"><b>📣 Mandar un mensaje ahora</b><span>Un aviso a un grupo, una sola vez: sabor nuevo, drop, apertura.</span></button>
+            <button class="pcard" data-ctab-go="autos"><b>🔁 Que salga solo</b><span>Después de una compra, premio por vencer o promo de un producto.</span></button>
+            <button class="pcard" data-ctab-go="tpls"><b>✍️ Armar un mensaje nuevo</b><span>Escribís el texto, ves cómo llega y lo mandás a Meta para aprobar.</span></button>
+            <button class="pcard" data-ctab-go="codigos"><b>🏷️ Crear un código de descuento</b><span>Para sumarle a un mensaje o darlo a mano.</span></button>
+          </div>
+        </section>
+        <section class="sec"><h2>Lo que tenés armado</h2><p class="hintp" style="margin-bottom:10px">Qué está saliendo, qué está en pausa y qué le falta a cada una para salir.</p><div class="clista" id="campInicio"><p class="muted">Cargando…</p></div></section>
+      </div>
+
+      <div data-ctab="unico" hidden>
+        <section class="sec"><h2>Nuevo mensaje a un grupo</h2>
+          <p class="hintp" style="margin-bottom:12px">Se manda <b>una sola vez</b>, cuando vos tocás "Mandar". Primero se guarda como borrador para que te mandes una prueba.</p>
+          <form class="pcard cform" id="campForm">
+            <fieldset class="cpaso"><legend><i>1</i> ¿A quién le llega?</legend>
+              <label>Grupo de clientes<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></label>
+              <p class="cdato" data-cquien></p></fieldset>
+            <fieldset class="cpaso"><legend><i>2</i> ¿Qué mensaje?</legend>
+              <div data-tplbox><span class="muted">Cargando plantillas…</span></div>
+              <div data-varsbox class="varsbox"></div></fieldset>
+            <fieldset class="cpaso"><legend><i>3</i> ¿Le sumás un descuento? <small>opcional</small></legend>
+              <div data-promobox class="varsbox"></div></fieldset>
+            <fieldset class="cpaso"><legend><i>4</i> Revisá y guardá</legend>
+              <label>Nombre (para vos)<input class="inp" name="nombre" required placeholder="Ej: Lanzamiento Lemon pie"></label>
+              <div class="cres" data-cres></div>
+              <div class="acts"><button class="btn solid" type="submit">Guardar borrador</button><button class="btn" type="reset" data-cancelar hidden>Cancelar edición</button></div></fieldset>
+          </form></section>
+        <section class="sec"><h2>Tus mensajes a grupos</h2><div class="pgrid" id="campList"><p class="muted">Cargando…</p></div></section>
+      </div>
+
+      <div data-ctab="autos" hidden>
+        <section class="sec"><h2>Nueva automática</h2>
+          <p class="hintp" style="margin-bottom:12px">Sale <b>sola</b> cada vez que se cumple la condición. Se guarda <b>pausada</b>: la revisás, te mandás una prueba y recién ahí la prendés.</p>
+          <form class="pcard cform" id="autoForm">
+            <fieldset class="cpaso"><legend><i>1</i> ¿Cuándo sale?</legend>
+              <label>Sale cuando…<select class="inp" name="disparador"><option value="compra">Pasan X días desde la última compra</option><option value="premio">Un premio de la maquinita está por vencer</option><option value="producto">Un producto está en promo</option></select></label>
+              <p class="cdato" data-ccuando></p>
+              <label data-solo="compra">Días después de la última compra<input class="inp" name="dias" type="number" min="1" max="365" value="7"></label>
+              <label data-solo="premio" hidden>Horas antes de que venza<input class="inp" name="horas" type="number" min="3" max="46" value="24"></label>
+              <label data-solo="producto" hidden>Producto en promo<select class="inp" name="producto"><option value="">Elegí un producto</option>${P.products.filter((x) => x.activo !== false).map((x) => `<option value="${esc(x.id)}">${esc(String(x.nombre).trim())}</option>`).join("")}</select></label></fieldset>
+            <fieldset class="cpaso"><legend><i>2</i> ¿A quién le llega?</legend>
+              <label data-solo="compra">Grupo de clientes<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}"${k === "todos" ? " selected" : ""}>${n}</option>`).join("")}</select></label>
+              <label data-solo="producto" hidden>A quién<select class="inp" name="audiencia"><option value="ambos">Lo pidieron últimamente o es su favorito</option><option value="ultimos">Lo pidieron últimamente</option><option value="favorito">Es su favorito</option></select></label>
+              <label data-solo="producto" data-ultimos hidden>"Últimamente" = en los últimos (días)<input class="inp" name="dias_prod" type="number" min="1" max="365" value="60"></label>
+              <p class="cdato" data-cquien></p></fieldset>
+            <fieldset class="cpaso"><legend><i>3</i> ¿Qué mensaje?</legend>
+              <div data-tplbox><span class="muted">Cargando plantillas…</span></div>
+              <div data-varsbox class="varsbox"></div></fieldset>
+            <fieldset class="cpaso" data-solo="compra producto"><legend><i>4</i> <span data-ldesc>¿Le sumás un descuento? <small>opcional</small></span></legend>
+              <div data-promobox class="varsbox"></div></fieldset>
+            <fieldset class="cpaso"><legend><i data-nres>5</i> Revisá y guardá</legend>
+              <label>Nombre (para vos)<input class="inp" name="nombre" required placeholder="Ej: Segunda compra a los 7 días"></label>
+              <div class="cres" data-cres></div>
+              <div class="acts"><button class="btn solid" type="submit">Guardar (queda pausada)</button><button class="btn" type="reset" data-cancelar hidden>Cancelar edición</button></div></fieldset>
+          </form></section>
+        <section class="sec"><h2>Tus automáticas</h2><div class="pgrid" id="autoList"><p class="muted">Cargando…</p></div>
+          <details class="pcard creglas" style="margin-top:16px"><summary>Reglas de las automáticas (para no spamear)</summary>
+            <ul>
+              <li><b>Después de una compra:</b> salen todos los días a las 11 h a quien cumple los días desde su última compra entregada. Una sola vez por compra (si vuelve a comprar, el reloj arranca de nuevo). Al prenderla arranca con quienes cumplan desde ese día: no le escribe a compras viejas.</li>
+              <li><b>Premio de la maquinita:</b> revisa cada hora de 10 a 20 h quién ganó, guardó el premio con su celular y no lo usó. Un solo aviso por premio, con el código y el vencimiento reales, nunca con menos de 2 h por delante. Si esa persona te escribió en las últimas 24 h va gratis; si no, se paga.</li>
+              <li><b>Promo de un producto:</b> revisa cada hora de 10 a 20 h mientras el código elegido esté activo. Le escribe a quien pidió ese producto últimamente y/o lo tiene de favorito, una sola vez por persona y por promo, y nunca a quien ya lo volvió a pedir.</li>
+              <li><b>En todas:</b> solo a quienes aceptaron novedades por WhatsApp, y nadie recibe dos mensajes de campaña en 7 días.</li>
+            </ul></details></section>
+      </div>
+
+      <div data-ctab="tpls" hidden>
+        <section class="sec"><h2>Plantillas (los mensajes)</h2>
+          <p class="hintp" style="margin-bottom:12px">Es el texto que manda WhatsApp. Lo armás acá, ves cómo llega y lo mandás a Meta para aprobar. <b>Solo las aprobadas</b> se pueden elegir en un mensaje a un grupo o en una automática.</p>
+          <div class="acts" style="margin-bottom:14px"><button class="btn solid" id="tplNueva">+ Nueva plantilla</button><button class="btn" id="tplRefresh">Actualizar estado</button></div>
+          <div id="tplEditor" hidden></div>
+          <div class="pgrid" id="tplList"><p class="muted">Cargando…</p></div></section>
+      </div>
+
+      <div data-ctab="codigos" hidden>
+        <section class="sec"><h2>Códigos de descuento</h2>
+          <p class="hintp" style="margin-bottom:12px">Un incentivo para tus mensajes o para dar a mano: % off, monto, mochi o bebida de regalo, o envío gratis. El cliente lo escribe en el carrito y ve el descuento antes de mandar el pedido. Si el pedido se cancela, el código vuelve a quedar disponible.</p>
+          ${promoFormHTML()}
+          <div class="pgrid" id="promoList" style="margin-top:16px"><p class="muted">Cargando…</p></div></section>
+      </div>
+
+      <div data-ctab="numeros" hidden>
+        <section class="sec"><h2>Gasto de WhatsApp</h2><div class="pcard" id="gastoBox"><span class="muted">Cargando…</span></div></section>
+        <section class="sec"><h2>Grupos de clientes</h2><div class="pcard"><div class="hist" id="segList"><span class="muted">Cargando…</span></div>
+          <div class="acts"><button class="btn" id="syncAud">Actualizar públicos de Meta</button></div><span class="hintp">Esto es para <b>anuncios</b> de Instagram/Facebook, no para WhatsApp: crea o actualiza un público "Setto · grupo" por cada uno, solo con quienes aceptaron anuncios.</span></div></section>
+        <section class="sec"><h2>Respuestas y bajas por WhatsApp</h2><div class="pcard"><div class="hist" id="msgList"><span class="muted">Cargando…</span></div></div></section>
+        <section class="sec"><h2>Envíos a Meta</h2><div class="pcard"><div class="hist" id="syncList"><span class="muted">Cargando…</span></div></div></section>${MACHETE}
+      </div>`;
+    $("#view").querySelectorAll("[data-ctab-go]").forEach((b) => b.addEventListener("click", () => campTab(b.dataset.ctabGo)));
+    campTab(P.campTab || "inicio", true);
     $("#tplNueva").addEventListener("click", tplAbrir);
     $("#tplRefresh").addEventListener("click", async (e) => { e.target.disabled = true; await cargarPlantillas(); e.target.disabled = false; toast("Estado actualizado"); });
     $("#tplList").addEventListener("click", (e) => {
       const b = e.target.closest("[data-tpl-usar]"); if (!b) return;
-      const f = $("#campForm"); f.elements.plantilla.value = b.dataset.tplUsar; campVars(f);
+      const f = $("#campForm"); campTab("unico"); f.elements.plantilla.value = b.dataset.tplUsar; campVars(f); campResumen(f);
       f.scrollIntoView({ behavior: "smooth", block: "start" }); f.elements.nombre.focus({ preventScroll: true });
     });
     const cf = $("#campForm");
@@ -1180,8 +1243,12 @@
       else { await API.createCampaign(datos); toast("Borrador guardado"); }
       cargarCampanas(); });
     cf.addEventListener("reset", () => setTimeout(() => campEditarFin(cf)));
-    const af = $("#autoForm"), autoTipo = () => { af.querySelectorAll("[data-solo]").forEach((el) => { el.hidden = !el.dataset.solo.split(" ").includes(af.elements.disparador.value); });
-      af.querySelector("[data-ultimos]").hidden = af.elements.audiencia.value === "favorito"; promoCampo(af); };
+    const af = $("#autoForm"), autoTipo = () => { const d = af.elements.disparador.value;
+      af.querySelectorAll("[data-solo]").forEach((el) => { el.hidden = !el.dataset.solo.split(" ").includes(d); });
+      const ul = af.querySelector("[data-ultimos]"); ul.hidden = ul.hidden || af.elements.audiencia.value === "favorito";
+      af.querySelector("[data-nres]").textContent = d === "premio" ? "4" : "5";
+      af.querySelector("[data-ldesc]").innerHTML = d === "producto" ? "¿Con qué código? <small>obligatorio: la automática sale mientras esté activo</small>" : "¿Le sumás un descuento? <small>opcional</small>";
+      promoCampo(af); campResumen(af); };
     af.addEventListener("change", (e) => {
       if (e.target.name === "disparador" || e.target.name === "audiencia") autoTipo();
       // al elegir un código "solo con la compra de", el producto se completa solo
@@ -1190,6 +1257,9 @@
       }
     });
     af.addEventListener("reset", () => setTimeout(() => { autoEditarFin(af); autoTipo(); }));
+    autoTipo();
+    // el resumen ("le llega a… por WhatsApp… falta…") se actualiza con cada cambio
+    [cf, af].forEach((f) => { f.addEventListener("input", () => campResumen(f)); f.addEventListener("change", () => setTimeout(() => campResumen(f))); });
     enganchar(af, async (v) => { const premio = v.d.disparador === "premio", prod = v.d.disparador === "producto";
       if (prod && !v.d.producto) throw new Error("Elegí el producto en promo");
       if (prod && !v.d.promo_id) throw new Error("Elegí el código de descuento: la automática sale mientras ese código esté activo");
@@ -1205,9 +1275,100 @@
     cargarGasto(); engancharPromos();
     cargarPlantillas().then(() => { cargarCampanas(); cargarAutomaticas(); cargarPromos(); });
   }
+  /* ---- Campañas guiadas: pestañas, resumen en vivo de cada formulario y "qué le falta" a cada una ---- */
+  const CTABS = [["inicio", "Inicio"], ["unico", "Mensaje a un grupo"], ["autos", "Automáticas"], ["tpls", "Plantillas"], ["codigos", "Códigos"], ["numeros", "Números y ayuda"]];
+  function campTab(k, sinScroll) {
+    if (!CTABS.some((x) => x[0] === k)) k = "inicio";
+    P.campTab = k;
+    $("#view").querySelectorAll("[data-ctab]").forEach((el) => { el.hidden = el.dataset.ctab !== k; });
+    $("#view").querySelectorAll(".ctabs [data-ctab-go]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.ctabGo === k)));
+    if (!sinScroll) { const t = $(".ctabs"); if (t && t.getBoundingClientRect().top < 0) t.scrollIntoView({ block: "start" }); }
+  }
+  const conPermiso = (seg) => (P.segs ? ((P.segs[seg] || {}).whatsapp || 0) : null);
+  const COSTO_WA = 0.06; // ≈ US$ por mensaje de marketing en Argentina (referencia del machete)
+  const usd = (n) => `US$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // qué le falta a una campaña o automática para salir (lista vacía = está lista)
+  function faltaPara(x, tipo) {
+    const out = [];
+    if (!x.plantilla) out.push("elegir el mensaje (plantilla)");
+    else if (P.tpls) {
+      const t = tplDe(x.plantilla);
+      if (!t) out.push(`crear la plantilla <b>${esc(x.plantilla)}</b> en Plantillas`);
+      else if (t.estado === "PENDING") out.push(`que Meta apruebe <b>${esc(x.plantilla)}</b> (tocá "Actualizar estado" en Plantillas)`);
+      else if (t.estado !== "APPROVED") out.push(`<b>${esc(x.plantilla)}</b> no está aprobada: armá otra en Plantillas`);
+    }
+    if (x.promo_id && P.promos && x.disparador !== "premio") {
+      const p = P.promos.find((y) => y.id === x.promo_id);
+      if (!p) out.push("el código de descuento fue borrado: elegí otro");
+      else if (!promoVigente(p)) out.push(`activar el código <b>${esc(p.nombre)}</b> (está ${promoEstado(p)[0].toLowerCase()})`);
+    }
+    if (tipo === "camp" && x.segmento && conPermiso(x.segmento) === 0) out.push(`que haya clientes con permiso en <b>${esc(segNom(x.segmento))}</b> (hoy son 0)`);
+    return out;
+  }
+  // a quién y por dónde: una frase corta para tarjetas y resumen
+  function destinoTxt(x, tipo) {
+    if (tipo === "camp") { const n = conPermiso(x.segmento); return `WhatsApp → ${esc(segNom(x.segmento))}${n === null ? "" : ` · ${personas(n)} con permiso`}`; }
+    if (x.disparador === "premio") return "WhatsApp → quien ganó un premio en la maquinita y no lo usó";
+    if (x.disparador === "producto") return `WhatsApp → quienes ${AUD[x.audiencia] || "pidieron el producto"}`;
+    const n = conPermiso(x.segmento); return `WhatsApp → ${esc(segNom(x.segmento))}${n === null ? "" : ` (hoy ${personas(n)} con permiso)`}`;
+  }
+  function estadoDe(x, tipo) {
+    const f = faltaPara(x, tipo);
+    if (tipo === "camp") {
+      if (x.estado === "enviada") return ["Ya salió", "entregado", `${x.enviados || 0} enviados${x.fallidos ? ` · ${x.fallidos} con error` : ""}`];
+      if (x.estado === "enviando") return ["Saliendo", "pendiente", "Se está mandando ahora"];
+      if (x.estado === "error") return ["Con error", "cancelado", "Revisá la plantilla y probá de nuevo"];
+      return f.length ? ["Le falta algo", "cancelado", "Falta: " + f.join(" · ")] : ["Lista para mandar", "pendiente", "Mandate una prueba y después tocá Mandar"];
+    }
+    if (f.length) return [x.activa ? "Prendida, pero frenada" : "Le falta algo", "cancelado", "Falta: " + f.join(" · ")];
+    return x.activa ? ["Saliendo sola", "entregado", ""] : ["Lista para prender", "pendiente", "Mandate una prueba y después tocá Prender"];
+  }
+  function pintarInicio() {
+    const box = $("#campInicio"); if (!box) return;
+    if (!P.camps || !P.autos) return;
+    const fila = (x, tipo) => { const [lbl, cls, det] = estadoDe(x, tipo);
+      return `<div class="cfila"><div class="ohead"><b>${esc(x.nombre)}</b><span class="ctipo">${tipo === "camp" ? "Mensaje a un grupo" : "Automática"}</span><span class="st ${cls}">${lbl}</span></div>
+        <p class="hintp">📱 ${destinoTxt(x, tipo)}${tipo === "auto" ? ` · ${x.disparador === "compra" || !x.disparador ? `${x.dias} ${x.dias === 1 ? "día" : "días"} después de la última compra` : autoRegla(x)}` : ""}</p>${det ? `<p class="cfalta${cls === "cancelado" ? " mal" : ""}">${det}</p>` : ""}
+        <button class="linkbtn" data-ctab-go="${tipo === "camp" ? "unico" : "autos"}" data-cver="${esc(x.id)}">Ver</button></div>`; };
+    const autos = P.autos.map((a) => fila(a, "auto")), camps = P.camps.filter((c) => c.estado !== "enviada").map((c) => fila(c, "camp")), idas = P.camps.filter((c) => c.estado === "enviada").slice(0, 3).map((c) => fila(c, "camp"));
+    box.innerHTML = autos.length + camps.length + idas.length ? `<div class="pcard">${[...autos, ...camps, ...idas].join("")}</div>`
+      : '<p class="muted">Todavía no armaste ninguna. Empezá por "Armar un mensaje nuevo" y, cuando Meta lo apruebe, usalo en un mensaje a un grupo o en una automática.</p>';
+    box.querySelectorAll("[data-ctab-go]").forEach((b) => b.addEventListener("click", () => { campTab(b.dataset.ctabGo); const el = $(`[data-camp="${b.dataset.cver}"],[data-auto="${b.dataset.cver}"]`); if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("cflash"); setTimeout(() => el.classList.remove("cflash"), 1600); } }));
+  }
+  // resumen en vivo al pie de cada formulario: a quién, por dónde, cuánto cuesta y qué falta
+  function campResumen(f) {
+    if (!f) return;
+    const box = f.querySelector("[data-cres]"); if (!box) return;
+    const d = Object.fromEntries(new FormData(f)), auto = f.id === "autoForm", disp = d.disparador || "compra";
+    const vars = [...f.querySelectorAll("[data-cvar]")];
+    const x = auto ? { disparador: disp, segmento: disp === "compra" ? d.segmento : "todos", audiencia: d.audiencia, plantilla: d.plantilla, promo_id: d.promo_id } : { segmento: d.segmento, plantilla: d.plantilla, promo_id: d.promo_id };
+    const n = disp === "compra" || !auto ? conPermiso(x.segmento) : null;
+    // paso "a quién": cuántos hay hoy
+    const q = f.querySelector("[data-cquien]");
+    if (q) q.innerHTML = auto && disp !== "compra" ? (disp === "premio" ? "Le llega a quien ganó un premio en la maquinita, guardó su celular y todavía no lo usó." : "Le llega a quienes eligieron arriba, siempre que hayan aceptado novedades.")
+      : n === null ? "" : n ? `Hoy hay <b>${personas(n)}</b> en este grupo que aceptaron WhatsApp.` : "Hoy no hay nadie con permiso en este grupo: no le llegaría a nadie.";
+    const c = f.querySelector("[data-ccuando]");
+    if (c) c.innerHTML = disp === "premio" ? "Revisa cada hora de 10 a 20 h y avisa una sola vez por premio." : disp === "producto" ? "Revisa cada hora de 10 a 20 h mientras el código del paso 4 esté activo." : "Sale todos los días a las 11 h a quien cumple los días desde su última compra entregada. Una vez por compra.";
+    const falta = [];
+    if (!d.plantilla) falta.push(P.tpls && !P.tpls.some((y) => y.estado === "APPROVED") ? 'un mensaje aprobado: armalo en <button type="button" class="linkbtn" data-ctab-go="tpls">Plantillas</button>' : "elegir el mensaje (paso " + (auto ? 3 : 2) + ")");
+    else if (vars.some((v) => !v.value.trim())) falta.push("completar qué va en cada variable del mensaje");
+    if (auto && disp === "producto" && !d.producto) falta.push("elegir el producto en promo (paso 1)");
+    if (auto && disp === "producto" && !d.promo_id) falta.push("elegir el código (paso 4)");
+    if (!auto && n === 0) falta.push("que haya alguien con permiso en este grupo (hoy son 0): elegí otro grupo");
+    if (!(d.nombre || "").trim()) falta.push("ponerle un nombre");
+    const quien = auto ? destinoTxt(x, "auto") : destinoTxt(x, "camp");
+    const cuando = auto ? `Sale sola · ${disp === "premio" ? `${d.horas || 24} h antes de que venza el premio` : disp === "producto" ? "mientras el código esté activo" : `${d.dias || 7} ${+d.dias === 1 ? "día" : "días"} después de la última compra`}` : "Sale una sola vez, cuando toques Mandar";
+    const costo = !auto && n ? `Cuesta ≈ ${usd(n * COSTO_WA)} (≈ US$0,06 por persona, lo cobra Meta).` : auto ? "Cada mensaje cuesta ≈ US$0,06 (gratis si esa persona te escribió en las últimas 24 h)." : "";
+    const promo = d.promo_id && P.promos && P.promos.find((y) => y.id === d.promo_id);
+    box.innerHTML = `<div class="cresgrid"><div><span class="eyebrow">Resumen</span>
+        <ul class="cresl"><li>📱 ${quien}</li><li>🕒 ${cuando}</li><li>✉️ Mensaje: ${d.plantilla ? `<b>${esc(d.plantilla)}</b>` : "<i>sin elegir</i>"}${promo ? ` · 🏷️ ${esc(promo.titulo)}` : ""}</li>${costo ? `<li>💸 ${costo}</li>` : ""}</ul>
+        ${falta.length ? `<p class="cfalta mal">Falta: ${falta.join(" · ")}</p>` : `<p class="cfalta">Todo listo. ${auto ? "Se guarda pausada: después te mandás una prueba y la prendés." : "Se guarda como borrador: después te mandás una prueba y la mandás al grupo."}</p>`}</div>
+</div>`;
+    box.querySelectorAll("[data-ctab-go]").forEach((b) => b.addEventListener("click", () => campTab(b.dataset.ctabGo)));
+  }
   // editar una automática: se carga en su formulario y se guarda encima
   function autoEditar(a) {
-    const f = $("#autoForm"); f.dataset.edit = a.id; f._vars = a.variables || [];
+    campTab("autos"); const f = $("#autoForm"); f.dataset.edit = a.id; f._vars = a.variables || [];
     const E = f.elements, val = (k, v) => { if (E[k] && v !== null && v !== undefined) E[k].value = v; };
     val("nombre", a.nombre); val("disparador", a.disparador || "compra"); val("segmento", a.segmento);
     if (a.disparador === "producto") { val("producto", a.producto || ""); val("audiencia", a.audiencia || "ambos"); val("dias_prod", a.dias || 60); }
@@ -1223,18 +1384,18 @@
     f.closest(".sec").querySelector("h2").textContent = `Editar automática: ${a.nombre}`;
     f.querySelector("[type=submit]").textContent = a.activa ? "Guardar cambios (sigue prendida)" : "Guardar cambios";
     f.querySelector("[data-cancelar]").hidden = false;
-    f.scrollIntoView({ behavior: "smooth", block: "start" });
+    campResumen(f); f.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   function autoEditarFin(f) {
     if (!f.dataset.edit) return;
     delete f.dataset.edit; f._vars = null;
-    f.closest(".sec").querySelector("h2").textContent = "Campañas automáticas";
+    f.closest(".sec").querySelector("h2").textContent = "Nueva automática";
     f.querySelector("[type=submit]").textContent = "Guardar (queda pausada)"; f.querySelector("[data-cancelar]").hidden = true;
     campPlantillaCampo(f); promoCampo(f);
   }
   // editar un borrador: se carga en el formulario de "Nueva campaña" y se guarda encima
   function campEditar(c) {
-    const f = $("#campForm"); f.dataset.edit = c.id; f._vars = c.variables || [];
+    campTab("unico"); const f = $("#campForm"); f.dataset.edit = c.id; f._vars = c.variables || [];
     f.elements.nombre.value = c.nombre; f.elements.segmento.value = c.segmento;
     const pl = f.querySelector("[name=plantilla]"); if (pl) { if (pl.tagName === "SELECT") pl.innerHTML = `<option value="${esc(c.plantilla)}" selected></option>`; pl.value = c.plantilla; }
     campPlantillaCampo(f);
@@ -1242,37 +1403,40 @@
     if (f.elements.variables) f.elements.variables.value = (c.variables || []).join("\n");
     f.querySelectorAll("[data-cvar]").forEach((x) => { x.value = (c.variables || [])[+x.dataset.cvar] ?? ""; }); campPrev(f);
     if (f.elements.promo_id) f.elements.promo_id.value = c.promo_id || "";
-    f.closest(".sec").querySelector("h2").textContent = `Editar campaña: ${c.nombre}`;
+    f.closest(".sec").querySelector("h2").textContent = `Editar mensaje: ${c.nombre}`;
     f.querySelector("[type=submit]").textContent = "Guardar cambios"; f.querySelector("[data-cancelar]").hidden = false;
-    f.scrollIntoView({ behavior: "smooth", block: "start" });
+    campResumen(f); f.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   function campEditarFin(f) {
     if (!f.dataset.edit) return;
     delete f.dataset.edit; f._vars = null;
-    f.closest(".sec").querySelector("h2").textContent = "Nueva campaña de WhatsApp";
+    f.closest(".sec").querySelector("h2").textContent = "Nuevo mensaje a un grupo";
     f.querySelector("[type=submit]").textContent = "Guardar borrador"; f.querySelector("[data-cancelar]").hidden = true;
     campPlantillaCampo(f); promoCampo(f);
   }
   function pintarCampanas() {
     const l = P.camps || [];
     $("#campList").innerHTML = l.length ? l.map((c) => `<article class="pcard" data-camp="${esc(c.id)}">
-        <div class="ohead"><b>${esc(c.nombre)}</b><span class="ago">${ago(c.created_at)}</span><span class="st ${EST_C[c.estado] || "pendiente"}">${c.estado}</span></div>
-        <p class="hintp">${esc(segNom(c.segmento))} · plantilla <b>${esc(c.plantilla)}</b> (${esc(c.idioma)})${(c.variables || []).length ? " · " + c.variables.map(esc).join(" / ") : ""}</p>
+        <div class="ohead"><b>${esc(c.nombre)}</b><span class="ago">${ago(c.created_at)}</span><span class="st ${EST_C[c.estado] || "pendiente"}">${c.estado === "borrador" ? "Borrador" : c.estado}</span></div>
+        <p class="cdest">📱 ${destinoTxt(c, "camp")}<br>✉️ <b>${esc(c.plantilla)}</b>${(c.variables || []).length ? ` <span class="muted">· ${c.variables.map(esc).join(" / ")}</span>` : ""}</p>
+        ${c.estado === "borrador" ? (() => { const [, cls, det] = estadoDe(c, "camp"); return `<p class="cfalta${cls === "cancelado" ? " mal" : ""}">${det}</p>`; })() : ""}
         ${c.promo_id ? `<p class="hintp">🏷️ Código: <b>${esc(promoNom(c.promo_id))}</b> · ${promoNums(((P.presu || {}).campana || {})[c.id])}</p>` : ""}
         ${tplDe(c.plantilla) ? `<details class="tplver"><summary>Así le llega</summary>${TP.burbuja(tplDe(c.plantilla), c.variables)}</details>` : ""}
         ${c.estado === "borrador" ? `<div class="row2"><label>Probar con un número<input class="inp" data-prueba inputmode="tel" placeholder="223 347-1277"></label></div>
           <div class="acts"><button class="btn" data-cprobar>Mandar prueba</button><button class="btn solid wa" data-cenviar>Mandar a ${(P.segs && P.segs[c.segmento] || {}).whatsapp || 0}</button><button class="btn" data-ceditar>Editar</button><button class="linkbtn warn" data-cborrar>Borrar</button></div>`
           : `<p class="num">${c.enviados} enviados · ${c.fallidos} con error${c.enviada_at ? " · " + ago(c.enviada_at) : ""}</p>`}
-      </article>`).join("") : '<p class="muted">Todavía no hay campañas.</p>';
+      </article>`).join("") : '<p class="muted">Todavía no mandaste mensajes a grupos.</p>';
+    pintarInicio();
   }
   async function cargarCampanas() {
     try {
       const r = await API.segmentosResumen(); P.segs = r;
       $("#segList").innerHTML = `<div><span class="muted">Segmento</span><span class="muted">WhatsApp · Anuncios</span></div>` + SEGS.map(([k, n, d]) => `<div><span><b>${n}</b> <span class="muted">${d}</span></span><span class="num">${(r[k] || {}).whatsapp || 0} · ${(r[k] || {}).meta_ads || 0}</span></div>`).join("");
     } catch (e) { $("#segList").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+    campResumen($("#campForm")); campResumen($("#autoForm"));
     try {
       P.camps = await API.listCampaigns(); pintarCampanas();
-    } catch (e) { $("#campList").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+    } catch (e) { $("#campList").innerHTML = `<p class="err">${esc(e.message)}</p>`; P.camps = P.camps || []; pintarInicio(); }
     try {
       const a = await API.crmActividad();
       $("#msgList").innerHTML = a.mensajes.map((m) => `<div><span>${esc(pretty(m.phone))} · ${m.estado === "baja" ? "<b>Se dio de baja</b>" : m.estado === "alta" ? "<b>Se suscribió</b>" : esc(m.texto || "")} <span class="muted">${ago(m.created_at)}</span></span><button class="linkbtn" data-client-go="${esc(m.phone)}">Ver</button></div>`).join("") || '<span class="muted">Sin mensajes todavía.</span>';
