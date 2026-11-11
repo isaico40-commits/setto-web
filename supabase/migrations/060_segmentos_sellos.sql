@@ -1,4 +1,4 @@
--- 058 · Campañas y automáticas según los sellos del Setto Club.
+-- 060 · Campañas y automáticas según los sellos del Setto Club.
 --   Dos segmentos nuevos (siempre solo con permiso del canal, como los demás):
 --     · cerca_premio: le faltan 1 o 2 sellos para completar la tarjeta.
 --     · premio_listo: ya completó la tarjeta y todavía no canjeó el premio.

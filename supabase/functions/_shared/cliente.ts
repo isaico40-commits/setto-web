@@ -1,5 +1,5 @@
 // Variables de campaña según lo que compra cada cliente: {favorito} = lo que más pidió, {ultimo} = lo último que pidió.
-// Setto Club (migración 058): {sellos} = cuántos tiene, {faltan} = cuántos le faltan para el premio, {meta} = de cuántos es la tarjeta.
+// Setto Club (migración 060): {sellos} = cuántos tiene, {faltan} = cuántos le faltan para el premio, {meta} = de cuántos es la tarjeta.
 // Solo cuentan productos que hoy están en la carta (un especial que ya cerró no se ofrece).
 // Si todavía no pidió nada por la web, va lo más vendido de los últimos pedidos (el mensaje nunca sale con un hueco).
 import { sb } from "./supa.ts";
