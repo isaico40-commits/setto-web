@@ -72,6 +72,9 @@
   const socioN = (id) => (S.socios.find((c) => c.id === id) || {}).nombre || id || "—";
   const movPorId = (id) => S.movs.find((x) => x.id === id) || (S.retiros || []).find((x) => x.id === id);
   const catN = (id) => (S.cats.find((c) => c.id === id) || {}).nombre || "Sin categoría";
+  /* cuentas "a cobrar" de apps (PedidosYa): la venta queda ahí hasta que la app liquida (migración 063) */
+  const esApp = (id) => !!(S.cuentas.find((c) => c.id === id) || {}).por_cobrar;
+  const pctTxt = (p) => Number(p).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + "%";
 
   /* efecto de un movimiento (igual que la vista caja_efectos; solo para mostrar) */
   function efectos(m) {
@@ -218,7 +221,9 @@
     return { ent: sum("entrada"), gas: sum("gasto"), ret: sum("retiro"), aju: sum("ajuste"), n: ms.length, gc: porCat("gasto"), ec: porCat("entrada"), vend: vendidos(ms.filter((m) => m.tipo === "entrada")) };
   }
   function vInicio() {
-    const total = S.saldos.reduce((a, s) => a + Number(s.saldo), 0);
+    const cajas = S.saldos.filter((s) => !s.por_cobrar), apps = S.saldos.filter((s) => s.por_cobrar);
+    const total = cajas.reduce((a, s) => a + Number(s.saldo), 0);
+    const aCobrar = apps.reduce((a, s) => a + Math.max(0, Number(s.saldo)), 0);
     const st = mesStats(S.mes), res = st.ent - st.gas;
     const deben = S.deudas.filter((d) => Math.abs(d.le_debemos) >= 1);
     const ult = S.movs.filter((m) => m.estado === "activo").slice(0, 6);
@@ -226,10 +231,14 @@
     $("#view").innerHTML = `
       <h1 class="h1">Hola${S.me ? ", " + esc(S.me) : ""}</h1>
       <div class="saldos">
-        ${S.saldos.map((s) => `<div class="saldo"><span class="k">${esc(s.nombre)}</span><span class="v num">${money(s.saldo)}</span>
+        ${cajas.map((s) => `<div class="saldo"><span class="k">${esc(s.nombre)}</span><span class="v num">${money(s.saldo)}</span>
           <span class="c">${s.ultimo_conteo ? "Contado " + cuando(s.ultimo_conteo) : "Sin conteos todavía"}</span>
           <button data-contar="${esc(s.id)}">Contar</button></div>`).join("")}
         <div class="saldo total"><span class="k">Total en caja</span><span class="v num">${money(total)}</span></div>
+        ${apps.map((s) => { const p = s.comision_pct, v = Number(s.saldo);
+          return `<div class="saldo app"><span class="k">${esc(s.nombre)} · a cobrar</span><span class="v num">${money(v)}</span>
+          <span class="c">${p == null ? "Poné el % de comisión en Liquidar para ver cuánto te va a quedar." : v > 0 ? `Te quedarían ~${fmt(Math.round(v * (1 - p / 100)))} (${pctTxt(p)} de comisión y promos${s.ultima_liquidacion ? ", según la última liquidación" : ""})` : `Comisión estimada: ${pctTxt(p)}`}${s.ultima_liquidacion ? ` · Última liquidación: ${esc(diaNombre(s.ultima_liquidacion))}` : ""}</span>
+          <button data-liquidar="${esc(s.id)}">Liquidar</button></div>`; }).join("")}
       </div>
 
       <h2 class="h2">Socios <small>${deben.length ? "Setto les debe" : "Nadie tiene plata puesta"}</small><button class="more" data-go="retiros">Ver retiros</button></h2>
@@ -244,7 +253,7 @@
         <div class="kpi"><div class="k">Gastamos</div><div class="v num">${fmt(st.gas)}</div></div>
         <div class="kpi res ${res < 0 ? "neg" : ""}"><div class="k">Resultado</div><div class="v num">${money(res)}</div></div>
       </div>
-      <p class="kpinote">Los gastos incluyen lo que pagaron los socios de su bolsillo.${st.ret ? ` Retiros de ganancias: ${fmt(st.ret)}.` : ""}${st.aju ? ` Diferencias por conteo: ${signed(st.aju)}.` : ""}</p>
+      <p class="kpinote">Los gastos incluyen lo que pagaron los socios de su bolsillo.${aCobrar ? ` Hay ${fmt(aCobrar)} de apps sin liquidar: la comisión se descuenta cuando liquidás.` : ""}${st.ret ? ` Retiros de ganancias: ${fmt(st.ret)}.` : ""}${st.aju ? ` Diferencias por conteo: ${signed(st.aju)}.` : ""}</p>
       ${st.gc.length ? `<div class="bars"><b style="font-size:.85rem">¿En qué se fue?</b>${bars(st.gc, "")}</div>` : ""}
       ${st.ec.length ? `<div class="bars"><b style="font-size:.85rem">¿De dónde entró?</b>${bars(st.ec, "in")}</div>` : ""}
       ${st.vend.length ? (() => { const mx = Math.max(1, ...st.vend.map((x) => x[1].q)); return `<div class="bars"><b style="font-size:.85rem">¿Qué se vendió?</b>${st.vend.slice(0, 8).map(([n, x]) => `<div class="bar in"><span>${esc(n)}</span><span class="tr"><i style="width:${Math.max(2, (x.q / mx) * 100)}%"></i></span><span>${x.q} u.</span></div>`).join("")}<span class="kpinote" style="margin:0">Solo las entradas cargadas con productos. Los pedidos web están en el Dashboard del panel.</span></div>`; })() : ""}
@@ -465,10 +474,14 @@
       const t = D.tipo, otros = ["aporte", "devolucion", "retiro", "transferencia"];
       const cats = S.cats.filter((c) => c.tipo === t);
       const cChips = (k, sel, list) => `<div class="chips">${list.map(([v, l]) => `<button type="button" class="chip" data-set="${k}" data-v="${esc(v)}" aria-pressed="${sel === v}">${esc(l)}</button>`).join("")}</div>`;
-      const ctas = S.cuentas.filter((c) => c.activa).map((c) => [c.id, c.nombre]);
+      const ctasT = S.cuentas.filter((c) => c.activa).map((c) => [c.id, c.por_cobrar ? c.nombre + " (a cobrar)" : c.nombre]);
+      /* la cuenta de una app solo se usa para ventas (y para lo que ya la tenga, al editar) */
+      const ctas = t === "entrada" ? ctasT : ctasT.filter(([v]) => !esApp(v) || v === D.cuenta_id || v === D.cuenta_destino_id);
+      const app = t === "entrada" && esApp(D.cuenta_id) ? S.cuentas.find((c) => c.id === D.cuenta_id) : null;
       const socs = S.socios.filter((s) => s.activo).map((s) => [s.id, s.nombre]);
       let campos = "";
-      if (t === "entrada") campos = `<div class="fl"><span>¿A dónde entró?</span>${cChips("cuenta_id", D.cuenta_id, ctas)}</div>`;
+      if (t === "entrada") campos = `<div class="fl"><span>¿A dónde entró?</span>${cChips("cuenta_id", D.cuenta_id, ctas)}
+        ${app ? `<p class="hintp">Poné el precio que figura en ${esc(app.nombre)}${D.items.length ? " (el de la carta lo podés cambiar en cada producto)" : ""}. Queda a cobrar hasta que liquide y ahí se descuenta la comisión. Si el cliente te pagó en efectivo, elegí Efectivo.</p>` : ""}</div>`;
       if (t === "gasto") campos = `<div class="fl"><span>¿Quién pagó?</span>${cChips("pagador", D.pagador === "caja" ? "caja:" + D.cuenta_id : D.pagador, ctas.map(([v, l]) => ["caja:" + v, "Caja · " + l]).concat(socs.map(([v, l]) => [v, l + " (de su bolsillo)"])))}</div>`;
       if (["aporte", "devolucion", "retiro"].includes(t)) campos = `<div class="fl"><span>Socio</span>${cChips("socio_id", D.socio_id, socs)}</div>
         <div class="fl"><span>${t === "aporte" ? "¿A qué cuenta entra?" : "¿De qué cuenta sale?"}</span>${cChips("cuenta_id", D.cuenta_id, ctas)}</div>`;
@@ -505,6 +518,8 @@
       Object.entries(e.cuentas).forEach(([c, d]) => { const s = Number((S.saldos.find((x) => x.id === c) || {}).saldo || 0); lines.push(`${esc(cuentaN(c))}: <b>${money(s)}</b> → <b>${money(s + d)}</b>`); });
       if (e.socio) { const dd = Number((S.deudas.find((x) => x.id === e.socio) || {}).le_debemos || 0); lines.push(`Setto le debe a ${esc(socioN(e.socio))}: <b>${money(dd)}</b> → <b>${money(dd + e.deuda)}</b>`); }
       if (t === "retiro") lines.push(`${esc(socioN(D.socio_id))} se lleva ${fmt(v)} de ganancias`);
+      if (t === "entrada" && esApp(D.cuenta_id)) { const p = (S.saldos.find((x) => x.id === D.cuenta_id) || {}).comision_pct;
+        if (p != null) lines.push(`Comisión estimada ~${fmt(Math.round(v * p / 100))} (${pctTxt(p)}): te quedarían ~<b>${fmt(Math.round(v * (1 - p / 100)))}</b>`); }
       if (editId) lines.unshift('<span class="muted">Vista previa sin descontar el valor original:</span>');
       box.innerHTML = lines.length ? `<div class="preview">${lines.map((l) => `<div>${l}</div>`).join("")}</div>` : "";
     };
@@ -538,6 +553,11 @@
       else if (k === "pagador") { if (v.startsWith("caja:")) { D.pagador = "caja"; D.cuenta_id = v.slice(5); } else D.pagador = v; }
       else if (["verItems", "usarSuma", "vadd", "vq", "vsize", "vmochi", "vmclr"].includes(k)) vendOp(k, v);
       else D[k] = D[k] === v && k === "categoria_id" ? null : v;
+      if (k === "categoria_id" && D.tipo === "entrada") {
+        const ap = S.cuentas.find((c) => c.activa && c.por_cobrar && c.id === D.categoria_id);
+        if (ap) D.cuenta_id = ap.id;
+        else if (esApp(D.cuenta_id)) D.cuenta_id = (S.cuentas.find((c) => c.activa && !c.por_cobrar) || {}).id;
+      }
       draw(sh);
     };
     sh.oninput = (e) => {
@@ -652,6 +672,79 @@
         } catch (err) { er.textContent = err.message; er.hidden = false; }
       };
     });
+  }
+
+  /* --- liquidar una app: lo vendido a cobrar contra lo que depositaron de verdad (rpc caja_liquidar, 063) --- */
+  function liquidarSheet(cuenta) {
+    if (!needMe()) return;
+    const s = S.saldos.find((x) => x.id === cuenta); if (!s) return;
+    const cajas = S.cuentas.filter((c) => c.activa && !c.por_cobrar);
+    const L = { hasta: hoy(), destino: (cajas.find((c) => c.id === "mp") || cajas[0] || {}).id, cobrado: "" };
+    /* lo que sigue a cobrar hasta una fecha (mismo cálculo que hace la base) */
+    const brutoHasta = (f) => {
+      const ms = S.movs.filter((m) => m.estado === "activo" && m.fecha <= f);
+      const b = Number(s.saldo_inicial || 0) + ms.reduce((a, m) => a + (efectos(m).cuentas[cuenta] || 0), 0);
+      const n = ms.filter((m) => m.tipo === "entrada" && m.cuenta_id === cuenta && m.fecha > (s.ultima_liquidacion || "") && !/liquidaron más/.test(m.detalle || "")).length;
+      return { b: Math.round(b * 100) / 100, n };
+    };
+    const upd = (sh) => {
+      const { b, n } = brutoHasta(L.hasta), v = parseMoney(L.cobrado), box = sh.querySelector("#lprev");
+      const ok = b > 0 && v >= 0;
+      sh.querySelector('button[type="submit"]').disabled = !ok;
+      let h = `<div>Vendido y sin liquidar hasta esa fecha: <b>${fmt(b)}</b>${n ? ` <span class="muted">(${n} venta${n > 1 ? "s" : ""} cargada${n > 1 ? "s" : ""}${s.ultima_liquidacion ? " desde la última liquidación" : ""})</span>` : ""}</div>`;
+      if (!(b > 0)) h = `<div>No hay ventas de ${esc(s.nombre)} a cobrar hasta esa fecha.</div>`;
+      else if (v >= 0) {
+        const dif = Math.round((b - v) * 100) / 100, p = dif / b * 100;
+        h += dif > 0 ? `<div>Comisión y promos: <b>${fmt(dif)}</b> (${pctTxt(p)}). Se carga como gasto.</div>`
+          : dif < 0 ? `<div>Te depositaron <b>${fmt(-dif)}</b> más de lo cargado. Se carga como entrada para que cuadre. Revisá si falta cargar alguna venta.</div>`
+          : `<div>Coincide justo: no hay comisión.</div>`;
+        h += `<div>${esc(cuentaN(L.destino))} suma <b>${fmt(v)}</b> y ${esc(s.nombre)} queda en <b>${money(Number(s.saldo) - b)}</b>.</div>`;
+      }
+      box.innerHTML = `<div class="preview">${h}</div>`;
+    };
+    const draw = (sh) => {
+      sh.innerHTML = `<div class="grab"></div><div class="sh"><h3>Liquidación de ${esc(s.nombre)}</h3><button class="x" data-close aria-label="Cerrar">×</button></div>
+        <form class="form" id="lf" autocomplete="off"><p class="muted" style="font-size:.9rem">Poné lo que ${esc(s.nombre)} te depositó de verdad. La diferencia con lo que vendiste es lo que se quedó la app.</p>
+        <label class="fl"><span>Cubre las ventas hasta el</span><input id="lHasta" type="date" value="${esc(L.hasta)}" max="${hoy()}"></label>
+        <label class="fl monto"><input id="lCob" inputmode="decimal" placeholder="0" value="${esc(L.cobrado)}" aria-label="Lo que te depositaron"></label>
+        <div class="fl"><span>¿A dónde entró?</span><div class="chips">${cajas.map((c) => `<button type="button" class="chip" data-l="${esc(c.id)}" aria-pressed="${L.destino === c.id}">${esc(c.nombre)}</button>`).join("")}</div></div>
+        <label class="fl"><span>Nota (opcional)</span><input id="lNota" maxlength="80" placeholder="Ej: liquidación semana 2"></label>
+        <div id="lprev"></div>
+        <p class="err" id="lerr" hidden></p>
+        <button class="btn solid big" type="submit">Cargar liquidación</button>
+        <div class="fl pctrow"><span>Comisión estimada para lo que falta liquidar</span>
+          <div class="pctin"><input id="lPct" inputmode="decimal" value="${s.comision_pct == null ? "" : esc(String(Number(s.comision_pct)).replace(".", ","))}" placeholder="Ej: 25" aria-label="Porcentaje"><b>%</b><button type="button" class="btn" data-lpct>Guardar %</button></div>
+          <p class="hintp">Solo sirve para ver cuánto te va a quedar antes de que liquide. Con cada liquidación se actualiza solo con el % real.</p></div>
+        </form>`;
+      upd(sh);
+    };
+    openSheet("", draw);
+    const sh = $("#sheet");
+    sh.querySelector("#lCob").focus({ preventScroll: true });
+    sh.oninput = (e) => { if (e.target.id === "lCob") L.cobrado = e.target.value; if (e.target.id === "lHasta") L.hasta = e.target.value || hoy(); if (["lCob", "lHasta"].includes(e.target.id)) upd(sh); };
+    sh.onclick = async (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.l) { L.destino = b.dataset.l; sh.querySelectorAll("[data-l]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.l === L.destino)); upd(sh); }
+      if (b.dataset.lpct !== undefined) {
+        const raw = sh.querySelector("#lPct").value.trim(), p = raw ? parseMoney(raw) : null;
+        if (raw && !(p >= 0 && p < 100)) return toast("Poné un % entre 0 y 99");
+        try { fail(await sb.from("caja_cuentas").update({ comision_pct: p }).eq("id", cuenta)); toast(p == null ? "Sin % estimado" : `Comisión estimada: ${pctTxt(p)}`); await loadAll(); render(); }
+        catch (err) { toast(/comision_pct/.test(err.message) ? "Falta correr la migración 063 en la base." : err.message); }
+      }
+    };
+    sh.onsubmit = async (e) => {
+      e.preventDefault();
+      const v = parseMoney(L.cobrado), er = sh.querySelector("#lerr");
+      if (!(v >= 0)) { er.textContent = "Poné cuánto te depositaron (puede ser 0)"; er.hidden = false; return; }
+      sh.querySelector('button[type="submit"]').disabled = true;
+      try {
+        const r = fail(await sb.rpc("caja_liquidar", { p_cuenta: cuenta, p_destino: L.destino, p_cobrado: v, p_hasta: L.hasta, p_registro: S.me, p_nota: sh.querySelector("#lNota").value || null }));
+        closeSheet();
+        toast(Number(r.comision) > 0 ? `Liquidación cargada: la app se quedó ${fmt(r.comision)} (${pctTxt(r.pct)})` : "Liquidación cargada");
+        if (mesDe(L.hasta) !== S.mes) S.mes = mesDe(L.hasta);
+        await loadAll(); render();
+      } catch (err) { er.textContent = /caja_liquidar/.test(err.message) ? "Falta correr la migración 063 en la base." : err.message; er.hidden = false; sh.querySelector('button[type="submit"]').disabled = false; }
+    };
   }
 
   /* ---------- STOCK ---------- */
@@ -955,6 +1048,7 @@
     if (d.new !== undefined) return movForm(S.view === "retiros" ? { tipo: "retiro", socio_id: S.r.socio === "todos" ? null : S.r.socio } : {});
     if (d.mes) { S.mes = mesMov(S.mes, +d.mes); return render(); }
     if (d.contar) return contarSheet(d.contar);
+    if (d.liquidar) return liquidarSheet(d.liquidar);
     if (d.devolver) { const dd = S.deudas.find((x) => x.id === d.devolver); return movForm({ tipo: "devolucion", socio_id: d.devolver, monto: String(Number(dd.le_debemos)).replace(".", ","), detalle: "Devolución a " + dd.nombre }); }
     if (d.mov) return movDetail(d.mov);
     if (d.edit) { const m = movPorId(d.edit); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, fecha: m.fecha, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja", items: m.items, _touched: true }, m.id); }
