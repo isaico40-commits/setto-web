@@ -200,3 +200,13 @@ body[data-view="barra"] .lbar .appsw{display:none}
   .pt-t{font-weight:700;font-size:14px}
   .pt-cut{break-after:page;page-break-after:always;height:0}
 }
+
+/* categoría Local: productos que no están en la web (sin foto) */
+.tile.lp{grid-template-rows:1fr auto;min-height:96px;padding:12px 10px}
+.tile.lp .tn{font-size:1rem}
+.tile.lp.ed{border-style:dashed}
+.tile.otro{border-style:dashed;background:transparent;color:var(--turquesa)}
+.tile.otro .tn{font-family:var(--display);font-size:1.05rem}
+.lpnote{margin:12px 2px 0;font-size:.85rem;color:var(--ink-2)}
+.lpf{display:grid;grid-template-columns:1fr 130px;gap:10px}
+@media (max-width:860px){.tile.lp{min-height:84px}}

@@ -3,6 +3,8 @@
   - Los precios que se ven acá son solo para mostrar: la base los vuelve a calcular (local_crear, migración 058).
   - Cobrar crea la entrada en la Caja (categoría "Venta en el local") y descuenta los mochis del stock.
   - Vistas: #tickear (caja del mostrador), #barra (pantalla de pedidos en vivo) y #hoy (comandas del día).
+  - Categoría "Local": productos que no están en la web (facturas, etc., tabla local_productos, migración 062)
+    y "Otro" para cargar uno suelto con nombre y precio a mano.
 */
 (function () {
   const cfg = window.SETTO_CONFIG || {};
@@ -34,11 +36,11 @@
 
   /* ---------- estado ---------- */
   const PAGOS = [["efectivo", "Efectivo"], ["qr", "QR Mercado Pago"], ["transferencia", "Transferencia"], ["tarjeta", "Tarjeta"]];
-  const CATS = [["set", "Sets"], ["dirty", "Dirty"], ["mochi", "Mochis"], ["especial", "Especial"], ["promo", "Promos"]];
+  const CATS = [["set", "Sets"], ["dirty", "Dirty"], ["mochi", "Mochis"], ["especial", "Especial"], ["promo", "Promos"], ["local", "Local"]];
   const S = {
     me: (() => { try { return localStorage.getItem("setto-caja-yo") || ""; } catch (_) { return ""; } })(),
     view: ["tickear", "barra", "hoy"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "tickear",
-    socios: [], prods: [], pers: {}, comandas: [],
+    socios: [], prods: [], pers: {}, comandas: [], lprods: [], falta062: false, editLocal: false,
     cat: ls.get("setto-local-cat", "set"),
     ticket: ls.get("setto-local-ticket", []), // borrador: sobrevive a un refresco sin querer
     nombre: "", nota: "", desc: 0, verDesc: false,
@@ -63,8 +65,12 @@
   const nombreDe = (p) => (esBebida(p) || esPromo(p) ? p.nombre.trim() : "Mochi " + p.nombre.trim());
   const sinTxt = (x) => String(x).replace(/^\s*sin\s+/i, "");
   const vendible = (p) => on(p) && !p.agotado && (esBebida(p) ? Number(p.precio_12) > 0 || Number(p.precio_16) > 0 : Number(p.precio) > 0);
-  const precioLinea = (l) => { const p = find(l.id); return p ? precioBase(p, l.size) + (esBebida(p) ? lechePrecio(l.leche) : 0) : 0; };
+  /* líneas propias del local: tipo "lp" (guardado en local_productos) o "libre" (nombre y precio a mano) */
+  const findLp = (id) => S.lprods.find((x) => x.id === id);
+  const precioLinea = (l) => { if (l.tipo === "lp") return Number((findLp(l.lp) || l).precio) || 0; if (l.tipo === "libre") return Number(l.precio) || 0; const p = find(l.id); return p ? precioBase(p, l.size) + (esBebida(p) ? lechePrecio(l.leche) : 0) : 0; };
+  const nombreLinea = (l) => (l.tipo === "lp" ? (findLp(l.lp) || l).nombre : l.tipo === "libre" ? l.nombre : nombreDe(find(l.id)));
   const detalleLinea = (l) => {
+    if (l.tipo) return "";
     const p = find(l.id); if (!p) return "";
     if (esPromo(p)) { const c = new Map(); (l.mochis || []).forEach((id) => c.set(id, (c.get(id) || 0) + 1)); return [...c].map(([id, n]) => ((find(id) || {}).nombre || "Mochi").trim() + (n > 1 ? " ×" + n : "")).join(" · "); }
     const pri = (leches()[0] || {}).nombre;
@@ -73,18 +79,20 @@
   const subtotal = () => S.ticket.reduce((a, l) => a + precioLinea(l) * l.qty, 0);
   const total = () => Math.max(0, subtotal() - (S.desc || 0));
   const unidades = () => S.ticket.reduce((a, l) => a + l.qty, 0);
-  const keyDe = (l) => [l.id, l.size || "", l.leche || "", (l.sin || []).join(","), l.bebida || "", (l.mochis || []).join(","), l.nota || ""].join("|");
+  const keyDe = (l) => [l.id, l.tipo === "libre" ? l.nombre + "·" + l.precio : "", l.size || "", l.leche || "", (l.sin || []).join(","), l.bebida || "", (l.mochis || []).join(","), l.nota || ""].join("|");
 
   /* ---------- carga ---------- */
   async function loadBase() {
-    const [prods, pers, socios] = await Promise.all([
+    const [prods, pers, socios, lprods] = await Promise.all([
       sb.from("products").select("id,categoria,nombre,formato,precio,precio_12,precio_16,set_bebida,set_mochi,promo_cant,activo,agotado,orden,img").eq("activo", true).order("orden"),
       sb.from("settings").select("value").eq("key", "personalizacion").maybeSingle(),
       sb.from("caja_socios").select("nombre,activo").order("orden"),
+      sb.from("local_productos").select("id,nombre,precio,orden").eq("activo", true).order("orden"),
     ]);
+    S.falta062 = !!lprods.error; S.lprods = lprods.error ? [] : lprods.data || [];
     S.prods = fail(prods) || []; S.pers = (fail(pers) || {}).value || {}; S.socios = (fail(socios) || []).filter((s) => s.activo);
     // el borrador guardado se limpia si cambió la carta
-    S.ticket = S.ticket.filter((l) => { const p = find(l.id); return p && vendible(p) && l.qty > 0; }); guardarTicket();
+    S.ticket = S.ticket.filter((l) => { if (l.qty <= 0) return false; if (l.tipo === "libre") return true; if (l.tipo === "lp") return !!findLp(l.lp); const p = find(l.id); return p && vendible(p); }); guardarTicket();
   }
   async function loadComandas() {
     const r = await sb.from("comandas").select("*").eq("dia", hoy()).order("numero", { ascending: false }).limit(400);
@@ -169,24 +177,33 @@
       ${q ? `<span class="tq num">${q}</span>` : ""}</button>`;
   }
   function vTickear() {
-    const hay = CATS.filter(([k]) => S.prods.some((p) => on(p) && p.categoria === k));
+    const hay = CATS.filter(([k]) => k === "local" || S.prods.some((p) => on(p) && p.categoria === k));
     if (!hay.some(([k]) => k === S.cat) && hay.length) S.cat = hay[0][0];
     const lista = S.prods.filter((p) => on(p) && p.categoria === S.cat);
     $("#view").innerHTML = `<div class="pos">
       <section class="pos-l">
         <div class="cats" role="tablist">${hay.map(([k, l]) => `<button role="tab" data-cat="${k}" aria-selected="${k === S.cat}">${l}</button>`).join("")}</div>
-        <div class="tiles">${lista.map(tileHtml).join("") || `<p class="muted">No hay productos activos en esta categoría.</p>`}</div>
+        ${S.cat === "local" ? localTilesHtml() : `<div class="tiles">${lista.map(tileHtml).join("") || `<p class="muted">No hay productos activos en esta categoría.</p>`}</div>`}
       </section>
       <aside class="pos-r" id="tk">${ticketHtml()}</aside>
     </div>
     <button class="tk-mini" data-tkopen ${S.ticket.length ? "" : "hidden"}><span><b class="num">${unidades()}</b> ${unidades() === 1 ? "producto" : "productos"}</span><b class="num">${money(total())}</b><span>Ver comanda ›</span></button>`;
   }
+  function lpTileHtml(x) {
+    const q = S.ticket.filter((l) => l.tipo === "lp" && l.lp === x.id).reduce((a, l) => a + l.qty, 0);
+    return `<button class="tile lp${S.editLocal ? " ed" : ""}" data-lp="${esc(x.id)}"><span class="tn">${esc(x.nombre)}</span><span class="tp num">${money(x.precio)}</span>${S.editLocal ? `<span class="tq">✎</span>` : q ? `<span class="tq num">${q}</span>` : ""}</button>`;
+  }
+  function localTilesHtml() {
+    if (S.falta062) return `<p class="muted">Para cargar productos que no están en la web falta correr <b>supabase/migrations/062_local_productos_propios.sql</b> en el SQL Editor de Supabase.</p>`;
+    return `<div class="tiles">${S.lprods.map(lpTileHtml).join("")}<button class="tile lp otro" data-otro><span class="tn">＋ Otro producto</span><span class="tp">Nombre y precio a mano</span></button></div>
+      <p class="lpnote">${S.lprods.length ? `<button class="linkbtn" data-lpedit>${S.editLocal ? "Listo" : "Editar precios u ocultar"}</button>` : `Facturas, medialunas, agua… lo que no está en la web. Cargalo una vez con “Otro” y queda acá.`}</p>`;
+  }
   function ticketHtml() {
     const n = (S.comandas.filter((c) => c.dia === hoy()).reduce((a, c) => Math.max(a, c.numero), 0) || 0) + 1;
     if (!S.ticket.length) return `<div class="tk-h"><h2>Comanda <span class="num">#${n}</span></h2><button class="x tk-x" data-tkclose aria-label="Cerrar">✕</button></div><div class="tk-empty"><img src="img/mochito-cup.png" alt=""><p>Tocá un producto para empezar.</p><small>Los mochis se suman directo. Las bebidas abren sus opciones.</small></div>`;
     return `<div class="tk-h"><h2>Comanda <span class="num">#${n}</span></h2><button class="linkbtn" data-tkclear>Vaciar</button><button class="x tk-x" data-tkclose aria-label="Cerrar">✕</button></div>
-      <ul class="tk-lines">${S.ticket.map((l, i) => { const p = find(l.id), det = detalleLinea(l); return `<li>
-        <button class="tl-main" data-edit="${i}"><b>${esc(nombreDe(p))}${l.size ? ` <small>${esc(l.size)}</small>` : ""}</b>${det ? `<span>${esc(det)}</span>` : ""}${l.nota ? `<em>“${esc(l.nota)}”</em>` : ""}</button>
+      <ul class="tk-lines">${S.ticket.map((l, i) => { const det = detalleLinea(l); return `<li>
+        <button class="tl-main" data-edit="${i}"><b>${esc(nombreLinea(l))}${l.size ? ` <small>${esc(l.size)}</small>` : ""}</b>${det ? `<span>${esc(det)}</span>` : ""}${l.nota ? `<em>“${esc(l.nota)}”</em>` : ""}</button>
         <span class="stepper"><button data-q="${i}:-1" aria-label="Uno menos">−</button><b class="num">${l.qty}</b><button data-q="${i}:1" aria-label="Uno más">+</button></span>
         <span class="tl-p num">${money(precioLinea(l) * l.qty)}</span></li>`; }).join("")}</ul>
       <div class="tk-f">
@@ -203,13 +220,14 @@
     if (a && $("#" + a)) { const el = $("#" + a); el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch (_) {} }
     const mini = $("[data-tkopen]"); if (mini) { mini.hidden = !S.ticket.length; mini.innerHTML = `<span><b class="num">${unidades()}</b> ${unidades() === 1 ? "producto" : "productos"}</span><b class="num">${money(total())}</b><span>Ver comanda ›</span>`; }
     document.querySelectorAll(".tiles [data-p]").forEach((b) => { const p = find(b.dataset.p); if (p) b.outerHTML = tileHtml(p); });
+    document.querySelectorAll(".tiles [data-lp]").forEach((b) => { const x = findLp(b.dataset.lp); if (x) b.outerHTML = lpTileHtml(x); });
     if (!S.ticket.length) document.body.classList.remove("tk-on");
   }
   function sumar(l) {
     const k = keyDe(l), ex = S.ticket.find((x) => keyDe(x) === k);
     if (ex) ex.qty = Math.min(50, ex.qty + l.qty); else S.ticket.push(l);
     guardarTicket(); redrawTicket();
-    const b = document.querySelector(`.tiles [data-p="${CSS.escape(l.id)}"]`); if (b) { b.classList.add("pop"); setTimeout(() => b.classList.remove("pop"), 260); }
+    const b = document.querySelector(l.tipo === "lp" ? `.tiles [data-lp="${CSS.escape(l.lp)}"]` : `.tiles [data-p="${CSS.escape(l.id)}"]`); if (b) { b.classList.add("pop"); setTimeout(() => b.classList.remove("pop"), 260); }
   }
 
   /* hoja de opciones: misma personalización que la web (leche, sacar ingredientes, bebida del set, sabores de la box) + nota */
@@ -244,8 +262,49 @@
     closeSheet(); sumar(l);
   }
 
+  /* hoja "Otro producto": nombre y precio a mano. Si se tilda "guardar", queda en la categoría Local para la próxima.
+     También sirve para editar una línea propia del local (cantidad y nota) y, en modo edición, el producto guardado. */
+  let L = null;
+  function abrirLibre(idx, lp) {
+    const l = idx != null ? S.ticket[idx] : null, x = lp || (l && l.tipo === "lp" ? findLp(l.lp) : null);
+    L = { idx, lp: x ? x.id : null, gestion: !!lp, qty: l ? l.qty : 1, nombre: x ? x.nombre : l ? l.nombre : "", precio: x ? x.precio : l ? l.precio : "", nota: l ? l.nota || "" : "", guardar: !S.falta062 && !l };
+    drawLibre();
+  }
+  function drawLibre() {
+    const fijo = L.lp && !L.gestion; // una línea de un producto guardado: el precio se cambia desde "Editar precios"
+    const titulo = L.gestion ? "Producto del local" : L.idx != null ? "Editar" : "Otro producto";
+    openSheet(`<div class="sh"><h3>${titulo}</h3>${L.gestion ? "" : `<span class="stepper big"><button data-lq="-1" aria-label="Uno menos">−</button><b class="num">${L.qty}</b><button data-lq="1" aria-label="Uno más">+</button></span>`}<button class="x" data-close aria-label="Cerrar">✕</button></div>
+      <div class="og lpf"><label class="f">Nombre<input id="lNom" maxlength="40" placeholder="Ej. Medialuna de manteca" value="${esc(L.nombre)}" autocomplete="off" ${fijo ? "readonly" : ""}></label>
+        <label class="f">Precio<input id="lPre" class="num" inputmode="numeric" placeholder="$" value="${L.precio ? esc(String(L.precio)) : ""}" autocomplete="off" ${fijo ? "readonly" : ""}></label></div>
+      ${L.gestion ? "" : `<div class="og"><input class="inp" id="lNota" placeholder="Nota para la barra (opcional)" maxlength="80" value="${esc(L.nota)}" autocomplete="off"></div>`}
+      ${!L.gestion && !L.lp && !S.falta062 ? `<label class="tg"><input type="checkbox" id="lGuardar" ${L.guardar ? "checked" : ""}> Guardarlo en “Local” para la próxima</label>` : ""}
+      ${fijo ? `<p class="hintp">El precio de los productos guardados se cambia con “Editar precios u ocultar”.</p>` : ""}
+      <div class="oadd"><button class="btn solid big" data-lok>${L.gestion ? "Guardar" : `${L.idx != null ? "Guardar" : "Agregar"} · <span class="num" id="lTot">${money((parseMoney(L.precio) || 0) * L.qty)}</span>`}</button></div>
+      ${L.gestion ? `<button class="linkbtn danger" data-lhide>Ocultar de la lista</button>` : L.idx != null ? `<button class="linkbtn danger" data-ldel>Sacar de la comanda</button>` : ""}`);
+    if (!L.nombre && $("#lNom")) $("#lNom").focus();
+  }
+  async function confirmarLibre() {
+    const nombre = ($("#lNom").value || "").replace(/\s+/g, " ").trim().slice(0, 40), precio = parseMoney($("#lPre").value);
+    if (!nombre) { toast("Poné el nombre"); return $("#lNom").focus(); }
+    if (!(precio >= 1 && precio <= 10000000)) { toast("Poné el precio"); return $("#lPre").focus(); }
+    const nota = $("#lNota") ? $("#lNota").value.trim().slice(0, 80) : "";
+    const guardar = L.gestion || (!L.lp && $("#lGuardar") && $("#lGuardar").checked);
+    let lp = L.lp && !L.gestion ? findLp(L.lp) : null;
+    if (guardar) {
+      const ok = $("[data-lok]"); if (ok) ok.disabled = true;
+      try {
+        lp = fail(await sb.rpc("local_producto_guardar", { p_id: L.gestion ? L.lp : null, p_nombre: nombre, p_precio: precio, p_activo: true }));
+        S.lprods = [...S.lprods.filter((x) => x.id !== lp.id), lp].sort((a, b) => a.orden - b.orden);
+      } catch (e) { if (ok) ok.disabled = false; return toast(e.message); }
+      if (L.gestion) { closeSheet(); toast(`${lp.nombre}: ${money(lp.precio)}`); return vTickear(); }
+    }
+    const l = lp ? { id: "lp:" + lp.id, tipo: "lp", lp: lp.id, nombre: lp.nombre, precio: lp.precio, qty: L.qty, nota } : { id: "libre", tipo: "libre", nombre, precio, qty: L.qty, nota };
+    if (L.idx != null) S.ticket.splice(L.idx, 1);
+    closeSheet(); sumar(l); if (guardar && S.cat === "local") vTickear();
+  }
+
   /* ---------- cobrar ---------- */
-  function lineasParaBase() { return S.ticket.map((l) => ({ id: l.id, qty: l.qty, size: l.size || null, leche: l.leche || null, sin: l.sin || [], bebida: l.bebida || null, mochis: l.mochis && l.mochis.length ? l.mochis : null, nota: l.nota || null })); }
+  function lineasParaBase() { return S.ticket.map((l) => l.tipo === "lp" ? { tipo: "lp", lp: l.lp, qty: l.qty, nota: l.nota || null } : l.tipo === "libre" ? { tipo: "libre", nombre: l.nombre, precio: l.precio, qty: l.qty, nota: l.nota || null } : ({ id: l.id, qty: l.qty, size: l.size || null, leche: l.leche || null, sin: l.sin || [], bebida: l.bebida || null, mochis: l.mochis && l.mochis.length ? l.mochis : null, nota: l.nota || null })); }
   const needMe = () => { if (!S.me) { whoSheet(); toast("Primero elegí quién sos"); return false; } return true; };
   let C = null; // estado de la hoja de cobro
   function cobrarSheet(comanda) {
@@ -390,7 +449,7 @@
 
   /* ---------- hojas ---------- */
   function openSheet(html) { const sh = $("#sheet"); sh.innerHTML = `<div class="grab"></div>${html}`; sh.hidden = false; $("#sheetBg").hidden = false; document.body.classList.add("sheet-on"); }
-  function closeSheet() { $("#sheet").hidden = true; $("#sheetBg").hidden = true; $("#sheet").innerHTML = ""; document.body.classList.remove("sheet-on"); O = null; C = null; }
+  function closeSheet() { $("#sheet").hidden = true; $("#sheetBg").hidden = true; $("#sheet").innerHTML = ""; document.body.classList.remove("sheet-on"); O = null; C = null; L = null; }
   function whoSheet(first) {
     openSheet(`<div class="sh"><h3>¿Quién atiende?</h3>${first ? "" : '<button class="x" data-close aria-label="Cerrar">✕</button>'}</div>
       <p class="muted">Queda guardado en este dispositivo (es el mismo de la Caja). Las comandas y los cobros figuran a tu nombre.</p>
@@ -410,6 +469,7 @@
     else if (t.id === "tkNota") S.nota = t.value;
     else if (t.id === "tkDesc") { const v = parseMoney(t.value); S.desc = isNaN(v) ? 0 : Math.min(v, subtotal()); const tt = $("#tkTotal"); if (tt) tt.textContent = money(total()); const cb = $("[data-cobrar]"); if (cb) cb.innerHTML = `Cobrar <span class="num">${money(total())}</span>`; }
     else if (t.id === "oNota" && O) O.nota = t.value;
+    else if (L && ["lNom", "lPre", "lNota"].includes(t.id)) { L[{ lNom: "nombre", lPre: "precio", lNota: "nota" }[t.id]] = t.value; const tt = $("#lTot"); if (tt) tt.textContent = money((parseMoney(L.precio) || 0) * L.qty); }
     else if (t.id === "cCon" && C) { const v = parseMoney(t.value); C.con = isNaN(v) ? null : v; const pos = t.selectionStart; drawCobro(); const n = $("#cCon"); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (_) {} } }
   });
   document.addEventListener("change", (e) => {
@@ -418,6 +478,7 @@
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("#sheet").hidden && $("#sheet [data-close]")) closeSheet();
+    if (e.key === "Enter" && ["lNom", "lPre", "lNota"].includes(e.target.id)) { e.preventDefault(); const b = $("[data-lok]"); if (b && !b.disabled) b.click(); return; }
     if (e.key === "Enter" && e.target.id === "cCon") { e.preventDefault(); const b = $("[data-cobok]"); if (b && !b.disabled) b.click(); }
   });
   document.addEventListener("click", async (e) => {
@@ -439,7 +500,14 @@
       if (esBebida(p) || esPromo(p) || bebOpts(p).length) return abrirOpciones(p, null);
       return sumar({ id: p.id, qty: 1, size: "", leche: "", sin: [], bebida: "", mochis: [], nota: "" });
     }
-    if (d.edit) { const l = S.ticket[+d.edit]; const p = l && find(l.id); if (p) abrirOpciones(p, +d.edit); return; }
+    if (d.lp) {
+      const x = findLp(d.lp); if (!x) return;
+      if (S.editLocal) return abrirLibre(null, x);
+      return sumar({ id: "lp:" + x.id, tipo: "lp", lp: x.id, nombre: x.nombre, precio: x.precio, qty: 1, nota: "" });
+    }
+    if (d.otro !== undefined) return abrirLibre(null, null);
+    if (d.lpedit !== undefined) { S.editLocal = !S.editLocal; return vTickear(); }
+    if (d.edit) { const l = S.ticket[+d.edit]; if (l && l.tipo) return abrirLibre(+d.edit, null); const p = l && find(l.id); if (p) abrirOpciones(p, +d.edit); return; }
     if (d.q) { const [i, n] = d.q.split(":").map(Number); const l = S.ticket[i]; if (!l) return; l.qty += n; if (l.qty <= 0) S.ticket.splice(i, 1); else l.qty = Math.min(50, l.qty); guardarTicket(); return redrawTicket(); }
     if (d.tkclear !== undefined) { if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "¿Vaciar? Tocá de nuevo"; return; } S.ticket = []; S.desc = 0; S.verDesc = false; S.nombre = ""; S.nota = ""; guardarTicket(); return redrawTicket(); }
     if (d.desc !== undefined) { S.verDesc = true; redrawTicket(); const i = $("#tkDesc"); if (i) i.focus(); return; }
@@ -457,6 +525,20 @@
       if (d.bx) { const [id, n] = d.bx.split(":"); if (+n > 0) { if (O.mochis.length < promoCant(O.p)) O.mochis.push(id); } else { const k = O.mochis.lastIndexOf(id); if (k >= 0) O.mochis.splice(k, 1); } return drawOpciones(); }
       if (d.oadd !== undefined) return confirmarOpciones(d.oadd);
       if (d.odel !== undefined) { S.ticket.splice(O.idx, 1); guardarTicket(); closeSheet(); return redrawTicket(); }
+    }
+    /* producto del local / suelto */
+    if (L) {
+      if (d.lq) { L.qty = Math.max(1, Math.min(50, L.qty + +d.lq)); const s = $("#sheet .stepper b"); if (s) s.textContent = L.qty; const tt = $("#lTot"); if (tt) tt.textContent = money((parseMoney(L.precio) || 0) * L.qty); return; }
+      if (d.lok !== undefined) return confirmarLibre();
+      if (d.ldel !== undefined) { S.ticket.splice(L.idx, 1); guardarTicket(); closeSheet(); return redrawTicket(); }
+      if (d.lhide !== undefined) {
+        if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "¿Ocultarlo? Tocá de nuevo"; return; }
+        const x = findLp(L.lp); if (!x) return;
+        try { fail(await sb.rpc("local_producto_guardar", { p_id: x.id, p_nombre: x.nombre, p_precio: x.precio, p_activo: false })); }
+        catch (err) { return toast(err.message); }
+        S.lprods = S.lprods.filter((y) => y.id !== x.id); S.ticket = S.ticket.filter((l) => l.lp !== x.id); guardarTicket();
+        closeSheet(); toast(`${x.nombre} oculto`); if (!S.lprods.length) S.editLocal = false; return vTickear();
+      }
     }
     /* cobro */
     if (C) {
