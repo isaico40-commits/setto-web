@@ -2,7 +2,8 @@
   Local de Setto: tickear comandas en el mostrador, mandarlas a la barra y cobrar.
   - Los precios que se ven acá son solo para mostrar: la base los vuelve a calcular (local_crear, migración 058).
   - Cobrar crea la entrada en la Caja (categoría "Venta en el local") y descuenta los mochis del stock.
-  - Vistas: #tickear (caja del mostrador), #barra (pantalla de pedidos en vivo) y #hoy (comandas del día).
+  - Vistas: #tickear (caja del mostrador), #barra (pantalla de pedidos en vivo), #hoy (comandas del día)
+    y #horas (fichaje del equipo, en js/local-horas.js, migración 064).
   - Categoría "Local": productos que no están en la web (facturas, etc., tabla local_productos, migración 062)
     y "Otro" para cargar uno suelto con nombre y precio a mano.
 */
@@ -37,9 +38,10 @@
   /* ---------- estado ---------- */
   const PAGOS = [["efectivo", "Efectivo"], ["qr", "QR Mercado Pago"], ["transferencia", "Transferencia"], ["tarjeta", "Tarjeta"]];
   const CATS = [["set", "Sets"], ["dirty", "Dirty"], ["mochi", "Mochis"], ["especial", "Especial"], ["promo", "Promos"], ["local", "Local"]];
+  const VIEWS = ["tickear", "barra", "hoy", "horas"];
   const S = {
     me: (() => { try { return localStorage.getItem("setto-caja-yo") || ""; } catch (_) { return ""; } })(),
-    view: ["tickear", "barra", "hoy"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "tickear",
+    view: VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "tickear",
     socios: [], prods: [], pers: {}, comandas: [], lprods: [], falta062: false, editLocal: false,
     cat: ls.get("setto-local-cat", "set"),
     ticket: ls.get("setto-local-ticket", []), // borrador: sobrevive a un refresco sin querer
@@ -133,6 +135,7 @@
       return;
     }
     drawShell(); render();
+    if (window.SettoHoras) window.SettoHoras.init();
     if (!S.socios.some((s) => s.nombre === S.me)) whoSheet(true);
     sb.channel("local-live").on("postgres_changes", { event: "*", schema: "public", table: "comandas" }, softReload).subscribe();
     document.addEventListener("visibilitychange", () => { if (!document.hidden) softReload(); });
@@ -145,7 +148,7 @@
     app.innerHTML = `<header class="cbar lbar"><div class="wrap">
         <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.svg" alt="Setto"></a>
         <nav class="appsw" aria-label="Cambiar de app"><a href="panel.html">Pedidos</a><a href="caja.html">Caja</a><a href="local.html" aria-current="page">Local</a></nav>
-        <nav class="lviews" role="tablist">${[["tickear", "Tickear"], ["barra", "Barra"], ["hoy", "Hoy"]].map(([k, l]) => `<button role="tab" data-go="${k}">${l}<span class="n" data-n="${k}" hidden></span></button>`).join("")}</nav>
+        <nav class="lviews" role="tablist">${[["tickear", "Tickear"], ["barra", "Barra"], ["hoy", "Hoy"], ["horas", "Horas"]].map(([k, l]) => `<button role="tab" data-go="${k}">${l}<span class="n" data-n="${k}" hidden></span></button>`).join("")}</nav>
         <span class="sp"></span>
         <button class="icbtn" data-cfg title="Impresión" aria-label="Configurar impresión">🖨</button>
         <button class="mebtn" data-who><i>${esc((S.me || "?")[0])}</i><span>${esc(S.me || "¿Quién sos?")}</span></button>
@@ -161,9 +164,9 @@
     if (nb) { nb.textContent = enBarra; nb.hidden = !enBarra; }
     if (nh) { nh.textContent = sinCobrar; nh.hidden = !sinCobrar; nh.title = `${sinCobrar} sin cobrar`; }
     const mb = $("[data-who]"); if (mb) mb.innerHTML = `<i>${esc((S.me || "?")[0])}</i><span>${esc(S.me || "¿Quién sos?")}</span>`;
-    ({ tickear: vTickear, barra: vBarra, hoy: vHoy })[S.view]();
+    ({ tickear: vTickear, barra: vBarra, hoy: vHoy, horas: () => (window.SettoHoras ? window.SettoHoras.view() : null) })[S.view]();
   }
-  function go(v) { S.view = v; history.replaceState(null, "", "#" + v); if (v === "barra") S.comandas.forEach((c) => S.vistas.add(c.id)); render(); window.scrollTo(0, 0); if (v !== "tickear") softReload(); }
+  function go(v) { S.view = v; history.replaceState(null, "", "#" + v); if (v === "barra") S.comandas.forEach((c) => S.vistas.add(c.id)); render(); window.scrollTo(0, 0); if (v !== "tickear" && v !== "horas") softReload(); if (v === "horas" && window.SettoHoras) window.SettoHoras.recargar(); }
 
   /* ---------- TICKEAR ---------- */
   function tileHtml(p) {
@@ -560,7 +563,9 @@
       b.disabled = true; const c = await rpc("local_anular", { p_id: d.anular, p_motivo: mot.trim(), p_quien: S.me }, (x) => `#${x.numero} anulada`); if (c) { closeSheet(); render(); } else b.disabled = false; return;
     }
   });
-  window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (["tickear", "barra", "hoy"].includes(v) && v !== S.view) go(v); });
+  window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (VIEWS.includes(v) && v !== S.view) go(v); });
 
+  // para la pestaña Horas (js/local-horas.js)
+  window.SettoLocal = { sb, S, esc, toast, openSheet, closeSheet, fail, TZ, needMe };
   start();
 })();
