@@ -84,6 +84,7 @@ Pedidos que no vienen de la web (WhatsApp directo, PedidosYa, Rappi, Uber Eats):
 - **Hoy:** lo cobrado por efectivo / Mercado Pago, lo que falta cobrar, reimprimir, cambiar forma de pago y anular.
 - La base recalcula los precios. Cobrar crea la entrada "Venta en el local" en la Caja y descuenta los mochis del stock. Anular la comanda anula esa entrada.
 - **Impresión** (🖨 arriba): ancho 58/80 mm e impresión automática al mandar. Usa la impresora del dispositivo; para que salga sin el cuadro de imprimir, Chrome con `--kiosk-printing`.
+- **Horas** (fichaje del equipo): un toque en tu nombre al llegar y otro al irte. Resumen por persona (esta semana, este mes, mes pasado o fechas a elección) con % del total y una cuenta para repartir un monto según las horas. Si alguien se olvidó de fichar, se corrige el turno o se carga entero con **＋ Cargar turno olvidado**: queda marcado "Editado"/"Cargado a mano" y el historial muestra quién lo cambió, cuándo y qué decía antes. Los turnos no se borran, se anulan con motivo. Si un turno queda abierto más de 16 h, pide corregir la salida antes de volver a fichar. Requiere `064_fichaje_horas.sql`.
 
 ### Envío a domicilio
 En el checkout el cliente elige **Retiro** o **Envío a domicilio**. Si elige envío, tiene que poner la dirección exacta (y opcionalmente piso/depto/referencia). En el panel el pedido aparece con la etiqueta **Envío a domicilio**, la dirección y un link a Google Maps.
