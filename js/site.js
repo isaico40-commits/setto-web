@@ -358,7 +358,9 @@
   /* ---------- Ubicación (Panel → Ajustes → Ubicación) ---------- */
   function renderUbicacion() {
     const u = S.ubicacion || {}, sec = $("#ubicacion"); if (!sec) return;
-    const q = (u.mapa || "").trim(); sec.hidden = !(u.activo && q); if (sec.hidden) return;
+    const q = (u.mapa || "").trim(); sec.hidden = !(u.activo && q);
+    document.querySelectorAll("[data-navubi]").forEach((a) => (a.hidden = sec.hidden)); // link del menú: solo si la sección se ve
+    if (sec.hidden) return;
     $("#t-ubi").textContent = u.titulo || "Dónde estamos";
     $("#ubiTexto").textContent = u.texto || ""; $("#ubiTexto").hidden = !u.texto;
     const href = mapsUrl(q), map = $("#ubiMap"), link = $("#ubiMapLink"), cap = (u.captura || "").trim();
@@ -782,15 +784,17 @@
   function renderEspecial() {
     const E = ESPC(), items = on(ESP), fase = dropFase(), open = fase === "abierto", fin = fase === "terminado", P = prog();
     const sec = $("#especial"); renderDropBar();
-    if (items.length === 0 || fase === "apagado" || (fin && E.al_terminar !== "mostrar")) { sec.hidden = true; return; }
-    sec.hidden = false; sec.classList.toggle("drop-antes", antesProg());
+    // el link del menú (compu y celu) sigue a la sección: si está apagada o vacía, no aparece
+    const navEsp = document.querySelectorAll('header nav a[href$="#especial"]');
+    if (items.length === 0 || fase === "apagado" || (fin && E.al_terminar !== "mostrar")) { sec.hidden = true; navEsp.forEach((a) => (a.hidden = true)); return; }
+    sec.hidden = false; navEsp.forEach((a) => (a.hidden = false)); sec.classList.toggle("drop-antes", antesProg());
     // con la cuenta regresiva abajo, el cartel de arriba repite la fecha: se saca para que los sabores queden más cerca
     $("#espChip").hidden = antesProg() && !!E.lanzamiento;
     $("#espChip").textContent = esPromoDia() ? (fin ? "Esta promo terminó" : E.chip || (!open && E.lanzamiento ? "Arranca el " + fechaDrop(E.lanzamiento) : E.fin ? "Vale hasta el " + fechaDrop(E.fin) : ""))
       : fin ? "Este drop terminó" : (open ? E.chip_post || (P ? "¡Ya salió!" : E.chip) : E.chip) || (open ? "Disponible ahora" : P && E.lanzamiento ? "Sale el " + fechaDrop(E.lanzamiento) : "Próxima edición");
     $("#espChip").hidden = $("#espChip").hidden || !$("#espChip").textContent;
     $("#t-esp").textContent = E.titulo || "Edición especial";
-    document.querySelectorAll('a[href="#especial"]').forEach((a) => (a.textContent = E.titulo || "Edición especial"));
+    navEsp.forEach((a) => (a.textContent = E.titulo || "Edición especial"));
     $("#espIntro").textContent = (open && E.intro_post) || E.intro || "";
     const hideN = antesProg() && !!E.ocultar_nombres, hideP = antesProg() && !!E.ocultar_precios;
     // misma tarjeta que Sets (foto, título, descripción, línea fina, Desde $, +, estrellas, badges); el rosado la diferencia
@@ -1032,6 +1036,7 @@
   let MQ_IMG = MAQ_BASE;
   function renderMaquinita() {
     const sec = $("#maquinita"); if (!sec) return; sec.hidden = !maqOn();
+    document.querySelectorAll("[data-navmaq]").forEach((a) => (a.hidden = sec.hidden)); // link del menú: solo con la maquinita prendida
     const n = Math.max(1, Math.min(5, Math.round(+(S.maquinita || {}).fichas_dia || 1)));
     $("#mqTiradas").textContent = `${n === 1 ? "Una tirada gratis" : n + " tiradas gratis"} por día`;
     const fc = Math.max(0, Math.min(50, Math.round((S.maquinita || {}).fichas_compra ?? 5)));
