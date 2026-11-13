@@ -576,7 +576,7 @@
   /* código de descuento (Panel → Campañas → Códigos, migración 053): va después del premio del Club y antes de la maquinita, igual que create_order_v7 */
   let CUPON = null; try { CUPON = JSON.parse(localStorage.getItem("setto-codigo") || "null"); } catch (_) {}
   if (CUPON && CUPON.vence_at && new Date(CUPON.vence_at) <= new Date()) { CUPON = null; try { localStorage.removeItem("setto-codigo"); } catch (_) {} }
-  function usarCupon(p) { CUPON = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, regalo: p.regalo, tope: p.tope || 0, minimo: p.minimo || 0, acumula: !!p.acumula, vence_at: p.vence_at || null, requiere: p.requiere || null, requiere_nombre: p.requiere_nombre || null, desde_at: p.desde_at || null }; try { localStorage.setItem("setto-codigo", JSON.stringify(CUPON)); } catch (_) {} }
+  function usarCupon(p) { CUPON = { code: p.code, titulo: p.titulo, tipo: p.tipo, valor: p.valor, regalo: p.regalo, tope: p.tope || 0, minimo: p.minimo || 0, acumula: !!p.acumula, vence_at: p.vence_at || null, requiere: p.requiere || null, requiere_nombre: p.requiere_nombre || null, desde_at: p.desde_at || null, extra_pct: p.extra_pct || 0, minimo_aparte: !!p.minimo_aparte }; try { localStorage.setItem("setto-codigo", JSON.stringify(CUPON)); } catch (_) {} }
   function quitarCupon() { CUPON = null; try { localStorage.removeItem("setto-codigo"); } catch (_) {} }
   const esMochi = (p) => !!p && (p.categoria === "mochi" || (p.categoria === "especial" && (p.formato || "mochi") === "mochi"));
   const esBebida = (p) => !!p && (p.categoria === "dirty" || (p.categoria === "especial" && p.formato === "dirty"));
@@ -591,6 +591,7 @@
     if (CUPON.requiere && !cart.some((c) => c.id === CUPON.requiere)) return `es para pedidos con ${reqNom()}: sumalo al carrito`;
     if (total() < (CUPON.minimo || 0)) return `es para compras desde ${money(CUPON.minimo)}`;
     if (CUPON.tipo === "regalo" && !regaloMin()) return CUPON.regalo === "bebida" ? "sumá una bebida y te sale gratis" : "sumá un mochi y te sale gratis";
+    if (CUPON.tipo === "regalo" && CUPON.minimo_aparte && total() - regaloMin() < (CUPON.minimo || 0)) return `sumá productos por ${money(CUPON.minimo)} además del regalo`;
     if (CUPON.tipo === "envio" && form.modo !== "envio") return "elegí envío a domicilio para usarlo";
     return null;
   }
@@ -599,10 +600,11 @@
     const t = Math.max(total() + envioCosto() - (completes() ? premioOff() : 0), 0);
     let d = CUPON.tipo === "porcentaje" ? Math.round((total() * CUPON.valor) / 100 / 10) * 10 : CUPON.tipo === "monto" ? CUPON.valor : CUPON.tipo === "regalo" ? regaloMin() : envioCosto();
     if (CUPON.tipo === "porcentaje" && CUPON.tope > 0) d = Math.min(d, CUPON.tope);
+    if (CUPON.tipo === "regalo" && CUPON.extra_pct > 0) d += Math.round(((total() - d) * CUPON.extra_pct) / 100 / 10) * 10; // igual que create_order_v7 (068)
     return Math.max(0, Math.min(d, t));
   }
   const cuponDet = () => CUPON.tipo === "porcentaje" ? `${CUPON.valor}% off en tus productos${CUPON.tope > 0 ? ` (hasta ${money(CUPON.tope)})` : ""}.` : CUPON.tipo === "monto" ? `${money(CUPON.valor)} de descuento.`
-    : CUPON.tipo === "regalo" ? `Tu ${CUPON.regalo === "bebida" ? "bebida" : "mochi"} más barato sale gratis${CUPON.requiere ? ` con ${reqNom()}` : ""}.` : "El envío sale gratis.";
+    : CUPON.tipo === "regalo" ? `Tu ${CUPON.regalo === "bebida" ? "bebida" : "mochi"} más barato sale gratis${CUPON.requiere ? ` con ${reqNom()}` : ""}${CUPON.extra_pct > 0 ? ` y tenés ${CUPON.extra_pct}% off en lo demás` : ""}${CUPON.minimo_aparte && CUPON.minimo > 0 ? ` (sumando ${money(CUPON.minimo)} en otros productos)` : ""}.` : "El envío sale gratis.";
   // banner en el carrito, como el de la maquinita
   function cuponCartHtml() {
     if (!CUPON) return "";
