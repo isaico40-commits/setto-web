@@ -584,6 +584,9 @@
         [...new Set(o.items.filter((i) => !["envio", "premio", "maquinita", "gift", "codigo"].includes(i.id)).map((i) => i.id))].forEach((id) => { const a = (out[id] = out[id] || { s: 0, cantidad: 0 }); a.s += r.rating; a.cantidad++; }); });
       Object.values(out).forEach((a) => { a.promedio = Math.round((a.s / a.cantidad) * 10) / 10; delete a.s; }); return out;
     },
+    // reseña de una compra del Local (066): solo con la base real
+    async localResenaVer() { throw new Error("Las reseñas del local funcionan con la base real, no en modo demo."); },
+    async createReviewLocal() { throw new Error("Las reseñas del local funcionan con la base real, no en modo demo."); },
     async createReview(code, phone, rating, texto, foto, instagram) {
       const db = dbLoad(), ph = normPhone(phone); db.reviews = db.reviews || [];
       const ig = String(instagram || "").trim().replace(/^@+/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//, "").replace(/\/$/, "");
@@ -874,6 +877,8 @@
     async equipoPushQuien(endpoint) { const { data, error } = await sb.rpc("staff_push_quien", { p_endpoint: endpoint }); fail(error); return data; }, // null = apagado, "" = sin nombre
     async equipoSocios() { const { data, error } = await sb.from("caja_socios").select("nombre").eq("activo", true).order("nombre"); fail(error); return (data || []).map((x) => x.nombre); },
     async createReviewTrack(track, rating, texto, foto, instagram) { const { error } = await sb.rpc("create_review_track", { p_track: track, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); },
+    async localResenaVer(code) { const { data, error } = await sb.rpc("local_resena_ver", { p_code: code }); fail(error); return data; },
+    async createReviewLocal(code, phone, rating, texto, foto, instagram) { const { data, error } = await sb.rpc("create_review_local", { p_code: code, p_phone: phone, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); return data; },
     async createReview(code, phone, rating, texto, foto, instagram) { const { error } = await sb.rpc("create_review_v2", { p_code: code, p_phone: phone, p_rating: rating, p_texto: texto || null, p_foto: foto || null, p_instagram: instagram || null }); fail(error); },
     async uploadReviewPhoto(blob) {
       const ext = (blob.type || "").includes("webp") ? "webp" : "jpg", path = `r/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
