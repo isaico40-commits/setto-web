@@ -782,15 +782,17 @@
   function renderEspecial() {
     const E = ESPC(), items = on(ESP), fase = dropFase(), open = fase === "abierto", fin = fase === "terminado", P = prog();
     const sec = $("#especial"); renderDropBar();
-    if (items.length === 0 || fase === "apagado" || (fin && E.al_terminar !== "mostrar")) { sec.hidden = true; return; }
-    sec.hidden = false; sec.classList.toggle("drop-antes", antesProg());
+    // el link del menú (compu y celu) sigue a la sección: si está apagada o vacía, no aparece
+    const navEsp = document.querySelectorAll('header nav a[href$="#especial"]');
+    if (items.length === 0 || fase === "apagado" || (fin && E.al_terminar !== "mostrar")) { sec.hidden = true; navEsp.forEach((a) => (a.hidden = true)); return; }
+    sec.hidden = false; navEsp.forEach((a) => (a.hidden = false)); sec.classList.toggle("drop-antes", antesProg());
     // con la cuenta regresiva abajo, el cartel de arriba repite la fecha: se saca para que los sabores queden más cerca
     $("#espChip").hidden = antesProg() && !!E.lanzamiento;
     $("#espChip").textContent = esPromoDia() ? (fin ? "Esta promo terminó" : E.chip || (!open && E.lanzamiento ? "Arranca el " + fechaDrop(E.lanzamiento) : E.fin ? "Vale hasta el " + fechaDrop(E.fin) : ""))
       : fin ? "Este drop terminó" : (open ? E.chip_post || (P ? "¡Ya salió!" : E.chip) : E.chip) || (open ? "Disponible ahora" : P && E.lanzamiento ? "Sale el " + fechaDrop(E.lanzamiento) : "Próxima edición");
     $("#espChip").hidden = $("#espChip").hidden || !$("#espChip").textContent;
     $("#t-esp").textContent = E.titulo || "Edición especial";
-    document.querySelectorAll('a[href="#especial"]').forEach((a) => (a.textContent = E.titulo || "Edición especial"));
+    navEsp.forEach((a) => (a.textContent = E.titulo || "Edición especial"));
     $("#espIntro").textContent = (open && E.intro_post) || E.intro || "";
     const hideN = antesProg() && !!E.ocultar_nombres, hideP = antesProg() && !!E.ocultar_precios;
     // misma tarjeta que Sets (foto, título, descripción, línea fina, Desde $, +, estrellas, badges); el rosado la diferencia
