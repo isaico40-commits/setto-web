@@ -1075,7 +1075,7 @@
         <label>Compra mínima en $<input class="inp" name="minimo" type="number" min="0" inputmode="numeric" value="0"></label></div>
       <div class="row2" data-pregalo hidden><label>Además, % off en el resto (opcional)<input class="inp" name="extra_pct" type="number" min="0" max="100" inputmode="numeric" placeholder="0"></label>
         <label class="chk" style="align-self:end"><input type="checkbox" name="minimo_aparte"> La compra mínima no cuenta el regalo</label></div>
-      <span class="hintp" data-pregalo hidden>Ej. Top 1: bebida de regalo, compra mínima $5.500 sin contar el regalo (tiene que sumar algo más). Top 2 y 3: mochi de regalo + 10% off en lo demás.</span>
+      <span class="hintp" data-pregalo hidden>Ej. Top 1: bebida de regalo con compra mínima $5.500 sin contar el regalo (tiene que sumar algo más). Si querés, el regalo puede sumar además un % off en lo demás.</span>
       <div class="row2"><label>Solo con la compra de (opcional)<select class="inp" name="requiere"><option value="">Cualquier pedido</option>${P.products.filter((x) => x.activo !== false).map((x) => `<option value="${esc(x.id)}">${esc(String(x.nombre).trim())}</option>`).join("")}</select></label>
         <label>Vale desde (opcional)<input class="inp" name="desde" type="datetime-local"></label></div>
       <span class="hintp">"Solo con la compra de": el código entra únicamente si el pedido lleva ese producto (ej. mochi de regalo con un Spooky Set). Ese producto no cuenta como el regalo. "Vale desde": antes de esa hora el código no se puede usar.</span>

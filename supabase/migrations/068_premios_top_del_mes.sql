@@ -4,13 +4,13 @@
 --
 --   Códigos de descuento (promos), dos opciones nuevas:
 --   - promos.extra_pct: con tipo 'regalo', además del regalo descuenta ese % en el resto de los productos
---       (ej. top 2 y 3: un mochi de regalo + 10% off en lo demás).
+--       (ej. un mochi de regalo + 10% off en lo demás).
 --   - promos.minimo_aparte: el mínimo se cuenta SIN el regalo (ej. top 1: la bebida gratis exige comprar además
 --       al menos el precio de un mochi; así suma una compra y el sello sale de esa compra, como cualquier pedido).
 --   create_order_v7 se parchea por reemplazo de texto (como la 053 y la 054); promo_check devuelve los dos campos.
 --
 --   Automáticas:
---   - marketing_automations.disparador suma 'top' con top_desde / top_hasta (ej. 1..1 o 2..3).
+--   - marketing_automations.disparador suma 'top' con top_desde / top_hasta (ej. 1..1, 2..2 y 3..3: un premio por puesto).
 --   - top_mes(desde, hasta): el ranking de un período (solo equipo / service_role).
 --   - automatica_top_destinatarios(): el ranking del mes anterior (hora AR), puestos de la automática, con permiso de
 --     WhatsApp. Una sola vez por persona, automática y mes. No aplica la regla de "1 mensaje cada 7 días": es un premio.
