@@ -245,7 +245,7 @@ section.blk{padding-block:72px}
 .stamp.gift{background:var(--coral);border:2px solid var(--turquesa);font-family:var(--display);font-size:.95rem;color:var(--ink)}
 .ex{position:absolute;top:-13px;right:18px;background:var(--ink);color:var(--bg);border-radius:var(--pill);font-size:.7rem;font-weight:600;padding:3px 10px;letter-spacing:.07em;text-transform:uppercase}
 .clubsteps{margin-top:0}
-#club .stamps{grid-template-columns:repeat(4,minmax(0,64px));justify-content:space-between;gap:10px}
+#club .stamps{grid-template-columns:repeat(4,minmax(0,68px));justify-content:center;gap:12px}
 @media (min-width:821px){
   #club .club{align-items:stretch}
   #club .club > div:first-child{display:flex;flex-direction:column}
