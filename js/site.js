@@ -1019,7 +1019,7 @@
     $("#clubPremio").textContent = `El pedido que completa los ${c.meta || 8} sellos viene con ${premioTxt()}.` + (c.minimo > 0 ? ` Suman sello los pedidos desde ${money(c.minimo)}.` : "");
 
     renderBeneficios();
-    $("#mnavClub").hidden = !clubOn();
+    $("#mnavClub").hidden = !clubOn(); document.querySelectorAll("[data-clubtag]").forEach((t) => (t.hidden = !clubOn()));
     drawStamps(0, c.meta || 8, true);
   }
   function drawStamps(n, meta, ejemplo) {
