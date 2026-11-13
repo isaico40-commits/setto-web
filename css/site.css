@@ -245,6 +245,15 @@ section.blk{padding-block:72px}
 .stamp.gift{background:var(--coral);border:2px solid var(--turquesa);font-family:var(--display);font-size:.95rem;color:var(--ink)}
 .ex{position:absolute;top:-13px;right:18px;background:var(--ink);color:var(--bg);border-radius:var(--pill);font-size:.7rem;font-weight:600;padding:3px 10px;letter-spacing:.07em;text-transform:uppercase}
 .clubsteps{margin-top:0}
+#club .stamps{grid-template-columns:repeat(4,minmax(0,64px));justify-content:space-between;gap:10px}
+@media (min-width:821px){
+  #club .club{align-items:stretch}
+  #club .club > div:first-child{display:flex;flex-direction:column}
+  #club .clubsteps{flex:1;grid-template-rows:auto auto 1fr}
+  #club .stampcard{display:flex;flex-direction:column}
+  #club .stampcard .maq-link{margin-top:auto}
+  #club .stampcard #cardMsg{margin-bottom:14px}
+}
 .clubsteps > div:last-child{border-bottom:1.5px solid color-mix(in srgb,var(--turquesa) 40%,transparent)}
 .clubsteps b{font-size:1.05rem}
 .cextras{display:block;margin-top:6px}
