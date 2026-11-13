@@ -265,17 +265,15 @@
   </section>
 
   <section class="blk" id="club" aria-labelledby="t-club">
-    <div class="wrap club">
+    <div class="wrap">
+      <div class="head"><span class="eyebrow">Tarjeta de sellos</span><h2 id="t-club">Setto Club</h2><p id="clubIntro">Cada pedido desde la web suma un sello.</p></div>
+      <div class="club">
       <div>
-        <span class="eyebrow">Tarjeta de sellos</span>
-        <h2 id="t-club" style="font-size:clamp(2.3rem,5vw,3.6rem);margin-top:8px">Setto Club</h2>
-        <p class="muted" style="margin-top:14px;max-width:46ch" id="clubIntro">Cada pedido desde la web suma un sello.</p>
-        <div class="next">
-          <div><span class="k">1</span><span><b>Pedí desde la web</b></span></div>
+        <div class="next clubsteps">
+          <div><span class="k">1</span><span><b>Pedí desde la web</b><span class="cextras" id="clubBenef" hidden><small>Y además te llevás:</small><span class="cx-list" id="clubBenefList"></span></span></span></div>
           <div><span class="k">2</span><span><b>Recibilo y sumás el sello</b></span></div>
           <div><span class="k">3</span><span><b>Completá la tarjeta</b><small id="clubPremio">El pedido que la completa viene con premio.</small></span></div>
         </div>
-        <div class="clubbenef" id="clubBenef" hidden><b>Con tu compra tenés beneficios exclusivos del club</b><ul id="clubBenefList"></ul></div>
       </div>
       <div class="stampcard">
         <div class="row1"><img src="img/logo.svg" alt="Setto" loading="lazy" decoding="async"><span class="eyebrow">Club</span></div>
@@ -286,6 +284,7 @@
         <div class="stamps" id="stamps"></div>
         <p class="muted" id="cardMsg" style="font-size:.84rem;margin-top:14px">Con el celular de tus pedidos.</p>
         <a class="maq-link" href="/?maquinita" data-maq>🎰 Tirada gratis de hoy <span aria-hidden="true">→</span></a>
+      </div>
       </div>
     </div>
   </section>

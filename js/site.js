@@ -989,9 +989,10 @@
     return out;
   }
   function renderBeneficios() {
-    const b = beneficios(), box = $("#clubBenef"); if (!box) return;
+    // el sello ya lo cuentan los pasos 2 y 3: acá van solo los extras, como etiquetas del paso 1
+    const b = beneficios().filter((x) => x.ico !== "⭐"), box = $("#clubBenef"); if (!box) return;
     box.hidden = !b.length;
-    $("#clubBenefList").innerHTML = b.map((x) => `<li><span class="bn-ico" aria-hidden="true">${x.ico}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></li>`).join("");
+    $("#clubBenefList").innerHTML = b.map((x) => `<span class="cx" title="${esc(x.s)}"><span aria-hidden="true">${x.ico}</span>${esc(x.t)}</span>`).join("");
   }
   function renderGiftHome() {
     const sec = $("#giftcards"); if (!sec) return;

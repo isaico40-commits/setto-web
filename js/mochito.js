@@ -8,7 +8,7 @@
   let off = false; try { localStorage.removeItem("setto-mochito-off"); off = sessionStorage.getItem("setto-mochito-off") === "1"; } catch (_) {}
 
   /* ---------- 1) Aparición suave de bloques al hacer scroll ---------- */
-  const revealSel = "#especial .head, #sets .head, #carta .head, #pedir .head, #club .club > div, .stampcard, #faq .head, #resenas .head";
+  const revealSel = "#especial .head, #sets .head, #carta .head, #pedir .head, #club .head, #club .club > div, .stampcard, #faq .head, #resenas .head";
   const cardSel = "article.set, article.item, .cv, #resenas .rv, .faq-list > *";
   if (!RM && "IntersectionObserver" in window) {
     document.documentElement.classList.add("rv-on");
