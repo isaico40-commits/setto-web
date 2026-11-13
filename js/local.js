@@ -7,6 +7,8 @@
     y "Otro" para cargar uno suelto con nombre y precio a mano.
   - Setto Club en el mostrador (migración 065): celular opcional en la comanda. Al quedar cobrada suma el sello sola
     (mismas reglas que la web); si se anula, lo descuenta. El premio se canjea a mano con "Canjear" (redeem_reward).
+  - Ticket del cliente con QR (migración 066): abre /listo?local=<código> para dejar la reseña de esa compra;
+    si es la primera compra de ese celular, la base regala 1 sello (mismas reglas que la web).
 */
 (function () {
   const cfg = window.SETTO_CONFIG || {};
@@ -47,7 +49,7 @@
     ticket: ls.get("setto-local-ticket", []), // borrador: sobrevive a un refresco sin querer
     nombre: "", nota: "", desc: 0, verDesc: false,
     tel: "", card: null, wa: false, falta065: false, // Club: celular de la comanda que se está tickeando y su tarjeta
-    sending: false, vistas: new Set(),
+    sending: false, vistas: new Set(), club: {},
     print: Object.assign({ auto: false, cliente: false, ancho: 80 }, ls.get("setto-local-print", {})),
   };
   const guardarTicket = () => ls.set("setto-local-ticket", S.ticket);
@@ -86,12 +88,14 @@
 
   /* ---------- carga ---------- */
   async function loadBase() {
-    const [prods, pers, socios, lprods] = await Promise.all([
+    const [prods, pers, socios, lprods, club] = await Promise.all([
       sb.from("products").select("id,categoria,nombre,formato,precio,precio_12,precio_16,set_bebida,set_mochi,promo_cant,activo,agotado,orden,img").eq("activo", true).order("orden"),
       sb.from("settings").select("value").eq("key", "personalizacion").maybeSingle(),
       sb.from("caja_socios").select("nombre,activo").order("orden"),
       sb.from("local_productos").select("id,nombre,precio,orden").eq("activo", true).order("orden"),
+      sb.from("settings").select("value").eq("key", "club").maybeSingle(),
     ]);
+    S.club = (!club.error && club.data && club.data.value) || {};
     S.falta062 = !!lprods.error; S.lprods = lprods.error ? [] : lprods.data || [];
     S.prods = fail(prods) || []; S.pers = (fail(pers) || {}).value || {}; S.socios = (fail(socios) || []).filter((s) => s.activo);
     // el borrador guardado se limpia si cambió la carta
@@ -519,7 +523,17 @@
       <div class="pt-r pt-t"><span>TOTAL</span><span>${money(c.total)}</span></div>${c.pagado ? `<div class="pt-r"><span>${esc(c.pago || "")}</span><span></span></div>` : ""}
       ${c.paga_con ? `<div class="pt-r"><span>Pagó con</span><span>${money(c.paga_con)}</span></div><div class="pt-r"><span>Vuelto</span><span>${money(c.paga_con - c.total)}</span></div>` : ""}
       ${c.sellos ? `<hr><div class="pt-m">Setto Club: sumaste ${c.sellos} sello${c.sellos === 1 ? "" : "s"} · ${ult4(c.phone)}</div>` : ""}
+      ${qrResenaHtml(c)}
       <hr><div class="pt-m">No válido como factura · ¡Gracias!</div></div>`;
+  }
+  // QR para dejar la reseña de esta compra (066). Sin código (falta la migración) o sin cobrar, no va.
+  function qrResenaHtml(c) {
+    if (!c.resena_code || !c.pagado || c.estado === "anulada" || typeof window.qrcode !== "function") return "";
+    const url = `${location.origin}/listo?local=${encodeURIComponent(c.resena_code)}`;
+    let svg = "";
+    try { const q = window.qrcode(0, "M"); q.addData(url); q.make(); svg = q.createSvgTag({ cellSize: 3, margin: 0, scalable: true }); } catch (_) { return ""; }
+    const regalo = S.club.activo !== false && S.club.sello_resena !== false;
+    return `<hr><div class="pt-qr">${svg}</div><div class="pt-m pt-qrt">${regalo ? "¿Primera vez en Setto? Escaneá, dejá tu reseña con un comentario o una foto y te regalamos 1 sello del Club." : "Escaneá y contanos qué tal estuvo."}</div>`;
   }
   function imprimir(c, que) {
     const w = S.print.ancho === 58 ? 58 : 80;

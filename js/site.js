@@ -1859,15 +1859,16 @@
     } catch (ex) { box.classList.remove("cmb-busy"); st.err = ex.message; st.data = null; st.cancelArm = false; redibujarCambio(tr); cambioHtmlReload(tr); }
   });
   function cambioHtmlReload(tr) { const st = CMB[tr]; if (!st || st.loading) return; st.loading = true; API.cambioOpciones(tr).then((d) => { st.data = d; st.loading = false; redibujarCambio(tr); }).catch(() => { st.loading = false; }); }
-  function rvForm(code) {
-    return `<div class="rv-form" data-rvcode="${esc(code)}"><b style="font-size:.9rem">¿Qué tal estuvo?</b>
+  function rvForm(code, local) {
+    return `<div class="rv-form" data-rvcode="${esc(code)}"${local ? ` data-rvlocal="${esc(code)}"` : ""}><b style="font-size:.9rem">¿Qué tal estuvo?</b>
       <div class="stars" role="radiogroup" aria-label="Puntaje">${[1, 2, 3, 4, 5].map((n) => `<button type="button" data-star="${n}" aria-pressed="false" aria-label="${n} estrella${n > 1 ? "s" : ""}">★</button>`).join("")}</div>
       <textarea maxlength="400" placeholder="Contanos qué te pareció (opcional)"></textarea>
       <label class="rv-foto"><input type="file" accept="image/*" data-rvfoto hidden><span class="rv-prev">📷</span><span><b>Sumá una foto de tu pedido</b><small>Opcional · se ve con tu reseña</small></span></label>
       <label class="rv-ig"><span>@</span><input type="text" maxlength="40" placeholder="tu usuario de Instagram (opcional)" autocapitalize="off" autocomplete="off" data-rvig></label>
+      ${local ? `<label class="f rv-tel">Tu celular${local === "con" ? " (el que dejaste en el local)" : ""}<input type="tel" inputmode="tel" autocomplete="tel" placeholder="223 347-1277" data-rvtel></label>` : ""}
       <small class="muted" style="font-size:.76rem">Mostramos tu nombre, foto y usuario. Nunca tu teléfono.</small>
       <span class="rv-err" hidden></span>
-      <div class="trk-acts" style="margin:0"><button class="btn solid" data-rvsend>Enviar reseña</button><button class="back" data-rvcancel>Ahora no</button></div></div>`;
+      <div class="trk-acts" style="margin:0"><button class="btn solid" data-rvsend>Enviar reseña</button>${local ? "" : `<button class="back" data-rvcancel>Ahora no</button>`}</div></div>`;
   }
   function verSellos(tel) {
     $("#club").scrollIntoView({ behavior: "smooth" });
@@ -1894,6 +1895,14 @@
         if (file) { t.textContent = "Subiendo foto…"; foto = await API.uploadReviewPhoto(await achicarFoto(file)); }
         t.textContent = "Enviando…";
         const tr = trackDe(f.dataset.rvcode), ig = f.querySelector("[data-rvig]").value, tx = f.querySelector("textarea").value;
+        if (f.dataset.rvlocal) {
+          const tel = (f.querySelector("[data-rvtel]") || {}).value || "";
+          if (!API.normPhone(tel)) throw new Error("Revisá el celular: código de área + número.");
+          const x = await API.createReviewLocal(f.dataset.rvlocal, tel, r, tx, foto, ig);
+          const aviso = f.parentElement && f.parentElement.querySelector(".srs:not(.ok)"); if (aviso) aviso.remove();
+          f.outerHTML = `<p style="margin-top:10px"><b>¡Gracias!</b> Ya quedó publicada.</p>${x && x.sello_resena ? `<p class="srs ok">🎁 Por tu reseña te sumamos 1 sello de regalo al Setto Club.</p>` : ""}${x && x.sello_compra ? `<p class="srs ok">También sumamos el sello de esta compra a tu tarjeta.</p>` : ""}<div class="trk-acts">${clubOn() ? `<button class="btn" data-lsvercard>Ver mis sellos</button>` : ""}<button class="btn" data-verresenas>Ver reseñas</button></div>`;
+          LSL.tel = tel; if (LSL.data) LSL.data.resena = true; return;
+        }
         if (tr && API.createReviewTrack) await API.createReviewTrack(tr, r, tx, foto, ig); else await API.createReview(f.dataset.rvcode, telDe(f.dataset.rvcode), r, tx, foto, ig);
         f.outerHTML = `<p style="margin-top:10px"><b>¡Gracias!</b> Ya quedó publicada.</p>`; setTimeout(verSeguimiento, 4000);
       } catch (ex) { err.hidden = false; err.textContent = ex.message; t.disabled = false; t.textContent = "Enviar reseña"; }
@@ -1926,8 +1935,28 @@
         <button class="btn solid" type="submit">Buscar</button>
       </form><small class="muted">El código está en el mensaje de WhatsApp de tu pedido (empieza con STT).</small><span class="rv-err" id="lsErr" hidden></span></details>`;
   let lsTel = false;
+  /* compra en el Local: /listo?local=<código del ticket> (migración 066) */
+  const LSL = { code: PAGE === "listo" ? (new URLSearchParams(location.search).get("local") || "").trim().toUpperCase().slice(0, 12) : "", data: null, err: "", busy: false, tel: "" };
+  function renderListoLocal(box) {
+    if (!LSL.data && !LSL.err) {
+      box.innerHTML = `<div class="trk ls-trk"><p class="muted" style="margin:0">Buscando tu compra…</p></div>`;
+      if (!LSL.busy) { LSL.busy = true; API.localResenaVer(LSL.code).then((d) => { LSL.data = d; }).catch((e) => { LSL.err = e.message; }).finally(() => { LSL.busy = false; renderListo(); }); }
+      return;
+    }
+    if (LSL.err) { box.innerHTML = `<div class="trk ls-trk"><p style="margin:0"><b>${esc(LSL.err)}</b></p></div>`; return; }
+    const d = LSL.data, fecha = new Date(d.dia + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long" });
+    const regalo = d.regalo && clubOn();
+    let body;
+    if (d.resena) body = `<p style="margin:6px 0 0"><b>¡Gracias por tu reseña!</b> Ya quedó publicada.</p>${d.sello_resena ? `<p class="srs ok">🎁 Por tu reseña te sumamos 1 sello de regalo al Setto Club.</p>` : ""}<div class="trk-acts"><button class="btn" data-verresenas>Ver reseñas</button></div>`;
+    else if (!d.puede) body = `<p style="margin:6px 0 0">${d.vencida ? "Las reseñas se pueden dejar hasta 14 días después de la compra." : "Esta compra no está disponible para reseñar."}</p>`;
+    else body = `${regalo ? `<p class="srs">🎁 <b>¿Es tu primera compra en Setto?</b> Dejá tu reseña con un comentario o una foto y te regalamos 1 sello del Setto Club.</p>` : ""}<div class="trk-acts" hidden></div>${rvForm(LSL.code, d.con_celular ? "con" : "sin")}`;
+    box.innerHTML = `<div class="trk ls-trk"><div class="trk-h"><span class="eyebrow">Tu compra en el local</span><b class="num">#${d.numero}</b><span class="trk-r">${esc(fecha)}</span></div>
+      ${d.productos && d.productos.length ? `<p class="muted" style="margin:4px 0 0">${esc(d.productos.slice(0, 4).join(" · "))}</p>` : ""}${body}</div>`;
+  }
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-lsvercard]")) verSellos(LSL.tel); });
   function renderListo() {
     const box = $("#lsResBody"); if (!box || box.querySelector(".rv-form")) return;
+    if (LSL.code) return renderListoLocal(box);
     const mios = MIOS.filter((o) => o.status !== "cancelado");
     const tel = (mios.find((o) => o.phone) || {}).phone;
     if (tel && !lsTel && clubOn()) { lsTel = true; $("#cardPhone").value = API.prettyPhone ? API.prettyPhone(tel) : tel; $("#cardForm").requestSubmit(); }

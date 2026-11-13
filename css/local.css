@@ -199,6 +199,9 @@ body[data-view="barra"] .lbar .appsw{display:none}
   .pt-r{display:flex;justify-content:space-between;gap:6px}
   .pt-t{font-weight:700;font-size:14px}
   .pt-cut{break-after:page;page-break-after:always;height:0}
+  .pt-qr{width:32mm;margin:4px auto 2px}
+  .pt-qr svg{display:block;width:100%;height:auto}
+  .pt-qrt{padding:0 2mm}
 }
 
 /* categoría Local: productos que no están en la web (sin foto) */
