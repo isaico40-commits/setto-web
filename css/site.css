@@ -244,6 +244,13 @@ section.blk{padding-block:72px}
 .stamp.on img{width:68%}
 .stamp.gift{background:var(--coral);border:2px solid var(--turquesa);font-family:var(--display);font-size:.95rem;color:var(--ink)}
 .ex{position:absolute;top:-13px;right:18px;background:var(--ink);color:var(--bg);border-radius:var(--pill);font-size:.7rem;font-weight:600;padding:3px 10px;letter-spacing:.07em;text-transform:uppercase}
+.clubsteps{margin-top:0}
+.clubsteps > div:last-child{border-bottom:1.5px solid color-mix(in srgb,var(--turquesa) 40%,transparent)}
+.clubsteps b{font-size:1.05rem}
+.cextras{display:block;margin-top:6px}
+.cextras[hidden]{display:none}
+.cx-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.cx{display:inline-flex;align-items:center;gap:6px;background:var(--bg-2);color:var(--turquesa-2);border-radius:var(--pill);padding:5px 12px;font-size:.82rem;font-weight:600;line-height:1.2}
 @media (max-width:820px){.club{grid-template-columns:1fr}}
 
 /* footer */
