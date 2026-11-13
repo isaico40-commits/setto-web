@@ -95,38 +95,30 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;backgroun
 .dest{padding-block:6px 30px}
 .dest-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
 .dest-grid:has(> .dcard[hidden]){max-width:700px}
-.dcard{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:18px;border:var(--line);border-radius:var(--r);box-shadow:var(--sombra-chica);padding:20px 22px;min-width:0}
-.dcard h2{font-size:clamp(1.45rem,2.6vw,1.9rem);line-height:1.05;margin-top:4px;text-transform:none}
-.dcard p{margin-top:6px;font-size:.88rem;color:var(--ink-2);max-width:34ch}
-.dcard .btn{margin-top:14px;padding:9px 18px;font-size:.88rem}
-.dtop{background:var(--coral-2)}
-.dmaq{background:var(--turquesa);border-color:var(--turquesa-2);box-shadow:3px 3px 0 var(--turquesa-2);color:#FFFDF8}
-.dmaq .eyebrow{color:var(--coral)}
-.dmaq h2{color:#FFFDF8}
-.dmaq p{color:color-mix(in srgb,#FFFDF8 82%,transparent)}
-.dmaq .btn.solid{background:var(--coral);color:var(--ink);border-color:var(--ink);box-shadow:3px 3px 0 var(--ink)}
-.dmaq .btn.solid:hover{background:var(--coral-2)}
+.dcard{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:18px;background:var(--card);border:1.5px solid color-mix(in srgb,var(--turquesa) 22%,transparent);border-radius:20px;padding:18px 22px;min-width:0}
+.dcard h2{font-size:clamp(1.3rem,2.2vw,1.6rem);line-height:1.05;margin-top:4px;text-transform:none}
+.dcard p{margin-top:6px;font-size:.86rem;color:var(--ink-2);max-width:34ch}
+.dcard .btn{margin-top:12px;padding:7px 16px;font-size:.84rem;box-shadow:none;border-width:1.5px}
 .dbtns{display:flex;align-items:center;flex-wrap:wrap;gap:4px 16px}
-.dlink{margin-top:14px;font-size:.86rem;font-weight:600;color:#FFFDF8;text-underline-offset:3px}
+.dlink{margin-top:12px;font-size:.84rem;font-weight:600;color:var(--turquesa);text-underline-offset:3px}
 .dpodio{list-style:none;margin:0;padding:0;display:flex;align-items:flex-end;gap:6px}
 .dpodio li{display:flex;flex-direction:column;align-items:center;gap:4px;width:74px}
 .dpodio img{width:46px;height:auto;margin-bottom:-2px}
 .dn{font-size:.76rem;font-weight:700;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dpos{display:grid;place-items:center;width:100%;border-radius:12px 12px 4px 4px;background:var(--turquesa);color:#FFFDF8;font-family:var(--display);font-size:1.3rem;line-height:1}
-.dp1 .dpos{height:62px;background:var(--turquesa-2);font-size:1.6rem}
-.dp2 .dpos{height:44px}.dp3 .dpos{height:32px}
-.dreels{display:flex;gap:6px;background:var(--turquesa-2);border:2px solid #F2C14E;border-radius:16px;padding:8px}
-.dreels span{width:58px;height:66px;border-radius:10px;background:#FFFDF8;display:grid;place-items:center;overflow:hidden}
-.dreels img{width:46px;height:46px;object-fit:contain}
+.dpos{display:grid;place-items:center;width:100%;border-radius:10px 10px 3px 3px;background:color-mix(in srgb,var(--turquesa) 12%,transparent);color:var(--turquesa);font-family:var(--display);font-size:1.15rem;line-height:1}
+.dp1 .dpos{height:52px;background:var(--coral-2);color:var(--ink);font-size:1.4rem}
+.dp2 .dpos{height:38px}.dp3 .dpos{height:28px}
+.dreels{display:flex;gap:6px;background:var(--bg-2);border-radius:14px;padding:7px}
+.dreels span{width:52px;height:58px;border-radius:9px;background:var(--card);display:grid;place-items:center;overflow:hidden}
+.dreels img{width:42px;height:42px;object-fit:contain}
 @media (max-width:640px){
   .dest{padding-block:2px 18px}.dest-grid{gap:12px}
   .dcard{padding:16px;gap:10px}
   .dcard h2{font-size:1.35rem}
   .dcard p{display:none}
-  .dcard .btn{margin-top:12px;padding:8px 14px;font-size:.84rem}
   .dlink{margin-top:12px;font-size:.8rem}
   .dpodio{gap:4px}.dpodio li{width:50px}.dpodio img{width:32px}.dn{font-size:.68rem}
-  .dp1 .dpos{height:48px}.dp2 .dpos{height:34px}.dp3 .dpos{height:26px}
+  .dp1 .dpos{height:44px}.dp2 .dpos{height:32px}.dp3 .dpos{height:24px}
   .dreels{gap:4px;padding:6px;border-radius:12px}.dreels span{width:40px;height:48px;border-radius:8px}.dreels img{width:32px;height:32px}
 }
 @keyframes slide{to{transform:translateX(-50%)}}
