@@ -644,6 +644,11 @@
           <button class="btn" type="submit">Sumar</button></form>
       </div>
       <div id="cResult"></div>
+      <section class="sec" id="topSec"><div class="tophead"><h2>Top clientes</h2>
+        <div class="topctl"><div class="chips" role="group" aria-label="Período">${TOP_PER.map(([k, l]) => `<button type="button" data-top-per="${k}" aria-pressed="${(P.topPer || "mes") === k}">${l}</button>`).join("")}</div>
+        <label class="topshow"><input type="checkbox" id="topShow" ${P.topShow ? "checked" : ""}> Vista para mostrar</label></div></div>
+        <div id="topBox"><p class="muted">Cargando…</p></div>
+        <p class="hintp" style="margin-top:10px">Suma los pedidos web entregados y las compras del local cobradas con celular. Lo cargado a mano en la Caja sin celular no entra. "Vista para mostrar" esconde celulares y montos: así se vería si lo publicamos.</p></section>
       <section class="sec"><h2>Últimos clientes</h2><div class="clist" id="cList"><p class="muted">Cargando…</p></div></section>`;
     $("#cSearch").addEventListener("submit", (e) => { e.preventDefault(); openClient($("#csPhone").value); });
     $("#cManual").addEventListener("submit", async (e) => {
@@ -660,8 +665,44 @@
       }
       catch (err) { toast(err.message); }
     });
-    listClients();
+    $("#topSec").addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.topPer) { P.topPer = b.dataset.topPer; document.querySelectorAll("#topSec [data-top-per]").forEach((x) => x.setAttribute("aria-pressed", x === b)); P.topMas = false; renderTop(); }
+      else if (b.dataset.topMas !== undefined) { P.topMas = true; renderTop(); }
+      else if (b.dataset.topClient && !P.topShow) { openClient(b.dataset.topClient); $("#cResult").scrollIntoView({ behavior: "smooth", block: "start" }); }
+    });
+    $("#topShow").addEventListener("change", (e) => { P.topShow = e.target.checked; renderTop(); });
+    listClients(); renderTop();
     if (P.client) openClient(P.client);
+  }
+
+  /* ---- Top clientes (leaderboard): quién más gastó en el período ---- */
+  const TOP_PER = [["mes", "Este mes"], ["90", "Últimos 90 días"], ["todo", "Desde siempre"]];
+  const topDesde = (k) => { const d = new Date(); if (k === "mes") return new Date(d.getFullYear(), d.getMonth(), 1).toISOString(); if (k === "90") return new Date(d.getTime() - 90 * 864e5).toISOString(); return null; };
+  // "Lucía Martínez" → "Lucía M.": en la vista para mostrar nunca va el apellido entero ni el celular
+  const nombreCorto = (n) => { const p = String(n || "").trim().split(/\s+/).filter(Boolean); if (!p.length) return "Cliente Setto"; const a = p[0][0].toUpperCase() + p[0].slice(1).toLowerCase(); return p[1] ? `${a} ${p[1][0].toUpperCase()}.` : a; };
+  async function renderTop() {
+    const box = $("#topBox"); if (!box) return;
+    const per = P.topPer || "mes", show = !!P.topShow, meta = (P.settings.club || {}).meta || 8;
+    let l;
+    try { l = await API.leaderboard(topDesde(per)); } catch (e) { box.innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+    if ($("#topBox") !== box || (P.topPer || "mes") !== per) return; // cambiaron de período mientras cargaba
+    if (!l.length) { box.innerHTML = `<p class="muted">${per === "mes" ? "Este mes todavía no hay compras con celular." : "Todavía no hay compras con celular en este período."}</p>`; return; }
+    const nom = (r) => esc(show ? nombreCorto(r.nombre) : r.nombre || "Sin nombre");
+    const comp = (r) => `${r.compras} compra${r.compras === 1 ? "" : "s"}`;
+    const det = (r) => show ? comp(r) : `${comp(r)}${r.web && r.local ? ` · ${r.web} web, ${r.local} local` : r.local ? " · local" : " · web"}`;
+    const tag = show ? "div" : "button", attrs = (r) => show ? "" : `type="button" data-top-client="${esc(r.phone)}"`;
+    const podio = l.slice(0, 3).map((r, i) => `<${tag} class="topcard p${i + 1}" ${attrs(r)}>
+        <span class="toprank">${i + 1}</span>${i === 0 ? '<img class="topmochi" src="img/mochito-run.png" alt="">' : ""}
+        <b class="topname">${nom(r)}</b>
+        ${show ? "" : `<span class="topmoney num">${money(r.gastado)}</span>`}
+        <span class="topdet">${det(r)}</span><span class="topsel">${r.sellos}/${meta} sellos</span></${tag}>`).join("");
+    const resto = l.slice(3, P.topMas ? 25 : 10);
+    const lista = resto.map((r, i) => `<${tag} class="citem toprow" ${attrs(r)}>
+        <span class="toprk num">${i + 4}</span><span class="topmid"><b>${nom(r)}</b> <span class="muted">${det(r)}</span></span>
+        <span class="num">${show ? `${r.sellos}/${meta} sellos` : `<b>${money(r.gastado)}</b>`}</span></${tag}>`).join("");
+    box.innerHTML = `<div class="toppodio">${podio}</div>${lista ? `<div class="clist" style="margin-top:12px">${lista}</div>` : ""}
+      ${!P.topMas && l.length > 10 ? `<button class="linkbtn" type="button" data-top-mas style="margin-top:10px">Ver hasta el puesto 25</button>` : ""}`;
   }
   async function listClients() {
     try {

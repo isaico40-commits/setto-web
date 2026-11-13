@@ -30,6 +30,19 @@
     auth: PUBLICA ? { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, lock: (_n, _t, fn) => fn() } : {},
   });
 
+  /* Leaderboard del Club: suma por celular, nombre de customers (o el de la última compra) y sellos actuales */
+  function armarTop(ventas, clientes) {
+    const cli = new Map((clientes || []).map((c) => [c.phone, c])), m = new Map();
+    for (const v of ventas) {
+      const r = m.get(v.phone) || { phone: v.phone, nombre: null, gastado: 0, compras: 0, web: 0, local: 0, ultima: "" };
+      r.gastado += Number(v.total) || 0; r.compras += 1; r[v.canal] += 1;
+      if (String(v.at || "") >= r.ultima) { r.ultima = String(v.at || ""); if (v.nombre) r.nombre = v.nombre; }
+      m.set(v.phone, r);
+    }
+    return [...m.values()].map((r) => { const c = cli.get(r.phone) || {}; return { ...r, nombre: c.nombre || r.nombre, sellos: c.sellos || 0, canjes: c.canjes || 0 }; })
+      .sort((a, b) => b.gastado - a.gastado || b.compras - a.compras);
+  }
+
   /* Celulares argentinos → 549 + 10 dígitos (igual que norm_phone en la base) */
   function normPhone(p) {
     let d = String(p || "").replace(/\D/g, "");
@@ -670,6 +683,12 @@
         orders: db.orders.filter((o) => o.phone === ph).slice(0, 10),
       };
     },
+    async leaderboard(desde) { // top de clientes por plata gastada: pedidos web entregados + comandas del local cobradas con celular
+      const db = dbLoad(), d = desde ? String(desde) : "";
+      const ventas = db.orders.filter((o) => o.status === "entregado" && o.phone && (!d || o.created_at >= d)).map((o) => ({ phone: o.phone, nombre: o.nombre, total: o.total, canal: "web", at: o.created_at }))
+        .concat((db.comandas || []).filter((c) => c.phone && c.pagado && c.estado !== "anulada" && (!d || c.created_at >= d)).map((c) => ({ phone: c.phone, nombre: c.nombre, total: c.total, canal: "local", at: c.created_at })));
+      return armarTop(ventas, db.customers);
+    },
     async listCustomers() { return dbLoad().customers.slice().sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || ""))).slice(0, 40); },
     async saveProduct(p) {
       const db = dbLoad(), i = db.products.findIndex((x) => x.id === p.id);
@@ -907,6 +926,15 @@
       ]);
       fail(c.error); fail(e.error); fail(o.error);
       return { phone: ph, customer: c.data, events: e.data, orders: o.data };
+    },
+    async leaderboard(desde) {
+      let o = sb.from("orders").select("phone,nombre,total,created_at").eq("status", "entregado").not("phone", "is", null).range(0, 4999);
+      let k = sb.from("comandas").select("phone,nombre,total,created_at").not("phone", "is", null).eq("pagado", true).neq("estado", "anulada").range(0, 4999);
+      if (desde) { o = o.gte("created_at", desde); k = k.gte("created_at", desde); }
+      const [ro, rk, rc] = await Promise.all([o, k, sb.from("customers").select("phone,nombre,sellos,canjes").range(0, 4999)]);
+      fail(ro.error); fail(rc.error); // sin la migración 065 las comandas no tienen celular: se cuenta solo la web
+      const ventas = ro.data.map((x) => ({ ...x, canal: "web", at: x.created_at })).concat(rk.error ? [] : rk.data.map((x) => ({ ...x, canal: "local", at: x.created_at })));
+      return armarTop(ventas, rc.data);
     },
     async listCustomers() { const { data, error } = await sb.from("customers").select("*").order("updated_at", { ascending: false }).limit(40); fail(error); return data; },
     async saveProduct(p) {
