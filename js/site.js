@@ -749,10 +749,10 @@
     $("#faqList").innerHTML = items.map((x) => `<details><summary>${esc(x.p)}</summary><div class="faq-a">${mdLinks(x.r)}</div></details>`).join("");
   }
 
-  function renderBand() {
-    const words = ["Probá un set distinto cada día", "Dirty lattes fríos", "Mochis rellenos", "Take away en Mar del Plata", "Elegí tu leche"];
-    if (S.club && clubOn()) words.splice(1, 0, "Cada pedido suma sellos del Setto Club");
-    $("#track").innerHTML = [...words, ...words].map((w) => `<span>${w}</span>`).join("");
+  /* debajo de la portada: tarjetas al Top del Club y a la maquinita (cada una solo si su sección está prendida) */
+  function renderDestacados() {
+    const sec = $("#destacados"); if (!sec) return;
+    sec.hidden = $("#dTop").hidden && $("#dMaq").hidden;
   }
   function renderApps() {
     $("#apps").innerHTML = '<span class="eyebrow" style="padding-inline:4px">Delivery por apps</span>' + (S.apps || []).map((a) => {
@@ -1005,7 +1005,7 @@
     const sec = $("#topclub"); if (!sec || !API.topClubPublico) return;
     let r; try { r = await API.topClubPublico(); } catch (_) { return; } // sin la migración 067: la sección queda oculta
     const l = (r && r.activo && r.top) || [];
-    if (l.length < 3 || (S.club || {}).activo === false) { sec.hidden = true; return; }
+    if (l.length < 3 || (S.club || {}).activo === false) { sec.hidden = true; $("#dTop").hidden = true; renderDestacados(); return; }
     const meta = r.meta || 8, mes = new Date().toLocaleDateString("es-AR", { month: "long" });
     $("#t-top").textContent = `Top de ${mes}`;
     $("#topList").innerHTML = l.map((x) => `<li class="topit${x.pos <= 3 ? " p" + x.pos : ""}">
@@ -1013,6 +1013,10 @@
       <span class="tname">${esc(x.nombre)}</span>${x.gastado_aprox ? `<span class="tgasto">$${Math.round(x.gastado_aprox / 1000).toLocaleString("es-AR")} mil</span>` : ""}
       <span class="tmeta">${x.compras} ${x.compras === 1 ? "compra" : "compras"} · ${x.sellos}/${meta} sellos</span></li>`).join("");
     sec.hidden = false;
+    $("#dTopTit").textContent = `Top de ${mes}`;
+    $("#dPodio").innerHTML = l.filter((x) => x.pos <= 3).sort((a, b) => [2, 1, 3].indexOf(a.pos) - [2, 1, 3].indexOf(b.pos)).map((x) => `<li class="dp${x.pos}">
+      ${x.pos === 1 ? '<img src="img/mochito-campeon.png" alt="" loading="lazy" decoding="async">' : ""}<span class="dn">${esc(x.nombre)}</span><span class="dpos" aria-label="Puesto ${x.pos}">${x.pos}</span></li>`).join("");
+    $("#dTop").hidden = false; renderDestacados();
   }
   function renderClubInfo() {
     const c = S.club || {};
@@ -1045,6 +1049,10 @@
     const sim = (S.maquinita || {}).simbolos || [];
     MQ_IMG = MAQ_BASE.map((d, i) => IMG((sim[i] && sim[i].img) || d, 128)); // Panel → Maquinita → símbolos
     sec.querySelectorAll(".mq-strip").forEach((st, i) => { st.innerHTML = `<img src="${esc(MQ_IMG[i])}" alt="">`; });
+    $("#dMaq").hidden = sec.hidden;
+    $("#dMaqTx").textContent = `${n === 1 ? "Una tirada gratis" : n + " tiradas gratis"} por día. Si juntás iguales, te llevás un premio.`;
+    $("#dReels").innerHTML = MQ_IMG.slice(0, 3).map((u) => `<span><img src="${esc(u)}" alt="" loading="lazy" decoding="async"></span>`).join("");
+    renderDestacados();
   }
   function abrirMaq() {
     const f = $("#mqFrame"); if (!f.getAttribute("src")) f.src = "maquinita.html?embed";
@@ -2030,7 +2038,7 @@
   let pintado = false;
   function pintar(settings, products) {
     S = settings; adapt(products); syncCart();
-    renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderBand(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); renderFooter(); renderBadge();
+    renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); renderFooter(); renderBadge();
     abrirProductoDelLink();
     if (pintado) return;
     pintado = true;
@@ -2064,7 +2072,6 @@
   function boot() {
     $("#demoBar").hidden = !API.DEMO;
     fetch("/", { method: "HEAD", cache: "no-store" }).then((r) => { const d = Date.parse(r.headers.get("date") || ""); if (d && Math.abs(d - Date.now()) > 3000) { SKEW = d - Date.now(); tickDrop(); } }).catch(() => {});
-    renderBand();
     const snap = API.DEMO ? null : leerSnap();
     if (snap) { STOCK = snap.stock || null; pintar(snap.settings, snap.products); }
     else loading(); // primera visita: la portada guarda su lugar (css .htrack:empty) hasta que llega la de la base

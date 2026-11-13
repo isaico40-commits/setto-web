@@ -91,10 +91,36 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;backgroun
 .stage .mito{width:26%;left:6%;top:6%;filter:none}
 @media (max-width:820px){.hero .wrap{grid-template-columns:1fr;padding-block:28px 40px;gap:28px}}
 
-/* banda coral */
-.band{background:var(--coral);overflow:hidden;border-block:var(--line)}
-.band .track{display:flex;gap:36px;padding-block:12px;white-space:nowrap;font-family:var(--display);font-size:1.2rem;color:var(--ink);width:max-content;animation:slide 32s linear infinite}
-.band .track span::after{content:"✦";margin-left:36px;color:var(--turquesa)}
+/* debajo de la portada: tarjetas al Top del Club y a la maquinita */
+.dest{padding-block:6px 30px}
+.dest-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+.dest-grid:has(> .dcard[hidden]){max-width:700px}
+.dcard{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:18px;background:var(--card);border:1.5px solid color-mix(in srgb,var(--turquesa) 22%,transparent);border-radius:20px;padding:18px 22px;min-width:0}
+.dcard h2{font-size:clamp(1.3rem,2.2vw,1.6rem);line-height:1.05;margin-top:4px;text-transform:none}
+.dcard p{margin-top:6px;font-size:.86rem;color:var(--ink-2);max-width:34ch}
+.dcard .btn{margin-top:12px;padding:7px 16px;font-size:.84rem;box-shadow:none;border-width:1.5px}
+.dbtns{display:flex;align-items:center;flex-wrap:wrap;gap:4px 16px}
+.dlink{margin-top:12px;font-size:.84rem;font-weight:600;color:var(--turquesa);text-underline-offset:3px}
+.dpodio{list-style:none;margin:0;padding:0;display:flex;align-items:flex-end;gap:6px}
+.dpodio li{display:flex;flex-direction:column;align-items:center;gap:4px;width:74px}
+.dpodio img{width:46px;height:auto;margin-bottom:-2px}
+.dn{font-size:.76rem;font-weight:700;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dpos{display:grid;place-items:center;width:100%;border-radius:10px 10px 3px 3px;background:color-mix(in srgb,var(--turquesa) 12%,transparent);color:var(--turquesa);font-family:var(--display);font-size:1.15rem;line-height:1}
+.dp1 .dpos{height:52px;background:var(--coral-2);color:var(--ink);font-size:1.4rem}
+.dp2 .dpos{height:38px}.dp3 .dpos{height:28px}
+.dreels{display:flex;gap:6px;background:var(--bg-2);border-radius:14px;padding:7px}
+.dreels span{width:52px;height:58px;border-radius:9px;background:var(--card);display:grid;place-items:center;overflow:hidden}
+.dreels img{width:42px;height:42px;object-fit:contain}
+@media (max-width:640px){
+  .dest{padding-block:2px 18px}.dest-grid{gap:12px}
+  .dcard{padding:16px;gap:10px}
+  .dcard h2{font-size:1.35rem}
+  .dcard p{display:none}
+  .dlink{margin-top:12px;font-size:.8rem}
+  .dpodio{gap:4px}.dpodio li{width:50px}.dpodio img{width:32px}.dn{font-size:.68rem}
+  .dp1 .dpos{height:44px}.dp2 .dpos{height:32px}.dp3 .dpos{height:24px}
+  .dreels{gap:4px;padding:6px;border-radius:12px}.dreels span{width:40px;height:48px;border-radius:8px}.dreels img{width:32px;height:32px}
+}
 @keyframes slide{to{transform:translateX(-50%)}}
 
 /* secciones */
@@ -783,8 +809,6 @@ div.f#fHora{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .deco-pk{bottom:14px;right:16px;width:clamp(48px,6vw,78px)}
 @keyframes batfly{0%,100%{transform:translate(0,0) rotate(-4deg)}50%{transform:translate(-14px,10px) rotate(6deg)}}
 @media (prefers-reduced-motion:reduce){.deco-bat{animation:none}}
-.t-halloween .band{background:#e8742a;border-color:#2b2035}
-.t-halloween .band span{color:#2b2035}
 .t-halloween #especial{background:#2b2035;color:#ffe9d6}
 .t-halloween #especial .head p{color:#ffe9d6}
 .t-halloween #especial h2{color:#e8742a}
