@@ -1,6 +1,7 @@
 -- 067 · Top del mes del Setto Club, visible en la web.
---   - top_club_publico(): lo puede llamar cualquiera (anon). Devuelve SOLO nombre corto ("Lucía M."), compras y sellos.
---     Nunca celular, apellido entero ni montos. El orden es por lo gastado en el mes, pero la plata no sale de la base.
+--   - top_club_publico(): lo puede llamar cualquiera (anon). Devuelve nombre corto ("Lucía M."), compras y sellos.
+--     Al podio (puestos 1 a 3) le suma lo gastado en el mes REDONDEADO a miles (gastado_aprox), decisión de Isa 2026-11-13.
+--     Nunca celular, apellido entero ni montos exactos.
 --   - Cuenta pedidos web entregados + comandas del local cobradas con celular (necesita la 065), desde el 1 del mes (hora AR).
 --   - Se prende/apaga con settings.top_club {"activo": bool, "cuantos": 3..10}. Apagado por defecto.
 --   - customers.top_oculto: el equipo puede sacar a alguien del Top público (si lo pide o no quiere aparecer).
@@ -36,12 +37,13 @@ begin
   ), suma as (
     select phone, sum(total) as gastado, count(*) as compras from ventas group by phone
   ), rank as (
-    select public.top_club_nombre(c.nombre) as nombre, s.compras, c.sellos,
+    select public.top_club_nombre(c.nombre) as nombre, s.compras, c.sellos, s.gastado,
            row_number() over (order by s.gastado desc, s.compras desc, c.created_at) as pos
     from suma s join customers c on c.phone = s.phone
     where not c.top_oculto and public.top_club_nombre(c.nombre) is not null
   )
-  select coalesce(jsonb_agg(jsonb_build_object('pos', pos, 'nombre', nombre, 'compras', compras, 'sellos', sellos) order by pos), '[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object('pos', pos, 'nombre', nombre, 'compras', compras, 'sellos', sellos,
+             'gastado_aprox', case when pos <= 3 then round(gastado / 1000.0)::int * 1000 end) order by pos), '[]'::jsonb)
     into v_top from rank where pos <= v_n;
   return jsonb_build_object('activo', true, 'meta', v_meta, 'top', v_top);
 end $$;

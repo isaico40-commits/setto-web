@@ -1004,8 +1004,8 @@
     const meta = r.meta || 8, mes = new Date().toLocaleDateString("es-AR", { month: "long" });
     $("#t-top").textContent = `Top de ${mes}`;
     $("#topList").innerHTML = l.map((x) => `<li class="topit${x.pos <= 3 ? " p" + x.pos : ""}">
-      <span class="tpos" aria-label="Puesto ${x.pos}">${x.pos}</span>${x.pos === 1 ? '<img class="tmochi" src="img/mochito-run.png" alt="" loading="lazy" decoding="async">' : ""}
-      <span class="tname">${esc(x.nombre)}</span>
+      ${x.pos === 1 ? '<img class="tmochi" src="img/mochito-campeon.png" alt="" loading="lazy" decoding="async">' : ""}<span class="tpos" aria-label="Puesto ${x.pos}">${x.pos}</span>
+      <span class="tname">${esc(x.nombre)}</span>${x.gastado_aprox ? `<span class="tgasto">$${Math.round(x.gastado_aprox / 1000).toLocaleString("es-AR")} mil</span>` : ""}
       <span class="tmeta">${x.compras} ${x.compras === 1 ? "compra" : "compras"} · ${x.sellos}/${meta} sellos</span></li>`).join("");
     sec.hidden = false;
   }

@@ -649,9 +649,9 @@
         <label class="topshow"><input type="checkbox" id="topShow" ${P.topShow ? "checked" : ""}> Vista para mostrar</label></div></div>
         <div class="pcard topweb"><div class="topwebrow"><label class="topshow"><input type="checkbox" id="topWeb" ${(P.settings.top_club || {}).activo ? "checked" : ""}> Mostrar el Top del mes en la web</label>
           <label class="topshow">Puestos <select class="inp" id="topCuantos" style="width:auto">${[3, 5, 10].map((n) => `<option ${((P.settings.top_club || {}).cuantos || 5) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>
-          <span class="hintp">En la web sale solo el nombre y la inicial del apellido, las compras y los sellos del mes. Nunca la plata ni el celular. Los clientes sin nombre no aparecen. Si alguien no quiere salir, abrí su ficha y tocá "Sacar del Top de la web".</span></div>
+          <span class="hintp">En la web sale el nombre y la inicial del apellido, las compras y los sellos del mes. Al podio se le suma lo gastado redondeado (ej. "$171 mil"). Nunca el celular. Los clientes sin nombre no aparecen. Si alguien no quiere salir, abrí su ficha y tocá "Sacar del Top de la web".</span></div>
         <div id="topBox"><p class="muted">Cargando…</p></div>
-        <p class="hintp" style="margin-top:10px">Suma los pedidos web entregados y las compras del local cobradas con celular. Lo cargado a mano en la Caja sin celular no entra. "Vista para mostrar" esconde celulares y montos (en la web sale solo el Top del mes).</p></section>
+        <p class="hintp" style="margin-top:10px">Suma los pedidos web entregados y las compras del local cobradas con celular. Lo cargado a mano en la Caja sin celular no entra. "Vista para mostrar" esconde celulares y redondea la plata del podio, como en la web (que muestra solo el Top del mes).</p></section>
       <section class="sec"><h2>Últimos clientes</h2><div class="clist" id="cList"><p class="muted">Cargando…</p></div></section>`;
     $("#cSearch").addEventListener("submit", (e) => { e.preventDefault(); openClient($("#csPhone").value); });
     $("#cManual").addEventListener("submit", async (e) => {
@@ -690,6 +690,7 @@
   const topDesde = (k) => { const d = new Date(); if (k === "mes") return new Date(d.getFullYear(), d.getMonth(), 1).toISOString(); if (k === "90") return new Date(d.getTime() - 90 * 864e5).toISOString(); return null; };
   // "Lucía Martínez" → "Lucía M.": en la vista para mostrar nunca va el apellido entero ni el celular
   const nombreCorto = (n) => { const p = String(n || "").trim().split(/\s+/).filter(Boolean); if (!p.length) return "Cliente Setto"; const a = p[0][0].toUpperCase() + p[0].slice(1).toLowerCase(); return p[1] ? `${a} ${p[1][0].toUpperCase()}.` : a; };
+  const milTxt = (n) => `$${Math.round((Number(n) || 0) / 1000).toLocaleString("es-AR")} mil`; // como sale en la web (solo el podio)
   async function renderTop() {
     const box = $("#topBox"); if (!box) return;
     const per = P.topPer || "mes", show = !!P.topShow, meta = (P.settings.club || {}).meta || 8;
@@ -702,9 +703,9 @@
     const det = (r) => show ? comp(r) : `${comp(r)}${r.web && r.local ? ` · ${r.web} web, ${r.local} local` : r.local ? " · local" : " · web"}`;
     const tag = show ? "div" : "button", attrs = (r) => show ? "" : `type="button" data-top-client="${esc(r.phone)}"`;
     const podio = l.slice(0, 3).map((r, i) => `<${tag} class="topcard p${i + 1}" ${attrs(r)}>
-        <span class="toprank">${i + 1}</span>${i === 0 ? '<img class="topmochi" src="img/mochito-run.png" alt="">' : ""}
+        ${i === 0 ? '<img class="topmochi" src="img/mochito-campeon.png" alt="">' : ""}<span class="toprank">${i + 1}</span>
         <b class="topname">${nom(r)}</b>
-        ${show ? "" : `<span class="topmoney num">${money(r.gastado)}</span>`}
+        <span class="topmoney num">${show ? milTxt(r.gastado) : money(r.gastado)}</span>
         <span class="topdet">${det(r)}</span><span class="topsel">${r.sellos}/${meta} sellos</span>${r.top_oculto ? '<span class="topoc">No sale en la web</span>' : ""}</${tag}>`).join("");
     const resto = l.slice(3, P.topMas ? 25 : 10);
     const lista = resto.map((r, i) => `<${tag} class="citem toprow" ${attrs(r)}>

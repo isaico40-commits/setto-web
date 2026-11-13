@@ -446,7 +446,7 @@ button.topcard:hover{border-color:var(--turquesa)}
 .topcard.p1{background:var(--bg-2);border:2px solid var(--turquesa);box-shadow:var(--sombra-chica);padding-top:22px}
 .toprank{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--turquesa);color:#fff;font-family:var(--display);font-size:1.15rem;line-height:1}
 .p1 .toprank{width:42px;height:42px;font-size:1.45rem;background:var(--coral);color:var(--ink)}
-.topmochi{position:absolute;top:-16px;right:10px;width:44px;height:auto;transform:rotate(8deg)}
+.topmochi{width:72px;height:auto;margin:-6px 0 2px}
 .topname{font-family:var(--display);font-weight:400;font-size:1.15rem;line-height:1.1;overflow-wrap:anywhere}
 .p1 .topname{font-size:1.4rem}
 .topmoney{font-weight:700;color:var(--turquesa);font-size:1.05rem}

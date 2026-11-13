@@ -692,7 +692,7 @@
       const d = new Date(); const desde = new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
       const n = Math.max(3, Math.min(10, cfg.cuantos || 5)), oc = new Set(db.customers.filter((c) => c.top_oculto).map((c) => c.phone));
       const l = (await this.leaderboard(desde)).filter((r) => !oc.has(r.phone) && nombreCorto(r.nombre)).slice(0, n);
-      return { activo: true, meta: (db.settings.club || {}).meta || 8, top: l.map((r, i) => ({ pos: i + 1, nombre: nombreCorto(r.nombre), compras: r.compras, sellos: r.sellos })) };
+      return { activo: true, meta: (db.settings.club || {}).meta || 8, top: l.map((r, i) => ({ pos: i + 1, nombre: nombreCorto(r.nombre), compras: r.compras, sellos: r.sellos, gastado_aprox: i < 3 ? Math.round(r.gastado / 1000) * 1000 : null })) };
     },
     async topOcultar(phone, oculto) { const db = dbLoad(), c = db.customers.find((x) => x.phone === normPhone(phone)); if (!c) throw new Error("No encontré ese cliente"); c.top_oculto = !!oculto; dbSave(db); return { top_oculto: !!oculto }; },
     async leaderboard(desde) { // top de clientes por plata gastada: pedidos web entregados + comandas del local cobradas con celular
