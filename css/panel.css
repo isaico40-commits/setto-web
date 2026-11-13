@@ -430,3 +430,42 @@ a.ptab{text-decoration:none}
 .espsw{display:flex!important;align-items:center;gap:8px;font-weight:700;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--turquesa) 8%,transparent)}
 .espsw input{width:20px;height:20px;accent-color:var(--turquesa)}
 .pctrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;font-size:.85rem}.pctrow input{width:64px;padding:6px 8px;border:1px solid var(--line,#ddd);border-radius:8px;font:inherit}
+
+/* Club · Top clientes */
+.tophead{display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;margin-bottom:14px}
+.tophead h2{margin:0}
+.topctl{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}
+.topctl .chips{display:flex;flex-wrap:wrap;gap:6px}
+.topctl .chips button{border:1.5px solid var(--turquesa);background:var(--card);border-radius:999px;padding:6px 12px;font-size:.82rem;font-weight:600;color:var(--turquesa)}
+.topctl .chips button[aria-pressed="true"]{background:var(--turquesa);color:#fff}
+.topshow{display:flex;align-items:center;gap:6px;font-size:.84rem;font-weight:600;color:var(--ink-2)}
+.toppodio{padding-top:16px;display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:12px;align-items:end}
+.toppodio .p1{order:2}.toppodio .p2{order:1}.toppodio .p3{order:3}
+.topcard{position:relative;display:grid;justify-items:center;gap:4px;text-align:center;background:var(--card);border:1.5px solid color-mix(in srgb,var(--turquesa) 30%,transparent);border-radius:20px;padding:18px 10px 14px;min-width:0;width:100%}
+button.topcard:hover{border-color:var(--turquesa)}
+.topcard.p1{background:var(--bg-2);border:2px solid var(--turquesa);box-shadow:var(--sombra-chica);padding-top:22px}
+.toprank{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--turquesa);color:#fff;font-family:var(--display);font-size:1.15rem;line-height:1}
+.p1 .toprank{width:42px;height:42px;font-size:1.45rem;background:var(--coral);color:var(--ink)}
+.topmochi{width:72px;height:auto;margin:-6px 0 2px}
+.topname{font-family:var(--display);font-weight:400;font-size:1.15rem;line-height:1.1;overflow-wrap:anywhere}
+.p1 .topname{font-size:1.4rem}
+.topmoney{font-weight:700;color:var(--turquesa);font-size:1.05rem}
+.p1 .topmoney{font-size:1.25rem}
+.topdet{font-size:.76rem;color:var(--ink-2)}
+.topsel{font-size:.72rem;font-weight:700;color:var(--turquesa);background:color-mix(in srgb,var(--turquesa) 10%,transparent);border-radius:999px;padding:2px 9px}
+.toprow{justify-content:flex-start}
+.toprow>.num:last-child{margin-left:auto;white-space:nowrap}
+.toprk{display:grid;place-items:center;flex:none;width:28px;height:28px;border-radius:50%;background:color-mix(in srgb,var(--turquesa) 12%,transparent);color:var(--turquesa);font-weight:700;font-size:.85rem}
+.topmid{min-width:0}
+div.citem.toprow:hover{border-color:color-mix(in srgb,var(--turquesa) 25%,transparent)}
+@media (max-width:560px){
+  .toppodio{grid-template-columns:1fr 1fr;gap:10px}
+  .toppodio .p1{order:0;grid-column:1/-1}
+  .toppodio .p2{order:1}.toppodio .p3{order:2}
+  .topmid .muted{display:block;font-size:.76rem}
+}
+.topweb{margin-bottom:14px;gap:8px}
+.topwebrow{display:flex;align-items:center;gap:10px 18px;flex-wrap:wrap}
+.topoc{font-size:.7rem;font-weight:700;color:#9b2c2c;background:color-mix(in srgb,var(--coral) 30%,transparent);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.pcard.topweb label.topshow{display:flex;align-items:center;gap:8px;font-size:.84rem}
+.pcard.topweb label.topshow input[type=checkbox]{width:auto}

@@ -995,6 +995,20 @@
     $("#gchBuy").dataset.gcpick = ds[0];
     $("#gchCards").innerHTML = ds.slice(0, 3).map((k, i) => gcardHtml(k, 0, "button", `data-gcpick="${k}" style="--i:${i}" aria-label="Gift card ${esc(gnombre(k))}"`)).join("");
   }
+  /* Top del mes del Club: la base solo devuelve nombre corto, compras y sellos (nunca plata ni celular) */
+  async function renderTopClub() {
+    const sec = $("#topclub"); if (!sec || !API.topClubPublico) return;
+    let r; try { r = await API.topClubPublico(); } catch (_) { return; } // sin la migración 067: la sección queda oculta
+    const l = (r && r.activo && r.top) || [];
+    if (l.length < 3 || (S.club || {}).activo === false) { sec.hidden = true; return; }
+    const meta = r.meta || 8, mes = new Date().toLocaleDateString("es-AR", { month: "long" });
+    $("#t-top").textContent = `Top de ${mes}`;
+    $("#topList").innerHTML = l.map((x) => `<li class="topit${x.pos <= 3 ? " p" + x.pos : ""}">
+      ${x.pos === 1 ? '<img class="tmochi" src="img/mochito-campeon.png" alt="" loading="lazy" decoding="async">' : ""}<span class="tpos" aria-label="Puesto ${x.pos}">${x.pos}</span>
+      <span class="tname">${esc(x.nombre)}</span>${x.gastado_aprox ? `<span class="tgasto">$${Math.round(x.gastado_aprox / 1000).toLocaleString("es-AR")} mil</span>` : ""}
+      <span class="tmeta">${x.compras} ${x.compras === 1 ? "compra" : "compras"} · ${x.sellos}/${meta} sellos</span></li>`).join("");
+    sec.hidden = false;
+  }
   function renderClubInfo() {
     const c = S.club || {};
     $("#club").hidden = c.activo === false;
@@ -2014,7 +2028,7 @@
     abrirProductoDelLink();
     if (pintado) return;
     pintado = true;
-    verSeguimiento(); renderResenas(); renderVotar(); if (window.__regalo) abrirRegalo(window.__regalo);
+    verSeguimiento(); renderResenas(); renderVotar(); renderTopClub(); if (window.__regalo) abrirRegalo(window.__regalo);
     if (maqAlCargar && maqOn()) { maqAlCargar = false; abrirMaq(); }
     if (form.tel) $("#cardPhone").value = form.tel;
     let vc = null; try { vc = sessionStorage.getItem("setto-vercard"); sessionStorage.removeItem("setto-vercard"); } catch (_) {}
