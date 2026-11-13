@@ -358,7 +358,9 @@
   /* ---------- Ubicación (Panel → Ajustes → Ubicación) ---------- */
   function renderUbicacion() {
     const u = S.ubicacion || {}, sec = $("#ubicacion"); if (!sec) return;
-    const q = (u.mapa || "").trim(); sec.hidden = !(u.activo && q); if (sec.hidden) return;
+    const q = (u.mapa || "").trim(); sec.hidden = !(u.activo && q);
+    document.querySelectorAll("[data-navubi]").forEach((a) => (a.hidden = sec.hidden)); // link del menú: solo si la sección se ve
+    if (sec.hidden) return;
     $("#t-ubi").textContent = u.titulo || "Dónde estamos";
     $("#ubiTexto").textContent = u.texto || ""; $("#ubiTexto").hidden = !u.texto;
     const href = mapsUrl(q), map = $("#ubiMap"), link = $("#ubiMapLink"), cap = (u.captura || "").trim();
@@ -1020,6 +1022,7 @@
   let MQ_IMG = MAQ_BASE;
   function renderMaquinita() {
     const sec = $("#maquinita"); if (!sec) return; sec.hidden = !maqOn();
+    document.querySelectorAll("[data-navmaq]").forEach((a) => (a.hidden = sec.hidden)); // link del menú: solo con la maquinita prendida
     const n = Math.max(1, Math.min(5, Math.round(+(S.maquinita || {}).fichas_dia || 1)));
     $("#mqTiradas").textContent = `${n === 1 ? "Una tirada gratis" : n + " tiradas gratis"} por día`;
     const fc = Math.max(0, Math.min(50, Math.round((S.maquinita || {}).fichas_compra ?? 5)));

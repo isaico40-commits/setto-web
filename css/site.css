@@ -45,6 +45,14 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;backgroun
 .top .wrap>nav{display:flex;gap:26px;margin-inline:auto;font-weight:500;font-size:.92rem}
 .top .wrap>nav a{text-decoration:none;padding-block:4px;border-bottom:2px solid transparent}
 .top .wrap>nav a:hover{border-color:var(--coral)}
+.top .wrap>nav a small{font-size:.66rem;font-weight:700;letter-spacing:.03em;background:var(--coral);border-radius:999px;padding:2px 8px;margin-left:4px;vertical-align:1px;color:var(--ink)}
+.top .wrap>nav a{white-space:nowrap}
+.top .logo,.top .wacta,.top .cartbtn,.top .wacta svg{flex-shrink:0}
+.top .wrap>nav{gap:16px;font-size:.88rem}
+/* WhatsApp solo con el ícono cuando los links no entran: compu chica, o con la Edición especial prendida (8 links) */
+.top .wrap:has(>nav a[href$="#especial"]:not([hidden])) .wacta{width:42px;height:42px;padding:0;border-radius:50%;justify-content:center}
+.top .wrap:has(>nav a[href$="#especial"]:not([hidden])) .wacta span,.top .wrap>nav:has(a[href$="#especial"]:not([hidden])) a small{display:none}
+@media (max-width:1180px){.top .wrap>nav{gap:13px;font-size:.84rem}.top .wrap>nav a small{display:none}.top .wacta{width:42px;height:42px;padding:0;border-radius:50%;justify-content:center}.top .wacta span{display:none}}
 @media (max-width:760px){.top .wrap>nav{display:none}.top .cartbtn{margin-left:auto}}
 
 /* botones (estilo sticker) */
@@ -462,7 +470,9 @@ div.f#fHora{display:grid;gap:6px;font-size:.85rem;font-weight:600}
 .mnav-foot{display:grid;gap:4px;margin-top:12px;font-size:.85rem;color:var(--ink-2)}
 .mnav-foot b{color:var(--ink);font-weight:600}
 @media (max-width:760px){.burger{display:inline-flex}.top .wrap{gap:10px}.top .cartbtn{padding:9px 14px}}
-@media (min-width:761px){.mnav{display:none!important}}
+@media (min-width:1081px){.mnav{display:none!important}}
+/* entre celu y compu chica (tablet) los links no entran: va el menú hamburguesa */
+@media (min-width:761px) and (max-width:1080px){.top .wrap>nav{display:none}.burger{display:inline-flex}.top .wrap{gap:12px}}
 /* Club visible en todo el recorrido */
 .clubpill{display:flex;align-items:center;gap:10px;margin-top:12px;width:fit-content;max-width:100%;text-decoration:none;color:var(--ink);background:var(--card);border:1.5px dashed var(--turquesa);border-radius:999px;padding:5px 14px 5px 6px;font-size:.84rem}
 .clubpill img{width:30px;height:30px;object-fit:contain;flex:none}
