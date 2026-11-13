@@ -45,14 +45,17 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;backgroun
 .top .wrap>nav{display:flex;gap:26px;margin-inline:auto;font-weight:500;font-size:.92rem}
 .top .wrap>nav a{text-decoration:none;padding-block:4px;border-bottom:2px solid transparent}
 .top .wrap>nav a:hover{border-color:var(--coral)}
-.top .wrap>nav a small{font-size:.66rem;font-weight:700;letter-spacing:.03em;background:var(--coral);border-radius:999px;padding:2px 8px;margin-left:4px;vertical-align:1px;color:var(--ink)}
+/* etiquetas del menú (Tirada gratis, Sumá sellos): en compu no ocupan lugar, aparecen como globito al pasar el mouse */
+.top .wrap>nav a{position:relative}
+.top .wrap>nav a small{position:absolute;top:calc(100% + 8px);left:50%;transform:translate(-50%,-4px);font-size:.7rem;font-weight:700;letter-spacing:.03em;white-space:nowrap;background:var(--coral);border-radius:999px;padding:4px 10px;color:var(--ink);box-shadow:var(--sombra-chica);opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;z-index:5}
+.top .wrap>nav a:hover small,.top .wrap>nav a:focus-visible small{opacity:1;transform:translate(-50%,0)}
 .top .wrap>nav a{white-space:nowrap}
 .top .logo,.top .wacta,.top .cartbtn,.top .wacta svg{flex-shrink:0}
 .top .wrap>nav{gap:16px;font-size:.88rem}
 /* WhatsApp solo con el ícono cuando los links no entran: compu chica, o con la Edición especial prendida (8 links) */
 .top .wrap:has(>nav a[href$="#especial"]:not([hidden])) .wacta{width:42px;height:42px;padding:0;border-radius:50%;justify-content:center}
-.top .wrap:has(>nav a[href$="#especial"]:not([hidden])) .wacta span,.top .wrap>nav:has(a[href$="#especial"]:not([hidden])) a small{display:none}
-@media (max-width:1180px){.top .wrap>nav{gap:13px;font-size:.84rem}.top .wrap>nav a small{display:none}.top .wacta{width:42px;height:42px;padding:0;border-radius:50%;justify-content:center}.top .wacta span{display:none}}
+.top .wrap:has(>nav a[href$="#especial"]:not([hidden])) .wacta span{display:none}
+@media (max-width:1180px){.top .wrap>nav{gap:13px;font-size:.84rem}.top .wacta{width:42px;height:42px;padding:0;border-radius:50%;justify-content:center}.top .wacta span{display:none}}
 @media (max-width:760px){.top .wrap>nav{display:none}.top .cartbtn{margin-left:auto}}
 
 /* botones (estilo sticker) */
