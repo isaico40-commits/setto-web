@@ -126,27 +126,8 @@
     </div>
   </section>
 
-  <section class="dest" id="destacados" aria-label="Top del Club y maquinita" hidden>
-    <div class="wrap dest-grid">
-      <article class="dcard dtop" id="dTop" hidden>
-        <div class="dtx">
-          <span class="eyebrow">Setto Club</span>
-          <h2 id="dTopTit">Top del mes</h2>
-          <p>Los que más se dieron el gusto este mes.</p>
-          <a class="btn" href="#topclub">Ver el podio</a>
-        </div>
-        <ol class="dpodio" id="dPodio" aria-label="Primeros tres del mes"></ol>
-      </article>
-      <article class="dcard dmaq" id="dMaq" hidden>
-        <div class="dtx">
-          <span class="eyebrow">Probá suerte</span>
-          <h2>Setto Luckyslot</h2>
-          <p id="dMaqTx">Una tirada gratis por día. Si juntás iguales, te llevás un premio.</p>
-          <div class="dbtns"><a class="btn" href="/?maquinita" data-maq>Tirar gratis</a><a class="dlink" href="#maquinita">Cómo funciona</a></div>
-        </div>
-        <div class="dreels" id="dReels" aria-hidden="true"></div>
-      </article>
-    </div>
+  <section class="valor" id="valor" aria-label="Lo que suma pedir por la web" hidden>
+    <div class="wrap"><a class="valor-in" href="#club"><b>Pedir acá suma</b><span class="valor-list" id="valorList"></span><span class="valor-mas">Ver beneficios <span aria-hidden="true">→</span></span></a></div>
   </section>
 
   <section class="blk" id="especial" aria-labelledby="t-esp">
@@ -172,7 +153,6 @@
       <p class="setsnote">Bebida + mochi, más barato que por separado.</p>
     </div>
   </section>
-
 
   <section class="blk votar" id="votar" aria-labelledby="t-vot" hidden>
     <div class="wrap">
@@ -214,33 +194,41 @@
     </div>
   </section>
 
-  <section class="blk maqsec" id="maquinita" aria-labelledby="t-maq" hidden>
-    <div class="wrap club">
-      <div>
-        <span class="eyebrow">Probá suerte</span>
-        <h2 id="t-maq">Setto Luckyslot</h2>
-        <p class="muted" style="margin-top:12px;max-width:46ch">Tirá gratis y mirá qué sale. Si juntás iguales, te llevás un premio.</p>
-        <div class="next">
-          <div><span class="k">1</span><span><b>Juntá 4 o 5 iguales</b><small>Mirá los premios en la maquinita.</small></span></div>
-          <div><span class="k">2</span><span><b id="mqTiradas">Una tirada gratis por día</b><small>No apostás nada.</small></span></div>
-          <div><span class="k">3</span><span><b id="mqCompra">Cada compra suma 5 fichas</b><small>Se cargan cuando recibís tu pedido.</small></span></div>
-        </div>
-      </div>
-      <div class="maqcard" id="mqCard">
-        <div class="sl-cab">
-          <span class="sl-tope" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1 6.1 20.3l1.3-6.5L2.5 9.3l6.6-.8z" fill="#F2C14E" stroke="#1F5452" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
-          <div class="sl-top"><span>Setto</span><b>Luckyslot</b></div>
-          <div class="mq-ventana" aria-hidden="true">
-            <span class="mq-reel"><span class="mq-strip"><img src="img/sm/mochito-cup.webp" alt="" loading="lazy" decoding="async"></span></span>
-            <span class="mq-reel"><span class="mq-strip"><img src="img/sm/mochi-frutilla.webp" alt="" loading="lazy" decoding="async"></span></span>
-            <span class="mq-reel"><span class="mq-strip"><img src="img/dirty-caramel.webp" alt="" loading="lazy" decoding="async"></span></span>
+  <section class="blk alt" id="resenas" aria-labelledby="t-res" hidden>
+    <div class="wrap">
+      <div class="head"><span class="eyebrow" id="resProm"></span><h2 id="t-res">Lo que dicen</h2><p>De personas que ya recibieron su pedido.</p></div>
+      <div class="rail" id="resGrid" style="--cols:3;--w:82%"></div>
+      <div style="text-align:center;margin-top:18px"><button class="btn" id="verResenas">Ver todas las reseñas</button></div>
+    </div>
+  </section>
+  <section class="blk benefsec" id="club" aria-labelledby="t-club">
+    <div class="wrap">
+      <div class="head"><span class="eyebrow">Setto Club</span><h2 id="t-club">Pedir acá suma</h2><p id="clubIntro">Cada pedido por la web te da más que el producto.</p></div>
+      <div class="benef" id="benef">
+        <article class="bcard bclub">
+          <div class="bhd"><span class="eyebrow">Tarjeta de sellos</span><h3 id="clubTit">1 sello por pedido</h3><p id="clubPremio">El pedido que completa la tarjeta viene con premio.</p></div>
+          <div class="stampcard">
+            <form class="cardq" id="cardForm" novalidate>
+              <label class="f" for="cardPhone">Tu celular<input id="cardPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 347-1277"></label>
+              <button class="btn solid" type="submit">Ver mis sellos</button>
+            </form>
+            <div class="stamps" id="stamps"></div>
+            <p class="muted" id="cardMsg">Con el celular de tus pedidos.</p>
           </div>
-          <a class="mq-tirar" id="mqTirar" href="/?maquinita" data-maq>Tirar</a>
-          <span class="sl-ranura" aria-hidden="true"></span>
-        </div>
-        <button class="sl-palanca" type="button" data-maq aria-label="Bajar la palanca y tirar"><span class="sl-brazo"><span class="sl-bola"></span></span><span class="sl-eje"></span></button>
-        <span class="sl-pie" aria-hidden="true"></span>
+        </article>
+        <article class="bcard dmaq" id="dMaq" hidden>
+          <div class="bhd"><span class="eyebrow">Tirada gratis</span><h3>Setto Luckyslot</h3><p id="dMaqTx">Una tirada gratis por día. Si juntás iguales, te llevás un premio.</p></div>
+          <div class="dreels" id="dReels" aria-hidden="true"></div>
+          <p class="bnota" id="mqCompra">Cada compra suma 5 fichas.</p>
+          <div class="dbtns"><a class="btn solid" href="/?maquinita" data-maq>Tirar gratis</a></div>
+        </article>
+        <article class="bcard dtop" id="dTop" hidden>
+          <div class="bhd"><span class="eyebrow">Ranking del mes</span><h3 id="dTopTit">Top del mes</h3><p>Los que más se dieron el gusto este mes.</p></div>
+          <ol class="dpodio" id="dPodio" aria-label="Primeros tres del mes"></ol>
+          <div class="dbtns"><button class="btn" type="button" data-topopen>Ver el podio</button></div>
+        </article>
       </div>
+      <p class="benef-extra" id="clubBenef" hidden><span>Y con cada pedido, además:</span><span class="cx-list" id="clubBenefList"></span></p>
     </div>
   </section>
 
@@ -268,14 +256,6 @@
     </div>
   </section>
 
-  <section class="blk alt" id="resenas" aria-labelledby="t-res" hidden>
-    <div class="wrap">
-      <div class="head"><span class="eyebrow" id="resProm"></span><h2 id="t-res">Lo que dicen</h2><p>De personas que ya recibieron su pedido.</p></div>
-      <div class="rail" id="resGrid" style="--cols:3;--w:82%"></div>
-      <div style="text-align:center;margin-top:18px"><button class="btn" id="verResenas">Ver todas las reseñas</button></div>
-    </div>
-  </section>
-
   <section class="blk giftsec" id="regalo" aria-labelledby="t-gift" hidden>
     <div class="wrap">
       <a class="back volver" href="/">← Volver al inicio</a>
@@ -285,41 +265,6 @@
     </div>
   </section>
 
-  <section class="blk" id="club" aria-labelledby="t-club">
-    <div class="wrap">
-      <div class="head"><span class="eyebrow">Tarjeta de sellos</span><h2 id="t-club">Setto Club</h2><p id="clubIntro">Cada pedido desde la web suma un sello.</p></div>
-      <div class="club">
-      <div>
-        <div class="next clubsteps">
-          <div><span class="k">1</span><span><b>Pedí desde la web</b><span class="cextras" id="clubBenef" hidden><small>Y además te llevás:</small><span class="cx-list" id="clubBenefList"></span></span></span></div>
-          <div><span class="k">2</span><span><b>Recibilo y sumás el sello</b></span></div>
-          <div><span class="k">3</span><span><b>Completá la tarjeta</b><small id="clubPremio">El pedido que la completa viene con premio.</small></span></div>
-        </div>
-      </div>
-      <div class="stampcard">
-        <div class="row1"><img src="img/logo.svg" alt="Setto" loading="lazy" decoding="async"><span class="eyebrow">Club</span></div>
-        <form class="cardq" id="cardForm" novalidate>
-          <label class="f" for="cardPhone">Tu celular<input id="cardPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="223 347-1277"></label>
-          <button class="btn solid" type="submit">Ver mis sellos</button>
-        </form>
-        <div class="stamps" id="stamps"></div>
-        <p class="muted" id="cardMsg" style="font-size:.84rem;margin-top:14px">Con el celular de tus pedidos.</p>
-        <a class="maq-link" href="/?maquinita" data-maq>🎰 Tirada gratis de hoy <span aria-hidden="true">→</span></a>
-      </div>
-      </div>
-    </div>
-  </section>
-  <section class="blk alt topclub" id="topclub" aria-labelledby="t-top" hidden>
-    <div class="wrap">
-      <div class="tophd">
-        <span class="eyebrow">Setto Club</span>
-        <h2 id="t-top">Top del mes</h2>
-        <p class="muted" id="topIntro">Los que más se dieron el gusto este mes. El ranking arranca de cero el 1 de cada mes.</p>
-      </div>
-      <ol class="toplist" id="topList"></ol>
-      <p class="muted topnota">Suman las compras en la web y en el local con tu celular. ¿No querés aparecer? Escribinos y te sacamos.</p>
-    </div>
-  </section>
   <section class="blk gchome" id="giftcards" aria-labelledby="t-gch" hidden>
     <div class="wrap club">
       <div>
@@ -433,6 +378,19 @@
   </section>
 </main>
 
+<div class="allrev toppop" id="topPop" role="dialog" aria-modal="true" aria-labelledby="t-top" hidden>
+  <div class="ar-in tp-in">
+    <div class="ar-h"><span class="eyebrow">Setto Club</span><button class="x" data-topclose aria-label="Cerrar">✕</button></div>
+    <div class="topclub" id="topclub" hidden>
+      <div class="tophd">
+        <h2 id="t-top">Top del mes</h2>
+        <p class="muted" id="topIntro">Los que más se dieron el gusto este mes. El ranking arranca de cero el 1 de cada mes.</p>
+      </div>
+      <ol class="toplist" id="topList"></ol>
+      <p class="muted topnota">Suman las compras en la web y en el local con tu celular. ¿No querés aparecer? Escribinos y te sacamos.</p>
+    </div>
+  </div>
+</div>
 <div class="allrev mqover" id="mqView" role="dialog" aria-modal="true" aria-label="Setto Luckyslot" hidden>
   <div class="mq-in">
     <button class="x mq-x" data-mqclose aria-label="Cerrar">✕</button>
@@ -465,7 +423,7 @@
 <footer>
   <div class="wrap">
     <div class="box"><img class="logo" src="img/logo.svg" alt="Setto" loading="lazy" decoding="async"><p>Asian inspired home cafe en Mar del Plata.</p></div>
-    <div class="box"><b>Retiro y envíos</b><p>Dirección de retiro y costo de envío, por WhatsApp.</p><p style="margin-top:6px" id="footHours"></p></div>
+    <div class="box"><b>Retiro y envíos</b><p id="footDonde">Dirección de retiro y costo de envío, por WhatsApp.</p><p style="margin-top:6px" id="footHours"></p></div>
     <div class="box"><b>Contacto</b><p>WhatsApp <b style="display:inline;color:var(--ink);user-select:all" id="waNum"></b></p><p style="margin-top:6px">Instagram <b style="display:inline;color:var(--ink)">@setto.project</b></p><p style="margin-top:6px"><a href="https://setto-project.carrd.co/" target="_blank" rel="noopener" style="color:var(--turquesa);font-weight:600">Todos nuestros links ↗</a></p></div>
     <p class="fine" style="display:flex;gap:14px;flex-wrap:wrap"><a href="/armar" style="color:inherit">Cómo armar tu bebida</a><a href="/#faq" style="color:inherit">Preguntas frecuentes</a><a href="/gift-cards" style="color:inherit">Gift cards</a><a href="/privacidad" style="color:inherit">Privacidad y bajas</a></p>
     <p class="fine"><a href="panel.html" style="color:inherit;text-decoration:none">·</a> Precios en pesos. Sabores sujetos a disponibilidad.</p>
@@ -483,7 +441,6 @@
   <div class="df" id="dFoot"></div>
 </aside>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
 
 <script src="js/vendor/supabase-2.45.4.js"></script>
 <script src="js/pixel.js"></script>
