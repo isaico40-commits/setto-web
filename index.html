@@ -127,7 +127,7 @@
   </section>
 
   <section class="valor" id="valor" aria-label="Lo que suma pedir por la web" hidden>
-    <div class="wrap"><a class="valor-in" href="#club"><span class="valor-hd"><b>Pedir acá suma</b><span class="valor-mas">Ver beneficios <span aria-hidden="true">→</span></span></span><ul class="valor-list" id="valorList"></ul></a></div>
+    <div class="wrap"><div class="valor-in"><span class="valor-hd"><b>Pedir acá suma</b><a class="valor-mas" href="#club">Ver beneficios <span aria-hidden="true">→</span></a></span><ul class="valor-list" id="valorList"></ul></div></div>
   </section>
 
   <section class="blk" id="especial" aria-labelledby="t-esp">
@@ -219,13 +219,18 @@
         <article class="bcard dmaq" id="dMaq" hidden>
           <div class="bhd"><span class="eyebrow">Tirada gratis</span><h3>Setto Luckyslot</h3><p id="dMaqTx">Una tirada gratis por día. Si juntás iguales, te llevás un premio.</p></div>
           <div class="dreels" id="dReels" aria-hidden="true"></div>
-          <p class="bnota" id="mqCompra">Cada compra suma 5 fichas.</p>
+          <ol class="bpasos">
+            <li><b id="dMaqDia">1 tirada gratis por día</b><small>No apostás nada.</small></li>
+            <li><b id="mqCompra">Cada compra suma 5 fichas</b><small>Se cargan cuando recibís tu pedido.</small></li>
+            <li><b>Juntá 4 o 5 iguales</b><small>Y te llevás un premio. Los ves en la maquinita.</small></li>
+          </ol>
           <div class="dbtns"><a class="btn solid" href="/?maquinita" data-maq>Tirar gratis</a></div>
         </article>
         <article class="bcard dtop" id="dTop" hidden>
           <div class="bhd"><span class="eyebrow">Ranking del mes</span><h3 id="dTopTit">Top del mes</h3><p>Los que más se dieron el gusto este mes.</p></div>
-          <ol class="dpodio" id="dPodio" aria-label="Primeros tres del mes"></ol>
-          <div class="dbtns"><button class="btn" type="button" data-topopen>Ver el podio</button></div>
+          <ol class="dtlist" id="dTopList" aria-label="Ranking del mes"></ol>
+          <p class="bnota">Suman las compras en la web y en el local con tu celular. ¿No querés aparecer? Escribinos.</p>
+          <div class="dbtns" id="dTopMas" hidden><button class="btn" type="button" data-topopen>Ver ranking completo</button></div>
         </article>
       </div>
       <p class="benef-extra" id="clubBenef" hidden><span>Y con cada pedido, además:</span><span class="cx-list" id="clubBenefList"></span></p>

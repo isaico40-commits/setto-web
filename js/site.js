@@ -772,7 +772,7 @@
     if (regaloOn()) l.push(["regalo", "Regalo", "En tu pedido"]);
     sec.hidden = !l.length;
     sec.style.setProperty("--vn", l.length);
-    $("#valorList").innerHTML = l.map(([k, t, d]) => `<li class="vtile"><span class="vic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${V_IC[k]}</svg></span><b>${esc(t)}</b><small>${esc(d)}</small></li>`).join("");
+    $("#valorList").innerHTML = l.map(([k, t, d]) => `<li><a class="vtile" href="${k === "tirada" ? "#dMaq" : "#club"}"><span class="vic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${V_IC[k]}</svg></span><b>${esc(t)}</b><small>${esc(d)}</small></a></li>`).join("");
   }
   function renderApps() {
     $("#apps").innerHTML = '<span class="eyebrow" style="padding-inline:4px">Delivery por apps</span>' + (S.apps || []).map((a) => {
@@ -1036,8 +1036,12 @@
       <span class="tmeta">${x.compras} ${x.compras === 1 ? "compra" : "compras"} · ${x.sellos}/${meta} sellos</span></li>`).join("");
     sec.hidden = false;
     $("#dTopTit").textContent = `Top de ${mes}`;
-    $("#dPodio").innerHTML = l.filter((x) => x.pos <= 3).sort((a, b) => [2, 1, 3].indexOf(a.pos) - [2, 1, 3].indexOf(b.pos)).map((x) => `<li class="dp${x.pos}">
-      ${x.pos === 1 ? '<img src="img/mochito-campeon.png" alt="" loading="lazy" decoding="async">' : ""}<span class="dn">${esc(x.nombre)}</span><span class="dpos" aria-label="Puesto ${x.pos}">${x.pos}</span></li>`).join("");
+    const TOPN = 5; // en la tarjeta se ven los primeros 5; el resto, en "Ver ranking completo"
+    $("#dTopList").innerHTML = l.slice(0, TOPN).map((x) => `<li class="dt${x.pos <= 3 ? " d" + x.pos : ""}">
+      <span class="dtpos" aria-label="Puesto ${x.pos}">${x.pos === 1 ? '<img src="img/mochito-campeon.png" alt="" loading="lazy" decoding="async">' : x.pos}</span>
+      <span class="dtn"><b>${esc(x.nombre)}</b><small>${x.compras} ${x.compras === 1 ? "compra" : "compras"} · ${x.sellos}/${meta} sellos</small></span>
+      ${x.gastado_aprox ? `<span class="dtg">$${Math.round(x.gastado_aprox / 1000).toLocaleString("es-AR")} mil</span>` : ""}</li>`).join("");
+    $("#dTopMas").hidden = l.length <= TOPN;
     $("#dTop").hidden = false; renderDestacados();
   }
   function renderClubInfo() {
@@ -1069,11 +1073,12 @@
     document.querySelectorAll("[data-navmaq]").forEach((a) => (a.hidden = off)); // link del menú: solo con la maquinita prendida
     const n = Math.max(1, Math.min(5, Math.round(+(S.maquinita || {}).fichas_dia || 1)));
     const fc = Math.max(0, Math.min(50, Math.round((S.maquinita || {}).fichas_compra ?? 5)));
-    $("#mqCompra").textContent = `Cada compra suma ${fc} fichas: más tiradas, más chances.`; $("#mqCompra").hidden = !fc;
+    $("#mqCompra").textContent = `Cada compra suma ${fc} fichas`; $("#mqCompra").closest("li").hidden = !fc;
+    $("#dMaqDia").textContent = `${n === 1 ? "1 tirada gratis" : n + " tiradas gratis"} por día`;
     const sim = (S.maquinita || {}).simbolos || [];
     MQ_IMG = MAQ_BASE.map((d, i) => IMG((sim[i] && sim[i].img) || d, 128)); // Panel → Maquinita → símbolos
     $("#dMaq").hidden = off;
-    $("#dMaqTx").textContent = `${n === 1 ? "Una tirada gratis" : n + " tiradas gratis"} por día. Si juntás iguales, te llevás un premio.`;
+    $("#dMaqTx").textContent = "Tirá gratis y mirá qué sale. Si juntás iguales, te llevás un premio.";
     $("#dReels").innerHTML = MQ_IMG.slice(0, 3).map((u) => `<span><img src="${esc(u)}" alt="" loading="lazy" decoding="async"></span>`).join("");
     renderDestacados();
   }
