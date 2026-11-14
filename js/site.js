@@ -751,10 +751,28 @@
     $("#faqList").innerHTML = items.map((x) => `<details><summary>${esc(x.p)}</summary><div class="faq-a">${mdLinks(x.r)}</div></details>`).join("");
   }
 
-  /* debajo de la portada: tarjetas al Top del Club y a la maquinita (cada una solo si su sección está prendida) */
+  /* Setto Club (beneficios): tarjeta de sellos + Luckyslot + Top del mes, cada una solo si está prendida.
+     La grilla se arma con las que se ven (1, 2 o 3 columnas en compu) */
   function renderDestacados() {
-    const sec = $("#destacados"); if (!sec) return;
-    sec.hidden = $("#dTop").hidden && $("#dMaq").hidden;
+    const b = $("#benef"); if (!b) return;
+    b.style.setProperty("--bn", [...b.children].filter((x) => !x.hidden).length || 1);
+  }
+  /* Franja debajo de la portada: en una línea, lo que suma pedir por la web (sin tapar los productos) */
+  const V_IC = {
+    sello: '<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"/>',
+    tirada: '<rect x="3" y="5" width="15" height="14" rx="3"/><path d="M7 9.5v5M10.5 9.5v5M14 9.5v5M18 9h2.2a.8.8 0 0 1 .8.8V12"/><circle cx="21" cy="13.5" r="1.2"/>',
+    regalo: '<rect x="3.5" y="9" width="17" height="11.5" rx="2"/><path d="M2.5 9h19M12 9v11.5M12 9c-1.6-3.6-6-4.4-6-1.6C6 9 9 9 12 9zm0 0c1.6-3.6 6-4.4 6-1.6C18 9 15 9 12 9z"/>',
+  };
+  function renderValor() {
+    const sec = $("#valor"); if (!sec) return;
+    const c = club(), m = S.maquinita || {}, l = [];
+    const spp = c.sellos_por_pedido ?? 1, meta = c.meta || 8, fd = Math.max(1, Math.min(5, Math.round(+(m.fichas_dia || 1))));
+    if (clubOn()) l.push(["sello", "Sumá sellos", `Premio a los ${meta}`]);
+    if (maqOn()) l.push(["tirada", fd === 1 ? "Tirada gratis" : fd + " tiradas gratis", "Todos los días"]);
+    if (regaloOn()) l.push(["regalo", "Regalo", "En tu pedido"]);
+    sec.hidden = !l.length;
+    sec.style.setProperty("--vn", l.length);
+    $("#valorList").innerHTML = l.map(([k, t, d]) => `<li><a class="vtile" href="${k === "tirada" ? "#dMaq" : "#club"}"><span class="vic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${V_IC[k]}</svg></span><b>${esc(t)}</b><small>${esc(d)}</small></a></li>`).join("");
   }
   function renderApps() {
     $("#apps").innerHTML = '<span class="eyebrow" style="padding-inline:4px">Delivery por apps</span>' + (S.apps || []).map((a) => {
@@ -908,6 +926,8 @@
       </article>`;
     }).join("");
     $("#sets").hidden = on(SETS).length === 0;
+    // Columnas en compu según cuántos sets hay, para que nunca quede uno solo en la última fila (4 → 4 juntos, 5 → 3+2…)
+    const n = on(SETS).length; $("#setsGrid").style.setProperty("--cols", n <= 4 ? Math.max(n, 2) : n % 4 === 0 || n % 4 === 3 ? 4 : 3);
     dots("setsGrid");
   }
   /* Promos: pestaña de la carta con la misma tarjeta que Sets; el cartel dice cuánto ahorrás contra los mochis sueltos */
@@ -1016,14 +1036,21 @@
       <span class="tmeta">${x.compras} ${x.compras === 1 ? "compra" : "compras"} · ${x.sellos}/${meta} sellos</span></li>`).join("");
     sec.hidden = false;
     $("#dTopTit").textContent = `Top de ${mes}`;
-    $("#dPodio").innerHTML = l.filter((x) => x.pos <= 3).sort((a, b) => [2, 1, 3].indexOf(a.pos) - [2, 1, 3].indexOf(b.pos)).map((x) => `<li class="dp${x.pos}">
-      ${x.pos === 1 ? '<img src="img/mochito-campeon.png" alt="" loading="lazy" decoding="async">' : ""}<span class="dn">${esc(x.nombre)}</span><span class="dpos" aria-label="Puesto ${x.pos}">${x.pos}</span></li>`).join("");
+    const TOPN = 5; // en la tarjeta se ven los primeros 5; el resto, en "Ver ranking completo"
+    $("#dTopList").innerHTML = l.slice(0, TOPN).map((x) => `<li class="dt${x.pos <= 3 ? " d" + x.pos : ""}">
+      <span class="dtpos" aria-label="Puesto ${x.pos}">${x.pos === 1 ? '<img src="img/mochito-campeon.png" alt="" loading="lazy" decoding="async">' : x.pos}</span>
+      <span class="dtn"><b>${esc(x.nombre)}</b><small>${x.compras} ${x.compras === 1 ? "compra" : "compras"} · ${x.sellos}/${meta} sellos</small></span>
+      ${x.gastado_aprox ? `<span class="dtg">$${Math.round(x.gastado_aprox / 1000).toLocaleString("es-AR")} mil</span>` : ""}</li>`).join("");
+    $("#dTopMas").hidden = l.length <= TOPN;
     $("#dTop").hidden = false; renderDestacados();
   }
   function renderClubInfo() {
     const c = S.club || {};
     $("#club").hidden = c.activo === false;
-    $("#clubPremio").textContent = `El pedido que completa los ${c.meta || 8} sellos viene con ${premioTxt()}.` + (c.minimo > 0 ? ` Suman sello los pedidos desde ${money(c.minimo)}.` : "");
+    const spp = c.sellos_por_pedido ?? 1;
+    $("#clubTit").textContent = `${spp === 1 ? "1 sello" : spp + " sellos"} por pedido`;
+    $("#clubPremio").textContent = `Con ${c.meta || 8} sellos, tu pedido viene con ${premioTxt()}.` + (c.minimo > 0 ? ` Suman los pedidos desde ${money(c.minimo)}.` : "");
+    renderValor();
 
     renderBeneficios();
     $("#mnavClub").hidden = !clubOn(); document.querySelectorAll("[data-clubtag]").forEach((t) => (t.hidden = !clubOn()));
@@ -1042,17 +1069,16 @@
   const MAQ_BASE = ["img/mochito-cup.png", "img/mochi-frutilla.webp", "img/mochi-oreo.webp", "img/dirty-caramel.webp", "img/dirty-strawberry.webp"];
   let MQ_IMG = MAQ_BASE;
   function renderMaquinita() {
-    const sec = $("#maquinita"); if (!sec) return; sec.hidden = !maqOn();
-    document.querySelectorAll("[data-navmaq]").forEach((a) => (a.hidden = sec.hidden)); // link del menú: solo con la maquinita prendida
+    const off = !maqOn();
+    document.querySelectorAll("[data-navmaq]").forEach((a) => (a.hidden = off)); // link del menú: solo con la maquinita prendida
     const n = Math.max(1, Math.min(5, Math.round(+(S.maquinita || {}).fichas_dia || 1)));
-    $("#mqTiradas").textContent = `${n === 1 ? "Una tirada gratis" : n + " tiradas gratis"} por día`;
     const fc = Math.max(0, Math.min(50, Math.round((S.maquinita || {}).fichas_compra ?? 5)));
-    $("#mqCompra").textContent = `Cada compra suma ${fc} fichas`; $("#mqCompra").closest(".next > div").hidden = !fc;
+    $("#mqCompra").textContent = `Cada compra suma ${fc} fichas`; $("#mqCompra").closest("li").hidden = !fc;
+    $("#dMaqDia").textContent = `${n === 1 ? "1 tirada gratis" : n + " tiradas gratis"} por día`;
     const sim = (S.maquinita || {}).simbolos || [];
     MQ_IMG = MAQ_BASE.map((d, i) => IMG((sim[i] && sim[i].img) || d, 128)); // Panel → Maquinita → símbolos
-    sec.querySelectorAll(".mq-strip").forEach((st, i) => { st.innerHTML = `<img src="${esc(MQ_IMG[i])}" alt="">`; });
-    $("#dMaq").hidden = sec.hidden;
-    $("#dMaqTx").textContent = `${n === 1 ? "Una tirada gratis" : n + " tiradas gratis"} por día. Si juntás iguales, te llevás un premio.`;
+    $("#dMaq").hidden = off;
+    $("#dMaqTx").textContent = "Tirá gratis y mirá qué sale. Si juntás iguales, te llevás un premio.";
     $("#dReels").innerHTML = MQ_IMG.slice(0, 3).map((u) => `<span><img src="${esc(u)}" alt="" loading="lazy" decoding="async"></span>`).join("");
     renderDestacados();
   }
@@ -1083,35 +1109,47 @@
     const v = document.querySelector("#regalo .volver"); if (v) { v.href = "/?p=listo"; v.textContent = "← Volver"; }
   }
   function cerrarMaq() { $("#mqView").hidden = true; document.body.style.overflow = ""; maqSug = { tel: null, premios: [] }; if (view === "cart" && $("#drawer").classList.contains("on")) { drawDrawer(); const t = $("[data-cxmaq]"); if (t) t.focus(); } } // si ganó, el carrito vuelve a mirar sus premios
-  function girarMini(done) {
-    const reels = [...document.querySelectorAll("#maquinita .mq-reel")];
-    if (!reels.length || matchMedia("(prefers-reduced-motion: reduce)").matches) return done();
-    const h = reels[0].getBoundingClientRect().height;
-    reels.forEach((r, i) => {
-      const st = r.querySelector(".mq-strip"), imgs = [st.lastElementChild.getAttribute("src")];
-      for (let k = 0; k < 8 + i * 3; k++) imgs.push(MQ_IMG[Math.floor(Math.random() * MQ_IMG.length)]);
-      st.style.transition = "none"; st.style.transform = "translateY(0)";
-      st.innerHTML = imgs.map((x) => `<img src="${x}" alt="">`).join(""); void st.offsetHeight;
-      st.style.transition = `transform ${450 + i * 150}ms cubic-bezier(.3,.1,.3,1)`; st.style.transform = `translateY(${-(imgs.length - 1) * h}px)`;
-    });
-    setTimeout(done, 800);
-  }
-  let mqGirando = false;
+
   document.addEventListener("click", (e) => {
     if (e.target.closest("[data-mqclose]") || e.target.id === "mqView") return cerrarMaq();
     const a = e.target.closest("[data-maq]"); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
     e.preventDefault();
-    const card = a.closest("#mqCard"); if (!card) return abrirMaq(); // botón del carrito: directo
-    abrirMaq(); // se abre al instante; la palanca y los rodillos se mueven detrás
-    if (mqGirando) return; mqGirando = true;
-    card.classList.add("tirando");
-    setTimeout(() => girarMini(() => { mqGirando = false; card.classList.remove("tirando"); }), 380);
+    abrirMaq();
   });
+  /* Top del mes completo: pop up desde la tarjeta del Club */
+  function abrirTop() { if ($("#topclub").hidden) return; $("#topPop").hidden = false; document.body.style.overflow = "hidden"; $("[data-topclose]").focus(); }
+  function cerrarTop() { $("#topPop").hidden = true; document.body.style.overflow = ""; const b = $("[data-topopen]"); if (b) b.focus(); }
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-topopen]")) return abrirTop();
+    if (e.target.closest("[data-topclose]") || e.target.id === "topPop") cerrarTop();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#topPop").hidden) { e.preventDefault(); cerrarTop(); } });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#mqView").hidden) { e.preventDefault(); cerrarMaq(); } });
+  // [["12:00","18:00"],["15:00","21:00"]] → [["12:00","21:00"]]
+  function unirFranjas(rs) {
+    const o = rs.map(([a, b]) => [a, b]).sort((x, y) => hhmm(x[0]) - hhmm(y[0])), out = [];
+    for (const f of o) { const u = out[out.length - 1]; if (u && hhmm(f[0]) <= hhmm(u[1])) { if (hhmm(f[1]) > hhmm(u[1])) u[1] = f[1]; } else out.push(f); }
+    return out;
+  }
+  // [1,2,3,4,5,6] → "Lunes a sábado"; días sueltos → "Lun, mié y vie"; todos → "Todos los días"
+  function diasTxt(ds) {
+    const N = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"], d = [...new Set(ds.map(Number))].sort((a, b) => a - b);
+    if (!d.length) return ""; if (d.length === 7) return "Todos los días";
+    const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+    const seguido = d.every((x, i) => i === 0 || x === d[i - 1] + 1);
+    if (seguido && d.length > 2) return cap(N[d[0]]) + " a " + N[d[d.length - 1]];
+    const t = d.map((x) => N[x].slice(0, 3)); return cap(t.length > 1 ? t.slice(0, -1).join(", ") + " y " + t[t.length - 1] : t[0]);
+  }
   function renderFooter() {
-    const r = S.retiro || { rangos: [] }, rs = r.rangos.filter(([a, b]) => !(r.apagadas || []).includes(a + "-" + b));
-    HORARIO = "De " + rs.map(([a, b]) => a.replace(":00", "") + " a " + b.replace(":00", "")).join(" y de ") + " hs.";
-    $("#footHours").textContent = "Retiro: " + HORARIO.charAt(0).toLowerCase() + HORARIO.slice(1);
+    // Horario: sale de Ajustes → Horarios de retiro. Las franjas que se pisan o se tocan se muestran unidas (12–18 + 15–21 = 12 a 21)
+    const r = S.retiro || { rangos: [] }, rs = unirFranjas((r.rangos || []).filter(([a, b]) => !(r.apagadas || []).includes(a + "-" + b)));
+    const hs = (x) => x.replace(/^0/, "").replace(":00", "");
+    HORARIO = rs.length ? "De " + rs.map(([a, b]) => hs(a) + " a " + hs(b)).join(" y de ") + " hs." : "";
+    const dias = diasTxt(r.dias || []);
+    $("#footHours").textContent = HORARIO ? (dias ? dias + ", d" : "D") + HORARIO.slice(1) : "";
+    // Dónde: si la Ubicación está prendida, la dirección; si no, por WhatsApp
+    const u = S.ubicacion || {}, q = (u.mapa || "").trim(), fd = $("#footDonde");
+    if (fd) fd.innerHTML = u.activo && q ? `Retiro en ${esc(q.replace(/,.*$/, ""))} · <a href="/#ubicacion">Ver mapa</a>. Envíos: el costo te lo pasamos por WhatsApp.` : "Dirección de retiro y costo de envío, por WhatsApp.";
     $("#waNum").textContent = S.whatsapp_visible || API.prettyPhone(S.whatsapp);
     $("#mnavWa").textContent = S.whatsapp_visible || API.prettyPhone(S.whatsapp);
     $("#navWa").href = `https://wa.me/${S.whatsapp}?text=${encodeURIComponent(window.SettoMSG.render("consulta", {}, S))}`;
@@ -2022,10 +2060,28 @@
       sec.hidden = false; $("#resGrid").hidden = !(d.items && d.items.length);
       $("#verResenas").textContent = `Ver todas las reseñas (${d.cantidad})`;
       $("#resProm").textContent = `★ ${String(d.promedio).replace(".", ",")} · ${d.cantidad} reseña${d.cantidad > 1 ? "s" : ""} verificada${d.cantidad > 1 ? "s" : ""}`;
-      $("#resGrid").innerHTML = (d.items || []).map(rvCard).join("");
+      // Primero las de productos que hoy están en la carta y las que tienen foto; se muestran 6 (el resto en "Ver todas")
+      const enCarta = [...SETS, ...DIRTY, ...MOCHIS, ...PROMOS].map((x) => slugProd(x.nombre)).filter((k) => k.length > 3);
+      const actual = (n) => { const k = slugProd(n); return enCarta.some((c) => k.includes(c) || c.includes(k)); };
+      const pts = (r) => ((r.pedido || []).some(actual) ? 2 : 0) + (r.foto ? 1 : 0) + (r.texto ? 1 : 0);
+      const its = (d.items || []).map((r, i) => ({ r, i, p: pts(r) })).sort((a, b) => b.p - a.p || a.i - b.i).map((x) => x.r).slice(0, 6);
+      $("#resGrid").innerHTML = its.map(rvCard).join("");
     } catch (_) {}
   }
   document.addEventListener("click", (e) => { const x = e.target.closest("[data-trackx]"); if (!x) return; try { localStorage.setItem("setto-trk-ocultos", JSON.stringify([...ocultosTrk(), x.dataset.trackx].slice(-20))); } catch (_) {} verSeguimiento(); });
+
+  /* ---------- Medición: hasta qué sección llega la gente (Pixel de Meta, solo con permiso de medición) ----------
+     Un evento "SeccionVista" por sección y por visita, cuando al menos un tercio de la sección entra en pantalla. */
+  function medirSecciones() {
+    if (PAGE !== "home" || !("IntersectionObserver" in window) || !window.SettoPixel) return;
+    const vistas = new Set(), orden = [...document.querySelectorAll("main > section[id]")].map((x) => x.id);
+    const io = new IntersectionObserver((ents) => ents.forEach((e) => {
+      const id = e.target.id; if (!e.isIntersecting || vistas.has(id) || e.target.hidden) return;
+      vistas.add(id); io.unobserve(e.target);
+      window.SettoPixel.custom("SeccionVista", { seccion: id, posicion: orden.indexOf(id) + 1, ancho: innerWidth < 761 ? "celu" : "compu" });
+    }), { threshold: 0.25 });
+    document.querySelectorAll("main > section[id]").forEach((x) => { if (!["seguimiento", "listo", "armar", "lsRes", "regalo"].includes(x.id)) io.observe(x); });
+  }
 
   /* ---------- arranque ---------- */
   function loading() {
@@ -2045,6 +2101,7 @@
     if (pintado) return;
     pintado = true;
     verSeguimiento(); renderResenas(); renderVotar(); renderTopClub(); if (window.__regalo) abrirRegalo(window.__regalo);
+    medirSecciones();
     if (maqAlCargar && maqOn()) { maqAlCargar = false; abrirMaq(); }
     if (form.tel) $("#cardPhone").value = form.tel;
     let vc = null; try { vc = sessionStorage.getItem("setto-vercard"); sessionStorage.removeItem("setto-vercard"); } catch (_) {}
