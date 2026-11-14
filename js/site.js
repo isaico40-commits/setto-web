@@ -1009,11 +1009,19 @@
     const l = (r && r.activo && r.top) || [];
     if (l.length < 3 || (S.club || {}).activo === false) { sec.hidden = true; $("#dTop").hidden = true; renderDestacados(); return; }
     const meta = r.meta || 8, mes = new Date().toLocaleDateString("es-AR", { month: "long" });
+    // premios del podio (Panel → Club → Top): se ven para que sepan que comprar tiene premio
+    const prem = ((S.top_club || {}).premios || []).map((p) => String(p || "").trim()).slice(0, 3), hayPrem = prem.some(Boolean);
+    const may = (t) => t.charAt(0).toUpperCase() + t.slice(1), MED = ["🥇", "🥈", "🥉"];
+    $("#topPremios").innerHTML = prem.map((p, i) => p ? `<li class="tpr p${i + 1}"><span class="tprm" aria-hidden="true">${MED[i]}</span><span class="tprp">${i + 1}° puesto</span><b>${esc(may(p))}</b></li>` : "").join("");
+    $("#topPremios").hidden = !hayPrem; $("#topNotaPremio").hidden = !hayPrem;
+    $("#topIntro").textContent = hayPrem ? "Comprá, sumá y subí en el ranking: el podio se lleva premio. Arranca de cero el 1 de cada mes." : "Los que más se dieron el gusto este mes. El ranking arranca de cero el 1 de cada mes.";
+    $("#dTopPrem").hidden = !hayPrem;
+    $("#dTopTx").textContent = hayPrem ? "Comprá y subí al podio: " + prem.map((p, i) => p && `${i + 1}° ${p}`).filter(Boolean).join(" · ") + "." : "Los que más se dieron el gusto este mes.";
     $("#t-top").textContent = `Top de ${mes}`;
     $("#topList").innerHTML = l.map((x) => `<li class="topit${x.pos <= 3 ? " p" + x.pos : ""}">
       ${x.pos === 1 ? '<img class="tmochi" src="img/mochito-campeon.png" alt="" loading="lazy" decoding="async">' : ""}<span class="tpos" aria-label="Puesto ${x.pos}">${x.pos}</span>
       <span class="tname">${esc(x.nombre)}</span>${x.gastado_aprox ? `<span class="tgasto">$${Math.round(x.gastado_aprox / 1000).toLocaleString("es-AR")} mil</span>` : ""}
-      <span class="tmeta">${x.compras} ${x.compras === 1 ? "compra" : "compras"} · ${x.sellos}/${meta} sellos</span></li>`).join("");
+      <span class="tmeta">${x.compras} ${x.compras === 1 ? "compra" : "compras"} · ${x.sellos}/${meta} sellos</span>${x.pos <= 3 && prem[x.pos - 1] ? `<span class="tpremio">🎁 ${esc(prem[x.pos - 1])}</span>` : ""}</li>`).join("");
     sec.hidden = false;
     $("#dTopTit").textContent = `Top de ${mes}`;
     $("#dPodio").innerHTML = l.filter((x) => x.pos <= 3).sort((a, b) => [2, 1, 3].indexOf(a.pos) - [2, 1, 3].indexOf(b.pos)).map((x) => `<li class="dp${x.pos}">

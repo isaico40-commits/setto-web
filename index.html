@@ -132,7 +132,8 @@
         <div class="dtx">
           <span class="eyebrow">Setto Club</span>
           <h2 id="dTopTit">Top del mes</h2>
-          <p>Los que más se dieron el gusto este mes.</p>
+          <span class="dprem" id="dTopPrem" hidden>🎁 El podio se lleva premio</span>
+          <p id="dTopTx">Los que más se dieron el gusto este mes.</p>
           <a class="btn" href="#topclub">Ver el podio</a>
         </div>
         <ol class="dpodio" id="dPodio" aria-label="Primeros tres del mes"></ol>
@@ -316,8 +317,9 @@
         <h2 id="t-top">Top del mes</h2>
         <p class="muted" id="topIntro">Los que más se dieron el gusto este mes. El ranking arranca de cero el 1 de cada mes.</p>
       </div>
+      <ul class="toppremios" id="topPremios" aria-label="Premios del podio" hidden></ul>
       <ol class="toplist" id="topList"></ol>
-      <p class="muted topnota">Suman las compras en la web y en el local con tu celular. ¿No querés aparecer? Escribinos y te sacamos.</p>
+      <p class="muted topnota"><span id="topNotaPremio" hidden>El 1 de cada mes le mandamos el premio por WhatsApp a cada uno del podio, con un código para usar en la web durante 7 días. </span>Suman las compras en la web y en el local con tu celular. ¿No querés aparecer? Escribinos y te sacamos.</p>
     </div>
   </section>
   <section class="blk gchome" id="giftcards" aria-labelledby="t-gch" hidden>
