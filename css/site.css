@@ -1248,20 +1248,33 @@ article.set,article.item,article.prem{cursor:pointer}
 .burger{border-color:transparent;background:transparent;box-shadow:none}
 .burger:hover{background:color-mix(in srgb,var(--turquesa) 10%,transparent)}
 
-/* ---------- Franja de valor debajo de la portada (2026-11): qué suma pedir por la web, en una línea ---------- */
-.valor{padding-block:14px 0}
-.valor-in{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;justify-content:center;padding:10px 16px;border-radius:var(--pill);background:var(--card);border:1.5px solid color-mix(in srgb,var(--turquesa) 22%,transparent);text-decoration:none;color:var(--ink);font-size:.875rem;line-height:1.3}
-.valor-in>b{color:var(--turquesa);font-weight:700}
-.valor-list{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center}
-.vchip{display:inline-flex;align-items:center;gap:6px;font-weight:600}
-.valor-mas{color:var(--turquesa);font-weight:700;white-space:nowrap}
-.valor-in:hover{border-color:var(--turquesa)}
+/* ---------- Franja de valor debajo de la portada (2026-11): qué suma pedir por la web, tres tarjetitas con la línea y sombra de la marca ---------- */
+.valor{padding-block:28px 56px}
+.valor-in{display:block;text-decoration:none;color:var(--ink)}
+.valor-hd{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px;padding-inline:2px}
+.valor-hd b{font-family:var(--display);font-weight:400;font-size:1.25rem;color:var(--turquesa);line-height:1.1}
+.valor-mas{color:var(--turquesa);font-weight:700;font-size:.875rem;white-space:nowrap}
+.valor-in:hover .valor-mas{text-decoration:underline;text-underline-offset:3px}
+.valor-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(var(--vn,3),minmax(0,1fr));gap:14px}
+.vtile{align-items:center;background:var(--card);border:var(--line);border-radius:18px;box-shadow:var(--sombra-chica);padding:14px 16px;transition:transform .12s,box-shadow .12s}
+.valor-in:hover .vtile{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--turquesa)}
+.vic{flex:none;width:44px;height:44px;border-radius:50%;background:var(--coral-2);color:var(--turquesa);display:grid;place-items:center}
+.vic svg{width:22px;height:22px}
+.vtile b{display:block;font-weight:700;font-size:1rem;line-height:1.2}
+.vtile small{display:block;font-size:.75rem;color:var(--ink-2);line-height:1.3;margin-top:2px}
+.vtile>b,.vtile>small{grid-column:2}
+.vtile{display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:0}
+.vtile .vic{grid-row:1/span 2}
 @media (max-width:760px){
-  .valor{padding-block:10px 0}
-  .valor-in{border-radius:18px;justify-content:flex-start;gap:6px 12px;padding:12px 14px}
-  .valor-in>b{width:100%}
-  .valor-list{justify-content:flex-start;flex-direction:column;gap:4px}
-  .valor-mas{font-size:.875rem}
+  .valor{padding-block:20px 32px}
+  .valor-hd b{font-size:1.125rem}
+  .valor-list{gap:8px}
+  .vtile{grid-template-columns:1fr;justify-items:center;align-content:start;text-align:center;padding:12px 6px 12px;border-radius:16px}
+  .vtile .vic{grid-row:auto;width:38px;height:38px;margin-bottom:6px}
+  .vic svg{width:19px;height:19px}
+  .vtile>b,.vtile>small{grid-column:1}
+  .vtile b{font-size:.875rem}
+  .vtile small{font-size:.75rem}
 }
 
 /* ---------- Setto Club: tres tarjetas iguales (sellos, Luckyslot, Top del mes) ---------- */

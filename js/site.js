@@ -758,15 +758,21 @@
     b.style.setProperty("--bn", [...b.children].filter((x) => !x.hidden).length || 1);
   }
   /* Franja debajo de la portada: en una línea, lo que suma pedir por la web (sin tapar los productos) */
+  const V_IC = {
+    sello: '<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"/>',
+    tirada: '<rect x="3" y="5" width="15" height="14" rx="3"/><path d="M7 9.5v5M10.5 9.5v5M14 9.5v5M18 9h2.2a.8.8 0 0 1 .8.8V12"/><circle cx="21" cy="13.5" r="1.2"/>',
+    regalo: '<rect x="3.5" y="9" width="17" height="11.5" rx="2"/><path d="M2.5 9h19M12 9v11.5M12 9c-1.6-3.6-6-4.4-6-1.6C6 9 9 9 12 9zm0 0c1.6-3.6 6-4.4 6-1.6C18 9 15 9 12 9z"/>',
+  };
   function renderValor() {
     const sec = $("#valor"); if (!sec) return;
     const c = club(), m = S.maquinita || {}, l = [];
     const spp = c.sellos_por_pedido ?? 1, meta = c.meta || 8, fd = Math.max(1, Math.min(5, Math.round(+(m.fichas_dia || 1))));
-    if (clubOn()) l.push(["⭐", `${spp === 1 ? "1 sello" : spp + " sellos"} por pedido · premio a los ${meta}`]);
-    if (maqOn()) l.push(["🎰", `${fd === 1 ? "Tirada gratis" : fd + " tiradas gratis"} todos los días`]);
-    if (regaloOn()) l.push(["🎁", "Regalo en tu pedido"]);
+    if (clubOn()) l.push(["sello", "Sumá sellos", `Premio a los ${meta}`]);
+    if (maqOn()) l.push(["tirada", fd === 1 ? "Tirada gratis" : fd + " tiradas gratis", "Todos los días"]);
+    if (regaloOn()) l.push(["regalo", "Regalo", "En tu pedido"]);
     sec.hidden = !l.length;
-    $("#valorList").innerHTML = l.map(([i, t]) => `<span class="vchip"><span aria-hidden="true">${i}</span>${esc(t)}</span>`).join("");
+    sec.style.setProperty("--vn", l.length);
+    $("#valorList").innerHTML = l.map(([k, t, d]) => `<li class="vtile"><span class="vic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${V_IC[k]}</svg></span><b>${esc(t)}</b><small>${esc(d)}</small></li>`).join("");
   }
   function renderApps() {
     $("#apps").innerHTML = '<span class="eyebrow" style="padding-inline:4px">Delivery por apps</span>' + (S.apps || []).map((a) => {
