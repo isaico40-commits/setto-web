@@ -947,12 +947,13 @@
     if (!t) { box.innerHTML = ""; return; }
     const n = TP.cantidad(t.cuerpo), prev = [...box.querySelectorAll("[data-cvar]")].map((x) => x.value);
     box.innerHTML = `${n ? `<div class="tplvars">${Array.from({ length: n }, (_, i) => `<label>Qué va en {{${i + 1}}}<input class="inp" data-cvar="${i}" required value="${esc(prev[i] ?? (i === 0 && /^hola\b/i.test(t.cuerpo) ? "{nombre}" : ""))}" placeholder="${esc(t.ejemplos[i] || "")}"></label>`).join("")}</div>
-      <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente.${esProducto(f) ? " <b>{producto}</b> pone el nombre del producto en promo." : ""}${esPremio(f) ? " Para el premio: <b>{premio}</b> (ej. 10% off), <b>{codigo}</b> (MAQ-…) y <b>{vence}</b> (ej. el jueves 30/10 a las 18:40)." : " Con <b>{codigo}</b> le mandás un código de descuento personal (lo elegís abajo)."} <b>{favorito}</b> pone lo que más pidió cada uno y <b>{ultimo}</b>, lo último (si nunca pidió por la web, lo más vendido). Del Club: <b>{sellos}</b> (cuántos tiene), <b>{faltan}</b> (cuántos le faltan) y <b>{meta}</b> (de cuántos es la tarjeta).</span>` : ""}
+      <span class="hintp">Escribí <b>{nombre}</b> para poner el primer nombre de cada cliente.${esProducto(f) ? " <b>{producto}</b> pone el nombre del producto en promo." : ""}${esTop(f) ? " Del Top: <b>{puesto}</b> (1, 2…), <b>{mes}</b> (ej. noviembre) y <b>{premio}</b> (lo que ve el cliente del código, ej. Bebida de regalo)." : ""}${esPremio(f) ? " Para el premio: <b>{premio}</b> (ej. 10% off), <b>{codigo}</b> (MAQ-…) y <b>{vence}</b> (ej. el jueves 30/10 a las 18:40)." : " Con <b>{codigo}</b> le mandás un código de descuento personal (lo elegís abajo)."} <b>{favorito}</b> pone lo que más pidió cada uno y <b>{ultimo}</b>, lo último (si nunca pidió por la web, lo más vendido). Del Club: <b>{sellos}</b> (cuántos tiene), <b>{faltan}</b> (cuántos le faltan) y <b>{meta}</b> (de cuántos es la tarjeta).</span>` : ""}
       <div class="tplprev"><span class="eyebrow">Así le llega</span><div data-prev></div></div>`;
     campPrev(f);
   }
   const esPremio = (f) => f.id === "autoForm" && (f.elements.disparador || {}).value === "premio";
   const esProducto = (f) => f.id === "autoForm" && (f.elements.disparador || {}).value === "producto";
+  const esTop = (f) => f.id === "autoForm" && (f.elements.disparador || {}).value === "top";
   function campPrev(f) {
     const t = P.tpls && tplDe((f.elements.plantilla || {}).value), el = f.querySelector("[data-prev]"); if (!t || !el) return;
     el.innerHTML = TP.burbuja(t, [...f.querySelectorAll("[data-cvar]")].map((x) => x.value));
@@ -1001,9 +1002,13 @@
   function autoRegla(a) {
     if (a.disparador === "premio") return `Premio de la maquinita sin usar · ${a.horas} h antes de que venza`;
     if (a.disparador === "producto") return `Promo de <b>${esc(a.producto ? prodNom(a.producto) : "un producto borrado")}</b> · a quienes ${AUD[a.audiencia] || ""}${a.audiencia !== "favorito" ? ` (últimos ${a.dias} días)` : ""}`;
+    if (a.disparador === "top") return `El 1 de cada mes · ${puestosTxt(a)} del Top del mes que terminó`;
     return `${a.dias} ${a.dias === 1 ? "día" : "días"} después de la última compra · ${esc(segNom(a.segmento))}`;
   }
+  const puestosTxt = (a) => (a.top_desde === a.top_hasta ? `puesto ${a.top_desde}` : `puestos ${a.top_desde} a ${a.top_hasta}`);
+  const proximoUno = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() + 1, 1).toLocaleDateString("es-AR", { day: "numeric", month: "long" }); };
   function autoProximo(a, x) {
+    if (a.disparador === "top") return a.activa ? `próximo envío: el ${proximoUno()} desde las 10 h` : `si la prendés, sale el ${proximoUno()}`;
     if (a.disparador === "premio") return `${a.activa ? "ahora le toca a" : "si la prendés, le toca a"} ${personas(x.hoy)}`;
     if (a.disparador === "producto") {
       const p = (P.promos || []).find((y) => y.id === a.promo_id);
@@ -1035,7 +1040,7 @@
   const TIPOS_P = [["porcentaje", "% de descuento"], ["monto", "$ de descuento"], ["regalo:mochi", "Mochi de regalo"], ["regalo:bebida", "Bebida de regalo"], ["envio", "Envío gratis"]];
   const diaCorto = (iso) => new Date(iso).toLocaleDateString("es-AR", { day: "numeric", month: "numeric" });
   const tipoDe = (p) => (p.tipo === "regalo" ? "regalo:" + p.regalo : p.tipo);
-  const tituloDe = (t, v) => (t === "porcentaje" ? `${v || 0}% off` : t === "monto" ? `${money(v || 0)} off` : (TIPOS_P.find((x) => x[0] === t) || [, ""])[1]);
+  const tituloDe = (t, v, x) => (t.startsWith("regalo:") && x > 0 ? `${t === "regalo:bebida" ? "Bebida" : "Mochi"} de regalo + ${x}% off` : t === "porcentaje" ? `${v || 0}% off` : t === "monto" ? `${money(v || 0)} off` : (TIPOS_P.find((x) => x[0] === t) || [, ""])[1]);
   const desdePrecio = (f, k) => { const l = P.products.filter((p) => p.activo !== false && f(p)).map((p) => p[k]).filter((n) => n > 0); return l.length ? Math.min(...l) : 0; };
   // cuánto le cuesta a Setto cada uso, con los precios de la carta de hoy
   function costoTxt(p) {
@@ -1045,11 +1050,11 @@
     const uno = t === "monto" ? p.valor : t === "regalo:mochi" ? desdePrecio((x) => x.categoria === "mochi", "precio") : t === "regalo:bebida" ? desdePrecio((x) => x.categoria === "dirty", "precio_12") : Math.max(0, Number((P.settings.envio || {}).costo) || 0);
     const que = t === "monto" ? `${money(p.valor)} (si el pedido es menor, hasta el total)` : t === "regalo:mochi" ? `el mochi más barato del pedido${uno ? ` (hoy desde ${money(uno)})` : ""}`
       : t === "regalo:bebida" ? `la bebida más barata del pedido${uno ? ` (hoy desde ${money(uno)} en 12 oz)` : ""}` : uno ? `el envío (${money(uno)})` : "el envío (hoy el costo se coordina por WhatsApp)";
-    return `Cada uso cuesta ${que}.${max && uno ? `${max}: hasta ${money(uno * p.usos_max)} en total.` : max ? max + "." : ""}`;
+    return `Cada uso cuesta ${que}${p.extra_pct > 0 ? ` + el ${p.extra_pct}% del resto del pedido` : ""}.${max && uno ? `${max}: hasta ${money(uno * p.usos_max)} en total.` : max ? max + "." : ""}`;
   }
   const prodNom = (id) => String((P.products.find((x) => x.id === id) || {}).nombre || "un producto borrado").trim();
   const horaCorta = (iso) => new Date(iso).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
-  const condTxt = (p) => [p.requiere && `solo con ${prodNom(p.requiere)} en el pedido`, p.desde_at && `vale desde el ${horaCorta(p.desde_at)} hs`, p.minimo > 0 && `compra mínima ${money(p.minimo)}`, p.vence_at && `vale hasta el ${diaCorto(p.vence_at)}`, p.dias && `los personales duran ${p.dias} ${p.dias === 1 ? "día" : "días"}`,
+  const condTxt = (p) => [p.requiere && `solo con ${prodNom(p.requiere)} en el pedido`, p.desde_at && `vale desde el ${horaCorta(p.desde_at)} hs`, p.extra_pct > 0 && `+ ${p.extra_pct}% off en el resto`, p.minimo > 0 && `compra mínima ${money(p.minimo)}${p.minimo_aparte ? " sin contar el regalo" : ""}`, p.vence_at && `vale hasta el ${diaCorto(p.vence_at)}`, p.dias && `los personales duran ${p.dias} ${p.dias === 1 ? "día" : "días"}`,
     `${p.por_cliente || 1} ${(p.por_cliente || 1) === 1 ? "vez" : "veces"} por persona`, p.usos_max && `${p.usos_max} en total`, p.acumula ? "se suma al Club y la maquinita" : "no se suma al Club ni a la maquinita"].filter(Boolean).join(" · ");
   const promoEstado = (p) => (p.activa === false ? ["Pausado", "pendiente"] : p.vence_at && new Date(p.vence_at) <= new Date() ? ["Vencido", "cancelado"] : ["Activo", "entregado"]);
   const promoVigente = (p) => promoEstado(p)[0] === "Activo";
@@ -1068,6 +1073,9 @@
       <div class="row3"><label>Vale hasta (opcional)<input class="inp" name="vence" type="date"></label>
         <label>Los personales duran (días)<input class="inp" name="dias" type="number" min="1" max="365" inputmode="numeric" value="7"></label>
         <label>Compra mínima en $<input class="inp" name="minimo" type="number" min="0" inputmode="numeric" value="0"></label></div>
+      <div class="row2" data-pregalo hidden><label>Además, % off en el resto (opcional)<input class="inp" name="extra_pct" type="number" min="0" max="100" inputmode="numeric" placeholder="0"></label>
+        <label class="chk" style="align-self:end"><input type="checkbox" name="minimo_aparte"> La compra mínima no cuenta el regalo</label></div>
+      <span class="hintp" data-pregalo hidden>Ej. Top 1: bebida de regalo con compra mínima $5.500 sin contar el regalo (tiene que sumar algo más). Si querés, el regalo puede sumar además un % off en lo demás.</span>
       <div class="row2"><label>Solo con la compra de (opcional)<select class="inp" name="requiere"><option value="">Cualquier pedido</option>${P.products.filter((x) => x.activo !== false).map((x) => `<option value="${esc(x.id)}">${esc(String(x.nombre).trim())}</option>`).join("")}</select></label>
         <label>Vale desde (opcional)<input class="inp" name="desde" type="datetime-local"></label></div>
       <span class="hintp">"Solo con la compra de": el código entra únicamente si el pedido lleva ese producto (ej. mochi de regalo con un Spooky Set). Ese producto no cuenta como el regalo. "Vale desde": antes de esa hora el código no se puede usar.</span>
@@ -1081,16 +1089,18 @@
     const d = Object.fromEntries(new FormData(f)), t = d.tipo, num = (k) => (String(d[k] ?? "").trim() === "" ? null : Math.max(0, Math.round(+d[k] || 0)));
     return { nombre: (d.nombre || "").trim(), tipo: t.startsWith("regalo") ? "regalo" : t, regalo: t.startsWith("regalo:") ? t.slice(7) : null,
       valor: ["porcentaje", "monto"].includes(t) ? num("valor") || 0 : 0, tope: t === "porcentaje" ? num("tope") || 0 : 0,
-      titulo: (d.titulo || "").trim() || tituloDe(t, num("valor")), minimo: num("minimo") || 0, usos_max: num("usos_max") || null, por_cliente: Math.min(50, Math.max(1, num("por_cliente") || 1)),
+      titulo: (d.titulo || "").trim() || tituloDe(t, num("valor"), t.startsWith("regalo:") ? num("extra_pct") : 0), minimo: num("minimo") || 0, usos_max: num("usos_max") || null, por_cliente: Math.min(50, Math.max(1, num("por_cliente") || 1)),
       dias: num("dias") ? Math.min(365, num("dias")) : null, vence_at: d.vence ? `${d.vence}T23:59:59-03:00` : null, acumula: !!d.acumula,
+      ...(t.startsWith("regalo:") && num("extra_pct") ? { extra_pct: Math.min(100, num("extra_pct")) } : {}), ...(t.startsWith("regalo:") && d.minimo_aparte ? { minimo_aparte: true } : {}), // sin la 068 el resto sigue andando
       ...(d.requiere ? { requiere: d.requiere } : {}), ...(d.desde ? { desde_at: `${d.desde}:00-03:00` } : {}), // solo si se usan: sin la migración 054 el resto sigue andando
       prefijo: (d.prefijo || "SETTO").trim().toUpperCase() || "SETTO", code: (d.code || "").trim().toUpperCase() };
   };
   function promoPintar(f) {
     const t = f.elements.tipo.value, conValor = ["porcentaje", "monto"].includes(t);
     f.querySelector("[data-pval]").hidden = !conValor; f.querySelector("[data-ptope]").hidden = t !== "porcentaje";
+    f.querySelectorAll("[data-pregalo]").forEach((el) => { el.hidden = !t.startsWith("regalo:"); });
     f.querySelector("[data-pvalor]").firstChild.textContent = t === "monto" ? "Cuánto ($)" : "Cuánto (%)";
-    f.elements.titulo.placeholder = tituloDe(t, +f.elements.valor.value || 0);
+    f.elements.titulo.placeholder = tituloDe(t, +f.elements.valor.value || 0, t.startsWith("regalo:") ? +f.elements.extra_pct.value || 0 : 0);
     f.querySelector("[data-pcosto]").textContent = "💸 " + costoTxt(leerPromo(f));
   }
   function promoValidar(p) {
@@ -1228,10 +1238,12 @@
           <p class="hintp" style="margin-bottom:12px">Sale <b>sola</b> cada vez que se cumple la condición. Se guarda <b>pausada</b>: la revisás, te mandás una prueba y recién ahí la prendés.</p>
           <form class="pcard cform" id="autoForm">
             <fieldset class="cpaso"><legend><i>1</i> ¿Cuándo sale?</legend>
-              <label>Sale cuando…<select class="inp" name="disparador"><option value="compra">Pasan X días desde la última compra</option><option value="premio">Un premio de la maquinita está por vencer</option><option value="producto">Un producto está en promo</option></select></label>
+              <label>Sale cuando…<select class="inp" name="disparador"><option value="compra">Pasan X días desde la última compra</option><option value="premio">Un premio de la maquinita está por vencer</option><option value="producto">Un producto está en promo</option><option value="top">Premio del Top del mes (el 1 de cada mes)</option></select></label>
               <p class="cdato" data-ccuando></p>
               <label data-solo="compra">Días después de la última compra<input class="inp" name="dias" type="number" min="1" max="365" value="7"></label>
               <label data-solo="premio" hidden>Horas antes de que venza<input class="inp" name="horas" type="number" min="3" max="46" value="24"></label>
+              <div class="row2" data-solo="top" hidden><label>Desde el puesto<input class="inp" name="top_desde" type="number" min="1" max="10" value="1"></label>
+                <label>Hasta el puesto<input class="inp" name="top_hasta" type="number" min="1" max="10" value="1"></label></div>
               <label data-solo="producto" hidden>Producto en promo<select class="inp" name="producto"><option value="">Elegí un producto</option>${P.products.filter((x) => x.activo !== false).map((x) => `<option value="${esc(x.id)}">${esc(String(x.nombre).trim())}</option>`).join("")}</select></label></fieldset>
             <fieldset class="cpaso"><legend><i>2</i> ¿A quién le llega?</legend>
               <label data-solo="compra">Grupo de clientes<select class="inp" name="segmento">${SEGS.map(([k, n]) => `<option value="${k}"${k === "todos" ? " selected" : ""}>${n}</option>`).join("")}</select></label>
@@ -1241,7 +1253,7 @@
             <fieldset class="cpaso"><legend><i>3</i> ¿Qué mensaje?</legend>
               <div data-tplbox><span class="muted">Cargando plantillas…</span></div>
               <div data-varsbox class="varsbox"></div></fieldset>
-            <fieldset class="cpaso" data-solo="compra producto"><legend><i>4</i> <span data-ldesc>¿Le sumás un descuento? <small>opcional</small></span></legend>
+            <fieldset class="cpaso" data-solo="compra producto top"><legend><i>4</i> <span data-ldesc>¿Le sumás un descuento? <small>opcional</small></span></legend>
               <div data-promobox class="varsbox"></div></fieldset>
             <fieldset class="cpaso"><legend><i data-nres>5</i> Revisá y guardá</legend>
               <label>Nombre (para vos)<input class="inp" name="nombre" required placeholder="Ej: Segunda compra a los 7 días"></label>
@@ -1254,6 +1266,7 @@
               <li><b>Después de una compra:</b> salen todos los días a las 11 h a quien cumple los días desde su última compra entregada. Una sola vez por compra (si vuelve a comprar, el reloj arranca de nuevo). Al prenderla arranca con quienes cumplan desde ese día: no le escribe a compras viejas.</li>
               <li><b>Premio de la maquinita:</b> revisa cada hora de 10 a 20 h quién ganó, guardó el premio con su celular y no lo usó. Un solo aviso por premio, con el código y el vencimiento reales, nunca con menos de 2 h por delante. Si esa persona te escribió en las últimas 24 h va gratis; si no, se paga.</li>
               <li><b>Promo de un producto:</b> revisa cada hora de 10 a 20 h mientras el código elegido esté activo. Le escribe a quien pidió ese producto últimamente y/o lo tiene de favorito, una sola vez por persona y por promo, y nunca a quien ya lo volvió a pedir.</li>
+              <li><b>Premio del Top del mes:</b> el día 1 (desde las 10 h) le escribe a quien terminó el mes anterior en los puestos elegidos, con su código personal. Una sola vez por persona y mes. Al ser un premio, no espera los 7 días.</li>
               <li><b>En todas:</b> solo a quienes aceptaron novedades por WhatsApp, y nadie recibe dos mensajes de campaña en 7 días.</li>
             </ul></details></section>
       </div>
@@ -1299,7 +1312,7 @@
       af.querySelectorAll("[data-solo]").forEach((el) => { el.hidden = !el.dataset.solo.split(" ").includes(d); });
       const ul = af.querySelector("[data-ultimos]"); ul.hidden = ul.hidden || af.elements.audiencia.value === "favorito";
       af.querySelector("[data-nres]").textContent = d === "premio" ? "4" : "5";
-      af.querySelector("[data-ldesc]").innerHTML = d === "producto" ? "¿Con qué código? <small>obligatorio: la automática sale mientras esté activo</small>" : "¿Le sumás un descuento? <small>opcional</small>";
+      af.querySelector("[data-ldesc]").innerHTML = d === "producto" ? "¿Con qué código? <small>obligatorio: la automática sale mientras esté activo</small>" : d === "top" ? "¿Qué premio? <small>el código personal que le llega (dura lo que diga el código)</small>" : "¿Le sumás un descuento? <small>opcional</small>";
       promoCampo(af); campResumen(af); };
     af.addEventListener("change", (e) => {
       if (e.target.name === "disparador" || e.target.name === "audiencia") autoTipo();
@@ -1312,13 +1325,15 @@
     autoTipo();
     // el resumen ("le llega a… por WhatsApp… falta…") se actualiza con cada cambio
     [cf, af].forEach((f) => { f.addEventListener("input", () => campResumen(f)); f.addEventListener("change", () => setTimeout(() => campResumen(f))); });
-    enganchar(af, async (v) => { const premio = v.d.disparador === "premio", prod = v.d.disparador === "producto";
+    enganchar(af, async (v) => { const premio = v.d.disparador === "premio", prod = v.d.disparador === "producto", top = v.d.disparador === "top";
       if (prod && !v.d.producto) throw new Error("Elegí el producto en promo");
+      if (top && !v.d.promo_id) throw new Error("Elegí el código del premio (paso 4)");
+      const td = Math.max(1, Math.min(10, +v.d.top_desde || 1)), th = Math.max(td, Math.min(10, +v.d.top_hasta || td));
       if (prod && !v.d.promo_id) throw new Error("Elegí el código de descuento: la automática sale mientras ese código esté activo");
-      const datos = { nombre: v.d.nombre.trim(), disparador: v.d.disparador, segmento: premio || prod ? "todos" : v.d.segmento,
-        dias: premio ? null : prod ? (v.d.audiencia === "favorito" ? null : Math.max(1, Math.min(365, +v.d.dias_prod || 60))) : Math.max(1, Math.min(365, +v.d.dias || 7)),
+      const datos = { nombre: v.d.nombre.trim(), disparador: v.d.disparador, segmento: premio || prod || top ? "todos" : v.d.segmento,
+        dias: premio || top ? null : prod ? (v.d.audiencia === "favorito" ? null : Math.max(1, Math.min(365, +v.d.dias_prod || 60))) : Math.max(1, Math.min(365, +v.d.dias || 7)),
         horas: premio ? Math.max(3, Math.min(46, +v.d.horas || 24)) : null, plantilla: v.plantilla, idioma: v.idioma, variables: v.variables,
-        ...(prod ? { producto: v.d.producto, audiencia: v.d.audiencia } : {}), ...(premio ? {} : v.promo) };
+        ...(prod ? { producto: v.d.producto, audiencia: v.d.audiencia } : {}), ...(top ? { top_desde: td, top_hasta: th } : {}), ...(premio ? {} : v.promo) };
       // al editar se guarda encima (si estaba prendida, sigue prendida con los cambios); sin código elegido, se le saca el que tenía
       if (af.dataset.edit) { await API.updateAutomation(af.dataset.edit, { promo_id: null, ...datos }); toast("Cambios guardados"); }
       else { await API.createAutomation(datos); toast("Guardada. Revisala y tocá Prender"); }
@@ -1362,6 +1377,7 @@
     if (tipo === "camp") { const n = conPermiso(x.segmento); return `WhatsApp → ${esc(segNom(x.segmento))}${n === null ? "" : ` · ${personas(n)} con permiso`}`; }
     if (x.disparador === "premio") return "WhatsApp → quien ganó un premio en la maquinita y no lo usó";
     if (x.disparador === "producto") return `WhatsApp → quienes ${AUD[x.audiencia] || "pidieron el producto"}`;
+    if (x.disparador === "top") return `WhatsApp → ${x.top_desde ? puestosTxt(x) : "los puestos elegidos"} del Top del mes`;
     const n = conPermiso(x.segmento); return `WhatsApp → ${esc(segNom(x.segmento))}${n === null ? "" : ` (hoy ${personas(n)} con permiso)`}`;
   }
   function estadoDe(x, tipo) {
@@ -1393,23 +1409,25 @@
     const box = f.querySelector("[data-cres]"); if (!box) return;
     const d = Object.fromEntries(new FormData(f)), auto = f.id === "autoForm", disp = d.disparador || "compra";
     const vars = [...f.querySelectorAll("[data-cvar]")];
-    const x = auto ? { disparador: disp, segmento: disp === "compra" ? d.segmento : "todos", audiencia: d.audiencia, plantilla: d.plantilla, promo_id: d.promo_id } : { segmento: d.segmento, plantilla: d.plantilla, promo_id: d.promo_id };
+    const x = auto ? { disparador: disp, segmento: disp === "compra" ? d.segmento : "todos", audiencia: d.audiencia, plantilla: d.plantilla, promo_id: d.promo_id, top_desde: +d.top_desde || 1, top_hasta: Math.max(+d.top_desde || 1, +d.top_hasta || 1) } : { segmento: d.segmento, plantilla: d.plantilla, promo_id: d.promo_id };
     const n = disp === "compra" || !auto ? conPermiso(x.segmento) : null;
     // paso "a quién": cuántos hay hoy
     const q = f.querySelector("[data-cquien]");
-    if (q) q.innerHTML = auto && disp !== "compra" ? (disp === "premio" ? "Le llega a quien ganó un premio en la maquinita, guardó su celular y todavía no lo usó." : "Le llega a quienes eligieron arriba, siempre que hayan aceptado novedades.")
+    if (q) q.innerHTML = auto && disp === "top" ? "Le llega a quien terminó el mes en esos puestos (lo gastado en la web y en el local con su celular), si aceptó novedades por WhatsApp. Si alguien del podio no aceptó, no se corre la lista: ese premio no sale."
+      : auto && disp !== "compra" ? (disp === "premio" ? "Le llega a quien ganó un premio en la maquinita, guardó su celular y todavía no lo usó." : "Le llega a quienes eligieron arriba, siempre que hayan aceptado novedades.")
       : n === null ? "" : n ? `Hoy hay <b>${personas(n)}</b> en este grupo que aceptaron WhatsApp.` : "Hoy no hay nadie con permiso en este grupo: no le llegaría a nadie.";
     const c = f.querySelector("[data-ccuando]");
-    if (c) c.innerHTML = disp === "premio" ? "Revisa cada hora de 10 a 20 h y avisa una sola vez por premio." : disp === "producto" ? "Revisa cada hora de 10 a 20 h mientras el código del paso 4 esté activo." : "Sale todos los días a las 11 h a quien cumple los días desde su última compra entregada. Una vez por compra.";
+    if (c) c.innerHTML = disp === "top" ? "Sale el día 1 de cada mes (desde las 10 h) con el ranking del mes que terminó. Una sola vez por persona y mes." : disp === "premio" ? "Revisa cada hora de 10 a 20 h y avisa una sola vez por premio." : disp === "producto" ? "Revisa cada hora de 10 a 20 h mientras el código del paso 4 esté activo." : "Sale todos los días a las 11 h a quien cumple los días desde su última compra entregada. Una vez por compra.";
     const falta = [];
     if (!d.plantilla) falta.push(P.tpls && !P.tpls.some((y) => y.estado === "APPROVED") ? 'un mensaje aprobado: armalo en <button type="button" class="linkbtn" data-ctab-go="tpls">Plantillas</button>' : "elegir el mensaje (paso " + (auto ? 3 : 2) + ")");
     else if (vars.some((v) => !v.value.trim())) falta.push("completar qué va en cada variable del mensaje");
     if (auto && disp === "producto" && !d.producto) falta.push("elegir el producto en promo (paso 1)");
     if (auto && disp === "producto" && !d.promo_id) falta.push("elegir el código (paso 4)");
+    if (auto && disp === "top" && !d.promo_id) falta.push("elegir el código del premio (paso 4)");
     if (!auto && n === 0) falta.push("que haya alguien con permiso en este grupo (hoy son 0): elegí otro grupo");
     if (!(d.nombre || "").trim()) falta.push("ponerle un nombre");
     const quien = auto ? destinoTxt(x, "auto") : destinoTxt(x, "camp");
-    const cuando = auto ? `Sale sola · ${disp === "premio" ? `${d.horas || 24} h antes de que venza el premio` : disp === "producto" ? "mientras el código esté activo" : `${d.dias || 7} ${+d.dias === 1 ? "día" : "días"} después de la última compra`}` : "Sale una sola vez, cuando toques Mandar";
+    const cuando = auto ? `Sale sola · ${disp === "top" ? `el 1 de cada mes, ${puestosTxt(x)}` : disp === "premio" ? `${d.horas || 24} h antes de que venza el premio` : disp === "producto" ? "mientras el código esté activo" : `${d.dias || 7} ${+d.dias === 1 ? "día" : "días"} después de la última compra`}` : "Sale una sola vez, cuando toques Mandar";
     const costo = !auto && n ? `Cuesta ≈ ${usd(n * COSTO_WA)} (≈ US$0,06 por persona, lo cobra Meta).` : auto ? "Cada mensaje cuesta ≈ US$0,06 (gratis si esa persona te escribió en las últimas 24 h)." : "";
     const promo = d.promo_id && P.promos && P.promos.find((y) => y.id === d.promo_id);
     box.innerHTML = `<div class="cresgrid"><div><span class="eyebrow">Resumen</span>
@@ -1424,7 +1442,7 @@
     const E = f.elements, val = (k, v) => { if (E[k] && v !== null && v !== undefined) E[k].value = v; };
     val("nombre", a.nombre); val("disparador", a.disparador || "compra"); val("segmento", a.segmento);
     if (a.disparador === "producto") { val("producto", a.producto || ""); val("audiencia", a.audiencia || "ambos"); val("dias_prod", a.dias || 60); }
-    else if (a.disparador === "premio") val("horas", a.horas); else val("dias", a.dias);
+    else if (a.disparador === "premio") val("horas", a.horas); else if (a.disparador === "top") { val("top_desde", a.top_desde); val("top_hasta", a.top_hasta); } else val("dias", a.dias);
     E.disparador.dispatchEvent(new Event("change", { bubbles: true })); // muestra los campos del tipo y arma el código
     if (E.promo_id) E.promo_id.value = a.promo_id || "";
     const pl = f.querySelector("[name=plantilla]"); if (pl) { if (pl.tagName === "SELECT") pl.innerHTML = `<option value="${esc(a.plantilla)}" selected></option>`; pl.value = a.plantilla; }
@@ -2245,7 +2263,7 @@
         b.disabled = true; try { await API.testAutomation(id, ph); toast("Prueba enviada"); } catch (err) { toast(err.message); } b.disabled = false; return;
       }
       if (b.dataset.aborrar !== undefined && !confirm(`¿Borrar "${a.nombre}"? Deja de mandarse; lo que ya salió queda registrado.`)) return;
-      const cuando = a.disparador === "premio" ? "Revisa cada hora de 10 a 20 h quién tiene un premio de la maquinita por vencer."
+      const cuando = a.disparador === "top" ? `El ${proximoUno()} desde las 10 h le llega a ${puestosTxt(a)} del Top de este mes, si aceptó novedades.` : a.disparador === "premio" ? "Revisa cada hora de 10 a 20 h quién tiene un premio de la maquinita por vencer."
         : a.disparador === "producto" ? "Revisa cada hora de 10 a 20 h, mientras el código esté activo, quién pidió el producto o lo tiene de favorito."
         : `Desde mañana a las 11 le llega sola a quien cumpla ${a.dias} ${a.dias === 1 ? "día" : "días"} desde su última compra.`;
       if (b.dataset.aonoff !== undefined && !a.activa && !confirm(`¿Prender "${a.nombre}"? ${cuando}`)) return;
