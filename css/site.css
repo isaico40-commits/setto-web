@@ -1322,3 +1322,13 @@ body[data-page="listo"] .benef{grid-template-columns:minmax(0,520px);justify-con
 #resGrid{align-items:start}
 .rv p{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .ar-list .rv p,.s-rvlist .rv p{display:block;-webkit-line-clamp:unset}
+
+/* Carta con 3 categorías en pantallas medianas (561–1000 px): la tarjeta se apila (foto + flecha arriba, texto abajo) para que el botón no pise el texto */
+@media (min-width:561px) and (max-width:1000px){
+  .switch.tres .sw{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"th go" "tx tx";align-items:start;gap:10px;padding:10px 12px 14px 10px}
+  .switch.tres .sw-th{grid-area:th;width:56px;height:56px}
+  .switch.tres .sw-go{grid-area:go;justify-self:end}
+  .switch.tres .sw-tx{grid-area:tx;padding-left:4px}
+  .switch.tres .sw-tx b{font-size:1.25rem}
+  .switch.tres .sw-tx small{display:block;margin-top:2px}
+}
