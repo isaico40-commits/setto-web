@@ -649,6 +649,8 @@
         <label class="topshow"><input type="checkbox" id="topShow" ${P.topShow ? "checked" : ""}> Vista para mostrar</label></div></div>
         <div class="pcard topweb"><div class="topwebrow"><label class="topshow"><input type="checkbox" id="topWeb" ${(P.settings.top_club || {}).activo ? "checked" : ""}> Mostrar el Top del mes en la web</label>
           <label class="topshow">Puestos <select class="inp" id="topCuantos" style="width:auto">${[3, 5, 10].map((n) => `<option ${((P.settings.top_club || {}).cuantos || 5) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>
+          <div class="row3 toppremios">${[1, 2, 3].map((n) => `<label>Premio del ${n}°<input class="inp" id="topP${n}" maxlength="40" placeholder="${["Ej: Una bebida de regalo", "Ej: Un mochi de regalo", "Ej: 10% off"][n - 1]}" value="${esc(((P.settings.top_club || {}).premios || [])[n - 1] || "")}"></label>`).join("")}</div>
+          <span class="hintp">Los premios se ven en la web, en el Top y en el recuadro de arriba, para que sepan que comprar tiene premio. Dejalos vacíos si no hay. Se mandan solos el día 1 con las automáticas de "Premio del Top del mes".</span>
           <span class="hintp">En la web sale el nombre y la inicial del apellido, las compras y los sellos del mes. Al podio se le suma lo gastado redondeado (ej. "$171 mil"). Nunca el celular. Los clientes sin nombre no aparecen. Si alguien no quiere salir, abrí su ficha y tocá "Sacar del Top de la web".</span></div>
         <div id="topBox"><p class="muted">Cargando…</p></div>
         <p class="hintp" style="margin-top:10px">Suma los pedidos web entregados y las compras del local cobradas con celular. Lo cargado a mano en la Caja sin celular no entra. "Vista para mostrar" esconde celulares y redondea la plata del podio, como en la web (que muestra solo el Top del mes).</p></section>
@@ -676,11 +678,12 @@
     });
     $("#topShow").addEventListener("change", (e) => { P.topShow = e.target.checked; renderTop(); });
     const guardarTopWeb = async () => {
-      const v = { activo: $("#topWeb").checked, cuantos: +$("#topCuantos").value || 5 };
+      const v = { activo: $("#topWeb").checked, cuantos: +$("#topCuantos").value || 5, premios: [1, 2, 3].map((n) => $("#topP" + n).value.trim()) };
       try { await API.saveSetting("top_club", v); P.settings.top_club = v; toast(v.activo ? "Listo: el Top del mes ya se ve en la web" : "Listo: el Top ya no se ve en la web"); }
       catch (err) { toast(err.message); }
     };
     $("#topWeb").addEventListener("change", guardarTopWeb); $("#topCuantos").addEventListener("change", guardarTopWeb);
+    [1, 2, 3].forEach((n) => $("#topP" + n).addEventListener("change", guardarTopWeb));
     listClients(); renderTop();
     if (P.client) openClient(P.client);
   }
