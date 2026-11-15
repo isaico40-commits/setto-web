@@ -1336,7 +1336,7 @@ body[data-page="listo"] .benef{grid-template-columns:minmax(0,520px);justify-con
 .bpasos small{font-size:.75rem;color:var(--ink-2);line-height:1.3}
 .dtlist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .dt{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;padding:6px 10px 6px 6px;border-radius:14px;background:var(--bg)}
-.dt.d1{background:var(--coral-2)}
+.dt.d1{background:var(--bg);box-shadow:inset 0 0 0 2px var(--coral)}
 .dtpos{width:34px;height:34px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-family:var(--display);font-size:1rem;color:var(--turquesa)}
 .dt.d1 .dtpos{background:none}
 .dtpos img{width:34px;height:auto}
@@ -1421,7 +1421,6 @@ body[data-page="listo"] .benef{grid-template-columns:minmax(0,520px);justify-con
 }
 
 /* Premios del podio del Top del mes (settings.top_club.premios): en la tarjeta y en el pop up */
-.dtn small.dtpr{color:var(--turquesa);font-weight:700}
 .toppremios{list-style:none;margin:0 auto 22px;padding:0;max-width:760px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .toppremios[hidden]{display:none}
 .tpr{display:grid;justify-items:center;align-content:start;gap:2px;text-align:center;padding:12px 10px;border-radius:18px;background:color-mix(in srgb,var(--coral) 22%,var(--card));border:1.5px dashed color-mix(in srgb,var(--turquesa) 45%,transparent)}
