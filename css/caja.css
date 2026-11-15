@@ -264,3 +264,12 @@ body.caja.consel{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 .vdet{display:grid;gap:6px;margin-top:12px;background:var(--card);border-radius:16px;padding:12px 14px;border:1.5px solid color-mix(in srgb,var(--turquesa) 22%,transparent);font-size:.88rem}
 .vdet div{display:flex;justify-content:space-between;gap:10px}
 .vdet .hintp{margin:2px 0 0}
+
+/* cuenta a cobrar de una app (PedidosYa) */
+.saldo.app{background:var(--card);border-style:dashed}
+.saldo.app.solo{grid-column:1/-1}
+.saldo.app .v{font-size:clamp(1.3rem,5vw,1.6rem)}
+.pctrow{margin-top:14px;padding-top:14px;border-top:var(--line)}
+.pctin{display:flex;align-items:center;gap:8px}
+.pctin input{width:90px}
+.pctin .btn{margin-left:auto}
