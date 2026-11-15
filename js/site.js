@@ -290,9 +290,16 @@
     const reales = HS.map((x, i) => card(x, i, false)).join(""), copias = HS.length > 1 ? HS.map((x, i) => card(x, i, true)).join("") : "";
     $("#heroSlides").innerHTML = copias + reales + copias;
     document.querySelector(".hnav").hidden = HS.length < 2;
+    // portada sin texto en las fotos (lo normal en prod): un solo texto fijo de marca encima, con el precio del mochi
+    const sinTxt = HS.every((x) => x.tipo === "media" || !((x.titulo || "").trim() || (x.texto || "").trim()));
+    $("#heroBox").classList.toggle("concap", sinTxt); $("#heroCap").hidden = !sinTxt; heroPrecio();
     heroI = 0; heroIr(0, false); heroAuto();
     const f = document.querySelector('#heroSlides .hcard[data-hi="0"]:not(.clon) img');
     if (!f || f.complete) heroResto(); else { f.addEventListener("load", heroResto, { once: true }); f.addEventListener("error", heroResto, { once: true }); setTimeout(heroResto, 4000); }
+  }
+  function heroPrecio() {
+    const el = $("#heroPrecio"); if (!el) return;
+    const m = mochiRef(); el.hidden = !m; if (m) el.textContent = `Mochis desde ${money(m)}`;
   }
   function heroResto() {
     document.querySelectorAll("#heroSlides [data-srcset]").forEach((el) => { el.srcset = el.dataset.srcset; el.removeAttribute("data-srcset"); });
@@ -2096,7 +2103,7 @@
   let pintado = false;
   function pintar(settings, products) {
     S = settings; adapt(products); syncCart();
-    renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); renderClubInfo(); renderMaquinita(); renderFooter(); renderBadge();
+    renderTema(); renderHero(); renderUbicacion(); renderStickers(); renderFaq(); renderAbierto(); renderGift(); renderGiftHome(); renderApps(); renderConviene(); renderEspecial(); renderSets(); renderCarta(); heroPrecio(); renderClubInfo(); renderMaquinita(); renderFooter(); renderBadge();
     abrirProductoDelLink();
     if (pintado) return;
     pintado = true;
