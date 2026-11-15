@@ -1063,7 +1063,9 @@
     $("#club").hidden = c.activo === false;
     const spp = c.sellos_por_pedido ?? 1;
     $("#clubTit").textContent = `${spp === 1 ? "1 sello" : spp + " sellos"} por pedido`;
-    $("#clubPremio").textContent = `Con ${c.meta || 8} sellos, tu pedido viene con ${premioTxt()}.` + (c.minimo > 0 ? ` Suman los pedidos desde ${money(c.minimo)}.` : "");
+    // el premio en negrita: "un set de regalo" y el "% off"
+    const premio = esc(premioTxt()).replace("un set de regalo", "<b>un set de regalo</b>").replace(/(\d+% off)/, "<b>$1</b>");
+    $("#clubPremio").innerHTML = `Con ${c.meta || 8} sellos, tu pedido viene con ${premio}.` + (c.minimo > 0 ? ` Suman los pedidos desde ${esc(money(c.minimo))}.` : "");
     renderValor();
 
     renderBeneficios();
