@@ -1367,13 +1367,13 @@ body[data-page="listo"] .benef{grid-template-columns:minmax(0,520px);justify-con
 }
 
 /* Luckyslot del Club: mini maquinita con botón Tirar y palanca (vuelve la de antes, en chico) */
-.bcard.dmaq{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-content:start;column-gap:14px;row-gap:16px;align-items:start}
+.bcard.dmaq{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;column-gap:14px;row-gap:18px;align-items:start}
 .bcard.dmaq[hidden]{display:none}
 .bcard.dmaq .bhd{grid-column:1;grid-row:1}
-.bcard.dmaq .bpasos{grid-column:1;grid-row:2}
+.bcard.dmaq .bpasos{grid-column:1;grid-row:3}
 .bcard.dmaq .bpasos li{grid-template-columns:24px 1fr;align-items:center}
 .bcard.dmaq .bpasos li::before{grid-row:auto;width:24px;height:24px}
-.maqcard.mini{grid-column:2;grid-row:1/span 2;align-self:center;justify-self:end;width:168px;max-width:none;padding:0 24px 8px 0}
+.maqcard.mini{grid-column:1;grid-row:2;justify-self:center;width:236px;max-width:100%;padding:4px 30px 8px 0;--mz:1.3}
 .maqcard.mini .sl-cab{gap:8px;border-radius:22px 22px 14px 14px;padding:10px 8px 12px;box-shadow:inset 0 0 0 2px rgba(242,193,78,.55),4px 4px 0 var(--turquesa-2)}
 .maqcard.mini .sl-top{padding:5px 6px 5px;border-width:2px;border-radius:50% 50% 10px 10px / 22px 22px 10px 10px}
 .maqcard.mini .sl-top span{font-size:.5rem}
@@ -1390,9 +1390,25 @@ body[data-page="listo"] .benef{grid-template-columns:minmax(0,520px);justify-con
 .maqcard.mini .sl-eje{bottom:18px;width:16px;height:22px}
 .maqcard.mini .sl-brazo{left:10px;bottom:28px;width:5px;height:66px}
 .maqcard.mini .sl-bola{top:-10px;width:18px;height:18px;margin-left:-9px;border-width:2px}
+@media (min-width:761px){
+  .maqcard.mini .sl-cab{padding:14px 12px 16px;gap:10px}
+  .maqcard.mini .sl-top b{font-size:1.4rem}
+  .maqcard.mini .sl-top span{font-size:.56rem}
+  .maqcard.mini .mq-reel,.maqcard.mini .mq-strip img{height:62px}
+  .maqcard.mini .mq-strip img{padding:7px}
+  .maqcard.mini .mq-tirar{font-size:1.15rem;padding:9px 30px}
+  .maqcard.mini .sl-palanca{top:52px;width:30px;height:126px}
+  .maqcard.mini .sl-eje{width:20px;height:26px}
+  .maqcard.mini .sl-brazo{left:12px;height:84px;width:6px}
+  .maqcard.mini .sl-bola{width:22px;height:22px;margin-left:-11px;top:-12px}
+  .maqcard.mini .sl-pie{right:40px}
+}
 @media (max-width:760px){
-  .bcard.dmaq .bpasos{grid-column:1/-1}
-  .maqcard.mini{grid-row:1;align-self:start;width:146px;padding-right:22px}
+  .bcard.dmaq{grid-template-columns:minmax(0,1fr) auto;row-gap:16px}
+  .bcard.dmaq .bpasos{grid-column:1/-1;grid-row:2}
+  .maqcard.mini{grid-column:2;grid-row:1;align-self:start;justify-self:end;width:146px;padding:0 22px 8px 0}
+  .maqcard.mini .sl-cab{padding:10px 8px 12px}.maqcard.mini .sl-top b{font-size:.95rem}.maqcard.mini .sl-top span{font-size:.5rem}.maqcard.mini .mq-tirar{font-size:.9375rem;padding:6px 18px}
+  .maqcard.mini .sl-palanca{top:40px;width:24px;height:100px}.maqcard.mini .sl-brazo{height:66px}
   .maqcard.mini .mq-reel,.maqcard.mini .mq-strip img{height:40px}
   .maqcard.mini .mq-strip img{padding:5px}
   .maqcard.mini .sl-top b{font-size:.95rem}
