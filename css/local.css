@@ -199,6 +199,9 @@ body[data-view="barra"] .lbar .appsw{display:none}
   .pt-r{display:flex;justify-content:space-between;gap:6px}
   .pt-t{font-weight:700;font-size:14px}
   .pt-cut{break-after:page;page-break-after:always;height:0}
+  .pt-qr{width:32mm;margin:4px auto 2px}
+  .pt-qr svg{display:block;width:100%;height:auto}
+  .pt-qrt{padding:0 2mm}
 }
 
 /* categoría Local: productos que no están en la web (sin foto) */
@@ -210,3 +213,22 @@ body[data-view="barra"] .lbar .appsw{display:none}
 .lpnote{margin:12px 2px 0;font-size:.85rem;color:var(--ink-2)}
 .lpf{display:grid;grid-template-columns:1fr 130px;gap:10px}
 @media (max-width:860px){.tile.lp{min-height:84px}}
+
+/* ---------- Setto Club en el mostrador (065) ---------- */
+.tk-club{display:grid;gap:6px}
+.tk-club .inp{width:100%;padding:9px 11px}
+.cl-h{font-size:.76rem;color:var(--ink-2);margin:0;line-height:1.35}
+.cl-card{display:grid;gap:6px;border:1.5px solid color-mix(in srgb,var(--turquesa) 35%,transparent);border-radius:14px;padding:8px 10px;background:color-mix(in srgb,var(--turquesa) 6%,var(--card))}
+.cl-card.full{border-color:var(--coral);background:color-mix(in srgb,var(--coral) 14%,var(--card))}
+.cl-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:.88rem}
+.cl-top .num{font-weight:700;color:var(--turquesa)}
+.cl-dots{display:flex;gap:4px;flex-wrap:wrap}
+.cl-dots i{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--turquesa);background:transparent}
+.cl-dots i.on{background:var(--turquesa)}
+.cl-premio{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.84rem}
+.cl-ok{font-size:.76rem;color:var(--turquesa);font-weight:600}
+.tg.sm{font-size:.8rem;font-weight:500;gap:8px}
+.tg.sm input{width:16px;height:16px}
+.cl-line{font-size:.86rem;margin:0}
+.cl-row{display:flex;gap:8px}
+.cl-row .inp{flex:1;padding:9px 11px}

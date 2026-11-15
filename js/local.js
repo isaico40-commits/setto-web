@@ -5,6 +5,10 @@
   - Vistas: #tickear (caja del mostrador), #barra (pantalla de pedidos en vivo) y #hoy (comandas del día).
   - Categoría "Local": productos que no están en la web (facturas, etc., tabla local_productos, migración 062)
     y "Otro" para cargar uno suelto con nombre y precio a mano.
+  - Setto Club en el mostrador (migración 065): celular opcional en la comanda. Al quedar cobrada suma el sello sola
+    (mismas reglas que la web); si se anula, lo descuenta. El premio se canjea a mano con "Canjear" (redeem_reward).
+  - Ticket del cliente con QR (migración 066): abre /listo?local=<código> para dejar la reseña de esa compra;
+    si es la primera compra de ese celular, la base regala 1 sello (mismas reglas que la web).
 */
 (function () {
   const cfg = window.SETTO_CONFIG || {};
@@ -44,7 +48,8 @@
     cat: ls.get("setto-local-cat", "set"),
     ticket: ls.get("setto-local-ticket", []), // borrador: sobrevive a un refresco sin querer
     nombre: "", nota: "", desc: 0, verDesc: false,
-    sending: false, vistas: new Set(),
+    tel: "", card: null, wa: false, falta065: false, // Club: celular de la comanda que se está tickeando y su tarjeta
+    sending: false, vistas: new Set(), club: {},
     print: Object.assign({ auto: false, cliente: false, ancho: 80 }, ls.get("setto-local-print", {})),
   };
   const guardarTicket = () => ls.set("setto-local-ticket", S.ticket);
@@ -83,12 +88,14 @@
 
   /* ---------- carga ---------- */
   async function loadBase() {
-    const [prods, pers, socios, lprods] = await Promise.all([
+    const [prods, pers, socios, lprods, club] = await Promise.all([
       sb.from("products").select("id,categoria,nombre,formato,precio,precio_12,precio_16,set_bebida,set_mochi,promo_cant,activo,agotado,orden,img").eq("activo", true).order("orden"),
       sb.from("settings").select("value").eq("key", "personalizacion").maybeSingle(),
       sb.from("caja_socios").select("nombre,activo").order("orden"),
       sb.from("local_productos").select("id,nombre,precio,orden").eq("activo", true).order("orden"),
+      sb.from("settings").select("value").eq("key", "club").maybeSingle(),
     ]);
+    S.club = (!club.error && club.data && club.data.value) || {};
     S.falta062 = !!lprods.error; S.lprods = lprods.error ? [] : lprods.data || [];
     S.prods = fail(prods) || []; S.pers = (fail(pers) || {}).value || {}; S.socios = (fail(socios) || []).filter((s) => s.activo);
     // el borrador guardado se limpia si cambió la carta
@@ -208,12 +215,85 @@
         <span class="tl-p num">${money(precioLinea(l) * l.qty)}</span></li>`; }).join("")}</ul>
       <div class="tk-f">
         <div class="tk-in"><input class="inp" id="tkNombre" placeholder="Nombre (opcional)" maxlength="40" value="${esc(S.nombre)}" autocomplete="off"><input class="inp" id="tkNota" placeholder="Nota para la barra" maxlength="200" value="${esc(S.nota)}" autocomplete="off"></div>
+        <div class="tk-club"><input class="inp" id="tkTel" type="tel" inputmode="tel" placeholder="Celular · Setto Club (opcional)" maxlength="20" value="${esc(S.tel)}" autocomplete="off"><div id="tkCard">${clubHtml()}</div></div>
         ${S.verDesc ? `<label class="tk-desc">Descuento $<input class="inp num" id="tkDesc" inputmode="numeric" value="${S.desc || ""}" placeholder="0"><button class="linkbtn" data-nodesc>Quitar</button></label>` : `<button class="linkbtn" data-desc>+ Descuento</button>`}
         <div class="tk-tot">${S.desc ? `<span>Subtotal <s class="num">${money(subtotal())}</s></span>` : ""}<span>Total</span><b class="num" id="tkTotal">${money(total())}</b></div>
         <div class="tk-acts"><button class="btn solid big" data-cobrar ${S.sending ? "disabled" : ""}>Cobrar <span class="num">${money(total())}</span></button>
         <button class="btn" data-sincobrar ${S.sending ? "disabled" : ""}>Mandar a barra sin cobrar</button></div>
       </div>`;
   }
+  /* ---------- Setto Club en el mostrador ---------- */
+  const telDig = (t) => String(t || "").replace(/\D/g, "");
+  const telOk = (t) => telDig(t).length >= 10;
+  const ult4 = (ph) => "···" + String(ph || "").slice(-4);
+  const puntos = (n, meta) => `<span class="cl-dots" aria-hidden="true">${Array.from({ length: meta }, (_, i) => `<i class="${i < n ? "on" : ""}"></i>`).join("")}</span>`;
+  const falta065Html = `<p class="cl-h">Para sumar sellos desde el local falta correr <b>supabase/migrations/065_local_club.sql</b> en el SQL Editor de Supabase.</p>`;
+  const es065 = (m) => /local_club|comandas_club|column .*phone/i.test(m || "") && /does not exist|no existe|schema cache/i.test(m || "");
+  function clubHtml() {
+    if (S.falta065) return falta065Html;
+    if (!S.tel.trim()) return `<p class="cl-h">Con el celular suma 1 sello en su tarjeta del Club.</p>`;
+    if (!telOk(S.tel)) return `<p class="cl-h">Seguí escribiendo el número (con característica).</p>`;
+    const k = S.card;
+    if (!k) return `<p class="cl-h">Buscando la tarjeta…</p>`;
+    if (k.error) return `<p class="cl-h err">${esc(k.error)}</p>`;
+    if (!k.activo) return `<p class="cl-h">El Club está apagado en Ajustes: esta compra no suma sellos.</p>`;
+    const meta = k.meta || 8, completa = k.sellos >= meta;
+    const suma = total() >= (k.minimo || 0);
+    const wa = k.whatsapp ? `<span class="cl-ok">Recibe novedades por WhatsApp ✓</span>` : `<label class="tg sm"><input type="checkbox" id="tkWa" ${S.wa ? "checked" : ""}> Me dijo que quiere novedades por WhatsApp</label>`;
+    return `<div class="cl-card${completa ? " full" : ""}">
+        <div class="cl-top"><b>${k.existe ? esc(k.nombre || "Cliente del Club") : "Nuevo en el Club"}</b><span class="num">${k.sellos}/${meta}</span></div>
+        ${puntos(Math.min(k.sellos, meta), meta)}
+        ${completa ? `<div class="cl-premio"><span>Completó la tarjeta${k.premio ? `: <b>${esc(k.premio)}</b>` : ""}</span><button class="btn sm solid" data-canje="${esc(k.phone)}">Canjear premio</button></div>`
+          : `<span class="cl-h">${suma ? `Con esta compra queda en ${Math.min(meta, k.sellos + 1)}/${meta}${k.sellos + 1 >= meta ? " y completa la tarjeta" : ""}.` : `No suma sello: la compra mínima es ${money(k.minimo)}.`}</span>`}
+        ${wa}</div>`;
+  }
+  let telT, telSeq = 0;
+  function buscarTarjeta() {
+    clearTimeout(telT); S.card = null;
+    const el = $("#tkCard"); if (el) el.innerHTML = clubHtml();
+    if (!telOk(S.tel) || S.falta065) return;
+    const seq = ++telSeq, tel = S.tel;
+    telT = setTimeout(async () => {
+      const r = await sb.rpc("local_club_ver", { p_phone: tel });
+      if (seq !== telSeq) return;
+      if (r.error) { if (es065(r.error.message)) S.falta065 = true; else S.card = { error: clean(r.error.message) }; }
+      else {
+        S.card = r.data;
+        // si el cliente ya tiene nombre en el Club y la comanda no, se completa solo
+        if (r.data.nombre && !S.nombre.trim()) { S.nombre = r.data.nombre; const n = $("#tkNombre"); if (n) n.value = S.nombre; }
+      }
+      const c = $("#tkCard"); if (c) c.innerHTML = clubHtml();
+    }, 350);
+  }
+  // anota el celular en la comanda; la base suma el sello si ya está cobrada (o cuando se cobre)
+  async function anotarClub(c, tel, wa) {
+    const r = await sb.rpc("local_club", { p_id: c.id, p_phone: tel, p_whatsapp: !!wa });
+    if (r.error) { if (es065(r.error.message)) S.falta065 = true; throw new Error(S.falta065 ? "falta correr la migración 065" : clean(r.error.message)); }
+    S.comandas = S.comandas.map((x) => (x.id === r.data.comanda.id ? r.data.comanda : x));
+    return r.data;
+  }
+  function premioSheet(k) {
+    openSheet(`<div class="sh"><h3>¡Completó la tarjeta!</h3><button class="x" data-close aria-label="Cerrar">✕</button></div>
+      <p>${esc(k.nombre || "El cliente")} (${ult4(k.phone)}) tiene <b class="num">${k.sellos}/${k.meta}</b> sellos.${k.premio ? ` Premio: <b>${esc(k.premio)}</b>.` : ""}</p>
+      <p class="muted">Si se lo das ahora, tocá Canjear: se descuentan ${k.meta} sellos de la tarjeta. Si lo prefiere para la próxima, queda guardado.</p>
+      <div class="oadd"><button class="btn solid big" data-canje="${esc(k.phone)}">Canjear premio</button></div>
+      <button class="linkbtn" data-close>Lo usa la próxima</button>`);
+  }
+  async function canjear(phone, b) {
+    if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "¿Canjear? Tocá de nuevo"; return; }
+    b.disabled = true;
+    const r = await sb.rpc("redeem_reward", { p_phone: phone });
+    if (r.error) { b.disabled = false; return toast(clean(r.error.message)); }
+    toast(`Premio canjeado · le quedan ${r.data.sellos} sello${r.data.sellos === 1 ? "" : "s"}`);
+    if (!$("#sheet").hidden && $("#sheet [data-canje]")) closeSheet();
+    if (S.card && S.card.phone === phone) {
+      S.card = Object.assign({}, S.card, { sellos: r.data.sellos, canjes: r.data.canjes });
+      // si el premio va en esta comanda, queda a mano el descuento
+      if (S.ticket.length && !S.verDesc) { S.verDesc = true; redrawTicket(); toast("Premio canjeado. Si va en esta comanda, cargalo como descuento"); }
+      const c = $("#tkCard"); if (c) c.innerHTML = clubHtml();
+    }
+  }
+
   function redrawTicket() {
     const tk = $("#tk"); if (!tk) return;
     const a = document.activeElement && document.activeElement.id; tk.innerHTML = ticketHtml();
@@ -329,14 +409,19 @@
     if (S.sending || !S.ticket.length || !needMe()) return;
     S.sending = true; redrawTicket(); if (C) drawCobro();
     try {
-      const c = fail(await sb.rpc("local_crear", { p_items: lineasParaBase(), p_nombre: S.nombre.trim() || null, p_nota: S.nota.trim() || null, p_descuento: S.desc || 0, p_pago: pago || null, p_paga_con: pago === "efectivo" && con != null ? con : null, p_quien: S.me }));
+      let c = fail(await sb.rpc("local_crear", { p_items: lineasParaBase(), p_nombre: S.nombre.trim() || null, p_nota: S.nota.trim() || null, p_descuento: S.desc || 0, p_pago: pago || null, p_paga_con: pago === "efectivo" && con != null ? con : null, p_quien: S.me }));
       if (pago) ls.set("setto-local-pago", pago);
-      S.ticket = []; S.nombre = ""; S.nota = ""; S.desc = 0; S.verDesc = false; guardarTicket();
+      // Club: la comanda ya salió; si falla el sello, no se frena nada y se puede sumar después desde "Hoy"
+      let club = null, clubErr = "";
+      if (telOk(S.tel) && !S.falta065) { try { club = await anotarClub(c, S.tel, S.wa); c = club.comanda; } catch (err) { clubErr = err.message; } }
+      S.ticket = []; S.nombre = ""; S.nota = ""; S.desc = 0; S.verDesc = false; S.tel = ""; S.card = null; S.wa = false; guardarTicket();
       S.comandas = [c, ...S.comandas.filter((x) => x.id !== c.id)];
       closeSheet(); document.body.classList.remove("tk-on");
       S.sending = false; render();
-      toast(`Comanda #${c.numero} a la barra${pago ? " · cobrada" : " · sin cobrar"}${pago === "efectivo" && con != null && con > c.total ? ` · vuelto ${money(con - c.total)}` : ""}`);
+      toast(`Comanda #${c.numero} a la barra${pago ? " · cobrada" : " · sin cobrar"}${pago === "efectivo" && con != null && con > c.total ? ` · vuelto ${money(con - c.total)}` : ""}${club ? (c.sellos ? ` · +${c.sellos} sello (${club.tarjeta.sellos}/${club.tarjeta.meta})` : c.pagado ? "" : " · el sello se suma al cobrar") : ""}`);
+      if (clubErr) setTimeout(() => toast(`No se sumó al Club: ${clubErr}. Probá desde “Hoy”.`), 2700);
       if (S.print.auto) imprimir(c, S.print.cliente && c.pagado ? "ambos" : "comanda");
+      if (club && c.sellos && club.tarjeta.sellos >= club.tarjeta.meta) premioSheet(club.tarjeta);
     } catch (e) { S.sending = false; redrawTicket(); if (C && $("#sheet:not([hidden])")) drawCobro(); toast(e.message); }
   }
   async function cobrarExistente(pago, con) {
@@ -346,7 +431,7 @@
       const c = fail(await sb.rpc("local_cobrar", { p_id: C.comanda.id, p_pago: pago, p_paga_con: pago === "efectivo" && con != null ? con : null, p_quien: S.me }));
       ls.set("setto-local-pago", pago); S.sending = false; closeSheet();
       S.comandas = S.comandas.map((x) => (x.id === c.id ? c : x)); render();
-      toast(`#${c.numero} cobrada${pago === "efectivo" && con != null && con > c.total ? ` · vuelto ${money(con - c.total)}` : ""}`);
+      toast(`#${c.numero} cobrada${pago === "efectivo" && con != null && con > c.total ? ` · vuelto ${money(con - c.total)}` : ""}${c.sellos ? ` · +${c.sellos} sello al Club` : ""}`);
       if (S.print.auto && S.print.cliente) imprimir(c, "cliente");
     } catch (e) { S.sending = false; drawCobro(); toast(e.message); }
   }
@@ -400,6 +485,7 @@
         ${c.descuento ? `<li><span class="tl-main"><b>Descuento</b></span><span class="tl-p num">−${money(c.descuento)}</span></li>` : ""}</ul>
       ${c.nota ? `<p class="bnota">“${esc(c.nota)}”</p>` : ""}
       <div class="tk-tot"><span>Total</span><b class="num">${money(c.total)}</b></div>
+      ${clubComandaHtml(c)}
       <p>${c.pagado ? `Cobrada · <b>${esc(c.pago || "")}</b>${c.paga_con ? ` · pagó con ${money(c.paga_con)}, vuelto ${money(c.paga_con - c.total)}` : ""}` : c.estado === "anulada" ? "" : "<b>Sin cobrar</b>"}</p>
       ${c.estado === "anulada" ? "" : `<div class="og"><div class="chips">
         ${c.pagado ? "" : `<button data-cobrarc="${c.id}">Cobrar</button>`}
@@ -409,6 +495,13 @@
         ${c.estado !== "entregada" ? `<button data-est="${c.id}:entregada">Marcar entregada</button>` : `<button data-est="${c.id}:lista">Volver a “lista”</button>`}
       </div></div>
       <details class="anul"><summary>Anular comanda</summary><input class="inp" id="anMot" maxlength="140" placeholder="¿Por qué? (ej. se cargó dos veces)"><button class="btn sm" data-anular="${c.id}">Anular${c.pagado ? " y sacar de la caja" : ""}</button></details>`}`);
+  }
+  function clubComandaHtml(c) {
+    if (c.phone) return `<p class="cl-line">Setto Club · <b class="num">${ult4(c.phone)}</b> · ${c.sellos ? `sumó ${c.sellos} sello${c.sellos === 1 ? "" : "s"}` : c.estado === "anulada" ? "sin sellos (anulada)" : c.pagado ? "no sumó sello (compra mínima o Club apagado)" : "suma el sello al cobrar"}</p>`;
+    if (c.estado === "anulada") return "";
+    if (S.falta065) return falta065Html;
+    return `<div class="og cl-add"><span class="eyebrow">Setto Club</span><div class="cl-row"><input class="inp" id="cTel" type="tel" inputmode="tel" placeholder="Celular del cliente" maxlength="20" autocomplete="off"><button class="btn sm solid" data-clubc="${c.id}">Sumar</button></div>
+      <label class="tg sm"><input type="checkbox" id="cWa"> Me dijo que quiere novedades por WhatsApp</label></div>`;
   }
   function cambiarPagoSheet(id) {
     const c = S.comandas.find((x) => x.id === id); if (!c) return;
@@ -429,7 +522,18 @@
       ${c.descuento ? `<div class="pt-r"><span>Descuento</span><span>−${money(c.descuento)}</span></div>` : ""}<hr>
       <div class="pt-r pt-t"><span>TOTAL</span><span>${money(c.total)}</span></div>${c.pagado ? `<div class="pt-r"><span>${esc(c.pago || "")}</span><span></span></div>` : ""}
       ${c.paga_con ? `<div class="pt-r"><span>Pagó con</span><span>${money(c.paga_con)}</span></div><div class="pt-r"><span>Vuelto</span><span>${money(c.paga_con - c.total)}</span></div>` : ""}
+      ${c.sellos ? `<hr><div class="pt-m">Setto Club: sumaste ${c.sellos} sello${c.sellos === 1 ? "" : "s"} · ${ult4(c.phone)}</div>` : ""}
+      ${qrResenaHtml(c)}
       <hr><div class="pt-m">No válido como factura · ¡Gracias!</div></div>`;
+  }
+  // QR para dejar la reseña de esta compra (066). Sin código (falta la migración) o sin cobrar, no va.
+  function qrResenaHtml(c) {
+    if (!c.resena_code || !c.pagado || c.estado === "anulada" || typeof window.qrcode !== "function") return "";
+    const url = `${location.origin}/listo?local=${encodeURIComponent(c.resena_code)}`;
+    let svg = "";
+    try { const q = window.qrcode(0, "M"); q.addData(url); q.make(); svg = q.createSvgTag({ cellSize: 3, margin: 0, scalable: true }); } catch (_) { return ""; }
+    const regalo = S.club.activo !== false && S.club.sello_resena !== false;
+    return `<hr><div class="pt-qr">${svg}</div><div class="pt-m pt-qrt">${regalo ? "¿Primera vez en Setto? Escaneá, dejá tu reseña con un comentario o una foto y te regalamos 1 sello del Club." : "Escaneá y contanos qué tal estuvo."}</div>`;
   }
   function imprimir(c, que) {
     const w = S.print.ancho === 58 ? 58 : 80;
@@ -467,18 +571,21 @@
     const t = e.target;
     if (t.id === "tkNombre") S.nombre = t.value;
     else if (t.id === "tkNota") S.nota = t.value;
-    else if (t.id === "tkDesc") { const v = parseMoney(t.value); S.desc = isNaN(v) ? 0 : Math.min(v, subtotal()); const tt = $("#tkTotal"); if (tt) tt.textContent = money(total()); const cb = $("[data-cobrar]"); if (cb) cb.innerHTML = `Cobrar <span class="num">${money(total())}</span>`; }
+    else if (t.id === "tkTel") { const antes = telDig(S.tel); S.tel = t.value; if (telDig(S.tel) !== antes) { S.wa = false; buscarTarjeta(); } }
+    else if (t.id === "tkDesc") { const v = parseMoney(t.value); S.desc = isNaN(v) ? 0 : Math.min(v, subtotal()); const tt = $("#tkTotal"); if (tt) tt.textContent = money(total()); const cb = $("[data-cobrar]"); if (cb) cb.innerHTML = `Cobrar <span class="num">${money(total())}</span>`; const kc = $("#tkCard"); if (kc && S.card) kc.innerHTML = clubHtml(); }
     else if (t.id === "oNota" && O) O.nota = t.value;
     else if (L && ["lNom", "lPre", "lNota"].includes(t.id)) { L[{ lNom: "nombre", lPre: "precio", lNota: "nota" }[t.id]] = t.value; const tt = $("#lTot"); if (tt) tt.textContent = money((parseMoney(L.precio) || 0) * L.qty); }
     else if (t.id === "cCon" && C) { const v = parseMoney(t.value); C.con = isNaN(v) ? null : v; const pos = t.selectionStart; drawCobro(); const n = $("#cCon"); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (_) {} } }
   });
   document.addEventListener("change", (e) => {
+    if (e.target.id === "tkWa") { S.wa = e.target.checked; return; }
     const k = e.target.dataset && e.target.dataset.pcfg; if (!k) return;
     S.print[k] = e.target.checked; ls.set("setto-local-print", S.print);
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("#sheet").hidden && $("#sheet [data-close]")) closeSheet();
     if (e.key === "Enter" && ["lNom", "lPre", "lNota"].includes(e.target.id)) { e.preventDefault(); const b = $("[data-lok]"); if (b && !b.disabled) b.click(); return; }
+    if (e.key === "Enter" && e.target.id === "cTel") { e.preventDefault(); const b = $("[data-clubc]"); if (b && !b.disabled) b.click(); return; }
     if (e.key === "Enter" && e.target.id === "cCon") { e.preventDefault(); const b = $("[data-cobok]"); if (b && !b.disabled) b.click(); }
   });
   document.addEventListener("click", async (e) => {
@@ -551,6 +658,18 @@
     if (d.reimp) { const c = S.comandas.find((x) => x.id === d.reimp); if (c) imprimir(c, "comanda"); return; }
     if (d.reimpcli) { const c = S.comandas.find((x) => x.id === d.reimpcli); if (c) imprimir(c, "cliente"); return; }
     if (d.com) return comandaSheet(d.com);
+    if (d.canje) return canjear(d.canje, b);
+    if (d.clubc) {
+      const tel = ($("#cTel") || {}).value || ""; if (!telOk(tel)) { toast("Poné el celular con característica"); const i = $("#cTel"); if (i) i.focus(); return; }
+      b.disabled = true;
+      try {
+        const r = await anotarClub({ id: d.clubc }, tel, ($("#cWa") || {}).checked);
+        const c = r.comanda, k = r.tarjeta; render();
+        toast(c.sellos ? `+${c.sellos} sello · ${k.sellos}/${k.meta}` : c.pagado ? "Anotado, pero no suma sello (compra mínima o Club apagado)" : "Anotado: el sello se suma al cobrar");
+        if (c.sellos && k.sellos >= k.meta) premioSheet(k); else comandaSheet(c.id);
+      } catch (err) { b.disabled = false; toast(err.message); }
+      return;
+    }
     if (d.cobrarc) { const c = S.comandas.find((x) => x.id === d.cobrarc); if (c) cobrarSheet(c); return; }
     if (d.cambpago) return cambiarPagoSheet(d.cambpago);
     if (d.cpago) { if (!needMe()) return; const [id, k] = d.cpago.split(":"); const c = await rpc("local_cambiar_pago", { p_id: id, p_pago: k, p_quien: S.me }, (x) => `#${x.numero}: ${x.pago}`); if (c) { closeSheet(); render(); } return; }
