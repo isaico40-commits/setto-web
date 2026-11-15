@@ -1085,7 +1085,7 @@
     const sim = (S.maquinita || {}).simbolos || [];
     MQ_IMG = MAQ_BASE.map((d, i) => IMG((sim[i] && sim[i].img) || d, 128)); // Panel → Maquinita → símbolos
     $("#dMaq").hidden = off;
-    $("#dMaqTx").textContent = "Tirá gratis y mirá qué sale. Si juntás iguales, te llevás un premio.";
+    $("#dMaqTx").textContent = "¡Tragamonedas con premios para tu siguiente compra!";
     document.querySelectorAll("#mqCard .mq-strip").forEach((st, i) => { st.innerHTML = `<img src="${esc(MQ_IMG[i])}" alt="" loading="lazy" decoding="async">`; });
     renderDestacados();
   }
