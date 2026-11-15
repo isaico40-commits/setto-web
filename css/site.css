@@ -1301,11 +1301,6 @@ article.set,article.item,article.prem{cursor:pointer}
 @media (max-width:760px){
   .benef{grid-template-columns:1fr;gap:12px}
   .bcard{padding:18px;gap:12px}
-  .bcard.dmaq{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:12px}
-  .bcard.dmaq[hidden]{display:none}
-  .bcard.dmaq .bhd{grid-column:1}
-  .bcard.dmaq .dreels{grid-column:2;grid-row:1;align-self:start}
-  .bcard.dmaq .bpasos,.bcard.dmaq .dbtns{grid-column:1/-1}
   .bhd h3{font-size:1.25rem}
 }
 /* en /listo la tarjeta de sellos va sola */
@@ -1369,4 +1364,42 @@ body[data-page="listo"] .benef{grid-template-columns:minmax(0,520px);justify-con
   .hcap-s{font-size:.875rem}
   .hcap-b.btn{padding:9px 18px;font-size:.875rem}
   .hcar.concap .hcard::after{background:linear-gradient(0deg,rgba(20,24,22,.7) 0%,rgba(20,24,22,.38) 36%,rgba(20,24,22,0) 60%)}
+}
+
+/* Luckyslot del Club: mini maquinita con botón Tirar y palanca (vuelve la de antes, en chico) */
+.bcard.dmaq{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-content:start;column-gap:14px;row-gap:16px;align-items:start}
+.bcard.dmaq[hidden]{display:none}
+.bcard.dmaq .bhd{grid-column:1;grid-row:1}
+.bcard.dmaq .bpasos{grid-column:1;grid-row:2}
+.bcard.dmaq .bpasos li{grid-template-columns:24px 1fr;align-items:center}
+.bcard.dmaq .bpasos li::before{grid-row:auto;width:24px;height:24px}
+.maqcard.mini{grid-column:2;grid-row:1/span 2;align-self:center;justify-self:end;width:168px;max-width:none;padding:0 24px 8px 0}
+.maqcard.mini .sl-cab{gap:8px;border-radius:22px 22px 14px 14px;padding:10px 8px 12px;box-shadow:inset 0 0 0 2px rgba(242,193,78,.55),4px 4px 0 var(--turquesa-2)}
+.maqcard.mini .sl-top{padding:5px 6px 5px;border-width:2px;border-radius:50% 50% 10px 10px / 22px 22px 10px 10px}
+.maqcard.mini .sl-top span{font-size:.5rem}
+.maqcard.mini .sl-top b{font-size:1.05rem;text-shadow:0 0 8px rgba(248,162,154,.55),0 2px 0 var(--turquesa-2)}
+.maqcard.mini .mq-ventana{gap:3px;padding:4px;border-width:2px;border-radius:11px}
+.maqcard.mini .mq-ventana::before,.maqcard.mini .mq-ventana::after{margin-top:-5px;border-block-width:5px}
+.maqcard.mini .mq-ventana::before{border-left-width:6px}.maqcard.mini .mq-ventana::after{border-right-width:6px}
+.maqcard.mini .mq-reel{height:48px;border-radius:7px}
+.maqcard.mini .mq-strip img{height:48px;padding:6px}
+.maqcard.mini .mq-tirar{font-size:1rem;padding:7px 22px;border-width:2px;box-shadow:0 4px 0 var(--turquesa-2)}
+.maqcard.mini .mq-tirar:active,.maqcard.mini.tirando .mq-tirar{transform:translateY(3px);box-shadow:0 1px 0 var(--turquesa-2)}
+.maqcard.mini .sl-pie{left:8px;right:32px;height:10px}
+.maqcard.mini .sl-palanca{top:40px;width:24px;height:100px}
+.maqcard.mini .sl-eje{bottom:18px;width:16px;height:22px}
+.maqcard.mini .sl-brazo{left:10px;bottom:28px;width:5px;height:66px}
+.maqcard.mini .sl-bola{top:-10px;width:18px;height:18px;margin-left:-9px;border-width:2px}
+@media (max-width:760px){
+  .bcard.dmaq .bpasos{grid-column:1/-1}
+  .maqcard.mini{grid-row:1;align-self:start;width:146px;padding-right:22px}
+  .maqcard.mini .mq-reel,.maqcard.mini .mq-strip img{height:40px}
+  .maqcard.mini .mq-strip img{padding:5px}
+  .maqcard.mini .sl-top b{font-size:.95rem}
+  .maqcard.mini .mq-tirar{font-size:.9375rem;padding:6px 18px}
+}
+@media (max-width:380px){
+  .bcard.dmaq{grid-template-columns:1fr}
+  .bcard.dmaq .bpasos{grid-row:auto}
+  .maqcard.mini{grid-column:1;grid-row:auto;justify-self:center}
 }

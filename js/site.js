@@ -1086,7 +1086,7 @@
     MQ_IMG = MAQ_BASE.map((d, i) => IMG((sim[i] && sim[i].img) || d, 128)); // Panel → Maquinita → símbolos
     $("#dMaq").hidden = off;
     $("#dMaqTx").textContent = "Tirá gratis y mirá qué sale. Si juntás iguales, te llevás un premio.";
-    $("#dReels").innerHTML = MQ_IMG.slice(0, 3).map((u) => `<span><img src="${esc(u)}" alt="" loading="lazy" decoding="async"></span>`).join("");
+    document.querySelectorAll("#mqCard .mq-strip").forEach((st, i) => { st.innerHTML = `<img src="${esc(MQ_IMG[i])}" alt="" loading="lazy" decoding="async">`; });
     renderDestacados();
   }
   function abrirMaq() {
@@ -1121,8 +1121,26 @@
     if (e.target.closest("[data-mqclose]") || e.target.id === "mqView") return cerrarMaq();
     const a = e.target.closest("[data-maq]"); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
     e.preventDefault();
-    abrirMaq();
+    const card = a.closest("#mqCard"); if (!card) return abrirMaq();
+    abrirMaq(); // se abre al instante; la palanca y los rodillos de la mini se mueven detrás
+    if (mqGirando) return; mqGirando = true;
+    card.classList.add("tirando");
+    setTimeout(() => girarMini(() => { mqGirando = false; card.classList.remove("tirando"); }), 380);
   });
+  let mqGirando = false;
+  function girarMini(done) {
+    const reels = [...document.querySelectorAll("#mqCard .mq-reel")];
+    if (!reels.length || matchMedia("(prefers-reduced-motion: reduce)").matches) return done();
+    const h = reels[0].getBoundingClientRect().height;
+    reels.forEach((r, i) => {
+      const st = r.querySelector(".mq-strip"), last = st.lastElementChild, imgs = [last ? last.getAttribute("src") : MQ_IMG[i]];
+      for (let k = 0; k < 8 + i * 3; k++) imgs.push(MQ_IMG[Math.floor(Math.random() * MQ_IMG.length)]);
+      st.style.transition = "none"; st.style.transform = "translateY(0)";
+      st.innerHTML = imgs.map((x) => `<img src="${esc(x)}" alt="">`).join(""); void st.offsetHeight;
+      st.style.transition = `transform ${450 + i * 150}ms cubic-bezier(.3,.1,.3,1)`; st.style.transform = `translateY(${-(imgs.length - 1) * h}px)`;
+    });
+    setTimeout(done, 800);
+  }
   /* Top del mes completo: pop up desde la tarjeta del Club */
   function abrirTop() { if ($("#topclub").hidden) return; $("#topPop").hidden = false; document.body.style.overflow = "hidden"; $("[data-topclose]").focus(); }
   function cerrarTop() { $("#topPop").hidden = true; document.body.style.overflow = ""; const b = $("[data-topopen]"); if (b) b.focus(); }
