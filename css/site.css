@@ -1421,6 +1421,7 @@ body[data-page="listo"] .benef{grid-template-columns:minmax(0,520px);justify-con
 }
 
 /* Premios del podio del Top del mes (settings.top_club.premios): en la tarjeta y en el pop up */
+.dtn small.dtpr{color:var(--turquesa);font-weight:700}
 .toppremios{list-style:none;margin:0 auto 22px;padding:0;max-width:760px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .toppremios[hidden]{display:none}
 .tpr{display:grid;justify-items:center;align-content:start;gap:2px;text-align:center;padding:12px 10px;border-radius:18px;background:color-mix(in srgb,var(--coral) 22%,var(--card));border:1.5px dashed color-mix(in srgb,var(--turquesa) 45%,transparent)}

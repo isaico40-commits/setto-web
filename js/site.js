@@ -1053,7 +1053,7 @@
     const TOPN = 5; // en la tarjeta se ven los primeros 5; el resto, en "Ver ranking completo"
     $("#dTopList").innerHTML = l.slice(0, TOPN).map((x) => `<li class="dt${x.pos <= 3 ? " d" + x.pos : ""}">
       <span class="dtpos" aria-label="Puesto ${x.pos}">${x.pos === 1 ? '<img src="img/mochito-campeon.png" alt="" loading="lazy" decoding="async">' : x.pos}</span>
-      <span class="dtn"><b>${esc(x.nombre)}</b><small>${x.compras} ${x.compras === 1 ? "compra" : "compras"} · ${x.sellos}/${meta} sellos</small></span>
+      <span class="dtn"><b>${esc(x.nombre)}</b>${x.pos <= 3 && prem[x.pos - 1] ? `<small class="dtpr">🎁 Gana ${esc(prem[x.pos - 1])}</small>` : ""}</span>
       ${x.gastado_aprox ? `<span class="dtg">$${Math.round(x.gastado_aprox / 1000).toLocaleString("es-AR")} mil</span>` : ""}</li>`).join("");
     $("#dTopMas").hidden = l.length <= TOPN;
     $("#dTop").hidden = false; renderDestacados();
