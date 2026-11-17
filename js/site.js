@@ -1032,15 +1032,21 @@
   /* Premios del podio (los mismos códigos que manda la automática "Premio del Top N del mes" el día 1; migración 068).
      Si cambian los premios en Panel → Campañas, cambiarlos acá también. */
   const PREMIO_TOP_MIN = 5500;
+  // foto: la del más vendido de la carta (pedidos entregados al 17/11: Caramel Vanilla Dirty y mochi de Oreo); si no está, el primero disponible
   const PREMIOS_TOP = {
-    1: { txt: "Bebida de regalo", img: "img/sm/dirty-strawberry.webp" },
-    2: { txt: "Mochi de regalo", img: "img/sm/mochi-frutilla.webp" },
+    1: { txt: "Bebida de regalo", foto: () => fotoPremio(DIRTY, "dirty-caramel", "img/dirty-caramel.webp") },
+    2: { txt: "Mochi de regalo", foto: () => fotoPremio(MOCHIS, "mochi-oreo", "img/mochi-oreo.webp") },
     3: { txt: "Descuento en tu pedido", pct: "10%" },
   };
+  function fotoPremio(lista, id, porDefecto) {
+    const ok = (x) => x && x.img && !x.agotado;
+    const p = [lista.find((x) => x.id === id), ...lista].find(ok);
+    return IMG(p ? p.img : porDefecto, 160);
+  }
   function premioTopHtml(pos) {
     const p = PREMIOS_TOP[pos]; if (!p) return "";
-    const ic = p.img ? `<img src="${p.img}" alt="" loading="lazy" decoding="async">` : `<b>${p.pct}</b>`;
-    return `<span class="tpremio"><span class="tpic${p.img ? "" : " pct"}">${ic}</span><span class="tptx"><small>Premio</small>${p.txt}</span></span>`;
+    const ic = p.foto ? `<img src="${esc(p.foto())}" alt="" loading="lazy" decoding="async">` : `<b>${p.pct}</b>`;
+    return `<span class="tpremio"><span class="tpic${p.foto ? "" : " pct"}">${ic}</span><span class="tptx"><small>Premio</small>${p.txt}</span></span>`;
   }
   /* Top del mes del Club: la base solo devuelve nombre corto, compras y sellos (nunca plata ni celular) */
   async function renderTopClub() {
