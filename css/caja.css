@@ -264,3 +264,22 @@ body.caja.consel{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 .vdet{display:grid;gap:6px;margin-top:12px;background:var(--card);border-radius:16px;padding:12px 14px;border:1.5px solid color-mix(in srgb,var(--turquesa) 22%,transparent);font-size:.88rem}
 .vdet div{display:flex;justify-content:space-between;gap:10px}
 .vdet .hintp{margin:2px 0 0}
+
+/* inversión */
+.ic.inversion{background:color-mix(in srgb,var(--turquesa) 16%,var(--card));color:var(--turquesa)}
+.h2 .mores{margin-left:auto;display:flex;gap:14px}
+.h2 .mores .more{margin-left:0}
+.invbtns{margin-top:12px}
+.invbtns .btn{min-width:0;padding-left:8px;padding-right:8px;font-size:.85rem}
+.invsoc{display:grid;gap:8px}
+.isoc{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:4px 12px;align-items:center;background:var(--card);border:1.5px solid color-mix(in srgb,var(--turquesa) 25%,transparent);border-radius:16px;padding:10px 12px}
+.isoc .iav{width:34px;height:34px;border-radius:50%;background:var(--menta);display:grid;place-items:center;font-weight:700;font-size:.85rem}
+.isoc .inm{min-width:0;line-height:1.3}
+.isoc .inm b{display:block;font-size:.95rem}
+.isoc .inm small{display:block;font-size:.76rem;color:var(--ink-2)}
+.isoc .ival{font-weight:700;text-align:right;white-space:nowrap;line-height:1.2}
+.isoc .ival.pend{color:#9b2c2c}
+.isoc .ival small{display:block;font-weight:500;font-size:.7rem;color:var(--ink-2)}
+.isoc .idev{grid-column:3;justify-self:end;border:1.5px solid var(--turquesa);background:var(--card);color:var(--turquesa);border-radius:999px;padding:5px 12px;font-size:.78rem;font-weight:600}
+.saldo.itot .v{white-space:nowrap;font-size:clamp(1.2rem,5.5vw,1.5rem)}
+.rs.ireparto{grid-template-columns:34px 1fr auto}
