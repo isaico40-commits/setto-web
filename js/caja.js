@@ -199,7 +199,7 @@
   }
   function render() {
     if (!$("#view")) return;
-    document.querySelectorAll(".bnav [data-go]").forEach((b) => { if (b.dataset.go === (["retiros", "inversion"].includes(S.view) ? "inicio" : S.view)) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+    document.querySelectorAll(".bnav [data-go]").forEach((b) => { if (b.dataset.go === (["retiros", "inversion", "costos"].includes(S.view) ? "inicio" : S.view)) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
     const pt = S.tareas.filter((t) => t.estado === "pendiente").length, pc = S.compras.filter((c) => c.estado === "pendiente").length;
     const dt = $('[data-dot="tareas"]'), dc = $('[data-dot="compras"]');
     if (dt) { dt.textContent = pt; dt.hidden = !pt; } if (dc) { dc.textContent = pc; dc.hidden = !pc; }
@@ -208,7 +208,7 @@
     $(".fab").hidden = !["inicio", "movs", "retiros", "inversion"].includes(S.view);
     document.body.classList.remove("consel");
     const y = window.scrollY;
-    ({ inicio: vInicio, movs: vMovs, retiros: vRetiros, inversion: vInversion, stock: vStock, tareas: vTareas, compras: vCompras }[S.view] || vInicio)();
+    ({ inicio: vInicio, movs: vMovs, retiros: vRetiros, inversion: vInversion, costos: costos ? costos.view : vInicio, stock: vStock, tareas: vTareas, compras: vCompras }[S.view] || vInicio)();
     window.scrollTo(0, y);
   }
   function go(v) { S.view = v; history.replaceState(null, "", "#" + v); render(); window.scrollTo(0, 0); }
@@ -243,6 +243,7 @@
           <span class="t"><b>${esc(d.nombre)}</b>${Number(d.retirado) ? `Retiró ${fmt(d.retirado)} de ganancias` : "Sin retiros"}</span>
           <span class="m num ${d.le_debemos >= 1 ? "pend" : ""}">${d.le_debemos >= 1 ? fmt(d.le_debemos) : d.le_debemos <= -1 ? "debe " + fmt(d.le_debemos) : "al día"}</span>
           ${d.le_debemos >= 1 ? `<button data-devolver="${esc(d.id)}">Devolver</button>` : ""}</div>`).join("")}</div>
+      ${costos ? costos.linkHTML() : ""}
 
       <h2 class="h2"><span class="mesnav"><button data-mes="-1" aria-label="Mes anterior">‹</button><b>${esc(mesNombre(S.mes))}</b><button data-mes="1" aria-label="Mes siguiente">›</button></span></h2>
       <div class="kpis">
@@ -444,11 +445,14 @@
 
   /* ---------- hoja (bottom sheet) ---------- */
   function openSheet(html, onMount) {
-    const sh = $("#sheet"); sh.innerHTML = `<div class="grab"></div>${html}`; sh.hidden = false; $("#sheetBg").hidden = false;
+    const sh = $("#sheet"); sh.onclick = sh.oninput = sh.onsubmit = null; // que no queden manejadores de la hoja anterior
+    sh.innerHTML = `<div class="grab"></div>${html}`; sh.hidden = false; $("#sheetBg").hidden = false;
     document.body.style.overflow = "hidden"; if (onMount) onMount(sh);
   }
   function closeSheet() { $("#sheet").hidden = true; $("#sheetBg").hidden = true; $("#sheet").innerHTML = ""; document.body.style.overflow = ""; }
   const needMe = () => { if (!S.me) { whoSheet(); toast("Primero elegí quién sos"); return false; } return true; };
+  /* Costos de producción (js/caja-costos.js): pestaña aparte, se entra desde Inicio */
+  const costos = window.CajaCostos ? window.CajaCostos({ sb, $, esc, fail, toast, openSheet, closeSheet, needMe, me: () => S.me, view: () => S.view }) : null;
 
   function whoSheet(first) {
     openSheet(`<div class="sh"><h3>¿Quién está usando la caja?</h3>${first ? "" : '<button class="x" data-close aria-label="Cerrar">×</button>'}</div>
