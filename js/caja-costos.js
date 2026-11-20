@@ -12,10 +12,10 @@ window.CajaCostos = function (K) {
   const UNL = { g: "Gramos (g)", ml: "Mililitros (ml / cc)", u: "Unidades" };
   const PARTES = ["Masa", "Relleno", "Bebida", "Foam", "Packaging", "Otros"];
   const VIEJO = 30; // días: un precio más viejo se muestra en gris
-  const C = { ok: false, loading: null, err: "", tab: "productos", filtro: "todos", qi: "", fi: "todos", ins: [], pre: {}, rec: [], lin: [], prods: [], lug: [] };
+  const C = { an: { g: "todos", t: "12 oz", si: null, sf: 0.2 }, ok: false, loading: null, err: "", tab: "productos", filtro: "todos", qi: "", fi: "todos", ins: [], pre: {}, rec: [], lin: [], prods: [], lug: [] };
   {
     const t = (location.hash.split("/")[1] || "");
-    if (["productos", "preps", "insumos"].includes(t)) C.tab = t;
+    if (["productos", "preps", "insumos", "graficos"].includes(t)) C.tab = t;
   }
 
   /* ---------- formatos ---------- */
@@ -67,7 +67,8 @@ window.CajaCostos = function (K) {
   const prodPor = (id) => C.prods.find((p) => p.id === id);
   const lineasDe = (rid) => C.lin.filter((l) => l.receta_id === rid).sort((a, b) => a.orden - b.orden);
   const recDe = (pid, tam) => C.rec.find((r) => r.tipo === "producto" && r.product_id === pid && (r.tamano || null) === (tam || null));
-  const precioU = (iid) => { const p = C.pre[iid]; return p ? Number(p.precio) / Number(p.paquete) : null; };
+  let SIM = { id: null, f: 0 }; // simulación "¿y si sube?": multiplica el precio de un insumo
+  const precioU = (iid) => { const p = C.pre[iid]; if (!p) return null; const v = Number(p.precio) / Number(p.paquete); return SIM.id === iid ? v * (1 + SIM.f) : v; };
   const unidadL = (l) => (l.insumo_id ? (insPor(l.insumo_id) || {}).unidad : (recPor(l.sub_id) || {}).rinde_unidad) || "u";
   const nombreL = (l) => (l.insumo_id ? (insPor(l.insumo_id) || {}).nombre : (recPor(l.sub_id) || {}).nombre) || "(borrado)";
 
@@ -135,9 +136,9 @@ window.CajaCostos = function (K) {
     el.innerHTML = `<button class="back" data-go="inicio">‹ Inicio</button>
       <h1 class="h1">Costos</h1>
       <p class="muted kintro">Cuánto cuesta hacer cada producto en materia prima y packaging, y cuánto queda del precio de la carta.</p>
-      <div class="seg ktabs">${tab("productos", "Productos")}${tab("preps", "Preparaciones")}${tab("insumos", "Insumos")}</div>
+      <div class="seg ktabs">${tab("productos", "Productos")}${tab("preps", "Preparaciones")}${tab("insumos", "Insumos")}${tab("graficos", "Gráficos")}</div>
       <div id="kbody"></div>`;
-    ({ productos: vProductos, preps: vPreps, insumos: vInsumos }[C.tab] || vProductos)();
+    ({ productos: vProductos, preps: vPreps, insumos: vInsumos, graficos: vGraficos }[C.tab] || vProductos)();
   }
   function setTab(t) { C.tab = t; history.replaceState(null, "", "#costos" + (t === "productos" ? "" : "/" + t)); view(); window.scrollTo(0, 0); }
 
@@ -172,6 +173,102 @@ window.CajaCostos = function (K) {
       ${p.img ? `<img class="kth" src="${esc(p.img)}" alt="" loading="lazy">` : `<span class="kth ph">${esc(p.nombre[0])}</span>`}
       <span class="kpb"><span class="kpn"><b>${esc(p.nombre)}</b><small>${{ mochis: p.categoria === "especial" ? "Especial" : "Mochi", bebidas: p.categoria === "especial" ? "Especial" : "Bebida", sets: "Set · bebida + mochi" }[f.g]}</small></span>
       ${f.sizes.map(fila).join("")}</span><span class="kgo">›</span></button>`;
+  }
+
+  /* ---------- gráficos ---------- */
+  // cuánto pone cada insumo en 1 unidad de una receta (entra en las preparaciones)
+  function aporte(rid, mult, acc, stack = []) {
+    const r = recPor(rid); if (!r || stack.includes(rid)) return;
+    const ef = Number(r.rinde) * (1 - (Number(r.merma) || 0) / 100); if (!(ef > 0)) return;
+    lineasDe(rid).forEach((l) => {
+      const q = ((Number(l.cantidad) || 0) * mult) / ef;
+      if (l.insumo_id) { const pu = precioU(l.insumo_id); if (pu != null) acc[l.insumo_id] = (acc[l.insumo_id] || 0) + q * pu; }
+      else if (l.sub_id) aporte(l.sub_id, q, acc, [...stack, rid]);
+    });
+  }
+  const etiq = (p, t) => p.nombre + (t ? " " + t.replace(" oz", "") : "");
+  function vGraficos() {
+    const A = C.an, filas = filasProductos();
+    // 1) costo y lo que queda, por producto
+    const items = filas.filter((f) => A.g === "todos" || f.g === A.g).flatMap((f) => f.sizes.filter((s) => !s.t || s.t === A.t).map((s) => ({ f, s })))
+      .filter(({ s }) => s.ok && s.pr > 0).sort((a, b) => b.s.m - a.s.m);
+    const fuera = filas.filter((f) => A.g === "todos" || f.g === A.g).flatMap((f) => f.sizes.filter((s) => !s.t || s.t === A.t)).filter((s) => !(s.ok && s.pr > 0)).length;
+    const maxP = Math.max(1, ...items.map(({ s }) => s.pr));
+    const conTam = A.g !== "mochis";
+    const chip = (k, l) => `<button class="chip" data-kag="${k}" aria-pressed="${A.g === k}">${l}</button>`;
+    const barra = ({ f, s }) => `<div class="kbar" title="${esc(etiq(f.p, s.t))}: costo ${fmtC(s.c.cost)}, precio ${fmtC(s.pr)}, te quedan ${fmtC(s.pr - s.c.cost)} (${pct(s.m)})">
+        <span class="kbn">${esc(f.p.nombre)}${s.t ? ` <small>${esc(s.t)}</small>` : ""}</span>
+        <span class="kbt"><span class="kbw" style="width:${(s.pr / maxP) * 100}%"><i class="kbc" style="width:${(s.c.cost / s.pr) * 100}%"></i><i class="kbg kg-${tono(s.m)}"></i></span></span>
+        <span class="kbv"><b class="num">${pct(s.m)}</b><small class="num">${fmtC(s.pr - s.c.cost)}</small></span></div>`;
+    // 2) qué insumos pesan más (1 unidad de cada producto de la carta)
+    const acc = {}, enProd = {};
+    filas.filter((f) => f.g !== "sets").forEach((f) => f.sizes.forEach((s) => { if (!s.c.receta) return; const a = {}; aporte(s.c.receta.id, 1, a); Object.keys(a).forEach((k) => { acc[k] = (acc[k] || 0) + a[k]; (enProd[k] = enProd[k] || new Set()).add(f.p.id); }); }));
+    const tot = Object.values(acc).reduce((x, y) => x + y, 0);
+    const top = Object.entries(acc).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    const top8 = top.slice(0, 8), resto = top.slice(8).reduce((x, [, v]) => x + v, 0), maxI = top8.length ? top8[0][1] : 1;
+    const filaI = ([id, v]) => { const i = insPor(id) || { nombre: "(borrado)" }, n = enProd[id].size;
+      return `<button class="kbar kbari" data-ki="${id}" title="${esc(i.nombre)}: ${pct(v / tot)} del costo de la carta, en ${n} producto${n > 1 ? "s" : ""}">
+        <span class="kbn">${esc(i.nombre)}<small>en ${n} producto${n > 1 ? "s" : ""}</small></span>
+        <span class="kbt"><span class="kbw" style="width:${(v / maxI) * 100}%"><i class="kbi${i.tipo === "packaging" ? " kbpk" : ""}"></i></span></span>
+        <span class="kbv"><b class="num">${pct(v / tot)}</b></span></button>`; };
+    // 3) ¿y si sube un insumo?
+    if (!A.si || !acc[A.si]) A.si = top.length ? top[0][0] : null;
+    let simHTML = "";
+    if (A.si) {
+      const antes = filas.flatMap((f) => f.sizes.map((s) => ({ f, s })));
+      SIM = { id: A.si, f: A.sf }; memo = {};
+      const desp = filasProductos().flatMap((f) => f.sizes.map((s) => ({ f, s })));
+      SIM = { id: null, f: 0 }; memo = {};
+      const pares = antes.map((x, k) => ({ f: x.f, t: x.s.t, m0: x.s.m, m1: desp[k].s.m, c0: x.s.c.cost, c1: desp[k].s.c.cost, ok: x.s.ok && x.s.pr > 0 }))
+        .filter((x) => x.ok && x.c1 - x.c0 > 0.005);
+      const okAll = antes.filter((x) => x.s.ok && x.s.pr > 0), prom0 = okAll.length ? okAll.reduce((a, x) => a + x.s.m, 0) / okAll.length : null;
+      const prom1 = okAll.length ? prom0 + pares.reduce((a, x) => a + (x.m1 - x.m0), 0) / okAll.length : null;
+      const cruzan = (lim) => pares.filter((x) => x.m0 >= lim && x.m1 < lim).length;
+      const peores = pares.sort((a, b) => (a.m1 - a.m0) - (b.m1 - b.m0)).slice(0, 6);
+      const opts = top.map(([id]) => `<option value="${id}" ${id === A.si ? "selected" : ""}>${esc((insPor(id) || {}).nombre || "?")}</option>`).join("");
+      simHTML = `<div class="krow ksimrow"><label class="fl"><span>Insumo</span><select id="ksi">${opts}</select></label>
+          <div class="fl"><span>Sube</span><div class="seg ksimseg">${[0.1, 0.2, 0.3, 0.5].map((f) => `<button type="button" data-ksf="${f}" aria-pressed="${A.sf === f}">+${f * 100}%</button>`).join("")}</div></div></div>
+        ${pares.length ? `<div class="kpis kk ksimk">
+          <div class="kpi"><div class="k">Productos afectados</div><div class="v num">${pares.length}</div></div>
+          <div class="kpi"><div class="k">Margen promedio</div><div class="v num">${pct(prom0)} → ${pct(prom1)}</div></div>
+          <div class="kpi ${cruzan(0.65) + cruzan(0.5) ? "warn" : ""}"><div class="k">Bajan de 65% / 50%</div><div class="v num">${cruzan(0.65)} / ${cruzan(0.5)}</div></div></div>
+          <div class="items ksimlist">${peores.map((x) => `<div class="it"><span class="t"><b>${esc(x.f.p.nombre)}${x.t ? ` <small>${esc(x.t)}</small>` : ""}</b><span>Costo ${fmtC(x.c0)} → ${fmtC(x.c1)}</span></span>
+            <span class="side kside"><span class="kpill kt-${tono(x.m1)}">${pct(x.m0)} → ${pct(x.m1)}</span></span></div>`).join("")}</div>`
+        : `<p class="hintp">Ese insumo no está en ningún producto con costo completo.</p>`}`;
+    }
+    $("#kbody").innerHTML = `
+      <section class="kchart"><h3 class="kch">Costo y lo que te queda</h3>
+        <p class="kpinote">Cada barra es el precio de la carta: la parte gris es el costo y la de color lo que te queda. Ordenado de mayor a menor margen.</p>
+        <div class="filters">${chip("todos", "Todos")}${chip("mochis", "Mochis")}${chip("bebidas", "Bebidas")}${chip("sets", "Sets")}</div>
+        ${conTam ? `<div class="seg ktamseg">${["12 oz", "16 oz"].map((t) => `<button type="button" data-kat="${t}" aria-pressed="${A.t === t}">${t}</button>`).join("")}</div>` : ""}
+        <div class="klegend kleg2"><span><i class="kbc"></i>Costo</span><span><i class="kg-ok"></i>Te queda (65%+)</span><span><i class="kg-mid"></i>50 a 65%</span><span><i class="kg-low"></i>menos de 50%</span></div>
+        <div class="kbars">${items.map(barra).join("") || `<div class="emptyc"><span>No hay productos con costo completo en este filtro.</span></div>`}</div>
+        ${fuera ? `<p class="kpinote">${fuera} sin receta o con precios faltantes no aparecen.</p>` : ""}</section>
+      <section class="kchart"><h3 class="kch">Qué insumos pesan más</h3>
+        <p class="kpinote">Sumando una unidad de cada producto de la carta (incluye lo que va dentro de las preparaciones). Tocá uno para ver su precio.</p>
+        <div class="kbars">${top8.map(filaI).join("")}${resto > 0 ? `<div class="kbar"><span class="kbn">Otros ${top.length - 8}</span><span class="kbt"><span class="kbw" style="width:${(resto / maxI) * 100}%"><i class="kbi kbo"></i></span></span><span class="kbv"><b class="num">${pct(resto / tot)}</b></span></div>` : ""}</div>
+        ${top8.some(([id]) => (insPor(id) || {}).tipo === "packaging") ? `<div class="klegend kleg2"><span><i class="kbi"></i>Materia prima</span><span><i class="kbi kbpk"></i>Packaging</span></div>` : ""}</section>
+      <section class="kchart"><h3 class="kch">¿Y si sube un insumo?</h3>
+        <p class="kpinote">Elegí un insumo y cuánto sube para ver qué productos pierden margen.</p>
+        ${simHTML || `<p class="hintp">Cargá precios y recetas para simular.</p>`}</section>`;
+  }
+
+  // línea del precio de un insumo en el tiempo (por kg, litro o unidad)
+  function histChart(hist, u) {
+    const pts = hist.map((h) => ({ d: new Date(h.fecha + "T12:00:00").getTime(), v: (Number(h.precio) / Number(h.paquete)) * (u === "u" ? 1 : 1000), h })).sort((a, b) => a.d - b.d);
+    const W = 320, H = 120, L = 8, R = 8, T = 22, B = 22;
+    const d0 = pts[0].d, d1 = pts[pts.length - 1].d, vs = pts.map((p) => p.v), lo = Math.min(...vs) * 0.9, hi = Math.max(...vs) * 1.05;
+    const x = (d) => (d1 === d0 ? W / 2 : L + ((d - d0) / (d1 - d0)) * (W - L - R)), y = (v) => T + (1 - (v - lo) / (hi - lo || 1)) * (H - T - B);
+    const ult = pts[pts.length - 1], pri = pts[0], dif = pri.v ? (ult.v - pri.v) / pri.v : 0;
+    const fC = (t) => new Date(t).toLocaleDateString("es-AR", { day: "numeric", month: "short" });
+    return `<h4 class="kh4">Precio en el tiempo <small class="kdif ${dif > 0.005 ? "up" : dif < -0.005 ? "down" : ""}">${dif > 0.005 ? "▲" : dif < -0.005 ? "▼" : "="} ${Math.abs(Math.round(dif * 100))}% desde ${fC(pri.d)}</small></h4>
+      <svg class="khist" viewBox="0 0 ${W} ${H}" role="img" aria-label="Precio ${u === "u" ? "por unidad" : u === "g" ? "por kg" : "por litro"}: ${pts.map((p) => fC(p.d) + " " + fmtC(p.v)).join(", ")}">
+        <line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" class="kax"/>
+        <polyline points="${pts.map((p) => `${x(p.d).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ")}" class="kln2"/>
+        ${pts.map((p) => `<circle cx="${x(p.d).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="4.5" class="kpt"><title>${fC(p.d)}: ${fmtC(p.v)}${p.h.lugar ? " · " + esc(p.h.lugar) : ""}</title></circle>`).join("")}
+        <text x="${x(ult.d).toFixed(1)}" y="${(y(ult.v) - 9).toFixed(1)}" text-anchor="end" class="ktx">${fmtC(ult.v)}</text>
+        <text x="${L}" y="${H - 6}" class="ktx2">${fC(pri.d)}</text><text x="${W - R}" y="${H - 6}" text-anchor="end" class="ktx2">${fC(ult.d)}</text>
+      </svg>`;
   }
 
   function usado(iid) { return C.lin.some((l) => l.insumo_id === iid && recPor(l.receta_id)); }
@@ -504,6 +601,7 @@ window.CajaCostos = function (K) {
         <p class="err" id="kperr" hidden></p>
         <button class="btn solid big" type="submit">Guardar precio</button>
       </form>
+      ${hist.length > 1 ? histChart(hist, i.unidad) : ""}
       ${hist.length ? `<h4 class="kh4">Historial</h4><div class="items">${hist.map((h) => `<div class="it"><span class="t"><b>${fmtC(Number(h.precio))} por ${trae(Number(h.paquete), i.unidad)}</b><span>${fechaC(h.fecha)}${h.lugar ? " · " + esc(h.lugar) : ""}${h.detalle ? " · " + esc(h.detalle) : ""} · ${esc(h.registro)}${h.origen !== "manual" ? " · " + ({ compras: "lista de compras", app: "app de compras" }[h.origen] || h.origen) : ""}</span></span><span class="side num">${porTxt(Number(h.precio) / Number(h.paquete), i.unidad)}</span></div>`).join("")}</div>` : ""}
       ${usos.length ? `<p class="hintp">Se usa en: ${usos.map((r) => esc(r.nombre + (r.tamano ? " " + r.tamano : ""))).join(", ")}.</p>` : `<p class="hintp">Todavía no se usa en ninguna receta.</p>`}
       <div class="toolsrow"><button type="button" class="ghost" data-kedi="${id}">Nombre, tipo y unidad</button></div>`;
@@ -580,11 +678,18 @@ window.CajaCostos = function (K) {
     if (d.kt) return setTab(d.kt);
     if (d.kf) { C.filtro = d.kf; return view(); }
     if (d.kfi) { C.fi = d.kfi; return view(); }
+    if (d.kag) { C.an.g = d.kag; return view(); }
+    if (d.kat) { C.an.t = d.kat; return view(); }
+    if (d.ksf) { C.an.sf = Number(d.ksf); return view(); }
     if (d.kp) return abrirProd(d.kp, d.ktam || null);
     if (d.kr) return editor({ id: d.kr });
     if (d.ki) return insumoSheet(d.ki);
     if (d.knewi !== undefined) return insumoForm(null);
     if (d.knewr !== undefined) return editor({ nuevo: { nombre: "", tipo: "base", rinde: 1000, rinde_unidad: "ml", merma: 0 } });
+  });
+  document.addEventListener("change", (e) => {
+    if (K.view() !== "costos" || e.target.id !== "ksi") return;
+    C.an.si = e.target.value; view();
   });
   document.addEventListener("input", (e) => {
     if (K.view() !== "costos" || e.target.id !== "kqi") return;
