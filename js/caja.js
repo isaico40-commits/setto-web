@@ -445,7 +445,7 @@
 
   /* ---------- hoja (bottom sheet) ---------- */
   function openSheet(html, onMount) {
-    const sh = $("#sheet"); sh.onclick = sh.oninput = sh.onsubmit = sh.onchange = null; // que no queden manejadores de la hoja anterior
+    const sh = $("#sheet"); sh.onclick = sh.oninput = sh.onsubmit = sh.onchange = sh.onpointerdown = null; // que no queden manejadores de la hoja anterior
     sh.innerHTML = `<div class="grab"></div>${html}`; sh.hidden = false; $("#sheetBg").hidden = false;
     document.body.style.overflow = "hidden"; if (onMount) onMount(sh);
   }
