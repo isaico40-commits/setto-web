@@ -132,7 +132,7 @@
     clearTimeout(reloadT);
     reloadT = setTimeout(async () => {
       if (stockBusy()) return softReload(); // con toques de stock sin guardar, esperar a que se guarden
-      try { await loadAll(); render(); } catch (e) { console.error(e); }
+      try { await loadAll(); if (dash) dash.invalidar(); render(); } catch (e) { console.error(e); }
     }, 250);
   }
 
@@ -164,6 +164,7 @@
       return;
     }
     drawShell(); render();
+    if (dash) dash.cargar(); // en segundo plano: márgenes y subas de insumos (aviso en Inicio y en la barra)
     if (!S.socios.some((s) => s.nombre === S.me)) whoSheet(true);
     else if (location.hash === "#compras/voz") { history.replaceState(null, "", "#compras"); escuchar(); } // atajo "Anotar compra" del ícono
     sb.channel("caja-live")
@@ -183,6 +184,7 @@
     stock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>',
     tareas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>',
     compras: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.2 11H6.2z"/><path d="M9 8a3 3 0 016 0"/></svg>',
+    dash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
   };
   function drawShell() {
     app.innerHTML = `<header class="cbar"><div class="wrap">
@@ -194,7 +196,7 @@
       <main class="cmain"><div class="wrap" id="view"></div></main>
       <button class="fab" data-new aria-label="Cargar movimiento">+</button>
       <nav class="bnav"><div class="wrap">
-        ${[["inicio", "Inicio"], ["movs", "Movimientos"], ["stock", "Stock"], ["tareas", "Tareas"], ["compras", "Compras"]].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}${l}<span class="dot" data-dot="${k}" hidden></span></button>`).join("")}
+        ${[["inicio", "Inicio"], ["movs", "Movimientos"], ["dash", "Dashboard"], ["stock", "Stock"], ["tareas", "Tareas"], ["compras", "Compras"]].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}${l}<span class="dot" data-dot="${k}" hidden></span></button>`).join("")}
       </div></nav>`;
   }
   function render() {
@@ -208,10 +210,10 @@
     $(".fab").hidden = !["inicio", "movs", "retiros", "inversion"].includes(S.view);
     document.body.classList.remove("consel");
     const y = window.scrollY;
-    ({ inicio: vInicio, movs: vMovs, retiros: vRetiros, inversion: vInversion, costos: costos ? costos.view : vInicio, stock: vStock, tareas: vTareas, compras: vCompras }[S.view] || vInicio)();
+    ({ inicio: vInicio, movs: vMovs, retiros: vRetiros, inversion: vInversion, costos: costos ? costos.view : vInicio, dash: dash ? dash.view : vInicio, stock: vStock, tareas: vTareas, compras: vCompras }[S.view] || vInicio)();
     window.scrollTo(0, y);
   }
-  function go(v) { S.view = v; history.replaceState(null, "", "#" + v); render(); window.scrollTo(0, 0); }
+  function go(v) { if (v === "dash" && S.view === "costos" && dash) dash.invalidar(); S.view = v; history.replaceState(null, "", "#" + v); render(); window.scrollTo(0, 0); }
 
   /* ---------- INICIO ---------- */
   function mesStats(mes) {
@@ -244,6 +246,7 @@
           <span class="m num ${d.le_debemos >= 1 ? "pend" : ""}">${d.le_debemos >= 1 ? fmt(d.le_debemos) : d.le_debemos <= -1 ? "debe " + fmt(d.le_debemos) : "al día"}</span>
           ${d.le_debemos >= 1 ? `<button data-devolver="${esc(d.id)}">Devolver</button>` : ""}</div>`).join("")}</div>
       ${costos ? costos.linkHTML() : ""}
+      ${dash ? dash.avisoHTML() : ""}
 
       <h2 class="h2"><span class="mesnav"><button data-mes="-1" aria-label="Mes anterior">‹</button><b>${esc(mesNombre(S.mes))}</b><button data-mes="1" aria-label="Mes siguiente">›</button></span></h2>
       <div class="kpis">
@@ -453,6 +456,10 @@
   const needMe = () => { if (!S.me) { whoSheet(); toast("Primero elegí quién sos"); return false; } return true; };
   /* Costos de producción (js/caja-costos.js): pestaña aparte, se entra desde Inicio */
   const costos = window.CajaCostos ? window.CajaCostos({ sb, $, esc, fail, toast, openSheet, closeSheet, needMe, me: () => S.me, view: () => S.view }) : null;
+  /* Dashboard (js/caja-dash.js): ventas, costo de lo vendido, ganancia por día y turno, márgenes y subas de insumos */
+  const dash = window.CajaDash && window.CostosCalc ? window.CajaDash({ sb, $, esc, fail, toast, needMe, me: () => S.me, view: () => S.view,
+    setDot: (k) => { const el = $('[data-dot="dash"]'); if (el) { el.textContent = k ? "!" : ""; el.hidden = !k; el.title = k ? `${k} suba(s) de insumos para revisar` : ""; } },
+    refrescar: () => { if (S.view === "inicio") render(); } }) : null;
 
   function whoSheet(first) {
     openSheet(`<div class="sh"><h3>¿Quién está usando la caja?</h3>${first ? "" : '<button class="x" data-close aria-label="Cerrar">×</button>'}</div>
@@ -1034,7 +1041,7 @@
     const b = e.target.closest("button"); if (!b) return;
     const d = b.dataset;
     if (d.close !== undefined) { closeSheet(); return; }
-    if (d.go) return go(d.go);
+    if (d.go) { if (d.go === "costos" && d.ktab && costos) costos.tab(d.ktab); return go(d.go); }
     if (d.who !== undefined) return whoSheet();
     if (d.iam) { S.me = d.iam; localStorage.setItem("setto-caja-yo", S.me); closeSheet(); render(); toast(`Hola, ${S.me}`); return; }
     if (d.new !== undefined) return movForm(S.view === "retiros" ? { tipo: "retiro", socio_id: S.r.socio === "todos" ? null : S.r.socio } : S.view === "inversion" ? { tipo: "inversion" } : {});

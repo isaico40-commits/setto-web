@@ -696,5 +696,6 @@ window.CajaCostos = function (K) {
     view,
     linkHTML: () => `<button class="kentry" data-go="costos"><span class="kei">${ICO.calc}</span><span class="ket"><b>Costos de producción</b><small>Cuánto cuesta hacer cada producto y cuánto te queda</small></span><span class="kgo">›</span></button>`,
     invalidar: () => { C.ok = false; },
+    tab: (t) => { if (["productos", "preps", "insumos", "graficos"].includes(t)) C.tab = t; },
   };
 };
