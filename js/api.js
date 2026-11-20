@@ -167,8 +167,7 @@
     async loadAll() { const db = dbLoad(); return { settings: db.settings, products: db.products }; },
     async getSetting(key) { return dbLoad().settings[key]; },
     // Dashboard: en modo demo solo hay pedidos web (la Caja necesita Supabase)
-    async dashboard(desde) { return { orders: dbLoad().orders.filter((o) => new Date(o.created_at) >= desde), caja: null, stock: null }; },
-    async maqStats() { return null; },
+    async costosDatos() { return null; },
     async turnosOcupados() { // mismo cálculo que la función turnos_ocupados de Supabase
       const k = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`, hoy = k(new Date()), cnt = {};
       dbLoad().orders.filter((o) => o.status === "pendiente" && (o.etapa || "recibido") !== "listo" && /· \d{1,2}:\d{2} hs$/.test(o.retiro || "")).forEach((o) => {
@@ -736,30 +735,18 @@
     async getSetting(key) { const { data, error } = await sb.from("settings").select("value").eq("key", key).maybeSingle(); fail(error); return data ? data.value : undefined; },
     // cuántos pedidos hay por turno (fecha + hora), sin datos de clientes; null si la función todavía no está en la base
     async turnosOcupados() { const { data, error } = await sb.rpc("turnos_ocupados"); return error ? null : data || []; },
-    // Dashboard: pedidos web, entradas y gastos de la Caja y mochis vendidos (stock) desde un día. Si la Caja falla, sigue solo con los pedidos.
-    async dashboard(desde) {
-      const iso = desde.toISOString(), f = `${desde.getFullYear()}-${String(desde.getMonth() + 1).padStart(2, "0")}-${String(desde.getDate()).padStart(2, "0")}`;
-      const [o, m, c, s, it] = await Promise.all([
-        sb.from("orders").select("id, code, phone, items, total, pago, modo, status, created_at").gte("created_at", iso).order("created_at").limit(3000),
-        // con los productos de cada entrada (migración 048); si la base todavía no los tiene, sin ellos
-        sb.from("caja_movimientos").select("fecha, tipo, monto, categoria_id, registro, items").in("tipo", ["entrada", "gasto"]).eq("estado", "activo").gte("fecha", f).limit(5000)
-          .then((r) => (r.error ? sb.from("caja_movimientos").select("fecha, tipo, monto, categoria_id, registro").in("tipo", ["entrada", "gasto"]).eq("estado", "activo").gte("fecha", f).limit(5000) : r)),
-        sb.from("caja_categorias").select("id, nombre"),
-        sb.from("caja_stock_mov").select("item_id, delta, created_at").eq("motivo", "venta").eq("estado", "activo").gte("created_at", iso).limit(5000),
-        sb.from("caja_stock_items").select("id, nombre"),
+    // Costos (migración 070) para avisar el margen en descuentos y premios. null si no hay acceso o falta la migración.
+    async costosDatos() {
+      const r = await Promise.all([
+        sb.from("costo_insumos").select("*"),
+        sb.from("costo_precios").select("id, insumo_id, precio, paquete, fecha, created_at").order("fecha").limit(10000),
+        sb.from("costo_recetas").select("*").eq("activo", true),
+        sb.from("costo_receta_lineas").select("*"),
+        sb.from("products").select("id,categoria,nombre,formato,precio,precio_12,precio_16,set_bebida,set_mochi,activo,orden"),
       ]);
-      fail(o.error);
-      return { orders: o.data || [], caja: m.error ? null : { movs: m.data || [], cats: c.data || [] }, stock: s.error ? null : { movs: s.data || [], items: it.data || [] } };
-    },
-    // Dashboard → Maquinita: todas las tiradas y premios (desde que arrancó). null si no hay acceso a las tablas.
-    async maqStats() {
-      const [t, p, u] = await Promise.all([
-        sb.from("maq_tiradas").select("created_at, resultado, gratis, dev, phone").order("created_at").limit(20000),
-        sb.from("maq_premios").select("id, titulo, estado, vence_at, created_at").limit(10000),
-        sb.from("maq_premio_usos").select("premio_id, monto, devuelto").eq("devuelto", false).limit(10000),
-      ]);
-      if (t.error || p.error) return null;
-      return { tiradas: t.data || [], premios: p.data || [], usos: u.error ? [] : u.data || [] };
+      if (r.some((x) => x.error)) return null;
+      const [ins, precios, rec, lin, prods] = r.map((x) => x.data || []);
+      return { ins, precios, rec, lin, prods };
     },
     async createOrder({ nombre, phone, items, retiro, pago, nota, modo, direccion, premio, gift, maq, codigo }) {
       // con código de descuento va por la v7 (migración 053); sin código, la v6 de siempre
