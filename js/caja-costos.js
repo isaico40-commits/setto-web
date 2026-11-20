@@ -12,7 +12,7 @@ window.CajaCostos = function (K) {
   const UNL = { g: "Gramos (g)", ml: "Mililitros (ml / cc)", u: "Unidades" };
   const PARTES = ["Masa", "Relleno", "Bebida", "Foam", "Packaging", "Otros"];
   const VIEJO = 30; // días: un precio más viejo se muestra en gris
-  const C = { ok: false, loading: null, err: "", tab: "productos", filtro: "todos", qi: "", fi: "todos", ins: [], pre: {}, rec: [], lin: [], prods: [] };
+  const C = { ok: false, loading: null, err: "", tab: "productos", filtro: "todos", qi: "", fi: "todos", ins: [], pre: {}, rec: [], lin: [], prods: [], lug: [] };
   {
     const t = (location.hash.split("/")[1] || "");
     if (["productos", "preps", "insumos"].includes(t)) C.tab = t;
@@ -42,6 +42,11 @@ window.CajaCostos = function (K) {
   };
 
   /* ---------- datos ---------- */
+  const NUEVO = "__nuevo";
+  function lugOpts(sel) {
+    const ls = C.lug || [], tiene = sel && ls.some((l) => l.toLowerCase() === String(sel).toLowerCase());
+    return `<option value="">Elegí…</option>${ls.map((l) => `<option${tiene && l.toLowerCase() === String(sel).toLowerCase() ? " selected" : ""}>${esc(l)}</option>`).join("")}<option value="${NUEVO}">+ Lugar nuevo…</option>`;
+  }
   async function load() {
     const r = await Promise.all([
       sb.from("costo_insumos").select("*").order("orden"),
@@ -49,8 +54,10 @@ window.CajaCostos = function (K) {
       sb.from("costo_recetas").select("*").eq("activo", true).order("orden"),
       sb.from("costo_receta_lineas").select("*").order("orden"),
       sb.from("products").select("id,categoria,nombre,formato,img,precio,precio_12,precio_16,set_bebida,set_mochi,activo,orden").order("orden"),
+      sb.from("costo_lugares").select("nombre").eq("activo", true).order("nombre"),
     ]);
-    const [ins, pre, rec, lin, prods] = r.map(fail);
+    const [ins, pre, rec, lin, prods, lug] = r.map(fail);
+    C.lug = lug.map((l) => l.nombre);
     C.ins = ins; C.pre = {}; pre.forEach((p) => (C.pre[p.insumo_id] = p));
     C.rec = rec; C.lin = lin; C.prods = prods; C.ok = true; C.err = "";
   }
@@ -407,17 +414,22 @@ window.CajaCostos = function (K) {
         </div>
         <div class="krow">
           <label class="fl"><span>Fecha</span><input id="kpF" type="date" value="${hoyISO()}" max="${hoyISO()}"></label>
-          <label class="fl"><span>Dónde (opcional)</span><input id="kpL" maxlength="60" placeholder="Makro, Multienvases…" value="${esc(p && p.lugar ? p.lugar : "")}"></label>
+          <label class="fl"><span>Dónde lo compraste</span><select id="kpL">${lugOpts(p && p.lugar)}</select></label>
         </div>
+        <label class="fl" id="kpLnw" hidden><span>Lugar nuevo</span><input id="kpLn" maxlength="60" autocomplete="off" placeholder="Ej: Distribuidora Centro"></label>
+        <label class="fl"><span>Marca o presentación (opcional)</span><input id="kpD" maxlength="60" autocomplete="off" placeholder="Ej: La Paulina 350 ml" value="${esc(p && p.detalle ? p.detalle : "")}"></label>
         <p class="hintp" id="kpPrev">${i.unidad === "u" ? "Ej: si el pack trae 12 vasos, poné 12." : `En ${i.unidad === "g" ? "gramos: 1 kg = 1000" : "ml: 1 litro = 1000"}.`}</p>
         <p class="err" id="kperr" hidden></p>
         <button class="btn solid big" type="submit">Guardar precio</button>
       </form>
-      ${hist.length ? `<h4 class="kh4">Historial</h4><div class="items">${hist.map((h) => `<div class="it"><span class="t"><b>${fmtC(Number(h.precio))} por ${trae(Number(h.paquete), i.unidad)}</b><span>${fechaC(h.fecha)}${h.lugar ? " · " + esc(h.lugar) : ""} · ${esc(h.registro)}${h.origen !== "manual" ? " · " + ({ compras: "lista de compras", app: "app de compras" }[h.origen] || h.origen) : ""}</span></span><span class="side num">${porTxt(Number(h.precio) / Number(h.paquete), i.unidad)}</span></div>`).join("")}</div>` : ""}
+      ${hist.length ? `<h4 class="kh4">Historial</h4><div class="items">${hist.map((h) => `<div class="it"><span class="t"><b>${fmtC(Number(h.precio))} por ${trae(Number(h.paquete), i.unidad)}</b><span>${fechaC(h.fecha)}${h.lugar ? " · " + esc(h.lugar) : ""}${h.detalle ? " · " + esc(h.detalle) : ""} · ${esc(h.registro)}${h.origen !== "manual" ? " · " + ({ compras: "lista de compras", app: "app de compras" }[h.origen] || h.origen) : ""}</span></span><span class="side num">${porTxt(Number(h.precio) / Number(h.paquete), i.unidad)}</span></div>`).join("")}</div>` : ""}
       ${usos.length ? `<p class="hintp">Se usa en: ${usos.map((r) => esc(r.nombre + (r.tamano ? " " + r.tamano : ""))).join(", ")}.</p>` : `<p class="hintp">Todavía no se usa en ninguna receta.</p>`}
       <div class="toolsrow"><button type="button" class="ghost" data-kedi="${id}">Nombre, tipo y unidad</button></div>`;
     const prev = () => { const pp = num(s.querySelector("#kpP").value), qq = num(s.querySelector("#kpQ").value); if (pp > 0 && qq > 0) s.querySelector("#kpPrev").textContent = `Queda en ${porTxt(pp / qq, i.unidad)}.`; };
+    const lugNuevo = () => { const nw = s.querySelector("#kpL").value === NUEVO; s.querySelector("#kpLnw").hidden = !nw; if (nw) s.querySelector("#kpLn").focus(); };
     s.oninput = (e) => { if (["kpP", "kpQ"].includes(e.target.id)) prev(); };
+    s.onchange = (e) => { if (e.target.id === "kpL") lugNuevo(); };
+    lugNuevo();
     s.onclick = (e) => { const b = e.target.closest("[data-kedi]"); if (b) insumoForm(id); };
     s.onsubmit = async (e) => {
       e.preventDefault(); if (!needMe()) return;
@@ -425,8 +437,10 @@ window.CajaCostos = function (K) {
       const pp = num(s.querySelector("#kpP").value), qq = num(s.querySelector("#kpQ").value);
       if (!(pp > 0)) { er.textContent = "Poné cuánto pagaste."; er.hidden = false; return; }
       if (!(qq > 0)) { er.textContent = "Poné cuánto trae el paquete."; er.hidden = false; return; }
+      const ls = s.querySelector("#kpL").value, lugar = (ls === NUEVO ? s.querySelector("#kpLn").value : ls).trim();
+      if (!lugar) { er.textContent = ls === NUEVO ? "Escribí el nombre del lugar nuevo." : "Elegí dónde lo compraste."; er.hidden = false; return; }
       try {
-        fail(await sb.rpc("costo_precio_cargar", { p_insumo: id, p_precio: pp, p_paquete: qq, p_fecha: s.querySelector("#kpF").value || null, p_lugar: s.querySelector("#kpL").value, p_origen: "manual", p_por: K.me() }));
+        fail(await sb.rpc("costo_precio_cargar", { p_insumo: id, p_precio: pp, p_paquete: qq, p_fecha: s.querySelector("#kpF").value || null, p_lugar: lugar, p_origen: "manual", p_por: K.me(), p_detalle: s.querySelector("#kpD").value.trim() || null }));
         await reload(); if (K.view() === "costos") view();
         toast(`Precio de ${i.nombre} guardado`); insumoSheet(id);
       } catch (err) { er.textContent = err.message; er.hidden = false; }
