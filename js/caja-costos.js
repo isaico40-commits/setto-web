@@ -271,8 +271,8 @@ window.CajaCostos = function (K) {
         + `<p class="kpinote" style="margin-top:6px">La tanda cuesta ${fmtC(c.total)} y rinde ${trae(Number(D.d.rinde) || 0, D.d.rinde_unidad)}${Number(D.d.merma) ? ` (−${fmtQ(D.d.merma)}% de merma)` : ""}. ${D.d.rinde_unidad === "u" ? "" : `Por ${D.d.rinde_unidad}: ${fmtC(c.unit)}.`}</p>`;
     }
     function lineaHTML(l, i, c) {
-      const u = unidadL(l), sub = l.sub_id && recPor(l.sub_id);
-      return `<div class="kln" data-i="${i}">
+      const u = unidadL(l), sub = l.sub_id && recPor(l.sub_id), mov = D.d.tipo === "producto";
+      return `<div class="kln${mov ? " kln-d" : ""}" data-i="${i}">${mov ? `<span class="kln-h" data-kdrag="${i}" title="Arrastrá para moverlo" aria-hidden="true">⠿</span>` : ""}
         <span class="kln-n">${sub ? `<button type="button" class="kln-sub" data-kr="${sub.id}">${esc(sub.nombre)} <span>›</span></button>` : `<button type="button" class="kln-ins" data-ki="${esc(l.insumo_id)}">${esc(nombreL(l))}</button>`}
           ${c.costs[i] == null ? `<small class="kwarn">${sub ? "faltan precios" : "sin precio"}</small>` : ""}</span>
         <label class="kq"><input data-kq="${i}" value="${l.cantidad ? fmtIn(l.cantidad) : ""}" inputmode="decimal" autocomplete="off" aria-label="Cantidad de ${esc(nombreL(l))}"><span>${UN[u]}</span></label>
@@ -284,7 +284,7 @@ window.CajaCostos = function (K) {
       if (!D.L.length) return `<div class="emptyc" style="padding:16px 10px"><span>Todavía no tiene ingredientes.</span></div>`;
       if (D.d.tipo !== "producto") return `<div class="klines">${D.L.map((l, i) => lineaHTML(l, i, c)).join("")}</div>`;
       const gs = {}; D.L.forEach((l, i) => (gs[l.parte || "Otros"] = gs[l.parte || "Otros"] || []).push(i));
-      return Object.keys(gs).sort((a, b) => PARTES.indexOf(a) - PARTES.indexOf(b)).map((g) => `<div class="kgrp"><div class="kgh">${esc(g)}<span class="num">${fmtC(gs[g].reduce((a, i) => a + (c.costs[i] || 0), 0))}</span></div><div class="klines">${gs[g].map((i) => lineaHTML(D.L[i], i, c)).join("")}</div></div>`).join("");
+      return Object.keys(gs).sort((a, b) => PARTES.indexOf(a) - PARTES.indexOf(b)).map((g) => `<div class="kgrp" data-kg="${esc(g)}"><div class="kgh">${esc(g)}<span class="num">${fmtC(gs[g].reduce((a, i) => a + (c.costs[i] || 0), 0))}</span></div><div class="klines">${gs[g].map((i) => lineaHTML(D.L[i], i, c)).join("")}</div></div>`).join("");
     }
     function pickHTML() {
       const q = E.q.trim().toLowerCase();
@@ -330,7 +330,48 @@ window.CajaCostos = function (K) {
     const ensucia = () => { if (!E.dirty) { E.dirty = true; const b = sh().querySelector("[data-ksave]"); if (b) { b.disabled = false; b.textContent = "Guardar cambios"; } const x = sh().querySelector(".sh .x"); if (x) { x.removeAttribute("data-close"); x.setAttribute("data-kx", ""); } } };
     const leer = () => { const s = sh(); const n = s.querySelector("#kN"); if (n) D.d.nombre = n.value; const no = s.querySelector("#kNo"); if (no) D.d.nota = no.value; };
 
-    const montar = () => { openSheet("", () => {}); draw(); sh().oninput = onInput; sh().onclick = onClick; };
+    const montar = () => { openSheet("", () => {}); draw(); sh().oninput = onInput; sh().onclick = onClick; sh().onpointerdown = onDrag; };
+    // Arrastrar un ingrediente (por la manija ⠿) a otro lugar o a otro grupo (Bebida, Foam…).
+    function onDrag(e) {
+      const h = e.target.closest("[data-kdrag]"); if (!h || (e.button && e.button !== 0)) return;
+      e.preventDefault(); leer();
+      const i = +h.dataset.kdrag, row = h.closest(".kln"), list = sh().querySelector("#klist"), r0 = row.getBoundingClientRect();
+      const hay = new Set([...list.querySelectorAll("[data-kg]")].map((g) => g.dataset.kg));
+      PARTES.filter((x) => !hay.has(x)).forEach((x) => list.insertAdjacentHTML("beforeend", `<div class="kgrp kzone" data-kg="${x}"><div class="kgh">${x}</div><div class="klines kdrop">Soltá acá para pasarlo a ${x}</div></div>`));
+      const ghost = row.cloneNode(true); ghost.classList.add("kghost"); ghost.style.width = r0.width + "px"; ghost.style.left = r0.left + "px"; document.body.appendChild(ghost);
+      const off = e.clientY - r0.top; row.classList.add("kdragsrc");
+      let tgt = null, timer = null, lastY = e.clientY;
+      const marca = () => sh().querySelectorAll(".kover,.kbefore,.kafter").forEach((x) => x.classList.remove("kover", "kbefore", "kafter"));
+      const mover = (x, y) => {
+        ghost.style.top = y - off + "px"; lastY = y;
+        ghost.style.display = "none"; const el = document.elementFromPoint(x, y); ghost.style.display = "";
+        marca(); tgt = null;
+        const grp = el && el.closest("#klist [data-kg]"); if (!grp) return;
+        const ln = el.closest(".kln[data-i]");
+        if (ln && ln !== row) { const b = ln.getBoundingClientRect(), after = y > b.top + b.height / 2; ln.classList.add(after ? "kafter" : "kbefore"); tgt = { parte: grp.dataset.kg, ref: +ln.dataset.i, after }; }
+        else { grp.classList.add("kover"); tgt = { parte: grp.dataset.kg, ref: null }; }
+      };
+      const scroll = () => { const s = sh(), b = s.getBoundingClientRect(); if (lastY < b.top + 70) s.scrollTop -= 12; else if (lastY > b.bottom - 70) s.scrollTop += 12; };
+      timer = setInterval(scroll, 30); mover(e.clientX, e.clientY);
+      const mv = (ev) => mover(ev.clientX, ev.clientY);
+      const up = () => {
+        clearInterval(timer); h.removeEventListener("pointermove", mv); h.removeEventListener("pointerup", up); h.removeEventListener("pointercancel", up);
+        ghost.remove();
+        if (tgt) {
+          const it = D.L[i], antes = it.parte; it.parte = tgt.parte;
+          const ref = tgt.ref != null ? D.L[tgt.ref] : null;
+          D.L.splice(i, 1);
+          let idx;
+          if (ref) idx = D.L.indexOf(ref) + (tgt.after ? 1 : 0);
+          else { const ult = D.L.map((l) => l.parte).lastIndexOf(tgt.parte); idx = ult >= 0 ? ult + 1 : D.L.length; }
+          D.L.splice(idx, 0, it);
+          if (antes !== tgt.parte || idx !== i) ensucia();
+        }
+        draw();
+      };
+      try { h.setPointerCapture(e.pointerId); } catch (_) {}
+      h.addEventListener("pointermove", mv); h.addEventListener("pointerup", up); h.addEventListener("pointercancel", up);
+    }
     const onInput = (e) => {
       const t = e.target;
       if (t.dataset.kq !== undefined) { const v = num(t.value); D.L[+t.dataset.kq].cantidad = isNaN(v) ? 0 : v; ensucia(); refresh(); return; }

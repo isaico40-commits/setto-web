@@ -393,4 +393,15 @@ body.caja.consel{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
   .ksz:not(:has(>b)){grid-template-columns:1fr 1fr 88px}
 }
 #ksum{margin-top:12px}
+/* mover ingredientes arrastrando */
+.kln.kln-d{grid-template-columns:18px minmax(0,1fr) 112px 68px 28px;padding-left:6px}
+.kln-h{cursor:grab;touch-action:none;user-select:none;color:color-mix(in srgb,var(--ink-2) 60%,transparent);font-size:1.05rem;line-height:1;text-align:center;padding:10px 0}
+.kln-h:hover{color:var(--turquesa)}
+.kghost{position:fixed;z-index:9999;pointer-events:none;background:var(--card);border:1.5px solid var(--turquesa);border-radius:14px;box-shadow:0 10px 28px rgba(0,0,0,.18);opacity:.95}
+.kdragsrc{opacity:.35}
+.kln.kbefore{box-shadow:inset 0 3px 0 var(--turquesa)}
+.kln.kafter{box-shadow:inset 0 -3px 0 var(--turquesa)}
+.kgrp.kover>.klines{border-color:var(--turquesa);background:color-mix(in srgb,var(--turquesa) 8%,var(--card))}
+.kdrop{padding:12px;text-align:center;font-size:.8rem;color:var(--ink-2);border-style:dashed}
+@media (max-width:420px){.kln.kln-d{grid-template-columns:16px minmax(0,1fr) 92px 56px 26px;padding-left:4px}}
 .kszseg+#ksum,.sh+#ksum{margin-top:0}
