@@ -252,6 +252,7 @@ window.CajaCostos = function (K) {
         L: lineasDe(r.id).map((l) => ({ insumo_id: l.insumo_id, sub_id: l.sub_id, cantidad: Number(l.cantidad), parte: l.parte || "" })), meta: r };
     } else D = { id: null, d: Object.assign({ nota: "" }, src.nuevo), L: [], meta: null };
     if (D.d.tipo === "producto" && !ctx.p) { ctx.p = prodPor(D.d.product_id); ctx.tam = D.d.tamano; }
+    const ORIG = D.L.map((l) => Object.assign({}, l)); // para sincronizar ingredientes con el otro tamaño
     const E = { dirty: false, pick: false, q: "", parte: D.d.tipo === "producto" ? (D.L.length ? D.L[D.L.length - 1].parte || "Otros" : esBebida(ctx.p || {}) ? "Bebida" : "Relleno") : "", seguro: false };
     const sh = () => $("#sheet");
     const unitTxt = () => (D.d.tipo === "producto" ? "por unidad" : D.d.rinde_unidad === "u" ? "por unidad" : D.d.rinde_unidad === "g" ? "por kg" : "por litro");
@@ -377,16 +378,52 @@ window.CajaCostos = function (K) {
       try {
         const id = fail(await sb.rpc("costo_receta_guardar", { p_id: D.id, p_datos: Object.assign({}, D.d, { activo }), p_lineas: activo ? D.L.map((l) => ({ insumo_id: l.insumo_id, sub_id: l.sub_id, cantidad: l.cantidad, parte: l.parte || null })) : null, p_por: K.me() }));
         await reload();
+        let extra = "";
+        if (activo) { try { extra = await sincronizarTam(); } catch (e2) { extra = ` (no se pudo pasar al otro tamaño: ${e2.message})`; } }
         if (K.view() === "costos") view();
         if (!activo) { closeSheet(); toast("Receta oculta"); return; }
-        toast("Guardado"); editor({ id }, ctx);
+        toast("Guardado" + extra); editor({ id }, ctx);
       } catch (err) { er.textContent = err.message; er.hidden = false; b.disabled = false; b.textContent = "Guardar cambios"; }
+    }
+    // Los dos tamaños de una bebida llevan los mismos ingredientes: lo que se agrega o se quita en uno
+    // se agrega o se quita en el otro (con la misma cantidad, para ajustar a mano). El vaso 12 ↔ 16 oz se cambia solo.
+    async function sincronizarTam() {
+      const p = ctx.p;
+      if (D.d.tipo !== "producto" || !D.d.tamano || !p || tamanos(p).length < 2) return "";
+      const t = tamanos(p).find((x) => x !== D.d.tamano);
+      const al = (L) => L.map((l) => aTam(l, t)), k = (l) => (l.insumo_id ? "i:" + l.insumo_id : "s:" + l.sub_id);
+      const antes = new Set(al(ORIG).map(k)), ahora = al(D.L), ahoraK = new Set(ahora.map(k));
+      const sumar = ahora.filter((l) => !antes.has(k(l))), sacar = [...antes].filter((x) => !ahoraK.has(x));
+      const otra = recDe(p.id, t);
+      if (!otra) {
+        if (!D.L.length || !(precioDe(p, t) > 0)) return "";
+        fail(await sb.rpc("costo_receta_guardar", { p_id: null, p_datos: Object.assign({}, D.d, { tamano: t, nota: `Copiada de ${D.d.tamano}: ajustá las cantidades.` }), p_lineas: ahora.map(lin), p_por: K.me() }));
+        await reload(); return `. Armé la de ${t} con los mismos ingredientes: ajustá las cantidades.`;
+      }
+      if (!sumar.length && !sacar.length) return "";
+      const L2 = lineasDe(otra.id).map((l) => ({ insumo_id: l.insumo_id, sub_id: l.sub_id, cantidad: Number(l.cantidad), parte: l.parte || "" }));
+      const L2k = new Set(L2.map(k));
+      const nuevaL = L2.filter((l) => !sacar.includes(k(l))).concat(sumar.filter((l) => !L2k.has(k(l))));
+      const cambios = nuevaL.length !== L2.length || sumar.some((l) => !L2k.has(k(l)));
+      if (!cambios) return "";
+      fail(await sb.rpc("costo_receta_guardar", { p_id: otra.id, p_datos: { nombre: otra.nombre, tipo: otra.tipo, product_id: otra.product_id, tamano: otra.tamano, rinde: Number(otra.rinde), rinde_unidad: otra.rinde_unidad, merma: Number(otra.merma), nota: otra.nota || "", activo: true }, p_lineas: nuevaL.map(lin), p_por: K.me() }));
+      await reload();
+      const n = sumar.filter((l) => !L2k.has(k(l))).length, m = L2.length - (nuevaL.length - n);
+      return `. En ${t}: ${[n ? `+${n} ingrediente${n > 1 ? "s" : ""} (ajustá la cantidad)` : "", m ? `−${m}` : ""].filter(Boolean).join(", ")}`;
+    }
+    const lin = (l) => ({ insumo_id: l.insumo_id, sub_id: l.sub_id, cantidad: l.cantidad, parte: l.parte || null });
+    function aTam(l, t) {
+      const i = l.insumo_id && insPor(l.insumo_id);
+      if (!i || !/(12|16)\s?oz/i.test(i.nombre)) return l;
+      const nom = i.nombre.replace(/(12|16)(\s?oz)/i, (_, __, r) => t.slice(0, 2) + r).toLowerCase();
+      const j = C.ins.find((x) => x.activo && x.nombre.toLowerCase() === nom);
+      return j ? Object.assign({}, l, { insumo_id: j.id }) : l;
     }
     async function copiarA(t) {
       if (!needMe()) return;
       if (E.dirty) return toast("Guardá los cambios primero");
       try {
-        const id = fail(await sb.rpc("costo_receta_guardar", { p_id: null, p_datos: Object.assign({}, D.d, { tamano: t, nota: "Copiada de " + D.d.tamano + ": ajustá las cantidades." }), p_lineas: D.L, p_por: K.me() }));
+        const id = fail(await sb.rpc("costo_receta_guardar", { p_id: null, p_datos: Object.assign({}, D.d, { tamano: t, nota: "Copiada de " + D.d.tamano + ": ajustá las cantidades." }), p_lineas: D.L.map((l) => lin(aTam(l, t))), p_por: K.me() }));
         await reload(); if (K.view() === "costos") view();
         toast(`Copiada a ${t}. Ajustá las cantidades.`); editor({ id }, ctx);
       } catch (err) { toast(err.message); }
