@@ -194,19 +194,21 @@ window.CajaCostos = function (K) {
     if (C.fi === "packaging") list = list.filter((i) => i.tipo === "packaging");
     if (C.fi === "materia") list = list.filter((i) => i.tipo === "materia");
     if (q) list = list.filter((i) => i.nombre.toLowerCase().includes(q));
-    list.sort((a, b) => (!!C.pre[a.id] - !!C.pre[b.id]) || (a.tipo === b.tipo ? 0 : a.tipo === "materia" ? -1 : 1) || a.nombre.localeCompare(b.nombre, "es"));
+    list.sort((a, b) => (!!C.pre[a.id] - !!C.pre[b.id]) || a.nombre.localeCompare(b.nombre, "es"));
     const sin = C.ins.filter((i) => i.activo && !C.pre[i.id]).length;
     const chip = (k, l) => `<button class="chip" data-kfi="${k}" aria-pressed="${C.fi === k}">${l}</button>`;
     $("#kbody").innerHTML = `
       <input class="search" id="kqi" placeholder="Buscar insumo" value="${esc(C.qi)}" autocomplete="off">
       <div class="filters">${chip("todos", "Todos")}${chip("sin", `Sin precio${sin ? ` (${sin})` : ""}`)}${chip("materia", "Materia prima")}${chip("packaging", "Packaging")}</div>
-      <div class="items">${list.map(filaIns).join("") || `<div class="emptyc"><span>No hay insumos con ese filtro.</span></div>`}</div>
+      ${list.length ? [["Insumos", list.filter((i) => i.tipo !== "packaging")], ["Packaging", list.filter((i) => i.tipo === "packaging")]].filter(([, xs]) => xs.length)
+        .map(([t, xs]) => `<small class="kpk-h kins-h">${t} <span class="num">${xs.length}</span></small><div class="items">${xs.map(filaIns).join("")}</div>`).join("")
+        : `<div class="items"><div class="emptyc"><span>No hay insumos con ese filtro.</span></div></div>`}
       <div class="toolsrow"><button class="ghost" data-knewi>+ Insumo</button></div>
       <p class="kpinote">El costo usa siempre el último precio cargado. En gris, los que tienen más de ${VIEJO} días.</p>`;
   }
   function filaIns(i) {
     const p = C.pre[i.id], viejo = p && dias(p.fecha) > VIEJO;
-    return `<button class="it kins ${viejo ? "old" : ""}" data-ki="${i.id}"><span class="t"><b>${esc(i.nombre)}${i.tipo === "packaging" ? '<span class="tagx">packaging</span>' : ""}</b>
+    return `<button class="it kins ${viejo ? "old" : ""}" data-ki="${i.id}"><span class="t"><b>${esc(i.nombre)}</b>
       <span>${p ? `${fmtC(Number(p.precio))} por ${trae(Number(p.paquete), i.unidad)} · ${fechaC(p.fecha)}${p.lugar ? " · " + esc(p.lugar) : ""}${viejo ? ` · hace ${dias(p.fecha)} días` : ""}` : "Sin precio todavía"}</span></span>
       <span class="side kside">${p ? `<b class="num">${porTxt(precioU(i.id), i.unidad)}</b>` : `<span class="kcargar">Cargar</span>`}</span></button>`;
   }
@@ -291,8 +293,10 @@ window.CajaCostos = function (K) {
       const usados = new Set(D.L.map((l) => l.insumo_id || l.sub_id));
       const ins = C.ins.filter((i) => i.activo && !usados.has(i.id) && (!q || i.nombre.toLowerCase().includes(q)));
       const subs = C.rec.filter((r) => r.tipo === "base" && r.id !== D.id && !usados.has(r.id) && (!q || r.nombre.toLowerCase().includes(q)));
+      const sec = (t, xs) => xs.length ? `<small class="kpk-h">${t}</small>${xs.slice(0, 30).map((i) => `<button type="button" class="chip" data-kadd="i:${i.id}">${esc(i.nombre)}</button>`).join("")}` : "";
       return `${subs.length ? `<small class="kpk-h">Preparaciones</small>${subs.slice(0, 12).map((r) => `<button type="button" class="chip" data-kadd="s:${r.id}">${esc(r.nombre)}</button>`).join("")}` : ""}
-        ${ins.length ? `<small class="kpk-h">Insumos</small>${ins.slice(0, 30).map((i) => `<button type="button" class="chip" data-kadd="i:${i.id}">${esc(i.nombre)}</button>`).join("")}` : ""}
+        ${sec("Insumos", ins.filter((i) => i.tipo !== "packaging"))}
+        ${sec("Packaging", ins.filter((i) => i.tipo === "packaging"))}
         ${q && !C.ins.some((i) => i.activo && i.nombre.toLowerCase() === q) ? `<button type="button" class="chip knewchip" data-knewin>+ Crear insumo "${esc(E.q.trim())}"</button>` : ""}`;
     }
     function draw() {
