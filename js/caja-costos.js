@@ -537,10 +537,11 @@ window.CajaCostos = function (K) {
       <form class="form" id="kif"><label class="fl"><span>Nombre</span><input id="kiN" value="${esc(F.nombre ?? i.nombre)}" maxlength="60" required placeholder="Ej: Leche de avena"></label>
       <div class="fl"><span>Tipo</span><div class="seg">${[["materia", "Materia prima"], ["packaging", "Packaging"]].map(([k, l]) => `<button type="button" data-kit="${k}" aria-pressed="${F.tipo === k}">${l}</button>`).join("")}</div></div>
       <div class="fl"><span>Se mide en</span><div class="seg">${["g", "ml", "u"].map((u) => `<button type="button" data-kiu="${u}" aria-pressed="${F.unidad === u}" ${conPrecio && u !== i.unidad ? "disabled" : ""}>${UNL[u]}</button>`).join("")}</div></div>
-      ${conPrecio ? `<p class="hintp">La unidad no se puede cambiar porque ya tiene precios. Si te equivocaste, creá otro insumo.</p>` : ""}
+      ${conPrecio ? `<p class="hintp">La unidad no se puede cambiar porque ya tiene precios. Si te equivocaste, eliminalo y creá otro.</p>` : ""}
       <p class="err" id="kierr" hidden></p>
       <button class="btn solid big" type="submit">Guardar</button>
-      ${id ? `<button type="button" class="btn danger" data-kihide>Ocultar insumo</button>` : ""}</form>`;
+      ${id ? `<button type="button" class="btn danger" data-kidel>${F.seguro ? "Tocá de nuevo para eliminarlo" : "Eliminar insumo"}</button>
+        ${F.seguro ? `<p class="hintp">Se borra el insumo${conPrecio ? " y sus precios" : ""}. No se puede deshacer.</p>` : ""}` : ""}</form>`;
     };
     openSheet("", draw);
     const s = $("#sheet");
@@ -549,9 +550,12 @@ window.CajaCostos = function (K) {
       const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.kit) { F.tipo = b.dataset.kit; draw(s); return; }
       if (b.dataset.kiu) { F.unidad = b.dataset.kiu; draw(s); return; }
-      if (b.dataset.kihide !== undefined) {
-        if (C.lin.some((l) => l.insumo_id === id && recPor(l.receta_id))) return toast("Está en recetas: sacalo de las recetas antes de ocultarlo");
-        try { fail(await sb.rpc("costo_insumo_guardar", { p_id: id, p_nombre: i.nombre, p_tipo: i.tipo, p_unidad: i.unidad, p_paquete: i.paquete, p_activo: false, p_por: K.me() })); await reload(); closeSheet(); if (K.view() === "costos") view(); toast("Insumo oculto"); } catch (err) { toast(err.message); }
+      if (b.dataset.kidel !== undefined) {
+        const recs = [...new Set(C.lin.filter((l) => l.insumo_id === id && recPor(l.receta_id)).map((l) => { const r = recPor(l.receta_id); return r.nombre + (r.tamano ? " " + r.tamano : ""); }))];
+        if (recs.length) return toast(`Está en ${recs.join(", ")}. Sacalo de ahí antes de eliminarlo.`);
+        if (!F.seguro) { F.seguro = true; draw(s); return; }
+        if (!needMe()) return;
+        try { fail(await sb.rpc("costo_insumo_eliminar", { p_id: id, p_por: K.me() })); await reload(); closeSheet(); if (K.view() === "costos") view(); toast(`${i.nombre} eliminado`); } catch (err) { toast(err.message); }
       }
     };
     s.onsubmit = async (e) => {
