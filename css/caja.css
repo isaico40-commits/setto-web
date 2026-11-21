@@ -498,3 +498,23 @@ body.caja.consel{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 @media (max-width:440px){.dtr{grid-template-columns:1fr 1fr auto}.dtn{grid-column:1/-1}}
 .dsug{font-size:.66rem;color:var(--ink-2);font-weight:600}
 .dmas summary{cursor:pointer;font-size:.8rem;font-weight:600;color:var(--turquesa);padding:4px 0}
+/* Resumen: facturado / gastado / te queda */
+.dneto{background:var(--card);border:1.5px solid color-mix(in srgb,var(--turquesa) 22%,transparent);border-radius:18px;padding:14px 16px;display:grid;gap:10px;margin-bottom:10px}
+.dncs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.dnc{display:grid;gap:2px;min-width:0;align-content:start}
+.dnc small{font-size:.72rem;font-weight:600;color:var(--ink-2)}
+.dnc .k{font-size:.74rem;font-weight:600;color:var(--ink-2)}
+.dnc b{font-size:1.2rem;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dnc.g b{color:#9b2c2c}.dnc.q b{color:#1d6b3a}.dnc.q.neg b{color:#9b2c2c}
+.dnc.q{background:var(--menta);border-radius:12px;padding:6px 8px;margin:-6px -6px -6px 0}
+.dnc.q.neg{background:var(--coral-2)}
+@media (min-width:700px){.dnc b{font-size:1.5rem}}
+.dnbs{display:grid;gap:5px}
+.dnb{display:block;height:10px;border-radius:5px;background:var(--bg-2);overflow:hidden}
+.dnb i{display:block;height:100%;border-radius:5px}
+.n0{background:var(--turquesa)}.n1{background:#e07a70}.n2{background:#3f9a5f}.n3{background:#9b2c2c}
+.dncat{margin:0;font-size:.76rem;color:var(--ink-2);line-height:1.4}
+.dncat b{color:var(--ink);font-weight:600}
+.dcolch.dpar .dpb{display:flex;align-items:flex-end;justify-content:center;gap:2px;height:100%;min-height:0}
+.dcolch.dpar .dpb i{display:block;width:42%;max-width:16px;border-radius:3px 3px 0 0}
+.dcv.dpos,.dleg .dpos{color:#1d6b3a}.dcv.dneg,.dleg .dneg{color:#9b2c2c}
