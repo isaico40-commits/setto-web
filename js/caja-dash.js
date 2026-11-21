@@ -1,9 +1,9 @@
 /*
-  Caja · Dashboard (pestaña de la barra de abajo, #dash).
-  Es el Dashboard que estaba en el panel de Pedidos, más costos y márgenes:
-  - Ganancia bruta = lo que entró − lo que costó hacer lo vendido (materia prima + packaging, js/costos-calc.js).
-    Cada venta usa los precios de insumos de ESE día. Solo se puede calcular en las ventas con productos:
-    pedidos web (sus ítems) y entradas de la Caja o del Local cargadas con productos. El resto se avisa como "sin detalle".
+  Caja · Dashboard (pestaña de la barra de abajo, #dash). Vistas Día / Semana / Mes con navegación hacia atrás.
+  - Facturado (bruto) = todas las entradas de la Caja. Gastado = todos los gastos. Te queda en caja = facturado − gastado.
+  - Ganancia neta = facturado − mercadería y packaging de lo vendido (recetas, js/costos-calc.js, con los precios de
+    insumos de ESE día). Lo cargado sin productos se costea con el mismo % que el resto (se marca como estimado).
+  - Cada período se compara con el anterior; si está en curso, contra la misma cantidad de días.
   - Por turno: mañana (antes de la hora de corte) y tarde, según la hora en que entró la venta.
   - Subas de insumos: cada precio que sube más de X% respecto del anterior queda en el historial, con los
     productos que pierden margen y a cuánto subirlos para volver al margen que tenían. Se guarda en settings.costos_alertas.
@@ -12,7 +12,7 @@ window.CajaDash = function (K) {
   const { sb, $, esc, fail, toast } = K;
   const TZ = "America/Argentina/Buenos_Aires";
   const CC = window.CostosCalc;
-  const D = { ok: false, loading: null, err: "", dia: 0, cfg: { suba: 10, piso: 50, corte: 14, alertas: {} }, verHist: false, editCfg: false };
+  const D = { ok: false, loading: null, err: "", per: "dia", off: 0, cfg: { suba: 10, piso: 50, corte: 14, alertas: {} }, verHist: false, editCfg: false };
   const AJ = { suba: [5, 10, 15, 20], piso: [40, 50, 60, 65] };
 
   /* ---------- formatos ---------- */
@@ -27,6 +27,32 @@ window.CajaDash = function (K) {
   const diaK = (i) => { const d = new Date(hoyK() + "T12:00:00"); d.setDate(d.getDate() - i); return d.toISOString().slice(0, 10); };
   const fechaD = (k) => new Date(k + "T12:00:00");
   const diaNom = (i) => (i === 0 ? "Hoy" : i === 1 ? "Ayer" : fechaD(diaK(i)).toLocaleDateString("es-AR", { weekday: "long" }));
+  const addK = (k, n) => { const d = fechaD(k); d.setDate(d.getDate() + n); return keyAR(d); };
+  const rango = (a, b) => { const r = []; for (let k = a; k <= b; k = addK(k, 1)) r.push(k); return r; };
+  const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const finMes = (k) => { const d = fechaD(k.slice(0, 8) + "01"); d.setMonth(d.getMonth() + 1); d.setDate(0); return keyAR(d); };
+  const mesAtras = (k, n) => { const d = fechaD(k.slice(0, 8) + "01"); d.setMonth(d.getMonth() - n); return keyAR(d); };
+  const MAXOFF = { dia: 59, semana: 8, mes: 2 };
+  // Período elegido (día / semana de lunes a domingo / mes calendario) y el anterior para comparar.
+  // Si el período está en curso, se compara contra la misma cantidad de días del anterior (ej. 1 al 21 vs. 1 al 21).
+  function periodo(per, off) {
+    const hoy = hoyK();
+    if (per === "dia") {
+      const k = diaK(off), nom = fechaD(k).toLocaleDateString("es-AR", { weekday: "long" });
+      return { keys: [k], prev: [addK(k, -7)], vs: `vs. ${nom} pasado`, label: `${off === 0 ? "Hoy" : off === 1 ? "Ayer" : nom} ${fechaD(k).getDate()}`, titulo: "Resumen del día" };
+    }
+    if (per === "semana") {
+      const dow = (fechaD(hoy).getDay() + 6) % 7, lun = addK(hoy, -dow - 7 * off), dom = addK(lun, 6), fin = dom < hoy ? dom : hoy;
+      const keys = rango(lun, fin), prev = keys.map((k) => addK(k, -7));
+      return { keys, prev, todos: rango(lun, dom), vs: off === 0 ? `vs. los mismos ${keys.length} días de la semana pasada` : "vs. la semana anterior",
+        label: off === 0 ? "Esta semana" : off === 1 ? "Semana pasada" : `${fCorta(lun)} al ${fCorta(dom)}`, sub: `lun ${fCorta(lun)} al dom ${fCorta(dom)}`, titulo: "Resumen de la semana" };
+    }
+    const ini = mesAtras(hoy, off), fm = finMes(ini), fin = fm < hoy ? fm : hoy, keys = rango(ini, fin);
+    const pIni = mesAtras(hoy, off + 1), pFin = finMes(pIni), prev = rango(pIni, addK(pIni, keys.length - 1)).filter((k) => k <= pFin);
+    const nomM = MESES[fechaD(ini).getMonth()], nomP = MESES[fechaD(pIni).getMonth()];
+    return { keys, prev, todos: rango(ini, fm), vs: fin < fm ? `vs. ${nomP} al ${fechaD(prev[prev.length - 1]).getDate()}` : `vs. ${nomP}`,
+      label: nomM + (fechaD(ini).getFullYear() !== fechaD(hoy).getFullYear() ? " " + fechaD(ini).getFullYear() : ""), sub: fin < fm ? `al ${fechaD(fin).getDate()} de ${nomM}, va en curso` : "mes completo", titulo: "Resumen del mes" };
+  }
   const fCorta = (k) => fechaD(k).toLocaleDateString("es-AR", { day: "numeric", month: "short" }).replace(".", "");
   const piso = () => (Number(D.cfg.piso) || 50) / 100;
   const tono = (m) => (m == null ? "na" : m >= Math.max(0.65, piso()) ? "ok" : m >= piso() ? "mid" : "low");
@@ -35,7 +61,7 @@ window.CajaDash = function (K) {
 
   /* ---------- datos ---------- */
   async function load() {
-    const desde = diaK(34), desdeIso = new Date(desde + "T00:00:00-03:00").toISOString();
+    const desde = mesAtras(hoyK(), 3), desdeIso = new Date(desde + "T00:00:00-03:00").toISOString();
     const r = await Promise.all([
       sb.from("orders").select("id, code, phone, items, total, pago, modo, status, created_at").gte("created_at", new Date(new Date(desdeIso).getTime() - 3 * 864e5).toISOString()).order("created_at").limit(5000),
       sb.from("caja_movimientos").select("id, fecha, tipo, monto, categoria_id, registro, items, legacy_id, created_at").in("tipo", ["entrada", "gasto"]).eq("estado", "activo").gte("fecha", desde).limit(10000),
@@ -92,7 +118,7 @@ window.CajaDash = function (K) {
     const ks = new Set(keys), ordPor = {};
     D.orders.forEach((o) => (ordPor[o.id] = o));
     const A = { ent: 0, gas: 0, canales: {}, webN: 0, webTot: 0, canc: 0, prods: {}, mochis: {}, mochisN: 0, horas: {}, pagos: {}, modos: {}, tels: {}, dias: {},
-      rc: 0, cost: 0, sinDet: 0, turnos: {}, gasCat: {} };
+      rc: 0, cost: 0, sinDet: 0, turnos: {}, gasCat: {}, horasF: {}, tkN: 0, tkV: 0, ventas: 0 };
     keys.forEach((k) => (A.dias[k] = { web: 0, otros: 0, n: 0, rc: 0, cost: 0, gas: 0 }));
     const T = (t) => A.turnos[t] || (A.turnos[t] = { ent: 0, rc: 0, cost: 0, n: 0 });
     D.orders.forEach((o) => {
@@ -108,11 +134,14 @@ window.CajaDash = function (K) {
       if (!ks.has(m.fecha)) return; const v = +m.monto || 0;
       if (m.tipo === "gasto") { A.gas += v; A.dias[m.fecha].gas += v; const gc = D.cats[m.categoria_id] || "Sin categoría"; A.gasCat[gc] = (A.gasCat[gc] || 0) + v; return; }
       const web = m.registro === "Pedidos web", c = web ? "Pedidos web" : D.cats[m.categoria_id] || "Sin categoría";
-      A.ent += v; A.canales[c] = (A.canales[c] || 0) + v; A.dias[m.fecha][web ? "web" : "otros"] += v;
+      A.ent += v; A.ventas++; A.canales[c] = (A.canales[c] || 0) + v; A.dias[m.fecha][web ? "web" : "otros"] += v;
       // productos de la venta: los del pedido web (legacy_id pedido:<id>) o los cargados en la entrada
       const ord = /^pedido:/.test(m.legacy_id || "") ? ordPor[m.legacy_id.slice(7)] : null;
       const items = ord ? ord.items || [] : m.items || [], cuando = ord ? ord.created_at : m.created_at, t = T(turnoDe(cuando, m.fecha));
       t.ent += v; t.n++;
+      if (cuando && keyAR(new Date(cuando)) === m.fecha) { const h = horaAR(cuando); A.horasF[h] = (A.horasF[h] || 0) + v; }
+      // ticket promedio: solo ventas sueltas (web o cargadas con productos); las apps y cafeterías se cargan en un total por día
+      if (ord || (items && items.length)) { A.tkN++; A.tkV += v; }
       let cost = 0, ok = !!D.costos && items.some((i) => !CC.NO_PROD.includes(i.id));
       const calc = D.costos && D.costos.en(m.fecha);
       items.forEach((i) => {
@@ -182,6 +211,7 @@ window.CajaDash = function (K) {
     return `<div class="dcolch ${cls || ""}" style="--n:${cols.length}">${cols.map((c) => { const t = c.v.reduce((a, b) => a + b, 0);
       return `<div class="dcol ${c.on ? "on" : ""}" title="${esc(c.tip)}"><span class="dcv num">${c.top != null ? c.top : t ? f(t) : ""}</span><span class="dstack">${c.v.map((v, i) => v ? `<i class="s${i}" style="height:${(v / max) * 100}%"></i>` : "").join("")}</span><span class="dcl">${esc(c.l)}</span></div>`; }).join("")}</div>`;
   };
+  const diaCorto = (k) => { const d = fechaD(k).getDate(); return d === 1 || d % 5 === 0 ? String(d) : "\u00a0"; };
   const colDia = (k) => { const d = fechaD(k); return d.toLocaleDateString("es-AR", { weekday: "short" }).replace(".", "") + " " + d.getDate(); };
   const cobertura = (A) => {
     if (!D.costos) return `<p class="note">Falta instalar los costos (migración 070): sin eso no se puede calcular la ganancia.</p>`;
@@ -204,102 +234,133 @@ window.CajaDash = function (K) {
     return `<div class="dneto">
         <div class="dncs">
           ${cifra("Facturado (bruto)", A.ent, Ap ? cmp(A.ent, Ap.ent) : null, "f", "n0", "todo lo que entró")}
-          ${cifra("Ganancia neta", gn, Ap ? cmp(gn, gnP) : null, gn != null && gn < 0 ? "q neg" : "q", gn != null && gn < 0 ? "n3" : "n2", cM == null ? "sin ventas con productos" : `− ${money(cM)} mercadería y packaging${est ? "*" : ""}`)}
+          ${cifra("Ganancia neta", gn, Ap ? cmp(gn, gnP) : null, gn != null && gn < 0 ? "q neg" : "q", gn != null && gn < 0 ? "n3" : "n2", cM == null ? "sin ventas con productos" : `− ${money(cM)} de mercadería${est ? "*" : ""}`)}
           ${cifra("Gastado", A.gas, Ap ? cmp(A.gas, Ap.gas) : null, "g", "n1", "gastos de la Caja", true)}
           ${cifra("Te queda en caja", neto, Ap && netoP > 0 ? cmp(neto, netoP) : null, neto < 0 ? "c neg" : "c", neto < 0 ? "n3" : "n2", "facturado − gastado")}
         </div>
-        <p class="dncat">${cats.length ? `Gastado en: ${cats.map(([c, v]) => `${esc(c)} <b>${money(v)}</b>`).join(" · ")}` : "Sin gastos cargados."}${est ? `<br>* Mercadería estimada: ${money(A.sinDet)} se cargó sin productos y se calcula con el mismo % de costo que el resto (${pct(A.cost / A.rc)}).` : ""}${Ap ? `<br>Flechas: ${vs}.` : ""}</p>
+        <p class="dncat">${cats.length ? `Gastado en: ${cats.map(([c, v]) => `${esc(c)} <b>${money(v)}</b>`).join(" · ")}` : "Sin gastos cargados."}${est ? `<br>* Mercadería = insumos y packaging de lo vendido, según las recetas. Estimada en parte: ${money(A.sinDet)} se cargó sin productos y se calcula con el mismo % de costo que el resto (${pct(A.cost / A.rc)}).` : ""}${Ap ? `<br>Flechas: ${vs}.` : ""}</p>
       </div>`;
   }
   // dos barras por día (facturado y gastado) con lo que quedó arriba
-  function parDias(cols) {
+  function parDias(cols, dense) {
     const max = Math.max(1, ...cols.map((c) => Math.max(c.f, c.g)));
-    return `<div class="dcolch dpar" style="--n:${cols.length}">${cols.map((c) => { const q = c.f - c.g;
-      return `<div class="dcol ${c.on ? "on" : ""}" title="${esc(c.tip)}"><span class="dcv num ${q < 0 ? "dneg" : "dpos"}">${c.f || c.g ? (q < 0 ? "−" : "+") + corto(Math.abs(q)).replace("−", "") : ""}</span>
+    return `<div class="dcolch dpar ${dense ? "dense" : ""}" style="--n:${cols.length}">${cols.map((c) => { const q = c.f - c.g;
+      return `<div class="dcol ${c.on ? "on" : ""} ${c.fut ? "fut" : ""}" title="${esc(c.tip)}"><span class="dcv num ${q < 0 ? "dneg" : "dpos"}">${c.f || c.g ? (q < 0 ? "−" : "+") + corto(Math.abs(q)).replace("−", "") : ""}</span>
         <span class="dpb"><i class="n0" style="height:${(c.f / max) * 100}%"></i><i class="n1" style="height:${(c.g / max) * 100}%"></i></span><span class="dcl">${esc(c.l)}</span></div>`; }).join("")}</div>`;
   }
 
   /* ---------- vista ---------- */
+  // Estructura (como los dashboards de POS: Square, Toast, Shopify, Fudo):
+  // 1) selector de período + navegación · 2) cifras clave con comparación · 3) lo destacado en una línea cada cosa
+  // 4) evolución en el tiempo · 5) productos · 6) canales, pagos y turnos · 7) gastos · y después carta, subas y maquinita.
   function view() {
     const el = $("#view"); if (!el) return;
     if (!D.ok) {
       el.innerHTML = `<h1 class="h1">Dashboard</h1>${D.err ? `<p class="note">No se pudo cargar: ${esc(D.err)}</p>` : `<div class="loading">Cargando números…</div>`}`;
       if (!D.err) cargar(); return;
     }
-    const di = D.dia, kDia = diaK(di), kPas = diaK(di + 7);
-    const sem = Array.from({ length: 7 }, (_, i) => diaK(6 - i)), semAnt = Array.from({ length: 7 }, (_, i) => diaK(13 - i));
-    const H = suma([kDia]), Hp = suma([kPas]), S = suma(sem), Sp = suma(semAnt);
-    const nomDia = fechaD(kDia).toLocaleDateString("es-AR", { weekday: "long" });
-    const prodRows = (A) => orden(A.prods, (x) => x.q).slice(0, 6).map(([l, q]) => [l, q, money(A.prods[l].m)]);
+    const per = D.per, P = periodo(per, D.off), A = suma(P.keys), Ap = suma(P.prev), nd = P.keys.length, hoy = hoyK();
+    const prodRows = (X) => orden(X.prods, (x) => x.q).slice(0, per === "dia" ? 6 : 8).map(([l, q]) => [l, q, money(X.prods[l].m)]);
     const unid = (v) => v + " u.";
-    const horasCh = (A) => { const hs = Object.keys(A.horas).map(Number); if (!hs.length) return `<p class="hintp">Sin pedidos web.</p>`;
-      const a = Math.min(...hs), b = Math.max(...hs), cols = [];
-      for (let h = a; h <= b; h++) cols.push({ l: String(h), v: [A.horas[h] || 0], tip: `${h}:00 a ${h}:59 · ${A.horas[h] || 0} pedidos` });
-      return columnas(cols, String) + `<p class="hintp">Hora en que entró cada pedido web (no la de retiro).</p>`; };
-    const repit = Object.values(S.tels).filter((x) => x > 1).length, clientes = Object.keys(S.tels).length;
-    const mejor = sem.map((k) => [k, S.dias[k].web + S.dias[k].otros]).sort((a, b) => b[1] - a[1])[0];
-    const mejorTxt = mejor[1] > 0 ? `Mejor día: <b>${fechaD(mejor[0]).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}</b> con ${money(mejor[1])}.` : "";
-    // margen de los productos: estimado con las recetas (no es plata que salió de la caja; eso está en Gastado)
+    const cmp = (a, b) => (b > 0 ? cmpPct(a, b) : null);
+    const diaLargo = (k) => fechaD(k).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" });
+    const fact = (k) => A.dias[k] ? A.dias[k].web + A.dias[k].otros : 0;
+    const repit = Object.values(A.tels).filter((x) => x > 1).length, clientes = Object.keys(A.tels).length;
+    const tk = A.tkN ? A.tkV / A.tkN : null, tkP = Ap.tkN ? Ap.tkV / Ap.tkN : null;
     const al = alertas(), pend = pendientes();
+
+    // --- lo destacado ---
+    const dest = [];
+    if (per !== "dia") { const mj = P.keys.map((k) => [k, fact(k)]).sort((a, b) => b[1] - a[1])[0];
+      if (mj && mj[1] > 0) dest.push(["📅", "Mejor día", `${diaLargo(mj[0])} · ${money(mj[1])}`]); }
+    const hp = orden(A.horasF)[0]; if (hp) dest.push(["⏰", "Hora pico", `${hp[0]} a ${+hp[0] + 1} h · ${money(hp[1])}`]);
+    const pq = orden(A.prods, (x) => x.q)[0]; if (pq) dest.push(["⭐", "Lo más vendido", `${esc(pq[0])} · ${unid(pq[1])}`]);
+    const pg = Object.entries(A.prods).filter(([, x]) => x.mc > 0).map(([l, x]) => [l, x.mc - x.cost]).sort((a, b) => b[1] - a[1])[0];
+    if (pg && (!pq || pg[0] !== pq[0])) dest.push(["💰", "El que más dejó", `${esc(pg[0])} · ${money(pg[1])}`]);
+    const ch = orden(A.canales)[0]; if (ch && A.ent) dest.push(["🛍️", "Canal principal", `${esc(ch[0])} · ${pct(ch[1] / A.ent)} de lo facturado`]);
+    const gc = orden(A.gasCat)[0]; if (gc) dest.push(["🧾", "Mayor gasto", `${esc(gc[0])} · ${money(gc[1])}${A.ent ? ` (${pct(gc[1] / A.ent)} de lo facturado)` : ""}`]);
+
+    // --- evolución ---
+    let evol = "";
+    const horasCh = (X) => { const hs = Object.keys(X.horasF).map(Number); if (!hs.length) return `<p class="hintp">Sin ventas con hora.</p>`;
+      const a = Math.min(...hs), b = Math.max(...hs), cols = [];
+      for (let h = a; h <= b; h++) cols.push({ l: String(h), v: [X.horasF[h] || 0], tip: `${h}:00 a ${h}:59 · ${money(X.horasF[h] || 0)}` });
+      return columnas(cols, corto, cols.length > 7 ? "mdense" : "") + `<p class="hintp">Hora en que se cobró cada venta (web y Local). Lo cargado después en la Caja no tiene hora.</p>`; };
+    if (per === "dia") evol = `<div class="dcard wide2"><b>Ventas por hora</b>${horasCh(A)}</div>`;
+    else {
+      const todos = P.todos, dense = todos.length > 10;
+      evol = `<div class="dcard wide2"><b>Facturado y gastado por día</b>
+          <div class="dleg"><span><i class="n0"></i>Facturado</span><span><i class="n1"></i>Gastado</span>${dense ? "" : `<span>Arriba: lo que te quedó ese día</span>`}</div>
+          ${parDias(todos.map((k) => { const x = A.dias[k] || { web: 0, otros: 0, gas: 0 }, f = x.web + x.otros;
+            return { l: dense ? diaCorto(k) : colDia(k), on: k === hoy, fut: k > hoy, f, g: x.gas, tip: `${diaLargo(k)}: facturado ${money(f)}, gastado ${money(x.gas)}, te quedó ${money(f - x.gas)}` }; }), dense)}
+          <p class="hintp">Los gastos se cargan el día que se compra (ej. insumos para toda la semana), así que un día puede dar negativo aunque ${per === "mes" ? "el mes" : "la semana"} dé bien.</p></div>`;
+      if (per === "mes") {
+        const DS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"], sumD = [0, 0, 0, 0, 0, 0, 0], cnt = [0, 0, 0, 0, 0, 0, 0];
+        P.keys.forEach((k) => { const w = (fechaD(k).getDay() + 6) % 7; sumD[w] += fact(k); cnt[w]++; });
+        evol += `<div class="dcard"><b>Promedio por día de la semana</b>${columnas(DS.map((l, i) => ({ l, v: [cnt[i] ? sumD[i] / cnt[i] : 0], tip: `${l}: promedio ${money(cnt[i] ? sumD[i] / cnt[i] : 0)} en ${n(cnt[i], "día", "días")}` })), corto)}
+          <p class="hintp">Sirve para decidir horarios, personal y promos de los días flojos.</p></div>`;
+      }
+      evol += `<div class="dcard"><b>Ventas por hora</b>${horasCh(A)}</div>`;
+    }
+
+    const kp = (lbl, val, sub, c, cls) => tile(lbl, val, c != null ? "" : sub, c, cls);
     $("#view").innerHTML = `<div class="cdash">
-      <h1 class="h1">Dashboard</h1>
-      <p class="muted dintro">Lo que entró por todos los canales (web, local, apps, cafeterías), la ganancia neta (descontando la mercadería y el packaging de lo vendido) y lo que te queda en caja después de todos los gastos. No incluye inversión ni retiros.</p>
+      <div class="dtop">
+        <h1 class="h1">Dashboard</h1>
+        <div class="dper" role="tablist">${[["dia", "Día"], ["semana", "Semana"], ["mes", "Mes"]].map(([k, l]) => `<button type="button" role="tab" data-dper="${k}" aria-selected="${per === k}">${l}</button>`).join("")}</div>
+        <div class="dnav"><button type="button" data-dd="1" ${D.off >= MAXOFF[per] ? "disabled" : ""} aria-label="Anterior">‹</button><span>${esc(P.label)}</span><button type="button" data-dd="-1" ${D.off <= 0 ? "disabled" : ""} aria-label="Siguiente">›</button></div>
+      </div>
       ${pend.length ? `<button class="dalert" data-dsec="subas"><b>⚠ ${n(pend.length, "insumo subió", "insumos subieron")}</b><span>${pend.map((a) => esc(a.c.insumo.nombre) + " +" + pct(a.c.d)).join(" · ")} · ${n(pend.reduce((x, a) => x + a.prods.filter((p) => p.falta).length, 0), "producto quedó", "productos quedaron")} con menos margen</span><i>›</i></button>` : ""}
 
       <section class="dsec">
-        <div class="dhead"><h2 class="dh2">Resumen del día</h2>
-          <div class="dnav"><button type="button" data-dd="1" ${di >= 13 ? "disabled" : ""} aria-label="Día anterior">‹</button><span>${esc(diaNom(di))} ${fechaD(kDia).getDate()}</span><button type="button" data-dd="-1" ${di <= 0 ? "disabled" : ""} aria-label="Día siguiente">›</button></div></div>
-        ${netoHTML(H, Hp, `vs. ${nomDia} pasado`)}
+        <div class="dhead"><h2 class="dh2">${P.titulo}</h2>${P.sub ? `<span class="hintp">${esc(P.sub)}</span>` : ""}</div>
+        ${netoHTML(A, Ap, P.vs)}
         <div class="kpis dk">
-          ${tile("Margen de los productos", H.rc ? pct(H.mg) : "—", H.rc ? "de lo vendido con productos, después de mercadería y packaging" : "sin ventas con productos")}
-          ${tile("Pedidos web", String(H.webN), H.webN ? `ticket promedio ${money(H.webTot / H.webN)}` : "ninguno")}
+          ${kp("Ventas", String(A.ventas), A.ventas ? "cobros cargados" : "ninguna", cmp(A.ventas, Ap.ventas))}
+          ${kp("Ticket promedio", tk ? money(tk) : "—", A.tkN ? `en ${n(A.tkN, "venta suelta", "ventas sueltas")}` : "sin ventas sueltas", tk && tkP ? cmpPct(tk, tkP) : null)}
+          ${per !== "dia" ? tile("Facturado por día", money(A.ent / nd), `promedio de ${n(nd, "día", "días")}`) : kp("Pedidos web", String(A.webN), A.webN ? `ticket ${money(A.webTot / A.webN)}` : "ninguno", cmp(A.webN, Ap.webN))}
+          ${tile("Clientes web", String(clientes), clientes ? (repit ? `${repit} volvieron a pedir` : "distintos") : "ninguno")}
         </div>
-        ${cobertura(H)}
+        ${cobertura(A)}
+        ${dest.length ? `<div class="ddest"><b>Lo destacado</b><ul>${dest.map(([i, k, v]) => `<li><span class="di" aria-hidden="true">${i}</span><span class="dk2">${k}</span><span class="dv">${v}</span></li>`).join("")}</ul></div>` : ""}
+      </section>
+
+      <section class="dsec">
+        <div class="dhead"><h2 class="dh2">${per === "dia" ? "Durante el día" : "Cómo fue " + (per === "mes" ? "el mes" : "la semana")}</h2></div>
+        <div class="dcols">${evol}</div>
+      </section>
+
+      <section class="dsec">
+        <div class="dhead"><h2 class="dh2">Productos</h2></div>
         <div class="dcols">
-          <div class="dcard"><b>Margen por turno</b>${turnosHTML(H)}</div>
-          <div class="dcard"><b>Por canal</b>${barras(orden(H.canales), money, "Sin entradas en la Caja.")}</div>
-          <div class="dcard"><b>Lo que más salió</b>${barras(prodRows(H), unid, "Sin pedidos web ni ventas cargadas con productos.")}</div>
-          ${D.stock ? `<div class="dcard"><b>Mochis por sabor</b>${barras(orden(H.mochis), unid, "Sin mochis descontados del stock.")}</div>` : ""}
-          <div class="dcard"><b>Pedidos web por hora</b>${horasCh(H)}</div>
-          ${H.webN ? `<div class="dcard"><b>Formas de pago (web)</b>${barras(orden(H.pagos), money)}</div>` : ""}
+          <div class="dcard"><b>Lo más vendido</b>${barras(prodRows(A), unid, "Sin pedidos web ni ventas cargadas con productos.")}</div>
+          <div class="dcard"><b>Lo que más dejó</b>${ganProdHTML(A)}</div>
+          ${D.stock ? `<div class="dcard"><b>Mochis por sabor</b>${barras(orden(A.mochis), unid, "Sin mochis descontados del stock.")}</div>` : ""}
         </div>
       </section>
 
       <section class="dsec">
-        <div class="dhead"><h2 class="dh2">Últimos 7 días</h2><span class="hintp">${esc(fCorta(sem[0]))} al ${esc(fCorta(sem[6]))} · comparado con los 7 anteriores</span></div>
-        ${netoHTML(S, Sp, "vs. semana anterior")}
-        <div class="kpis dk">
-          ${tile("Margen de los productos", S.rc ? pct(S.mg) : "—", S.rc ? "de lo vendido con productos, después de mercadería y packaging" : "sin ventas con productos")}
-          ${tile("Facturado por día", money(S.ent / 7), "promedio")}
-          ${tile("Pedidos web", String(S.webN), "vs. semana anterior", Sp.webN > 0 ? cmpPct(S.webN, Sp.webN) : null)}
-          ${D.stock ? tile("Mochis vendidos", String(S.mochisN), Sp.mochisN > 0 ? "vs. semana anterior" : "", Sp.mochisN > 0 ? cmpPct(S.mochisN, Sp.mochisN) : null) : ""}
-          ${clientes ? tile("Clientes web", String(clientes), repit ? `${repit} pidieron más de una vez` : "distintos") : ""}
-        </div>
-        ${cobertura(S)}
+        <div class="dhead"><h2 class="dh2">Canales y turnos</h2></div>
         <div class="dcols">
-          <div class="dcard wide2"><b>Facturado, gastado y lo que quedó, por día</b>
-            <div class="dleg"><span><i class="n0"></i>Facturado</span><span><i class="n1"></i>Gastado</span><span>Arriba: lo que te quedó ese día</span></div>
-            ${parDias(sem.map((k) => { const x = S.dias[k], f = x.web + x.otros;
-              return { l: colDia(k), on: k === kDia, f, g: x.gas, tip: `${fechaD(k).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}: facturado ${money(f)}, gastado ${money(x.gas)}, te quedó ${money(f - x.gas)}` }; }))}
-            <p class="hintp">Los gastos se cargan el día que se compra (ej. insumos para toda la semana), así que un día puede dar negativo aunque la semana dé bien.</p></div>
-          <div class="dcard wide2"><b>Facturado por día</b>
-            <div class="dleg"><span><i class="s0"></i>Pedidos web</span><span><i class="s1"></i>Otros canales</span></div>
-            ${columnas(sem.map((k) => { const x = S.dias[k];
-              return { l: colDia(k), on: k === kDia, v: [x.web, x.otros], tip: `${fechaD(k).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}: ${money(x.web + x.otros)} (web ${money(x.web)} · otros ${money(x.otros)})` }; }), corto)}
-            ${mejorTxt ? `<p class="hintp">${mejorTxt}</p>` : ""}</div>
-          <div class="dcard"><b>Margen por turno</b>${turnosHTML(S)}</div>
-          <div class="dcard"><b>Ganancia por producto</b>${ganProdHTML(S)}</div>
-          <div class="dcard"><b>Por canal</b>${barras(orden(S.canales), money, "Sin entradas en la Caja.")}</div>
-          <div class="dcard"><b>Lo que más salió</b>${barras(prodRows(S), unid, "Sin pedidos web ni ventas cargadas con productos.")}</div>
-          ${D.stock ? `<div class="dcard"><b>Mochis por sabor</b>${barras(orden(S.mochis), unid, "Sin mochis descontados del stock.")}</div>` : ""}
-          ${S.webN ? `<div class="dcard"><b>Retiro o envío (web)</b>${barras(orden(S.modos), (v) => n(v, "pedido", "pedidos"))}</div>` : ""}
-          ${S.webN ? `<div class="dcard"><b>Formas de pago (web)</b>${barras(orden(S.pagos), money)}</div>` : ""}
+          <div class="dcard"><b>Por canal</b>${barras(orden(A.canales).map(([l, v]) => [l, v, A.ent ? pct(v / A.ent) : ""]), money, "Sin entradas en la Caja.")}</div>
+          <div class="dcard"><b>Margen por turno</b>${turnosHTML(A)}</div>
+          ${A.webN ? `<div class="dcard"><b>Formas de pago (web)</b>${barras(orden(A.pagos), money)}</div>` : ""}
+          ${A.webN ? `<div class="dcard"><b>Retiro o envío (web)</b>${barras(orden(A.modos), (v) => n(v, "pedido", "pedidos"))}</div>` : ""}
+        </div>
+      </section>
+
+      <section class="dsec">
+        <div class="dhead"><h2 class="dh2">Gastos</h2><span class="hintp">${money(A.gas)}${A.ent ? ` · ${pct(A.gas / A.ent)} de lo facturado` : ""}</span></div>
+        <div class="dcols">
+          <div class="dcard"><b>Por categoría</b>${barras(orden(A.gasCat).map(([l, v]) => [l, v, A.ent ? pct(v / A.ent) + " de lo facturado" : ""]), money, "Sin gastos cargados.")}</div>
+          <div class="dcard"><b>Contra ${per === "dia" ? "el mismo día de la semana pasada" : per === "mes" ? "el mes anterior" : "la semana anterior"}</b>${barras(orden(Object.fromEntries([...new Set([...Object.keys(A.gasCat), ...Object.keys(Ap.gasCat)])].map((c) => [c, (A.gasCat[c] || 0) + 0.001]))).map(([c]) => { const a = A.gasCat[c] || 0, b = Ap.gasCat[c] || 0;
+            return [c, a, b ? `antes ${money(b)}${a !== b ? ` · ${a > b ? "▲" : "▼"} ${Math.abs(cmpPct(a, b))}%` : ""}` : "nuevo"]; }), money, "Sin gastos en ninguno de los dos períodos.")}</div>
         </div>
       </section>
       ${cartaHTML()}
       ${subasHTML(al)}
-      ${maqSec(sem, semAnt)}
-      <p class="hintp">Actualizado ${D.at ? D.at.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""} · <button type="button" class="linkbtn" data-dre>Actualizar</button>${S.canc ? ` · ${n(S.canc, "pedido web cancelado", "pedidos web cancelados")} en la semana (no suman)` : ""}</p>
+      ${maqSec(P)}
+      <p class="hintp">Actualizado ${D.at ? D.at.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""} · <button type="button" class="linkbtn" data-dre>Actualizar</button>${A.canc ? ` · ${n(A.canc, "pedido web cancelado", "pedidos web cancelados")} en el período (no suman)` : ""}</p>
     </div>`;
   }
 
@@ -379,9 +440,9 @@ window.CajaDash = function (K) {
         <div class="acts"><button class="btn" data-dcfgx>Listo</button></div></div>`;
   }
   // Maquinita: tiradas reales y qué pasó con cada premio (igual que en el panel)
-  function maqSec(sem, semAnt) {
+  function maqSec(P) {
     const M = D.maq; if (!M) return "";
-    const hoy = hoyK(), ks = new Set(sem), ksA = new Set(semAnt), ahora = Date.now();
+    const sem = P.todos || P.keys, hoy = hoyK(), ks = new Set(P.keys), ksA = new Set(P.prev), ahora = Date.now();
     const dia = (x) => keyAR(new Date(x.created_at)), quien = (x) => x.dev || x.phone;
     const T = M.tiradas, S = T.filter((x) => ks.has(dia(x))), Sa = T.filter((x) => ksA.has(dia(x))), H = T.filter((x) => dia(x) === hoy);
     const gano = (x) => x.resultado && x.resultado !== "nada", ganS = S.filter(gano).length;
@@ -393,10 +454,10 @@ window.CajaDash = function (K) {
     const usados = new Set(M.usos.map((u) => u.premio_id)).size, desc = M.usos.reduce((a, u) => a + (+u.monto || 0), 0);
     const desde = T.length ? new Date(T[0].created_at).toLocaleDateString("es-AR", { day: "numeric", month: "short" }) : "";
     return `<section class="dsec">
-        <div class="dhead"><h2 class="dh2">Maquinita</h2><span class="hintp">Últimos 7 días${desde ? ` · funciona desde el ${esc(desde)}` : ""}</span></div>
+        <div class="dhead"><h2 class="dh2">Maquinita</h2><span class="hintp">${esc(P.label)}${desde ? ` · funciona desde el ${esc(desde)}` : ""}</span></div>
         <div class="kpis dk">
           ${tile("Tiradas hoy", String(H.length), H.length ? n(H.filter(gano).length, "premio", "premios") : "ninguna")}
-          ${tile("Tiradas 7 días", String(S.length), "vs. semana anterior", Sa.length > 0 ? cmpPct(S.length, Sa.length) : null)}
+          ${P.keys.length > 1 ? tile("Tiradas del período", String(S.length), P.vs, Sa.length > 0 ? cmpPct(S.length, Sa.length) : null) : ""}
           ${tile("Jugaron", String(jug), "dispositivos distintos")}
           ${tile("Premios dados", String(ganS), S.length ? `${Math.round((ganS / S.length) * 1000) / 10}% de las tiradas` : "")}
           ${compra ? tile("Con fichas de compra", String(compra), "tiradas que no eran la gratis") : ""}
@@ -405,7 +466,7 @@ window.CajaDash = function (K) {
           <div class="dcard wide2"><b>Tiradas por día</b>
             <div class="dleg"><span><i class="s0"></i>Sin premio</span><span><i class="s1"></i>Con premio</span></div>
             ${columnas(sem.map((k) => { const x = S.filter((t) => dia(t) === k), g = x.filter(gano).length;
-              return { l: colDia(k), on: k === hoy, v: [x.length - g, g], tip: `${fechaD(k).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}: ${n(x.length, "tirada", "tiradas")}, ${n(g, "premio", "premios")}` }; }), String)}</div>
+              return { l: sem.length > 10 ? diaCorto(k) : colDia(k), on: k === hoy, v: [x.length - g, g], tip: `${fechaD(k).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}: ${n(x.length, "tirada", "tiradas")}, ${n(g, "premio", "premios")}` }; }), String, sem.length > 10 ? "dense" : "")}</div>
           <div class="dcard"><b>Premios por tipo</b>${barras(orden(tipos), String, "Todavía no salió ningún premio.")}<p class="hintp">Desde que arrancó: ${n(T.length, "tirada", "tiradas")}, ${n(M.premios.length, "premio", "premios")}.</p></div>
           <div class="dcard"><b>Qué pasó con los premios</b>${barras(orden(est), String, "Todavía no salió ningún premio.")}<p class="hintp">${usados ? `${n(usados, "premio usado", "premios usados")} en pedidos web, ${money(desc)} de descuento en total.` : "Ningún premio se usó todavía en un pedido."} Reclamado = dejó su celular para guardarlo. Vencen a las 48 hs.</p></div>
         </div>
@@ -424,7 +485,8 @@ window.CajaDash = function (K) {
     if (K.view() !== "dash" && !e.target.closest("[data-dsec]")) return;
     const b = e.target.closest("button, a"); if (!b) return;
     const d = b.dataset;
-    if (d.dd !== undefined) { D.dia = Math.max(0, Math.min(13, D.dia + +d.dd)); view(); return; }
+    if (d.dd !== undefined) { D.off = Math.max(0, Math.min(MAXOFF[D.per], D.off + +d.dd)); view(); return; }
+    if (d.dper) { if (D.per !== d.dper) { D.per = d.dper; D.off = 0; view(); } return; }
     if (d.dre !== undefined) { D.ok = false; view(); return; }
     if (d.dsec) { setTimeout(() => { const s = $("#dsubas"); if (s) s.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60); return; }
     if (d.dcfg !== undefined) { D.editCfg = !D.editCfg; view(); return; }
