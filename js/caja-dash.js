@@ -92,8 +92,8 @@ window.CajaDash = function (K) {
     const ks = new Set(keys), ordPor = {};
     D.orders.forEach((o) => (ordPor[o.id] = o));
     const A = { ent: 0, gas: 0, canales: {}, webN: 0, webTot: 0, canc: 0, prods: {}, mochis: {}, mochisN: 0, horas: {}, pagos: {}, modos: {}, tels: {}, dias: {},
-      rc: 0, cost: 0, sinDet: 0, turnos: {} };
-    keys.forEach((k) => (A.dias[k] = { web: 0, otros: 0, n: 0, rc: 0, cost: 0 }));
+      rc: 0, cost: 0, sinDet: 0, turnos: {}, gasCat: {} };
+    keys.forEach((k) => (A.dias[k] = { web: 0, otros: 0, n: 0, rc: 0, cost: 0, gas: 0 }));
     const T = (t) => A.turnos[t] || (A.turnos[t] = { ent: 0, rc: 0, cost: 0, n: 0 });
     D.orders.forEach((o) => {
       const k = keyAR(new Date(o.created_at)); if (!ks.has(k)) return;
@@ -106,7 +106,7 @@ window.CajaDash = function (K) {
     });
     D.movs.forEach((m) => {
       if (!ks.has(m.fecha)) return; const v = +m.monto || 0;
-      if (m.tipo === "gasto") { A.gas += v; return; }
+      if (m.tipo === "gasto") { A.gas += v; A.dias[m.fecha].gas += v; const gc = D.cats[m.categoria_id] || "Sin categoría"; A.gasCat[gc] = (A.gasCat[gc] || 0) + v; return; }
       const web = m.registro === "Pedidos web", c = web ? "Pedidos web" : D.cats[m.categoria_id] || "Sin categoría";
       A.ent += v; A.canales[c] = (A.canales[c] || 0) + v; A.dias[m.fecha][web ? "web" : "otros"] += v;
       // productos de la venta: los del pedido web (legacy_id pedido:<id>) o los cargados en la entrada
@@ -187,8 +187,30 @@ window.CajaDash = function (K) {
     if (!D.costos) return `<p class="note">Falta instalar los costos (migración 070): sin eso no se puede calcular la ganancia.</p>`;
     if (!A.ent) return "";
     const c = A.rc / A.ent;
-    return c > 0.995 ? "" : `<p class="dnote">La ganancia sale de ${money(A.rc)} de ${money(A.ent)} vendidos (${pct(c)}). Las entradas cargadas sin productos (${money(A.sinDet)}) no tienen costo: cargalas con productos o cobralas desde el Local.</p>`;
+    return c > 0.995 ? "" : `<p class="dnote">El margen de los productos sale de ${money(A.rc)} de ${money(A.ent)} vendidos (${pct(c)}): las entradas cargadas sin productos (${money(A.sinDet)}) no se pueden costear. Cargalas con productos o cobralas desde el Local.</p>`;
   };
+
+  // Facturado − Gastado = Te queda. Gastado = todos los gastos de la Caja (insumos, packaging, publicidad, servicios…).
+  // No se le suma el costo estimado de las recetas: los insumos ya están en los gastos, sería contarlos dos veces.
+  function netoHTML(A, Ap, vs) {
+    const neto = A.ent - A.gas, netoP = Ap ? Ap.ent - Ap.gas : null, max = Math.max(A.ent, A.gas, 1);
+    const cmp = (a, b) => (b > 0 ? cmpPct(a, b) : null);
+    const cifra = (lbl, v, c, cls, inv) => `<div class="dnc ${cls}"><span class="k">${lbl}</span><b class="num">${money(v)}</b>${c != null ? `<small class="${!c ? "" : (c > 0) !== !!inv ? "dsub-up" : "dsub-down"}">${c > 0 ? "▲ +" : c < 0 ? "▼ " : "= "}${c}%</small>` : ""}</div>`;
+    const bar = (v, cls) => `<span class="dnb"><i class="${cls}" style="width:${Math.max(v > 0 ? 2 : 0, (Math.abs(v) / max) * 100)}%"></i></span>`;
+    const cats = orden(A.gasCat);
+    return `<div class="dneto">
+        <div class="dncs">${cifra("Facturado", A.ent, Ap ? cmp(A.ent, Ap.ent) : null, "f")}${cifra("Gastado", A.gas, Ap ? cmp(A.gas, Ap.gas) : null, "g", true)}${cifra("Te queda", neto, Ap && netoP > 0 ? cmp(neto, netoP) : null, neto < 0 ? "q neg" : "q")}</div>
+        <div class="dnbs">${bar(A.ent, "n0")}${bar(A.gas, "n1")}${bar(neto, neto < 0 ? "n3" : "n2")}</div>
+        <p class="dncat">${cats.length ? `Gastado en: ${cats.map(([c, v]) => `${esc(c)} <b>${money(v)}</b>`).join(" · ")}` : "Sin gastos cargados."}${Ap ? `<br>Flechas: ${vs}.` : ""}</p>
+      </div>`;
+  }
+  // dos barras por día (facturado y gastado) con lo que quedó arriba
+  function parDias(cols) {
+    const max = Math.max(1, ...cols.map((c) => Math.max(c.f, c.g)));
+    return `<div class="dcolch dpar" style="--n:${cols.length}">${cols.map((c) => { const q = c.f - c.g;
+      return `<div class="dcol ${c.on ? "on" : ""}" title="${esc(c.tip)}"><span class="dcv num ${q < 0 ? "dneg" : "dpos"}">${c.f || c.g ? (q < 0 ? "−" : "+") + corto(Math.abs(q)).replace("−", "") : ""}</span>
+        <span class="dpb"><i class="n0" style="height:${(c.f / max) * 100}%"></i><i class="n1" style="height:${(c.g / max) * 100}%"></i></span><span class="dcl">${esc(c.l)}</span></div>`; }).join("")}</div>`;
+  }
 
   /* ---------- vista ---------- */
   function view() {
@@ -210,23 +232,20 @@ window.CajaDash = function (K) {
     const repit = Object.values(S.tels).filter((x) => x > 1).length, clientes = Object.keys(S.tels).length;
     const mejor = sem.map((k) => [k, S.dias[k].web + S.dias[k].otros]).sort((a, b) => b[1] - a[1])[0];
     const mejorTxt = mejor[1] > 0 ? `Mejor día: <b>${fechaD(mejor[0]).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}</b> con ${money(mejor[1])}.` : "";
-    const ganTile = (A, Ap, vs) => { const c = Ap && Ap.rc > 0 && A.rc ? cmpPct(A.gan, Ap.gan) : null;
-      return tile(`Ganancia bruta${A.rc ? ` <span class="dmg">${pct(A.mg)}</span>` : ""}`, A.rc ? money(A.gan) : "—", c != null ? vs : A.rc ? "ventas − costo" : "sin ventas con productos", c, "res" + (A.gan < 0 ? " neg" : "")); };
+    // margen de los productos: estimado con las recetas (no es plata que salió de la caja; eso está en Gastado)
+    const mgTile = (A) => tile("Margen de los productos", A.rc ? pct(A.mg) : "—", A.rc ? `costo estimado ${money(A.cost)} de ${money(A.rc)} vendidos con productos` : "sin ventas con productos");
     const al = alertas(), pend = pendientes();
     $("#view").innerHTML = `<div class="cdash">
       <h1 class="h1">Dashboard</h1>
-      <p class="muted dintro">Ventas de todos los canales (web, local, apps, cafeterías), lo que costó hacerlas y lo que te queda. Costo = materia prima + packaging, con los precios de insumos de cada día.</p>
+      <p class="muted dintro">Lo que entró por todos los canales (web, local, apps, cafeterías), lo que se gastó y lo que te queda. Gastado = todo lo cargado como gasto en la Caja. No incluye inversión ni retiros.</p>
       ${pend.length ? `<button class="dalert" data-dsec="subas"><b>⚠ ${n(pend.length, "insumo subió", "insumos subieron")}</b><span>${pend.map((a) => esc(a.c.insumo.nombre) + " +" + pct(a.c.d)).join(" · ")} · ${n(pend.reduce((x, a) => x + a.prods.filter((p) => p.falta).length, 0), "producto quedó", "productos quedaron")} con menos margen</span><i>›</i></button>` : ""}
 
       <section class="dsec">
         <div class="dhead"><h2 class="dh2">Resumen del día</h2>
           <div class="dnav"><button type="button" data-dd="1" ${di >= 13 ? "disabled" : ""} aria-label="Día anterior">‹</button><span>${esc(diaNom(di))} ${fechaD(kDia).getDate()}</span><button type="button" data-dd="-1" ${di <= 0 ? "disabled" : ""} aria-label="Día siguiente">›</button></div></div>
+        ${netoHTML(H, Hp, `vs. ${nomDia} pasado`)}
         <div class="kpis dk">
-          ${tile("Facturado", money(H.ent), `vs. ${nomDia} pasado`, Hp.ent > 0 ? cmpPct(H.ent, Hp.ent) : null)}
-          ${tile("Costo de lo vendido", H.rc ? money(H.cost) : "—", H.rc ? `materia prima + packaging` : "")}
-          ${ganTile(H, Hp, `vs. ${nomDia} pasado`)}
-          ${tile("Gastos", money(H.gas))}
-          ${tile("Resultado", money(H.ent - H.gas), "entradas − gastos")}
+          ${mgTile(H)}
           ${tile("Pedidos web", String(H.webN), H.webN ? `ticket promedio ${money(H.webTot / H.webN)}` : "ninguno")}
         </div>
         ${cobertura(H)}
@@ -242,25 +261,21 @@ window.CajaDash = function (K) {
 
       <section class="dsec">
         <div class="dhead"><h2 class="dh2">Últimos 7 días</h2><span class="hintp">${esc(fCorta(sem[0]))} al ${esc(fCorta(sem[6]))} · comparado con los 7 anteriores</span></div>
+        ${netoHTML(S, Sp, "vs. semana anterior")}
         <div class="kpis dk">
-          ${tile("Facturado", money(S.ent), "vs. semana anterior", Sp.ent > 0 ? cmpPct(S.ent, Sp.ent) : null)}
-          ${tile("Costo de lo vendido", S.rc ? money(S.cost) : "—", S.rc ? `${pct(S.cost / S.rc)} de lo vendido` : "")}
-          ${ganTile(S, Sp, "vs. semana anterior")}
-          ${tile("Gastos", money(S.gas), "vs. semana anterior", Sp.gas > 0 ? cmpPct(S.gas, Sp.gas) : null, "inv")}
-          ${tile("Resultado", money(S.ent - S.gas), "entradas − gastos")}
-          ${tile("Promedio por día", money(S.ent / 7))}
+          ${mgTile(S)}
+          ${tile("Facturado por día", money(S.ent / 7), "promedio")}
           ${tile("Pedidos web", String(S.webN), "vs. semana anterior", Sp.webN > 0 ? cmpPct(S.webN, Sp.webN) : null)}
           ${D.stock ? tile("Mochis vendidos", String(S.mochisN), Sp.mochisN > 0 ? "vs. semana anterior" : "", Sp.mochisN > 0 ? cmpPct(S.mochisN, Sp.mochisN) : null) : ""}
           ${clientes ? tile("Clientes web", String(clientes), repit ? `${repit} pidieron más de una vez` : "distintos") : ""}
         </div>
         ${cobertura(S)}
         <div class="dcols">
-          <div class="dcard wide2"><b>Ganancia por día</b>
-            <div class="dleg"><span><i class="g0"></i>Costo</span><span><i class="g1"></i>Ganancia bruta</span><span><i class="g2"></i>Sin detalle de productos</span></div>
-            ${columnas(sem.map((k) => { const x = S.dias[k], tot = x.web + x.otros, sd = tot - x.rc;
-              return { l: colDia(k), on: k === kDia, v: [x.cost, Math.max(0, x.rc - x.cost), sd], top: x.rc ? pct((x.rc - x.cost) / x.rc) : tot ? "—" : "",
-                tip: `${fechaD(k).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}: vendido ${money(tot)} · con productos ${money(x.rc)}, costo ${money(x.cost)}, ganancia ${money(x.rc - x.cost)}` }; }), corto, "dgan")}
-            <p class="hintp">Arriba de cada día, el margen (ganancia ÷ ventas con productos).</p></div>
+          <div class="dcard wide2"><b>Facturado, gastado y lo que quedó, por día</b>
+            <div class="dleg"><span><i class="n0"></i>Facturado</span><span><i class="n1"></i>Gastado</span><span>Arriba: lo que te quedó ese día</span></div>
+            ${parDias(sem.map((k) => { const x = S.dias[k], f = x.web + x.otros;
+              return { l: colDia(k), on: k === kDia, f, g: x.gas, tip: `${fechaD(k).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}: facturado ${money(f)}, gastado ${money(x.gas)}, te quedó ${money(f - x.gas)}` }; }))}
+            <p class="hintp">Los gastos se cargan el día que se compra (ej. insumos para toda la semana), así que un día puede dar negativo aunque la semana dé bien.</p></div>
           <div class="dcard wide2"><b>Facturado por día</b>
             <div class="dleg"><span><i class="s0"></i>Pedidos web</span><span><i class="s1"></i>Otros canales</span></div>
             ${columnas(sem.map((k) => { const x = S.dias[k];
