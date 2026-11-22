@@ -78,7 +78,7 @@
         <a class="logo" href="index.html" title="Ver el sitio"><img src="img/logo.svg" alt="Setto"></a>
         <nav class="appsw" aria-label="Cambiar de app"><a href="panel.html" aria-current="page">Pedidos</a><a href="caja.html">Caja</a><a href="local.html">Local</a></nav>
         <nav class="ptabs" role="tablist">
-          ${[["pedidos", "Pedidos"], ["dashboard", "Dashboard"], ["club", "Club"], ["campanas", "Campañas"], ["carta", "Carta"], ["resenas", "Reseñas"], ["gift", "Gift cards"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : k === "resenas" ? ' <span class="n" id="resN" hidden>0</span>' : k === "gift" ? ' <span class="n" id="gcN" hidden>0</span>' : ""}</button>`).join("")}
+          ${[["pedidos", "Pedidos"], ["dashboard", "Horarios"], ["club", "Club"], ["campanas", "Campañas"], ["carta", "Carta"], ["resenas", "Reseñas"], ["gift", "Gift cards"], ["ajustes", "Ajustes"]].map(([k, l]) => `<button class="ptab" role="tab" data-view="${k}" aria-selected="false">${l}${k === "pedidos" ? ' <span class="n" id="pendN" hidden>0</span>' : k === "resenas" ? ' <span class="n" id="resN" hidden>0</span>' : k === "gift" ? ' <span class="n" id="gcN" hidden>0</span>' : ""}</button>`).join("")}
         </nav>
         <button class="avisos-btn" id="avisosBtn" aria-expanded="false" aria-controls="avisos" title="Avisos en este dispositivo"><span>🔔</span><i hidden></i></button>
         <span class="who">${esc(P.user && P.user.email || "")}<button id="logout">Salir</button></span>
@@ -109,7 +109,7 @@
         <input class="inp" data-fnota placeholder="Nota para el cliente (opcional)" maxlength="140" value="${esc(F.nota || "")}">
         <div class="acts"><button class="btn solid" data-fsend ${Object.keys(F.sel).length ? "" : "disabled"}>Pedir cambio al cliente</button><button class="linkbtn" data-fx>Cancelar</button></div></div>`;
     }
-    if (!c) return o.status === "pendiente" ? `<button class="linkbtn" data-falta>¿Falta algo? Pedile un cambio al cliente</button>` : "";
+    if (!c) return ""; // el "¿Falta algo?" vive en la fila de acciones de abajo (Entregado · ¿Falta algo? · Cancelar)
     if (c.estado === "esperando") return `<div class="cambiobox wait"><b>⏳ Esperando que el cliente elija</b><span>Falta: ${esc(faltanTxt(c))}${c.nota ? ` · “${esc(c.nota)}”` : ""}</span>
         ${(o.avisos || {}).cambio && (o.avisos || {}).cambio === c.at ? `<span>✓ Le avisamos por WhatsApp</span>` : ""}
         <div class="acts"><a class="btn ${(o.avisos || {}).cambio === c.at ? "" : "solid"}" target="_blank" rel="noopener" href="https://wa.me/${esc(o.wa_phone || o.phone)}?text=${encodeURIComponent(cambioTxt(o))}">${(o.avisos || {}).cambio === c.at ? "Reenviar" : "Mandar el aviso por WhatsApp"}</a><button class="linkbtn" data-fquitar>Quitar aviso (lo arreglamos por chat)</button></div></div>`;
@@ -137,6 +137,7 @@
   const avisosLocal = () => { try { return JSON.parse(localStorage.getItem(AVK) || "{}"); } catch (_) { return {}; } };
   const avisadoEn = (o, e) => (o.avisos || {})[e] || avisosLocal()[o.id + ":" + e] || null;
   const faltaAvisar = (o) => o.status === "pendiente" && !avisadoEn(o, o.etapa || "recibido");
+  const etapaCorta = (o, e) => (e === "listo" ? (o.modo === "envio" ? "En camino" : "Listo") : e === "preparando" ? "Preparando" : "Recibido"); // para el stepper
   const etapaNom = (o, e) => (e === "listo" ? (o.modo === "envio" ? "En camino" : "Listo para retirar") : e === "preparando" ? "En preparación" : "Recibido");
   // pagado: lo marca el equipo a mano cuando llega la transferencia. Solo en pendientes por transferencia:
   // el efectivo se cobra al retirar y lo entregado ya está en la Caja. El cliente no lo ve.
@@ -154,17 +155,17 @@
   function pagoBox(o) {
     if (!conPago(o)) return "";
     return o.pagado_at
-      ? `<div class="pagobox si"><span><b>✓ Pagado</b><small>${esc(o.pago || "")}${o.pago ? " · " : ""}marcado ${ago(o.pagado_at)}</small></span><button class="linkbtn" data-pagado="0">Desmarcar</button></div>`
+      ? `<div class="pagobox si"><span><b>✓ Pagado</b><small>${ago(o.pagado_at)}</small></span><button class="linkbtn" data-pagado="0">Desmarcar</button></div>`
       : `<div class="pagobox"><span><b>Sin pagar</b><small>${esc(o.pago || "Forma de pago a confirmar")}</small></span><button class="btn solid" data-pagado="1">Marcar pagado</button></div>`;
   }
   function estadoBox(o) {
     const et = o.etapa || "recibido", orden = ["recibido", "preparando", "listo"], idx = orden.indexOf(et), av = avisadoEn(o, et);
     const wa = `https://wa.me/${esc(o.wa_phone || o.phone)}?text=${encodeURIComponent(avisoTxt(o))}`;
     return `<div class="estado">
-      <div class="estado-h"><b>Estado que ve el cliente</b><span class="hintp">Se actualiza solo en su celular y le llega por WhatsApp</span></div>
-      <div class="pasos">${orden.map((k, i) => `<button class="paso ${i < idx ? "done" : i === idx ? "now" : ""}" data-etapa="${k}" aria-pressed="${i === idx}"><i>${i < idx ? "✓" : i + 1}</i><span>${etapaNom(o, k)}</span></button>`).join("")}</div>
-      ${av ? `<div class="aviso ok"><span class="aviso-t"><b>✓ Ya le avisamos por WhatsApp</b><small>“${esc(etapaNom(o, et))}” · ${ago(av)}</small></span><a class="linkbtn" target="_blank" rel="noopener" data-aviso="${et}" href="${wa}">Reenviar</a></div>`
-        : `<div class="aviso pend"><span class="aviso-t"><b>💬 Falta avisarle: “${esc(etapaNom(o, et))}”</b><small>Sale solo si te escribió en las últimas 24 h. Si no, mandalo vos.</small></span><a class="btn solid wa" target="_blank" rel="noopener" data-aviso="${et}" href="${wa}">Enviar WhatsApp</a></div>`}
+      <b class="estado-l" title="Se actualiza solo en su celular y le llega por WhatsApp">Estado que ve el cliente</b>
+      <div class="pasos">${orden.map((k, i) => `<button class="paso ${i < idx ? "done" : i === idx ? "now" : ""}" data-etapa="${k}" aria-pressed="${i === idx}" aria-label="${etapaNom(o, k)}"><i>${i < idx ? "✓" : i + 1}</i><span>${etapaCorta(o, k)}</span></button>`).join("")}</div>
+      ${av ? `<div class="aviso ok"><span class="aviso-t"><b>✓ Avisado</b><small>${ago(av)}</small></span><a class="linkbtn" target="_blank" rel="noopener" data-aviso="${et}" href="${wa}">Reenviar</a></div>`
+        : `<div class="aviso pend" title="Sale solo si te escribió en las últimas 24 h. Si no, mandalo vos."><span class="aviso-t"><b>💬 Falta avisarle</b></span><a class="btn solid wa" target="_blank" rel="noopener" data-aviso="${et}" href="${wa}">💬 Avisarle por WhatsApp</a></div>`}
     </div>`;
   }
 
@@ -252,7 +253,6 @@
       document.title = (hoyN ? `(${hoyN}) ` : "") + "Panel Setto";
       if (notify && pend.length > prev) toast("Entró un pedido nuevo");
       if (P.view === "pedidos") { P.pend = pend; P.orders = P.sub === "pendiente" || P.sub === "reserva" ? pend : await API.listOrders(P.sub); drawOrders(); cargarOcupados(); }
-      if (P.view === "dashboard" && notify) cargarDash();
     } catch (e) { console.error(e); }
   }
   function viewPedidos() {
@@ -280,7 +280,7 @@
   const hoyKey = () => fechaKey(new Date());
   const cierresVigentes = (r) => (r.cierres || []).filter((c) => c.fecha >= hoyKey() && c.motivo === "cerrada"); // los de días pasados se limpian solos
   const liberadosVigentes = (r) => (r.liberados || []).filter((c) => c.fecha >= hoyKey());
-  // lo que comparten las dos tarjetas: Horarios para pedir (Dashboard) y Alta demanda por turno (Pedidos)
+  // lo que comparten las dos tarjetas: Horarios para pedir (pestaña Horarios) y Alta demanda por turno (Pedidos)
   function horDatos() {
     const r = P.settings.retiro || {}, dia = P.horDia || 0, day = diaMas(dia), k = fechaKey(day);
     const fr = (r.rangos || []).filter((x) => !(r.apagadas || []).includes(x.join("-"))).map(([a, b]) => ({ a, b,
@@ -293,7 +293,7 @@
   const horSin = (H) => !H.atiende ? `<p class="hintp">Ese día no atienden. Cambialo en <a href="#ajustes/retiro">Ajustes → Horarios de retiro</a>.</p>`
     : !H.fr.length ? `<p class="hintp">No hay franjas activas. Prendelas en <a href="#ajustes/retiro">Ajustes → Horarios de retiro</a>.</p>` : "";
   function drawHorarios() { drawFranjas(); drawAltaDemanda(); }
-  // Dashboard → Horarios para pedir: cerrar una franja hoy o mañana sin tocar los horarios fijos
+  // Horarios → Horarios para pedir: cerrar una franja hoy o mañana sin tocar los horarios fijos
   function drawFranjas() {
     const el = $("#franjaCard"); if (!el) return;
     const H = horDatos(), fr = H.fr;
@@ -323,7 +323,7 @@
     el.innerHTML = horHead("Alta demanda por turno", H) + (horSin(H)
       || `${cupo ? `<span class="hintp">Cada turno de ${r.cadaMin || 30} minutos acepta hasta ${cupo} pedidos en curso. Al marcar uno como <b>Listo</b> o <b>Entregado</b>, libera su lugar solo.</span>` : `<span class="hintp">El tope está apagado en <a href="#ajustes/retiro">Ajustes</a>: los turnos aceptan pedidos sin límite.</span>`}
           ${turnos.length ? turnos.map(turnoRow).join("") : `<span class="hintp">Ningún turno con pedidos en curso.</span>`}
-          ${cerradas.length ? `<p class="hintp">${cerradas.length === H.fr.length ? "Ese día está cerrado para pedir" : `Cerrada: ${cerradas.map((x) => `${x.a} a ${x.b}`).join(", ")}`}. Abrila en <a href="#dashboard">Dashboard → Horarios para pedir</a>.</p>` : ""}`);
+          ${cerradas.length ? `<p class="hintp">${cerradas.length === H.fr.length ? "Ese día está cerrado para pedir" : `Cerrada: ${cerradas.map((x) => `${x.a} a ${x.b}`).join(", ")}`}. Abrila en <a href="#dashboard">Horarios → Horarios para pedir</a>.</p>` : ""}`);
   }
   async function guardarRetiro(cambios, msg) {
     document.querySelectorAll(".horcard button").forEach((x) => (x.disabled = true));
@@ -344,179 +344,15 @@
     const cierres = cierresVigentes(r).filter((c) => !(c.fecha === k && fr.includes(c.franja))).concat(b.dataset.hor === "cerrada" ? fr.map((franja) => ({ fecha: k, franja, motivo: "cerrada" })) : []);
     guardarRetiro({ cierres }, `${b.dataset.hfr ? b.dataset.hfr.replace("-", " a ") : "Todo el día"}: ${b.dataset.hor} ${cuando}`);
   });
-  /* =================== DASHBOARD =================== */
-  // Solo datos reales: facturación y gastos = Caja (todas las ventas), productos = pedidos web + entradas de la Caja con productos, horarios = pedidos web, mochis por sabor = stock de la Caja.
-  // Se traen los últimos 14 días: la semana actual se compara con la anterior y cada día con el mismo día de la semana pasada.
-  const NO_PROD = ["envio", "premio", "maquinita", "gift", "codigo"];
+  /* =================== HORARIOS (antes Dashboard) =================== */
+  // El dashboard de ventas, costos y márgenes se mudó a la Caja (caja.html#dash, js/caja-dash.js). Acá quedan los horarios para pedir.
   const corto = (n) => { n = Math.round(n || 0); return n >= 1e6 ? "$" + (n / 1e6).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + "M" : n >= 1000 ? "$" + Math.round(n / 1000) + "k" : "$" + n; };
-  const pct = (a, b) => (b > 0 ? Math.round(((a - b) / b) * 100) : null);
-  const diaNom = (i) => (i === 0 ? "Hoy" : i === 1 ? "Ayer" : diaMas(-i).toLocaleDateString("es-AR", { weekday: "long" }));
   function viewDashboard() {
-    $("#view").innerHTML = `<h1 class="ph1">Dashboard</h1>
-      <p class="muted">Facturación y gastos salen de la <a href="caja.html">Caja</a> (todas las ventas: web, directas, apps y cafeterías). Lo que más salió suma los pedidos web y las entradas cargadas con productos; los horarios, solo los pedidos web.</p>
-      <section class="horcard" id="franjaCard"></section>
-      <div id="dash"><p class="muted">Cargando…</p></div>`;
+    $("#view").innerHTML = `<h1 class="ph1">Horarios</h1>
+      <a class="pcard dashmove" href="caja.html#dash"><b>📊 El dashboard ahora está en la Caja</b><span class="hintp">Ventas de todos los canales, ganancia por día y por turno, márgenes de la carta y subas de insumos. Pestaña <b>Dashboard</b> en la barra de abajo.</span></a>
+      <section class="horcard" id="franjaCard"></section>`;
     drawFranjas();
-    cargarDash();
   }
-  async function cargarDash() {
-    try { [P.dash, P.maq] = await Promise.all([API.dashboard(new Date(diaMas(-13).setHours(0, 0, 0, 0))), API.maqStats().catch(() => null)]); P.dashAt = new Date(); }
-    catch (err) { const el = $("#dash"); if (el && !P.dash) el.innerHTML = `<p class="err">No se pudo cargar el dashboard: ${esc(err.message)}</p>`; return; }
-    drawDash();
-  }
-  // suma todo lo de un conjunto de días (claves AAAA-MM-DD)
-  function dashSuma(keys) {
-    const D = P.dash, ks = new Set(keys), cat = {}, itm = {};
-    ((D.caja || {}).cats || []).forEach((c) => (cat[c.id] = c.nombre)); ((D.stock || {}).items || []).forEach((x) => (itm[x.id] = x.nombre));
-    const A = { ent: 0, gas: 0, canales: {}, webN: 0, webTot: 0, canc: 0, prods: {}, mochis: {}, mochisN: 0, horas: {}, pagos: {}, modos: {}, tels: {}, dias: {} };
-    keys.forEach((k) => (A.dias[k] = { web: 0, otros: 0, n: 0 }));
-    D.orders.forEach((o) => {
-      const k = fechaKey(new Date(o.created_at)); if (!ks.has(k)) return;
-      if (o.status === "cancelado") { A.canc++; return; }
-      A.webN++; A.webTot += o.total || 0; A.dias[k].n++;
-      const h = new Date(o.created_at).getHours(); A.horas[h] = (A.horas[h] || 0) + 1;
-      const pg = o.pago || "Sin dato"; A.pagos[pg] = (A.pagos[pg] || 0) + (o.total || 0);
-      const md = o.modo === "envio" ? "Envío" : "Retiro"; A.modos[md] = (A.modos[md] || 0) + 1;
-      if (o.phone) A.tels[o.phone] = (A.tels[o.phone] || 0) + 1;
-      (o.items || []).filter((i) => !NO_PROD.includes(i.id)).forEach((i) => {
-        const n = String(i.nombre || i.id).trim(), x = A.prods[n] || (A.prods[n] = { q: 0, m: 0 }); x.q += i.qty || 0; x.m += i.subtotal || 0;
-      });
-    });
-    if (D.caja) D.caja.movs.forEach((m) => {
-      if (!ks.has(m.fecha)) return; const v = +m.monto || 0;
-      if (m.tipo === "gasto") { A.gas += v; return; }
-      const web = m.registro === "Pedidos web", c = web ? "Pedidos web" : cat[m.categoria_id] || "Sin categoría";
-      A.ent += v; A.canales[c] = (A.canales[c] || 0) + v; A.dias[m.fecha][web ? "web" : "otros"] += v;
-      // ventas cargadas en la Caja con productos (los pedidos web ya se cuentan arriba desde orders)
-      if (!web) (m.items || []).forEach((i) => { const n = String(i.nombre || i.id).trim(), x = A.prods[n] || (A.prods[n] = { q: 0, m: 0 }); x.q += +i.qty || 0; x.m += (+i.qty || 0) * (+i.precio || 0); });
-    });
-    if (D.stock) D.stock.movs.forEach((m) => {
-      const k = fechaKey(new Date(m.created_at)); if (!ks.has(k)) return;
-      const n = itm[m.item_id] || "Otro"; A.mochis[n] = (A.mochis[n] || 0) - (m.delta || 0); A.mochisN -= m.delta || 0;
-    });
-    return A;
-  }
-  const orden = (o, f = (v) => v) => Object.entries(o).map(([l, v]) => [l, f(v)]).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]);
-  // con comparación (cmp en %), sub es contra qué se compara; sin dato anterior (cmp === null) no se muestra
-  const tile = (lbl, val, sub, cmp) => `<div class="kpi"><span class="kl">${lbl}</span><b class="kv num">${val}</b>${cmp != null ? `<span class="kc ${cmp > 0 ? "k-sube" : cmp < 0 ? "k-baja" : ""}">${cmp > 0 ? "▲ +" : cmp < 0 ? "▼ " : "= "}${cmp}% ${sub}</span>` : sub && cmp !== null ? `<span class="kc">${sub}</span>` : ""}</div>`;
-  // barras horizontales: una sola serie, cada valor con su número al lado
-  const barras = (rows, fmt, vacio) => {
-    if (!rows.length) return `<p class="hintp">${vacio || "Sin datos."}</p>`;
-    const max = Math.max(...rows.map((r) => r[1]), 1);
-    return `<ul class="dbars">${rows.map(([l, v, sub]) => `<li title="${esc(l)}: ${esc(fmt(v))}"><span class="dl">${esc(l)}${sub ? `<small>${esc(sub)}</small>` : ""}</span><span class="dtrack"><i style="width:${Math.max(3, (v / max) * 100)}%"></i></span><b class="num">${fmt(v)}</b></li>`).join("")}</ul>`;
-  };
-  // columnas (apiladas si hay dos series): cols = [{l, v:[a, b], tip, on}]
-  const columnas = (cols, fmt) => {
-    const max = Math.max(...cols.map((c) => c.v.reduce((a, b) => a + b, 0)), 1);
-    return `<div class="dcolch" style="--n:${cols.length}">${cols.map((c) => { const t = c.v.reduce((a, b) => a + b, 0);
-      return `<div class="dcol ${c.on ? "on" : ""}" title="${esc(c.tip)}"><span class="dcv num">${t ? fmt(t) : ""}</span><span class="dstack">${c.v.map((v, i) => v ? `<i class="s${i}" style="height:${(v / max) * 100}%"></i>` : "").join("")}</span><span class="dcl">${esc(c.l)}</span></div>`; }).join("")}</div>`;
-  };
-  function drawDash() {
-    const el = $("#dash"); if (!el || !P.dash) return;
-    const D = P.dash, di = P.dashDia || 0, kDia = fechaKey(diaMas(-di)), kPas = fechaKey(diaMas(-di - 7));
-    const sem = Array.from({ length: 7 }, (_, i) => fechaKey(diaMas(-6 + i))), semAnt = Array.from({ length: 7 }, (_, i) => fechaKey(diaMas(-13 + i)));
-    const H = dashSuma([kDia]), Hp = dashSuma([kPas]), S = dashSuma(sem), Sp = dashSuma(semAnt);
-    const caja = !!D.caja, stock = !!D.stock, nomDia = diaMas(-di).toLocaleDateString("es-AR", { weekday: "long" });
-    const fact = (A) => (caja ? A.ent : A.webTot);
-    const prodRows = (A) => orden(A.prods, (x) => x.q).slice(0, 6).map(([l, q]) => [l, q, money(A.prods[l].m)]);
-    const unid = (v) => v + " u.";
-    const horasCh = (A) => { const hs = Object.keys(A.horas).map(Number); if (!hs.length) return `<p class="hintp">Sin pedidos web.</p>`;
-      const a = Math.min(...hs), b = Math.max(...hs), cols = [];
-      for (let h = a; h <= b; h++) cols.push({ l: String(h), v: [A.horas[h] || 0], tip: `${h}:00 a ${h}:59 · ${A.horas[h] || 0} pedidos` });
-      return columnas(cols, String) + `<p class="hintp">Hora en que entró cada pedido web (no la de retiro).</p>`; };
-    const sinCaja = caja ? "" : `<p class="hintp">Sin acceso a la Caja${API.DEMO ? " en modo demo" : ""}: la facturación muestra solo pedidos web.</p>`;
-    const repit = Object.values(S.tels).filter((n) => n > 1).length, clientes = Object.keys(S.tels).length;
-    const mejor = sem.map((k) => [k, caja ? S.dias[k].web + S.dias[k].otros : 0]).sort((a, b) => b[1] - a[1])[0];
-    const mejorTxt = caja && mejor[1] > 0 ? `Mejor día: <b>${new Date(mejor[0] + "T12:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}</b> con ${money(mejor[1])}.` : "";
-    el.innerHTML = `
-      <section class="dsec">
-        <div class="dhead"><h2 class="dh2">Resumen del día</h2>
-          <div class="dnav"><button type="button" data-dd="1" ${di >= 6 ? "disabled" : ""} aria-label="Día anterior">‹</button><span>${esc(diaNom(di))} ${esc(String(diaMas(-di).getDate()))}</span><button type="button" data-dd="-1" ${di <= 0 ? "disabled" : ""} aria-label="Día siguiente">›</button></div></div>
-        ${sinCaja}
-        <div class="kpis">
-          ${tile("Facturado", money(fact(H)), `vs. ${nomDia} pasado`, fact(Hp) > 0 ? pct(fact(H), fact(Hp)) : null)}
-          ${caja ? tile("Gastos", money(H.gas)) + tile("Resultado", money(H.ent - H.gas), "entradas − gastos") : ""}
-          ${tile("Pedidos web", String(H.webN), H.webN ? `ticket promedio ${money(Math.round(H.webTot / H.webN))}` : H.canc ? "" : "ninguno")}
-          ${stock ? tile("Mochis vendidos", String(H.mochisN), "todas las ventas") : ""}
-          ${H.canc ? tile("Cancelados", String(H.canc), "pedidos web") : ""}
-        </div>
-        <div class="dcols">
-          ${caja ? `<div class="dcard"><b>Por canal</b>${barras(orden(H.canales), money, "Sin entradas en la Caja.")}</div>` : ""}
-          <div class="dcard"><b>Lo que más salió</b>${barras(prodRows(H), unid, "Sin pedidos web ni ventas cargadas con productos.")}<p class="hintp">Pedidos web y entradas de la Caja cargadas con productos.</p></div>
-          ${stock ? `<div class="dcard"><b>Mochis por sabor</b>${barras(orden(H.mochis), unid, "Sin mochis descontados del stock.")}<p class="hintp">Lo que se descontó del stock en la Caja: web y ventas directas.</p></div>` : ""}
-          <div class="dcard"><b>Pedidos web por hora</b>${horasCh(H)}</div>
-          ${H.webN ? `<div class="dcard"><b>Formas de pago (web)</b>${barras(orden(H.pagos), money)}</div>` : ""}
-        </div>
-      </section>
-      <section class="dsec">
-        <div class="dhead"><h2 class="dh2">Últimos 7 días</h2><span class="hintp">${esc(new Date(sem[0] + "T12:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" }))} al ${esc(new Date(sem[6] + "T12:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" }))} · comparado con los 7 anteriores</span></div>
-        <div class="kpis">
-          ${tile("Facturado", money(fact(S)), "vs. semana anterior", fact(Sp) > 0 ? pct(fact(S), fact(Sp)) : null)}
-          ${tile("Promedio por día", money(Math.round(fact(S) / 7)))}
-          ${caja ? tile("Gastos", money(S.gas), "vs. semana anterior", Sp.gas > 0 ? pct(S.gas, Sp.gas) : null) + tile("Resultado", money(S.ent - S.gas), "entradas − gastos") : ""}
-          ${tile("Pedidos web", String(S.webN), "vs. semana anterior", Sp.webN > 0 ? pct(S.webN, Sp.webN) : null)}
-          ${S.webN ? tile("Ticket promedio web", money(Math.round(S.webTot / S.webN))) : ""}
-          ${stock ? tile("Mochis vendidos", String(S.mochisN), "vs. semana anterior", Sp.mochisN > 0 ? pct(S.mochisN, Sp.mochisN) : null) : ""}
-          ${clientes ? tile("Clientes web", String(clientes), repit ? `${repit} pidieron más de una vez` : "distintos") : ""}
-        </div>
-        <div class="dcols">
-          <div class="dcard wide2"><b>${caja ? "Facturado por día" : "Pedidos web por día"}</b>
-            ${caja ? `<div class="dleg"><span><i class="s0"></i>Pedidos web</span><span><i class="s1"></i>Otros canales</span></div>` : ""}
-            ${columnas(sem.map((k, i) => { const d = new Date(k + "T12:00"), x = S.dias[k];
-              return { l: d.toLocaleDateString("es-AR", { weekday: "short" }).replace(".", "") + " " + d.getDate(), on: k === kDia,
-                v: caja ? [x.web, x.otros] : [x.n], tip: caja ? `${d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}: ${money(x.web + x.otros)} (web ${money(x.web)} · otros ${money(x.otros)})` : `${x.n} pedidos` }; }), caja ? corto : String)}
-            ${mejorTxt ? `<p class="hintp">${mejorTxt}</p>` : ""}</div>
-          ${caja ? `<div class="dcard"><b>Por canal</b>${barras(orden(S.canales), money, "Sin entradas en la Caja.")}</div>` : ""}
-          <div class="dcard"><b>Lo que más salió</b>${barras(prodRows(S), unid, "Sin pedidos web ni ventas cargadas con productos.")}</div>
-          ${stock ? `<div class="dcard"><b>Mochis por sabor</b>${barras(orden(S.mochis), unid, "Sin mochis descontados del stock.")}</div>` : ""}
-          ${S.webN ? `<div class="dcard"><b>Retiro o envío (web)</b>${barras(orden(S.modos), (v) => v + (v === 1 ? " pedido" : " pedidos"))}</div>` : ""}
-          ${S.webN ? `<div class="dcard"><b>Formas de pago (web)</b>${barras(orden(S.pagos), money)}</div>` : ""}
-        </div>
-      </section>
-      ${maqSec(sem, semAnt)}
-      <p class="hintp">Actualizado ${P.dashAt ? P.dashAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""} · <button type="button" class="linkbtn" data-dre>Actualizar</button>${S.canc ? ` · ${S.canc} pedido${S.canc > 1 ? "s" : ""} web cancelado${S.canc > 1 ? "s" : ""} en la semana (no suman)` : ""}</p>`;
-  }
-  // Maquinita: tiradas reales (maq_tiradas) y qué pasó con cada premio (maq_premios). Siempre la semana actual, no depende del día elegido arriba.
-  function maqSec(sem, semAnt) {
-    const M = P.maq; if (!M) return "";
-    const hoy = fechaKey(new Date()), ks = new Set(sem), ksA = new Set(semAnt), ahora = Date.now();
-    const dia = (x) => fechaKey(new Date(x.created_at)), quien = (x) => x.dev || x.phone;
-    const T = M.tiradas, S = T.filter((x) => ks.has(dia(x))), Sa = T.filter((x) => ksA.has(dia(x))), H = T.filter((x) => dia(x) === hoy);
-    const gano = (x) => x.resultado && x.resultado !== "nada", ganS = S.filter(gano).length;
-    const jug = new Set(S.map(quien).filter(Boolean)).size, compra = S.filter((x) => !x.gratis).length;
-    const vencido = (p) => p.vence_at && new Date(p.vence_at).getTime() <= ahora;
-    // pendiente = ganó pero no dejó el celular; activo = lo guardó con su celular y todavía no lo usó
-    const ESTADO = (p) => p.estado === "usado" ? "Usado" : p.estado === "anulado" ? "Anulado"
-      : p.estado === "pendiente" ? (vencido(p) ? "Vencido sin reclamar" : "Sin reclamar")
-      : vencido(p) ? "Vencido sin usar" : "Reclamado, sin usar";
-    const est = {}, tipos = {}; M.premios.forEach((p) => { const e = ESTADO(p); est[e] = (est[e] || 0) + 1; tipos[p.titulo] = (tipos[p.titulo] || 0) + 1; });
-    const usados = new Set(M.usos.map((u) => u.premio_id)).size, desc = M.usos.reduce((a, u) => a + (+u.monto || 0), 0);
-    const desde = T.length ? new Date(T[0].created_at).toLocaleDateString("es-AR", { day: "numeric", month: "short" }) : "";
-    const n = (v, a, b) => v + " " + (v === 1 ? a : b);
-    return `<section class="dsec">
-        <div class="dhead"><h2 class="dh2">Maquinita</h2><span class="hintp">Últimos 7 días${desde ? ` · funciona desde el ${esc(desde)}` : ""}</span></div>
-        <div class="kpis">
-          ${tile("Tiradas hoy", String(H.length), H.length ? n(H.filter(gano).length, "premio", "premios") : "ninguna")}
-          ${tile("Tiradas 7 días", String(S.length), "vs. semana anterior", Sa.length > 0 ? pct(S.length, Sa.length) : null)}
-          ${tile("Jugaron", String(jug), "dispositivos distintos")}
-          ${tile("Premios dados", String(ganS), S.length ? `${Math.round((ganS / S.length) * 1000) / 10}% de las tiradas` : "")}
-          ${compra ? tile("Con fichas de compra", String(compra), "tiradas que no eran la gratis") : ""}
-        </div>
-        <div class="dcols">
-          <div class="dcard wide2"><b>Tiradas por día</b>
-            <div class="dleg"><span><i class="s0"></i>Sin premio</span><span><i class="s1"></i>Con premio</span></div>
-            ${columnas(sem.map((k) => { const d = new Date(k + "T12:00"), x = S.filter((t) => dia(t) === k), g = x.filter(gano).length;
-              return { l: d.toLocaleDateString("es-AR", { weekday: "short" }).replace(".", "") + " " + d.getDate(), on: k === hoy, v: [x.length - g, g],
-                tip: `${d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}: ${n(x.length, "tirada", "tiradas")}, ${n(g, "premio", "premios")}` }; }), String)}</div>
-          <div class="dcard"><b>Premios por tipo</b>${barras(orden(tipos), String, "Todavía no salió ningún premio.")}<p class="hintp">Desde que arrancó: ${n(T.length, "tirada", "tiradas")}, ${n(M.premios.length, "premio", "premios")}.</p></div>
-          <div class="dcard"><b>Qué pasó con los premios</b>${barras(orden(est), String, "Todavía no salió ningún premio.")}<p class="hintp">${usados ? `${n(usados, "premio usado", "premios usados")} en pedidos web, ${money(desc)} de descuento en total.` : "Ningún premio se usó todavía en un pedido."} Reclamado = dejó su celular para guardarlo. Vencen a las 48 hs.</p></div>
-        </div>
-      </section>`;
-  }
-  document.addEventListener("click", (e) => {
-    const b = e.target.closest("#dash [data-dd]"); if (b) { P.dashDia = Math.max(0, Math.min(6, (P.dashDia || 0) + +b.dataset.dd)); drawDash(); return; }
-    if (e.target.closest("#dash [data-dre]")) cargarDash();
-  });
   function drawJust() {
     const el = $("#justDel"); if (!el) return; const o = P.justDelivered;
     el.hidden = !o; if (!o) return;
@@ -616,9 +452,9 @@
         ${cambioBox(o)}
         ${o.status === "pendiente" ? estadoBox(o) : ""}
         ${o.status === "pendiente" ? `<div class="confirm">
-            <label>Número del chat de WhatsApp<input class="inp" data-cphone value="${esc(c.phone)}" inputmode="tel"></label>
-            ${c.n ? "" : `<span class="hintp">${club.activo === false ? "El Club está apagado: no suma sello." : "No llega al mínimo del Club: no suma sello."}</span>`}
-            <div class="acts"><button class="btn solid" data-deliver>Entregado ✓</button><button class="linkbtn warn" data-cancel>${P.cancelArm === o.id ? "¿Seguro? Tocá de nuevo para cancelar" : "Cancelar pedido"}</button></div>
+            ${P.cphEdit === o.id ? `<label>Número del chat de WhatsApp<input class="inp" data-cphone value="${esc(c.phone)}" inputmode="tel"></label>`
+              : `<div class="cphone"><span>${c.n ? "Sello para" : club.activo === false ? "Club apagado, no suma sello ·" : "No llega al mínimo, no suma sello ·"} <b class="num">${esc(c.phone)}</b></span><button class="linkbtn" data-cphedit>Cambiar</button></div>`}
+            <div class="acts"><button class="btn solid" data-deliver>Entregado ✓</button>${o.cambio || P.falta[o.id] ? "" : `<button class="linkbtn" data-falta>¿Falta algo?</button>`}<button class="linkbtn warn" data-cancel>${P.cancelArm === o.id ? "¿Seguro? Tocá de nuevo" : "Cancelar"}</button></div>
           </div>` : o.status === "entregado" ? `<p class="hintp">Entregado ${o.closed_at ? ago(o.closed_at) : ""} · ${o.sellos || 0} sello(s) sumado(s) a ${esc(pretty(o.phone))} · <a class="tocaja" href="caja.html#movs">Cobro en la Caja →</a></p>
             ${(o.avisos || {}).resena ? `<p class="hintp">✓ Le pedimos la reseña por WhatsApp ${ago(o.avisos.resena)}</p>` : `<a class="btn solid" style="margin-top:8px" target="_blank" rel="noopener" href="https://wa.me/${esc(o.wa_phone || o.phone)}?text=${encodeURIComponent(resenaTxt(o))}">Pedir reseña por WhatsApp</a>`}` : ""}
       </article>`;
@@ -1052,6 +888,79 @@
       : t === "regalo:bebida" ? `la bebida más barata del pedido${uno ? ` (hoy desde ${money(uno)} en 12 oz)` : ""}` : uno ? `el envío (${money(uno)})` : "el envío (hoy el costo se coordina por WhatsApp)";
     return `Cada uso cuesta ${que}${p.extra_pct > 0 ? ` + el ${p.extra_pct}% del resto del pedido` : ""}.${max && uno ? `${max}: hasta ${money(uno * p.usos_max)} en total.` : max ? max + "." : ""}`;
   }
+  /* ---------- Piso de margen: con los costos de la Caja (js/costos-calc.js), avisa si un descuento o premio deja productos a pérdida ---------- */
+  // Margen = (lo que se cobra − costo de materia prima y packaging) / lo que se cobra. El piso se elige en Caja → Dashboard → Subas de insumos.
+  function cargarCostos() {
+    if (P.costosP) return P.costosP;
+    return (P.costosP = (async () => { try { const d = await API.costosDatos(); P.costosK = d && window.CostosCalc ? CostosCalc.crear(d) : null; } catch (_) { P.costosK = null; }
+      document.querySelectorAll("#promoForm").forEach(promoPintar); const mf = $('form[data-set="maquinita"]'); if (mf) margenMaq(mf); })());
+  }
+  const pisoM = () => (Number((P.settings.costos_alertas || {}).piso) || 50) / 100;
+  const pctM = (m) => (m === -Infinity ? "a pérdida" : Math.round(m * 100) + "%");
+  const nomF = (f) => String(f.p.nombre).trim() + (f.t ? " " + f.t : "");
+  // d = { tipo: porcentaje | monto | regalo:mochi | regalo:bebida | envio, valor, tope, minimo, minimo_aparte, extra_pct }
+  // devuelve { nivel: ok | piso | perdida, txt } o null si no se puede calcular
+  function margenDe(d) {
+    const K = P.costosK; if (!K || d.tipo === "envio") return null;
+    const fs = K.carta().filter((f) => f.ok && f.pr > 0); if (!fs.length) return null;
+    const piso = pisoM(), mAvg = fs.reduce((a, f) => a + f.m, 0) / fs.length, M = Math.max(0, +d.minimo || 0);
+    const P0 = (n) => `${Math.round(piso * 100)}%`;
+    if (d.tipo === "porcentaje") {
+      const v = Math.max(0, Math.min(100, +d.valor || 0)) / 100, T = +d.tope || 0;
+      const r = fs.map((f) => { const cobra = f.pr - (T > 0 ? Math.min(f.pr * v, T) : f.pr * v); return { f, m: cobra > 0 ? (cobra - f.cost) / cobra : -Infinity }; }).sort((a, b) => a.m - b.m);
+      const perd = r.filter((x) => x.m < 0), bajo = r.filter((x) => x.m >= 0 && x.m < piso), lista = (xs) => xs.slice(0, 3).map((x) => `${nomF(x.f)} (${pctM(x.m)})`).join(", ") + (xs.length > 3 ? ` y ${xs.length - 3} más` : "");
+      if (perd.length) return { nivel: "perdida", txt: `A pérdida con este descuento: ${lista(perd)}.` };
+      if (bajo.length) return { nivel: "piso", txt: `Quedan bajo el piso de ${P0()}: ${lista(bajo)}.` };
+      return { nivel: "ok", txt: `Todos los productos quedan arriba del piso de ${P0()}. El más justo: ${nomF(r[0].f)} (${pctM(r[0].m)}).` };
+    }
+    const minPr = Math.min(...fs.map((f) => f.pr)), sugMin = (V) => (isFinite(V) && V > Math.max(M, minPr) ? ` Para no bajar del ${P0()}, poné una compra mínima de ${money(Math.ceil(V / 500) * 500)}.` : "");
+    if (d.tipo === "monto") {
+      const X = Math.max(0, +d.valor || 0); if (!X) return null;
+      // peor caso: el pedido más chico que llega a la compra mínima, de un solo producto
+      const r = fs.map((f) => { const q = Math.max(1, Math.ceil(M / f.pr)), cobra = q * f.pr - X; return { f, q, m: cobra > 0 ? (cobra - q * f.cost) / cobra : -Infinity }; }).sort((a, b) => a.m - b.m)[0];
+      const V = mAvg > piso ? (X * (1 - piso)) / (mAvg - piso) : Infinity;
+      const caso = `En un pedido de ${r.q > 1 ? r.q + " × " : ""}${nomF(r.f)} (${money(r.q * r.f.pr)}) te queda ${pctM(r.m)}.`;
+      return { nivel: r.m < 0 ? "perdida" : r.m < piso ? "piso" : "ok", txt: caso + (r.m < piso ? sugMin(V) : "") };
+    }
+    if (d.tipo === "regalo:mochi" || d.tipo === "regalo:bebida") {
+      // regalo = el más barato de la carta (así lo aplica la web); lo que se cobra del resto tiene el margen promedio de la carta
+      const bebida = d.tipo === "regalo:bebida", g = fs.filter((f) => (bebida ? CostosCalc.esBebida(f.p) && f.t === "12 oz" : f.p.categoria === "mochi")).sort((a, b) => a.pr - b.pr)[0];
+      if (!g) return null;
+      const e = Math.max(0, Math.min(100, +d.extra_pct || 0)) / 100, paga = d.minimo_aparte ? M : Math.max(0, M - g.pr), cobra = paga * (1 - e);
+      const den = (1 - e) * (1 - piso) - (1 - mAvg), V = den > 0 ? g.cost / den : Infinity;
+      const cuesta = `Cada regalo cuesta ${money(Math.round(g.cost))} (${nomF(g)}).`;
+      if (!(cobra > 0)) return { nivel: "perdida", txt: `${cuesta} Sin compra mínima, si piden solo el regalo perdés eso.${isFinite(V) ? ` Para no bajar del ${P0()}, poné compra mínima de ${money(Math.ceil(V / 500) * 500)} sin contar el regalo.` : ""}` };
+      const m = (cobra - paga * (1 - mAvg) - g.cost) / cobra;
+      return { nivel: m < 0 ? "perdida" : m < piso ? "piso" : "ok", txt: `${cuesta} En un pedido justo de la compra mínima te queda ${pctM(m)}, con el margen promedio de la carta (${pctM(mAvg)}).${m < piso && isFinite(V) ? ` Para el ${P0()}: compra mínima de ${money(Math.ceil(V / 500) * 500)}${d.minimo_aparte ? "" : " sin contar el regalo"}.` : ""}` };
+    }
+    return null;
+  }
+  // premios de la maquinita: no tienen compra mínima, así que se cuenta qué pedido hace falta para no perder margen
+  function margenMaqDe(tp, v) {
+    if (tp === "porcentaje") return margenDe({ tipo: "porcentaje", valor: v });
+    const K = P.costosK; if (!K) return null;
+    const fs = K.carta().filter((f) => f.ok && f.pr > 0); if (!fs.length) return null;
+    const piso = pisoM(), mAvg = fs.reduce((a, f) => a + f.m, 0) / fs.length, pi = Math.round(piso * 100) + "%";
+    if (tp === "monto") {
+      if (!(v > 0)) return null;
+      const V = mAvg > piso ? (v * (1 - piso)) / (mAvg - piso) : Infinity, V0 = mAvg > 0 ? v / mAvg : Infinity;
+      return { nivel: "piso", txt: `Si lo usa entero en un pedido, recién no perdés plata en pedidos de ${money(Math.ceil(V0 / 100) * 100)} o más, y llegás al ${pi} desde ${isFinite(V) ? money(Math.ceil(V / 100) * 100) : "—"} (con el margen promedio de la carta, ${pctM(mAvg)}). Si el pedido es menor, le queda saldo.` };
+    }
+    const g = fs.filter((f) => f.p.categoria === "mochi").sort((a, b) => a.pr - b.pr)[0]; if (!g) return null;
+    const den = (1 - piso) - (1 - mAvg), V = den > 0 ? g.cost / den : Infinity;
+    return { nivel: "piso", txt: `Cada premio cuesta ${money(Math.round(g.cost))} (${nomF(g)}). Si el pedido es solo ese mochi, es pérdida; con otros ${money(Math.ceil(V / 100) * 100)} en el pedido mantenés el ${pi}.` };
+  }
+  const margenHTML = (r) => (r ? `<span class="pm-${r.nivel}">${r.nivel === "perdida" ? "⛔" : r.nivel === "piso" ? "⚠️" : "✓"} Margen: ${esc(r.txt)}</span>` : "");
+  // Ajustes → Maquinita: un aviso debajo de cada premio
+  function margenMaq(form) {
+    if (P.costosK === undefined) { cargarCostos(); return; }
+    MQ_PREM.forEach(([id]) => {
+      const el = form.querySelector(`[data-mqm="${id}"]`); if (!el) return;
+      const on = form.elements["pa_" + id] && form.elements["pa_" + id].checked, tp = (form.elements["pk_" + id] || {}).value, v = +((form.elements["pv_" + id] || {}).value) || 0;
+      const r = on ? margenMaqDe(tp, v) : null;
+      el.innerHTML = r ? margenHTML(r) : ""; el.hidden = !r;
+    });
+  }
   const prodNom = (id) => String((P.products.find((x) => x.id === id) || {}).nombre || "un producto borrado").trim();
   const horaCorta = (iso) => new Date(iso).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
   const condTxt = (p) => [p.requiere && `solo con ${prodNom(p.requiere)} en el pedido`, p.desde_at && `vale desde el ${horaCorta(p.desde_at)} hs`, p.extra_pct > 0 && `+ ${p.extra_pct}% off en el resto`, p.minimo > 0 && `compra mínima ${money(p.minimo)}${p.minimo_aparte ? " sin contar el regalo" : ""}`, p.vence_at && `vale hasta el ${diaCorto(p.vence_at)}`, p.dias && `los personales duran ${p.dias} ${p.dias === 1 ? "día" : "días"}`,
@@ -1083,6 +992,7 @@
         <label>Usos por persona<input class="inp" name="por_cliente" type="number" min="1" max="50" inputmode="numeric" value="1"></label></div>
       <label class="chk"><input type="checkbox" name="acumula"> Se suma al premio del Setto Club y al de la maquinita</label>
       <p class="pcosto" data-pcosto></p>
+      <p class="pmargen" data-pmargen hidden></p>
       <div class="acts"><button class="btn solid" type="submit">Crear código</button></div></form>`;
   }
   const leerPromo = (f) => {
@@ -1102,7 +1012,10 @@
     f.querySelector("[data-pvalor]").firstChild.textContent = t === "monto" ? "Cuánto ($)" : "Cuánto (%)";
     f.elements.titulo.placeholder = tituloDe(t, +f.elements.valor.value || 0, t.startsWith("regalo:") ? +f.elements.extra_pct.value || 0 : 0);
     f.querySelector("[data-pcosto]").textContent = "💸 " + costoTxt(leerPromo(f));
+    const pm = f.querySelector("[data-pmargen]"); if (P.costosK === undefined) { cargarCostos(); return; }
+    const r = margenDe(promoMargenIn(leerPromo(f))); pm.innerHTML = margenHTML(r); pm.hidden = !r;
   }
+  const promoMargenIn = (p) => ({ tipo: tipoDe(p), valor: p.valor, tope: p.tope, minimo: p.minimo, minimo_aparte: p.minimo_aparte, extra_pct: p.extra_pct });
   function promoValidar(p) {
     if (!p.nombre) return "Poné un nombre para reconocerlo";
     if (p.tipo === "porcentaje" && !(p.valor >= 1 && p.valor <= 100)) return "El porcentaje va de 1 a 100";
@@ -1116,7 +1029,7 @@
   async function cargarPromos() {
     const box = $("#promoList"); if (!box) return;
     try {
-      const [l, r] = await Promise.all([API.listPromos(), API.promosResumen().catch(() => ({}))]);
+      const [l, r] = await Promise.all([API.listPromos(), API.promosResumen().catch(() => ({})), cargarCostos()]);
       P.promos = l.promos; P.pcods = l.codigos; P.presu = r || {};
       box.innerHTML = l.promos.length ? l.promos.map((p) => { const [lbl, cls] = promoEstado(p), x = (P.presu.promo || {})[p.id] || {}, cods = l.codigos.filter((c) => c.promo_id === p.id), gen = cods.filter((c) => !c.phone), pers = cods.filter((c) => c.phone);
         return `<article class="pcard" data-promo="${esc(p.id)}">
@@ -1125,6 +1038,7 @@
         ${gen.length ? `<div class="pcods">${gen.map((c) => `<button class="pcode num" data-pcopy="${esc(c.code)}" title="Copiar">${esc(c.code)}</button>`).join("")}<span class="hintp">código para todos · tocalo para copiar</span></div>` : ""}
         <p class="pstat">${x.codigos || 0} ${x.codigos === 1 ? "código" : "códigos"} · ${x.usados || 0} ${x.usados === 1 ? "usado" : "usados"} · ${money(x.descontado || 0)} descontado · ${money(x.vendido || 0)} vendido (${x.entregados || 0} entregados)</p>
         <p class="hintp">💸 ${esc(costoTxt(p))}</p>
+        ${margenDe(promoMargenIn(p)) ? `<p class="pmargen">${margenHTML(margenDe(promoMargenIn(p)))}</p>` : ""}
         ${promoVigente(p) ? `<div class="row2"><label>Código personal para un número<input class="inp" data-pphone inputmode="tel" placeholder="223 347-1277"></label></div><div data-pout></div>` : ""}
         <div class="acts">${promoVigente(p) ? '<button class="btn" data-pgen>Generar código</button>' : ""}<button class="btn" data-ponoff>${p.activa === false ? "Activar" : "Pausar"}</button>${x.usados ? "" : '<button class="linkbtn warn" data-pborrar>Borrar</button>'}</div>
         ${pers.length ? `<details><summary class="hintp">Personales hechos a mano (${pers.length})</summary><div class="hist">${pers.map((c) => `<div><span><b class="num">${esc(c.code)}</b> · ${esc(pretty(c.phone))}${c.vence_at ? ` <span class="muted">hasta el ${diaCorto(c.vence_at)}</span>` : ""}</span><span>${c.usos ? "usado" : "sin usar"}</span></div>`).join("")}</div></details>` : ""}
@@ -1158,6 +1072,8 @@
     f.addEventListener("input", () => promoPintar(f)); f.addEventListener("change", () => promoPintar(f)); promoPintar(f);
     f.addEventListener("submit", async (e) => {
       e.preventDefault(); const p = leerPromo(f), err = promoValidar(p); if (err) { toast(err); return; }
+      const mg = margenDe(promoMargenIn(p));
+      if (mg && mg.nivel === "perdida" && !confirm(`Ojo: este descuento deja productos a pérdida.\n\n${mg.txt}\n\n¿Crearlo igual?`)) return;
       const { code, ...promo } = p; const b = f.querySelector("[type=submit]"); b.disabled = true;
       try { await API.createPromo(promo, code || null); toast(code ? `Listo: ${code} ya se puede usar` : "Listo: generá códigos personales desde la tarjeta o usalo en una campaña"); f.reset(); promoPintar(f); cargarPromos(); }
       catch (err2) { toast(err2.message); } b.disabled = false;
@@ -1741,7 +1657,7 @@
           <div class="checks">${dias.map((d, i) => `<label><input type="checkbox" name="d${i}" ${r.dias.includes(i) ? "checked" : ""}> ${d}</label>`).join("")}</div>
           <div class="frlist"><small>Franjas</small>${r.rangos.map(([a, b], i) => frRow(i, a, b, !(r.apagadas || []).includes(a + "-" + b))).join("")}</div>
           <button type="button" class="linkbtn" data-fradd>+ Agregar franja</button>
-          <span class="hintp">Apagá una franja para dejar de ofrecerla sin borrar el horario. Para cerrarla solo hoy o mañana (o marcar alta demanda), usá <b>Horarios para pedir</b> en el Dashboard. El tope de pedidos se ve en <b>Alta demanda por turno</b>, arriba de Pedidos.</span>
+          <span class="hintp">Apagá una franja para dejar de ofrecerla sin borrar el horario. Para cerrarla solo hoy o mañana (o marcar alta demanda), usá <b>Horarios para pedir</b> en la pestaña Horarios. El tope de pedidos se ve en <b>Alta demanda por turno</b>, arriba de Pedidos.</span>
           <div class="row2"><label>Turnos cada (min)<input class="inp" name="cada" type="number" value="${r.cadaMin || 30}"></label><label>Anticipación mínima (min)<input class="inp" name="antic" type="number" value="${r.anticipacionMin || 40}"></label></div>
           <label>Pedidos por turno antes de marcar alta demanda (0 = sin tope)<input class="inp" name="cupo" type="number" min="0" max="20" value="${r.cupoTurno ?? 3}"></label>
           <span class="hintp">Al llegar a ese número, la web deja de ofrecer ese turno, avisa que hay muchos pedidos y recomienda el siguiente libre.</span>
@@ -1796,7 +1712,8 @@
             const prem = MQ_PREM.map(([id, cuando, t, ch, tipo, valor]) => { const c = (m.premios || []).find((x) => x.id === id), tp = (c && c.tipo) || tipo, vl = c && c.valor != null ? +c.valor || 0 : valor, on = c ? c.activo !== false : !!t;
               return `<label class="chk" style="margin-top:6px"><input type="checkbox" name="pa_${id}" ${on ? "checked" : ""}> Activo: ${cuando}</label>
               <div class="row2"><label>${cuando}: premio (vacío = sin premio)<input class="inp" name="pt_${id}" maxlength="40" value="${esc(c ? c.titulo || "" : t)}"></label><label>Probabilidad (%)<input class="inp" name="pc_${id}" type="number" min="0" max="100" step="0.1" value="${c ? +c.chance || 0 : ch}"></label></div>
-              <div class="row2"><label>Qué se descuenta<select class="inp" name="pk_${id}">${MQ_TIPO.map(([v, l]) => `<option value="${v}" ${tp === v ? "selected" : ""}>${l}</option>`).join("")}</select></label><label>Valor ($ o %, no aplica al mochi)<input class="inp" name="pv_${id}" type="number" min="0" step="1" value="${vl}"></label></div>`; }).join("");
+              <div class="row2"><label>Qué se descuenta<select class="inp" name="pk_${id}">${MQ_TIPO.map(([v, l]) => `<option value="${v}" ${tp === v ? "selected" : ""}>${l}</option>`).join("")}</select></label><label>Valor ($ o %, no aplica al mochi)<input class="inp" name="pv_${id}" type="number" min="0" step="1" value="${vl}"></label></div>
+              <p class="pmargen" data-mqm="${id}" hidden></p>`; }).join("");
             return `<label class="chk"><input type="checkbox" name="activo" ${m.activo !== false ? "checked" : ""}> Mostrar la maquinita en la web (sección entre Sets y Carta y botón del carrito)</label>
           <div class="row2"><label>Tiradas gratis por día<input class="inp" name="fichas" type="number" min="1" max="5" value="${Math.max(1, +m.fichas_dia || 1)}"></label>
           <label>Fichas por cada compra<input class="inp" name="fcompra" type="number" min="0" max="50" value="${m.fichas_compra ?? 5}"></label></div>
@@ -1974,6 +1891,7 @@
     $(".ajbody").append(form);
     form.dataset.orig = ajKey(form);
     if (cur.k === "votacion") setTimeout(votResultados, 0);
+    if (cur.k === "maquinita") margenMaq(form);
   }
   async function votResultados() {
     const v = P.settings.votacion || {}, el = $("#votRes"); if (!el || !v.id) return;
@@ -2198,6 +2116,7 @@
         catch (err) { toast(err.message); b.disabled = false; }
         return;
       }
+      if (b.dataset.cphedit !== undefined) { P.cphEdit = id; drawOrders(); const i = document.querySelector(`[data-oid="${id}"] [data-cphone]`); if (i) i.focus(); return; }
       if (b.dataset.pagoedit !== undefined) { P.editPago = P.editPago === id ? null : id; drawOrders(); return; }
       if (b.dataset.pagoset !== undefined) {
         const o = P.orders.find((x) => x.id === id), nuevo = b.dataset.pagoset;
@@ -2459,6 +2378,7 @@
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-votnew]"); if (!b) return; if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = "¿Seguro? Tocá de nuevo y después Guardar"; return; } const f = b.closest("form"); f.dataset.newid = "v" + Date.now().toString(36); [0, 1, 2, 3, 4, 5].forEach((i) => (f.querySelector(`[name=oid${i}]`).value = "")); b.textContent = "Lista: tocá Guardar"; });
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-msgreset]"); if (!b) return; const ta = b.closest("form").querySelector(`[name=m_${b.dataset.msgreset}]`); ta.value = window.SettoMSG.MSG[b.dataset.msgreset].texto; toast("Restaurado · tocá Guardar mensajes"); });
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-gix]"); if (!b) return; const r = b.closest(".slrow"); r.querySelector(`[name=gi${b.dataset.gix}]`).value = ""; r.querySelector(".upprev").textContent = "Sin imagen · tocá Guardar"; b.remove(); });
+  ["input", "change"].forEach((t) => document.addEventListener(t, (e) => { const f = e.target.closest && e.target.closest('form[data-set="maquinita"]'); if (f) margenMaq(f); }));
   document.addEventListener("submit", (e) => { if (e.target.matches("form[data-set]")) { e.preventDefault(); const b = e.target.querySelector(".ajbar .btn"); if (b) { b.disabled = true; b.textContent = "Guardando…"; } saveAjuste(e.target).finally(() => { const b2 = e.target.querySelector(".ajbar .btn"); if (b2) { b2.disabled = false; b2.textContent = "Guardar"; } }); } });
   // cambios sin guardar en Ajustes: se revisan al tocar algo y cada tanto (las fotos subidas cambian campos ocultos)
   ["input", "change", "click"].forEach((ev) => document.addEventListener(ev, () => setTimeout(ajCheck, 0)));

@@ -50,6 +50,7 @@
   const TIPOS = {
     entrada: { l: "Entrada", ic: "↓", cls: "entrada" },
     gasto: { l: "Gasto", ic: "↑", cls: "gasto" },
+    inversion: { l: "Inversión", ic: "◆", cls: "inversion" },
     aporte: { l: "Aporte de socio", ic: "+", cls: "socio" },
     devolucion: { l: "Devolución a socio", ic: "↩", cls: "socio" },
     retiro: { l: "Retiro de ganancias", ic: "★", cls: "socio" },
@@ -70,8 +71,11 @@
   };
   const cuentaN = (id) => (S.cuentas.find((c) => c.id === id) || {}).nombre || id || "—";
   const socioN = (id) => (S.socios.find((c) => c.id === id) || {}).nombre || id || "—";
-  const movPorId = (id) => S.movs.find((x) => x.id === id) || (S.retiros || []).find((x) => x.id === id);
+  const movPorId = (id) => S.movs.find((x) => x.id === id) || (S.retiros || []).find((x) => x.id === id) || (S.inv || []).find((x) => x.id === id);
   const catN = (id) => (S.cats.find((c) => c.id === id) || {}).nombre || "Sin categoría";
+
+  /* tipos que llevan categoría y "¿quién pagó?" (caja o un socio de su bolsillo) */
+  const CONCAT = ["entrada", "gasto", "inversion"], DEPAGO = ["gasto", "inversion"];
 
   /* efecto de un movimiento (igual que la vista caja_efectos; solo para mostrar) */
   function efectos(m) {
@@ -79,15 +83,15 @@
     const add = (c, v) => { if (c) e.cuentas[c] = (e.cuentas[c] || 0) + v; };
     const v = Number(m.monto) || 0;
     if (["entrada", "aporte", "ajuste"].includes(m.tipo)) add(m.cuenta_id, v);
-    if (["gasto", "devolucion", "retiro"].includes(m.tipo)) add(m.cuenta_id, -v);
+    if (["gasto", "inversion", "devolucion", "retiro"].includes(m.tipo)) add(m.cuenta_id, -v);
     if (m.tipo === "transferencia") { add(m.cuenta_id, -v); add(m.cuenta_destino_id, v); }
-    if (m.socio_id && ["gasto", "aporte"].includes(m.tipo)) { e.socio = m.socio_id; e.deuda = v; }
+    if (m.socio_id && ["gasto", "inversion", "aporte"].includes(m.tipo)) { e.socio = m.socio_id; e.deuda = v; }
     if (m.socio_id && m.tipo === "devolucion") { e.socio = m.socio_id; e.deuda = -v; }
     return e;
   }
   function impacto(m) {
     if (m.tipo === "transferencia") return { txt: fmt(m.monto), cls: "", sub: `${cuentaN(m.cuenta_id)} → ${cuentaN(m.cuenta_destino_id)}` };
-    if (m.tipo === "gasto" && !m.cuenta_id) return { txt: "−" + fmt(m.monto), cls: "neg", sub: `pagó ${socioN(m.socio_id)}` };
+    if (DEPAGO.includes(m.tipo) && !m.cuenta_id) return { txt: "−" + fmt(m.monto), cls: "neg", sub: `pagó ${socioN(m.socio_id)}` };
     const d = efectos(m).cuentas[m.cuenta_id] || 0;
     return { txt: signed(d), cls: d > 0 ? "pos" : d < 0 ? "neg" : "", sub: cuentaN(m.cuenta_id) };
   }
@@ -106,8 +110,10 @@
       sb.from("caja_compras").select("*").order("created_at", { ascending: false }).limit(300),
       /* los retiros van aparte para que el historial no dependa del límite de movimientos */
       sb.from("caja_movimientos").select("*").eq("tipo", "retiro").order("fecha", { ascending: false }).order("created_at", { ascending: false }).limit(10000),
+      /* inversión y plata de los socios, desde siempre (pestaña Inversión) */
+      sb.from("caja_movimientos").select("*").or("tipo.in.(aporte,devolucion,inversion),and(tipo.eq.gasto,socio_id.not.is.null)").order("fecha", { ascending: false }).order("created_at", { ascending: false }).limit(10000),
     ]);
-    [S.cuentas, S.socios, S.cats, S.saldos, S.deudas, S.movs, S.stock, S.tareas, S.compras, S.retiros] = r.map(fail);
+    [S.cuentas, S.socios, S.cats, S.saldos, S.deudas, S.movs, S.stock, S.tareas, S.compras, S.retiros, S.inv] = r.map(fail);
     // reservado en pedidos web pendientes y disponible en la web (si falla, la pestaña sigue igual)
     try { const { data } = await sb.rpc("caja_stock_reservas"); S.reservas = {}; (data || []).forEach((x) => (S.reservas[x.item_id] = x)); } catch (_) { S.reservas = {}; }
     stockApplyLocal();
@@ -126,7 +132,7 @@
     clearTimeout(reloadT);
     reloadT = setTimeout(async () => {
       if (stockBusy()) return softReload(); // con toques de stock sin guardar, esperar a que se guarden
-      try { await loadAll(); render(); } catch (e) { console.error(e); }
+      try { await loadAll(); if (dash) dash.invalidar(); render(); } catch (e) { console.error(e); }
     }, 250);
   }
 
@@ -158,6 +164,7 @@
       return;
     }
     drawShell(); render();
+    if (dash) dash.cargar(); // en segundo plano: márgenes y subas de insumos (aviso en Inicio y en la barra)
     if (!S.socios.some((s) => s.nombre === S.me)) whoSheet(true);
     else if (location.hash === "#compras/voz") { history.replaceState(null, "", "#compras"); escuchar(); } // atajo "Anotar compra" del ícono
     sb.channel("caja-live")
@@ -177,6 +184,7 @@
     stock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>',
     tareas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>',
     compras: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.2 11H6.2z"/><path d="M9 8a3 3 0 016 0"/></svg>',
+    dash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
   };
   function drawShell() {
     app.innerHTML = `<header class="cbar"><div class="wrap">
@@ -188,24 +196,24 @@
       <main class="cmain"><div class="wrap" id="view"></div></main>
       <button class="fab" data-new aria-label="Cargar movimiento">+</button>
       <nav class="bnav"><div class="wrap">
-        ${[["inicio", "Inicio"], ["movs", "Movimientos"], ["stock", "Stock"], ["tareas", "Tareas"], ["compras", "Compras"]].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}${l}<span class="dot" data-dot="${k}" hidden></span></button>`).join("")}
+        ${[["inicio", "Inicio"], ["movs", "Movimientos"], ["dash", "Dashboard"], ["stock", "Stock"], ["tareas", "Tareas"], ["compras", "Compras"]].map(([k, l]) => `<button data-go="${k}">${ICONS[k]}${l}<span class="dot" data-dot="${k}" hidden></span></button>`).join("")}
       </div></nav>`;
   }
   function render() {
     if (!$("#view")) return;
-    document.querySelectorAll(".bnav [data-go]").forEach((b) => { if (b.dataset.go === (S.view === "retiros" ? "inicio" : S.view)) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+    document.querySelectorAll(".bnav [data-go]").forEach((b) => { if (b.dataset.go === (["retiros", "inversion", "costos"].includes(S.view) ? "inicio" : S.view)) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
     const pt = S.tareas.filter((t) => t.estado === "pendiente").length, pc = S.compras.filter((c) => c.estado === "pendiente").length;
     const dt = $('[data-dot="tareas"]'), dc = $('[data-dot="compras"]');
     if (dt) { dt.textContent = pt; dt.hidden = !pt; } if (dc) { dc.textContent = pc; dc.hidden = !pc; }
     const dp = $("[data-pend]"); if (dp) { dp.textContent = S.pend || ""; dp.hidden = !S.pend; dp.title = `${S.pend} pedido(s) pendiente(s)`; }
     const mb = $("[data-who]"); if (mb) mb.innerHTML = `<i>${esc((S.me || "?")[0])}</i>${esc(S.me || "¿Quién sos?")}`;
-    $(".fab").hidden = !["inicio", "movs", "retiros"].includes(S.view);
+    $(".fab").hidden = !["inicio", "movs", "retiros", "inversion"].includes(S.view);
     document.body.classList.remove("consel");
     const y = window.scrollY;
-    ({ inicio: vInicio, movs: vMovs, retiros: vRetiros, stock: vStock, tareas: vTareas, compras: vCompras }[S.view] || vInicio)();
+    ({ inicio: vInicio, movs: vMovs, retiros: vRetiros, inversion: vInversion, costos: costos ? costos.view : vInicio, dash: dash ? dash.view : vInicio, stock: vStock, tareas: vTareas, compras: vCompras }[S.view] || vInicio)();
     window.scrollTo(0, y);
   }
-  function go(v) { S.view = v; history.replaceState(null, "", "#" + v); render(); window.scrollTo(0, 0); }
+  function go(v) { if (v === "dash" && S.view === "costos" && dash) dash.invalidar(); S.view = v; history.replaceState(null, "", "#" + v); render(); window.scrollTo(0, 0); }
 
   /* ---------- INICIO ---------- */
   function mesStats(mes) {
@@ -215,7 +223,7 @@
       const o = {}; ms.filter((m) => m.tipo === t).forEach((m) => { const k = m.categoria_id || "_"; o[k] = (o[k] || 0) + Number(m.monto); });
       return Object.entries(o).sort((a, b) => b[1] - a[1]);
     };
-    return { ent: sum("entrada"), gas: sum("gasto"), ret: sum("retiro"), aju: sum("ajuste"), n: ms.length, gc: porCat("gasto"), ec: porCat("entrada"), vend: vendidos(ms.filter((m) => m.tipo === "entrada")) };
+    return { ent: sum("entrada"), gas: sum("gasto"), inv: sum("inversion"), ret: sum("retiro"), aju: sum("ajuste"), n: ms.length, gc: porCat("gasto"), ec: porCat("entrada"), vend: vendidos(ms.filter((m) => m.tipo === "entrada")) };
   }
   function vInicio() {
     const total = S.saldos.reduce((a, s) => a + Number(s.saldo), 0);
@@ -232,11 +240,13 @@
         <div class="saldo total"><span class="k">Total en caja</span><span class="v num">${money(total)}</span></div>
       </div>
 
-      <h2 class="h2">Socios <small>${deben.length ? "Setto les debe" : "Nadie tiene plata puesta"}</small><button class="more" data-go="retiros">Ver retiros</button></h2>
+      <h2 class="h2">Socios <small>${deben.length ? "Setto les debe" : "Nadie tiene plata puesta"}</small><span class="mores"><button class="more" data-go="inversion">Inversión</button><button class="more" data-go="retiros">Retiros</button></span></h2>
       <div class="deudas">${S.deudas.map((d) => `<div class="deuda"><span class="av">${esc(d.nombre[0])}</span>
           <span class="t"><b>${esc(d.nombre)}</b>${Number(d.retirado) ? `Retiró ${fmt(d.retirado)} de ganancias` : "Sin retiros"}</span>
           <span class="m num ${d.le_debemos >= 1 ? "pend" : ""}">${d.le_debemos >= 1 ? fmt(d.le_debemos) : d.le_debemos <= -1 ? "debe " + fmt(d.le_debemos) : "al día"}</span>
           ${d.le_debemos >= 1 ? `<button data-devolver="${esc(d.id)}">Devolver</button>` : ""}</div>`).join("")}</div>
+      ${costos ? costos.linkHTML() : ""}
+      ${dash ? dash.avisoHTML() : ""}
 
       <h2 class="h2"><span class="mesnav"><button data-mes="-1" aria-label="Mes anterior">‹</button><b>${esc(mesNombre(S.mes))}</b><button data-mes="1" aria-label="Mes siguiente">›</button></span></h2>
       <div class="kpis">
@@ -244,7 +254,7 @@
         <div class="kpi"><div class="k">Gastamos</div><div class="v num">${fmt(st.gas)}</div></div>
         <div class="kpi res ${res < 0 ? "neg" : ""}"><div class="k">Resultado</div><div class="v num">${money(res)}</div></div>
       </div>
-      <p class="kpinote">Los gastos incluyen lo que pagaron los socios de su bolsillo.${st.ret ? ` Retiros de ganancias: ${fmt(st.ret)}.` : ""}${st.aju ? ` Diferencias por conteo: ${signed(st.aju)}.` : ""}</p>
+      <p class="kpinote">Los gastos incluyen lo que pagaron los socios de su bolsillo.${st.inv ? ` Inversión: ${fmt(st.inv)} (va aparte, no es gasto).` : ""}${st.ret ? ` Retiros de ganancias: ${fmt(st.ret)}.` : ""}${st.aju ? ` Diferencias por conteo: ${signed(st.aju)}.` : ""}</p>
       ${st.gc.length ? `<div class="bars"><b style="font-size:.85rem">¿En qué se fue?</b>${bars(st.gc, "")}</div>` : ""}
       ${st.ec.length ? `<div class="bars"><b style="font-size:.85rem">¿De dónde entró?</b>${bars(st.ec, "in")}</div>` : ""}
       ${st.vend.length ? (() => { const mx = Math.max(1, ...st.vend.map((x) => x[1].q)); return `<div class="bars"><b style="font-size:.85rem">¿Qué se vendió?</b>${st.vend.slice(0, 8).map(([n, x]) => `<div class="bar in"><span>${esc(n)}</span><span class="tr"><i style="width:${Math.max(2, (x.q / mx) * 100)}%"></i></span><span>${x.q} u.</span></div>`).join("")}<span class="kpinote" style="margin:0">Solo las entradas cargadas con productos. Los pedidos web están en el Dashboard del panel.</span></div>`; })() : ""}
@@ -254,7 +264,7 @@
   }
   function movRow(m) {
     const t = TIPOS[m.tipo], im = impacto(m), an = m.estado === "anulado";
-    const sub = [m.tipo === "entrada" || m.tipo === "gasto" ? catN(m.categoria_id) : t.l, m.socio_id && m.tipo !== "gasto" ? socioN(m.socio_id) : null, m.registro].filter(Boolean).join(" · ");
+    const sub = [CONCAT.includes(m.tipo) ? (m.tipo === "inversion" ? "Inversión · " : "") + catN(m.categoria_id) : t.l, m.socio_id && !DEPAGO.includes(m.tipo) ? socioN(m.socio_id) : null, m.registro].filter(Boolean).join(" · ");
     return `<button class="mov ${an ? "anul" : ""}" data-mov="${m.id}">
       <span class="ic ${t.cls}">${t.ic}</span>
       <span class="t"><b>${esc(m.detalle || t.l)}</b><span>${esc(sub)}${an ? '<span class="tagx warn">anulado</span>' : ""}</span></span>
@@ -267,7 +277,7 @@
     let list = S.movs.filter((m) => mesDe(m.fecha) === S.mes);
     if (!f.anul) list = list.filter((m) => m.estado === "activo");
     if (f.tipo === "sincat") list = list.filter((m) => ["entrada", "gasto"].includes(m.tipo) && !m.categoria_id);
-    else if (f.tipo === "socios") list = list.filter((m) => ["aporte", "devolucion", "retiro"].includes(m.tipo) || (m.tipo === "gasto" && m.socio_id));
+    else if (f.tipo === "socios") list = list.filter((m) => ["aporte", "devolucion", "retiro"].includes(m.tipo) || (DEPAGO.includes(m.tipo) && m.socio_id));
     else if (f.tipo !== "todos") list = list.filter((m) => m.tipo === f.tipo);
     if (f.cuenta !== "todas") list = list.filter((m) => m.cuenta_id === f.cuenta || m.cuenta_destino_id === f.cuenta);
     if (q) list = list.filter((m) => (m.detalle + " " + catN(m.categoria_id) + " " + m.registro + " " + socioN(m.socio_id) + " " + m.monto).toLowerCase().includes(q));
@@ -277,7 +287,7 @@
     $("#view").innerHTML = `
       <h1 class="h1" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Movimientos <span class="mesnav" style="margin-left:auto;font-family:var(--texto);font-size:1rem"><button data-mes="-1" aria-label="Mes anterior">‹</button><b>${esc(mesNombre(S.mes))}</b><button data-mes="1" aria-label="Mes siguiente">›</button></span></h1>
       <input class="search" id="mq" placeholder="Buscar detalle, monto, categoría o persona" value="${esc(f.q)}">
-      <div class="filters">${chip("tipo", "todos", "Todos")}${chip("tipo", "entrada", "Entradas")}${chip("tipo", "gasto", "Gastos")}${chip("tipo", "socios", "Socios")}${chip("tipo", "transferencia", "Transferencias")}${chip("tipo", "ajuste", "Conteos")}${sinCat ? chip("tipo", "sincat", `Sin categoría (${sinCat})`) : ""}</div>
+      <div class="filters">${chip("tipo", "todos", "Todos")}${chip("tipo", "entrada", "Entradas")}${chip("tipo", "gasto", "Gastos")}${chip("tipo", "inversion", "Inversión")}${chip("tipo", "socios", "Socios")}${chip("tipo", "transferencia", "Transferencias")}${chip("tipo", "ajuste", "Conteos")}${sinCat ? chip("tipo", "sincat", `Sin categoría (${sinCat})`) : ""}</div>
       <div class="filters">${chip("cuenta", "todas", "Todas las cuentas")}${S.cuentas.map((c) => chip("cuenta", c.id, esc(c.nombre))).join("")}<button class="chip" data-anul aria-pressed="${f.anul}">Ver anulados</button></div>
       ${Object.keys(days).length ? Object.entries(days).map(([d, ms]) => {
         const net = ms.filter((m) => m.estado === "activo").reduce((a, m) => a + Object.values(efectos(m).cuentas).reduce((x, y) => x + y, 0), 0);
@@ -291,7 +301,7 @@
     const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const lines = [head.map(q).join(";")].concat(rows.map((m) => {
       const ef = Object.values(efectos(m).cuentas).reduce((a, b) => a + b, 0);
-      return [m.fecha, TIPOS[m.tipo].l, m.detalle, ["entrada", "gasto"].includes(m.tipo) ? catN(m.categoria_id) : "", String(m.monto).replace(".", ","), m.cuenta_id ? cuentaN(m.cuenta_id) : "", m.cuenta_destino_id ? cuentaN(m.cuenta_destino_id) : "", m.socio_id ? socioN(m.socio_id) : "", String(ef).replace(".", ","), m.registro, m.estado, m.anulado_motivo || "", (m.items || []).map(lineaTxt).join(" + ")].map(q).join(";");
+      return [m.fecha, TIPOS[m.tipo].l, m.detalle, CONCAT.includes(m.tipo) ? catN(m.categoria_id) : "", String(m.monto).replace(".", ","), m.cuenta_id ? cuentaN(m.cuenta_id) : "", m.cuenta_destino_id ? cuentaN(m.cuenta_destino_id) : "", m.socio_id ? socioN(m.socio_id) : "", String(ef).replace(".", ","), m.registro, m.estado, m.anulado_motivo || "", (m.items || []).map(lineaTxt).join(" + ")].map(q).join(";");
     }));
     const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `setto-caja-${S.mes}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -362,13 +372,94 @@
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `setto-retiros-${hoy()}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
 
+  /* ---------- INVERSIÓN (aportes, compras para el local y devoluciones) ----------
+     La deuda con los socios es de todos: se reparte en partes iguales entre los socios activos.
+     "A favor" = lo que Setto le debe a ese socio menos su parte de la deuda total. */
+  function invStats() {
+    const socs = S.socios.filter((s) => s.activo), n = Math.max(1, socs.length);
+    const ms = (S.inv || []).filter((m) => m.estado === "activo");
+    const sum = (f) => ms.filter(f).reduce((a, m) => a + Number(m.monto), 0);
+    const deuda = (id) => Number((S.deudas.find((d) => d.id === id) || {}).le_debemos || 0);
+    const total = socs.reduce((a, s) => a + deuda(s.id), 0), parte = total / n;
+    const porSocio = socs.map((s) => ({
+      s,
+      puso: sum((m) => m.socio_id === s.id && ["aporte", "inversion"].includes(m.tipo)),
+      bolsillo: sum((m) => m.socio_id === s.id && m.tipo === "gasto"),
+      devuelto: sum((m) => m.socio_id === s.id && m.tipo === "devolucion"),
+      debe: deuda(s.id),
+      neto: Math.round((deuda(s.id) - parte) * 100) / 100,
+    }));
+    const invs = ms.filter((m) => m.tipo === "inversion");
+    const cats = {}; invs.forEach((m) => { const k = m.categoria_id || "_"; cats[k] = (cats[k] || 0) + Number(m.monto); });
+    return {
+      socs, n, total, parte, porSocio, invs,
+      invertido: sum((m) => m.tipo === "inversion"), deCaja: sum((m) => m.tipo === "inversion" && m.cuenta_id),
+      aportado: sum((m) => m.tipo === "aporte"), devuelto: sum((m) => m.tipo === "devolucion"),
+      cats: Object.entries(cats).sort((a, b) => b[1] - a[1]),
+    };
+  }
+  function vInversion() {
+    const I = invStats(), mx = Math.max(1, ...I.cats.map((c) => c[1]));
+    const lista = (S.inv || []).filter((m) => m.estado === "activo" && m.tipo !== "gasto");
+    const months = {}; lista.forEach((m) => (months[mesDe(m.fecha)] = months[mesDe(m.fecha)] || []).push(m));
+    const sinMig = !S.cats.some((c) => c.tipo === "inversion");
+    $("#view").innerHTML = `
+      <button class="back" data-go="inicio">‹ Inicio</button>
+      <h1 class="h1">Inversión</h1>
+      <p class="muted" style="font-size:.88rem;margin-bottom:12px">Lo que ponemos para armar el local. No cuenta como gasto del mes ni como retiro de ganancias.</p>
+      ${sinMig ? `<p class="note">Falta instalar la inversión en la base: corré <b>supabase/migrations/069_caja_inversion.sql</b> en el SQL Editor de Supabase.</p>` : ""}
+      <div class="saldos">
+        <div class="saldo"><span class="k">Invertido en el local</span><span class="v num">${fmt(I.invertido)}</span><span class="c">${I.invertido ? `${fmt(I.deCaja)} salió de la caja` : "Todavía nada"}</span></div>
+        <div class="saldo"><span class="k">Aportes de socios</span><span class="v num">${fmt(I.aportado)}</span><span class="c">${I.devuelto ? `Ya se devolvió ${fmt(I.devuelto)}` : "Sin devoluciones"}</span></div>
+        <div class="saldo total itot"><span class="k">Setto les debe a los socios</span><span class="v num">${money(I.total)}</span></div>
+      </div>
+      <div class="btnrow invbtns"><button class="btn" data-inew="aporte">+ Aporte</button><button class="btn" data-inew="inversion">+ Compra</button><button class="btn" data-inew="devolucion">+ Devolución</button></div>
+
+      <h2 class="h2">Cada socio</h2>
+      <div class="invsoc">${I.porSocio.map((x) => `<div class="isoc"><span class="iav">${esc(x.s.nombre[0])}</span>
+          <div class="inm"><b>${esc(x.s.nombre)}</b><small>Puso ${fmt(x.puso)}${x.bolsillo ? ` · gastos de su bolsillo ${fmt(x.bolsillo)}` : ""} · le devolvieron ${fmt(x.devuelto)}</small></div>
+          <div class="ival num ${x.debe >= 1 ? "pend" : ""}">${x.debe >= 1 ? fmt(x.debe) : x.debe <= -1 ? "debe " + fmt(x.debe) : "al día"}${x.debe >= 1 ? "<small>le debemos</small>" : ""}</div>
+          ${x.debe >= 1 ? `<button class="idev" data-devolver="${esc(x.s.id)}">Devolver</button>` : ""}</div>`).join("")}</div>
+
+      <h2 class="h2">En partes iguales <small>${I.n} socios</small></h2>
+      ${I.total >= 1 ? `<div class="rsoc">
+          <p class="kpinote" style="margin:0">La deuda es de los ${I.n}: a cada uno le toca <b>${fmt(I.parte)}</b>.</p>
+          ${I.porSocio.map((x) => `<div class="rs ireparto"><span class="av">${esc(x.s.nombre[0])}</span><span class="t"><b>${esc(x.s.nombre)}</b></span>
+            <span class="m num ${x.neto >= 1 ? "pos" : x.neto <= -1 ? "neg" : ""}">${x.neto >= 1 ? `+${fmt(x.neto)} a favor` : x.neto <= -1 ? `le toca cubrir ${fmt(x.neto)}` : "parejo"}</span></div>`).join("")}
+        </div>
+        <p class="kpinote">"A favor" es lo que puso de más que los demás. Cada devolución de la caja baja la deuda y la parte de cada uno por igual.</p>`
+        : `<div class="emptyc"><img src="img/mochito-lie.png" alt=""><span>Setto no le debe nada a ningún socio. Están parejos.</span></div>`}
+
+      ${I.cats.length ? `<div class="bars"><b style="font-size:.85rem">¿En qué se invirtió?</b>${I.cats.map(([k, v]) => `<div class="bar"><span>${esc(k === "_" ? "Sin categoría" : catN(k))}</span><span class="tr"><i style="width:${Math.max(2, (v / mx) * 100)}%"></i></span><span>${fmt(v)}</span></div>`).join("")}</div>` : ""}
+
+      <h2 class="h2">Movimientos de inversión</h2>
+      ${lista.length ? Object.entries(months).map(([k, ms]) => `<div class="day"><div class="dayh"><span>${esc(mesNombre(k))}</span></div><div class="movs">${ms.map(movRow).join("")}</div></div>`).join("")
+        : `<div class="emptyc"><img src="img/mochito-lie.png" alt=""><span>Todavía no hay aportes ni compras de inversión.</span></div>`}
+      <div class="toolsrow"><button class="ghost" data-icsv>Descargar inversión (CSV)</button></div>`;
+  }
+  function csvInversion() {
+    const rows = (S.inv || []).filter((m) => m.estado === "activo").slice().sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
+    const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = [["Fecha", "Tipo", "Detalle", "Categoría", "Monto", "Cuenta", "Socio", "Cargó"].map(q).join(";")].concat(rows.map((m) =>
+      [m.fecha, TIPOS[m.tipo].l, m.detalle, CONCAT.includes(m.tipo) ? catN(m.categoria_id) : "", String(m.monto).replace(".", ","), m.cuenta_id ? cuentaN(m.cuenta_id) : "", m.socio_id ? socioN(m.socio_id) : "", m.registro].map(q).join(";")));
+    const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `setto-inversion-${hoy()}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
   /* ---------- hoja (bottom sheet) ---------- */
   function openSheet(html, onMount) {
-    const sh = $("#sheet"); sh.innerHTML = `<div class="grab"></div>${html}`; sh.hidden = false; $("#sheetBg").hidden = false;
+    const sh = $("#sheet"); sh.onclick = sh.oninput = sh.onsubmit = sh.onchange = sh.onpointerdown = null; // que no queden manejadores de la hoja anterior
+    sh.innerHTML = `<div class="grab"></div>${html}`; sh.hidden = false; $("#sheetBg").hidden = false;
     document.body.style.overflow = "hidden"; if (onMount) onMount(sh);
   }
   function closeSheet() { $("#sheet").hidden = true; $("#sheetBg").hidden = true; $("#sheet").innerHTML = ""; document.body.style.overflow = ""; }
   const needMe = () => { if (!S.me) { whoSheet(); toast("Primero elegí quién sos"); return false; } return true; };
+  /* Costos de producción (js/caja-costos.js): pestaña aparte, se entra desde Inicio */
+  const costos = window.CajaCostos ? window.CajaCostos({ sb, $, esc, fail, toast, openSheet, closeSheet, needMe, me: () => S.me, view: () => S.view }) : null;
+  /* Dashboard (js/caja-dash.js): ventas, costo de lo vendido, ganancia por día y turno, márgenes y subas de insumos */
+  const dash = window.CajaDash && window.CostosCalc ? window.CajaDash({ sb, $, esc, fail, toast, needMe, me: () => S.me, view: () => S.view,
+    setDot: (k) => { const el = $('[data-dot="dash"]'); if (el) { el.textContent = k ? "!" : ""; el.hidden = !k; el.title = k ? `${k} suba(s) de insumos para revisar` : ""; } },
+    refrescar: () => { if (S.view === "inicio") render(); } }) : null;
 
   function whoSheet(first) {
     openSheet(`<div class="sh"><h3>¿Quién está usando la caja?</h3>${first ? "" : '<button class="x" data-close aria-label="Cerrar">×</button>'}</div>
@@ -416,7 +507,7 @@
   function movForm(pre = {}, editId = null, onSaved = null) {
     if (!needMe()) return;
     const D = Object.assign({ tipo: "entrada", monto: "", detalle: "", cuenta_id: S.cuentas[0] && S.cuentas[0].id, cuenta_destino_id: null, socio_id: null, categoria_id: null, fecha: hoy(), pagador: "caja" }, pre);
-    if (D.tipo === "gasto" && D.socio_id && !D.cuenta_id) D.pagador = D.socio_id;
+    if (DEPAGO.includes(D.tipo) && D.socio_id && !D.cuenta_id) D.pagador = D.socio_id;
     if (D.tipo === "transferencia" && !D.cuenta_destino_id) D.cuenta_destino_id = (S.cuentas.find((c) => c.id !== D.cuenta_id) || {}).id;
     /* productos vendidos: el monto y el detalle se completan solos mientras no los toquen a mano */
     D.items = (pre.items || []).map((l) => Object.assign({}, l, l.mochis ? { mochis: l.mochis.slice() } : {}));
@@ -462,25 +553,26 @@
       }
     };
     const draw = (sh) => {
-      const t = D.tipo, otros = ["aporte", "devolucion", "retiro", "transferencia"];
+      const t = D.tipo, otros = ["inversion", "aporte", "devolucion", "retiro", "transferencia"];
       const cats = S.cats.filter((c) => c.tipo === t);
       const cChips = (k, sel, list) => `<div class="chips">${list.map(([v, l]) => `<button type="button" class="chip" data-set="${k}" data-v="${esc(v)}" aria-pressed="${sel === v}">${esc(l)}</button>`).join("")}</div>`;
       const ctas = S.cuentas.filter((c) => c.activa).map((c) => [c.id, c.nombre]);
       const socs = S.socios.filter((s) => s.activo).map((s) => [s.id, s.nombre]);
       let campos = "";
       if (t === "entrada") campos = `<div class="fl"><span>¿A dónde entró?</span>${cChips("cuenta_id", D.cuenta_id, ctas)}</div>`;
-      if (t === "gasto") campos = `<div class="fl"><span>¿Quién pagó?</span>${cChips("pagador", D.pagador === "caja" ? "caja:" + D.cuenta_id : D.pagador, ctas.map(([v, l]) => ["caja:" + v, "Caja · " + l]).concat(socs.map(([v, l]) => [v, l + " (de su bolsillo)"])))}</div>`;
+      if (DEPAGO.includes(t)) campos = `<div class="fl"><span>¿Quién pagó?</span>${cChips("pagador", D.pagador === "caja" ? "caja:" + D.cuenta_id : D.pagador, ctas.map(([v, l]) => ["caja:" + v, "Caja · " + l]).concat(socs.map(([v, l]) => [v, l + " (de su bolsillo)"])))}</div>`;
       if (["aporte", "devolucion", "retiro"].includes(t)) campos = `<div class="fl"><span>Socio</span>${cChips("socio_id", D.socio_id, socs)}</div>
         <div class="fl"><span>${t === "aporte" ? "¿A qué cuenta entra?" : "¿De qué cuenta sale?"}</span>${cChips("cuenta_id", D.cuenta_id, ctas)}</div>`;
       if (t === "transferencia") campos = `<div class="fl"><span>Sale de</span>${cChips("cuenta_id", D.cuenta_id, ctas)}</div><div class="fl"><span>Entra a</span>${cChips("cuenta_destino_id", D.cuenta_destino_id, ctas)}</div>`;
-      const ayuda = { aporte: "Un socio pone plata en la caja. Setto le queda debiendo ese monto.", devolucion: "Setto le devuelve a un socio lo que puso o pagó de su bolsillo.", retiro: "Un socio se lleva ganancias. No es deuda: es reparto.", transferencia: "Mover plata entre cuentas, por ejemplo depositar efectivo en Mercado Pago. No cambia el total." }[t];
+      const ayuda = { inversion: "Compras para armar el local: heladeras, máquinas, obra, muebles. No cuenta como gasto del mes. Si la paga un socio de su bolsillo, Setto le queda debiendo.", aporte: "Un socio pone plata en la caja para invertir. Setto le queda debiendo ese monto y la deuda se reparte entre los socios.", devolucion: "Setto le devuelve a un socio lo que puso o pagó de su bolsillo.", retiro: "Un socio se lleva ganancias. No es deuda: es reparto.", transferencia: "Mover plata entre cuentas, por ejemplo depositar efectivo en Mercado Pago. No cambia el total." }[t];
       sh.innerHTML = `<div class="grab"></div><div class="sh"><h3>${editId ? "Editar movimiento" : "Cargar movimiento"}</h3><button class="x" data-close aria-label="Cerrar">×</button></div>
         <form class="form" id="mf" autocomplete="off">
           <div class="seg">${["entrada", "gasto"].map((k) => `<button type="button" data-set="tipo" data-v="${k}" aria-pressed="${t === k}">${k === "entrada" ? "Entrada" : "Gasto"}</button>`).join("")}
             <button type="button" data-set="tipo" data-v="${otros.includes(t) ? t : "transferencia"}" aria-pressed="${otros.includes(t)}">Más</button></div>
           ${otros.includes(t) ? `<div class="chips">${otros.map((k) => `<button type="button" class="chip" data-set="tipo" data-v="${k}" aria-pressed="${t === k}">${TIPOS[k].l}</button>`).join("")}</div><p class="hintp">${ayuda}</p>` : ""}
           <label class="fl monto"><input id="fMonto" inputmode="decimal" placeholder="0" value="${esc(D.monto)}" aria-label="Monto"></label>
-          <label class="fl"><span>Detalle</span><input id="fDet" value="${esc(D.detalle)}" placeholder="${t === "entrada" ? "Ej: 3 mochis + 1 Strawberry Matcha" : t === "gasto" ? "Ej: 2 cremas en Makro" : "Opcional"}" maxlength="140"></label>
+          <label class="fl"><span>Detalle</span><input id="fDet" value="${esc(D.detalle)}" placeholder="${t === "entrada" ? "Ej: 3 mochis + 1 Strawberry Matcha" : t === "gasto" ? "Ej: 2 cremas en Makro" : t === "inversion" ? "Ej: Seña heladera" : t === "aporte" ? "Ej: Plata de la venta del auto" : "Opcional"}" maxlength="140"></label>
+          ${t === "inversion" && !cats.length ? `<p class="err">Falta instalar la inversión en la base: corré la migración 069 en el SQL Editor.</p>` : ""}
           ${cats.length ? `<div class="fl"><span>Categoría</span>${cChips("categoria_id", D.categoria_id, cats.map((c) => [c.id, c.nombre]))}</div>` : ""}
           ${vendHtml()}
           ${campos}
@@ -499,7 +591,7 @@
       sh.querySelector('button[type="submit"]').disabled = !ok;
       if (!ok) { box.innerHTML = ""; return; }
       const m = Object.assign({}, D, { monto: v });
-      if (t === "gasto") { if (D.pagador === "caja") m.socio_id = null; else { m.cuenta_id = null; m.socio_id = D.pagador; } }
+      if (DEPAGO.includes(t)) { if (D.pagador === "caja") m.socio_id = null; else { m.cuenta_id = null; m.socio_id = D.pagador; } }
       if (t === "entrada" || t === "ajuste") m.socio_id = null;
       const e = efectos(m), lines = [];
       Object.entries(e.cuentas).forEach(([c, d]) => { const s = Number((S.saldos.find((x) => x.id === c) || {}).saldo || 0); lines.push(`${esc(cuentaN(c))}: <b>${money(s)}</b> → <b>${money(s + d)}</b>`); });
@@ -550,16 +642,16 @@
       e.preventDefault();
       const btn = sh.querySelector('button[type="submit"]'), er = sh.querySelector("#ferr");
       const v = parseMoney(D.monto);
-      const row = { fecha: D.fecha || hoy(), tipo: D.tipo, detalle: (D.detalle || "").trim(), monto: v, categoria_id: ["entrada", "gasto"].includes(D.tipo) ? D.categoria_id : null, cuenta_id: null, cuenta_destino_id: null, socio_id: null };
+      const row = { fecha: D.fecha || hoy(), tipo: D.tipo, detalle: (D.detalle || "").trim(), monto: v, categoria_id: CONCAT.includes(D.tipo) ? D.categoria_id : null, cuenta_id: null, cuenta_destino_id: null, socio_id: null };
       if (D.tipo === "entrada") row.cuenta_id = D.cuenta_id;
-      if (D.tipo === "gasto") { if (D.pagador === "caja") row.cuenta_id = D.cuenta_id; else row.socio_id = D.pagador; }
+      if (DEPAGO.includes(D.tipo)) { if (D.pagador === "caja") row.cuenta_id = D.cuenta_id; else row.socio_id = D.pagador; }
       if (["aporte", "devolucion", "retiro"].includes(D.tipo)) { row.cuenta_id = D.cuenta_id; row.socio_id = D.socio_id; }
       if (D.tipo === "transferencia") { row.cuenta_id = D.cuenta_id; row.cuenta_destino_id = D.cuenta_destino_id; }
       /* productos: solo se mandan si hay (o había), así las cargas de siempre no cambian */
       const its = D.tipo === "entrada" && D.items.length ? D.items.map((l) => Object.assign({ id: l.id, nombre: l.nombre, size: l.size || null, qty: l.qty, precio: Number(l.precio) || 0 }, l.mochis ? { mochis: l.mochis.slice() } : {})) : null;
       if (its || (pre.items && pre.items.length)) row.items = its;
       const box = (its || []).find((l) => l.mochis && l.mochis.length !== ((prodPor(l.id) || {}).promo_cant || 5));
-      const msg = !(v > 0) ? "Poné un monto" : ["aporte", "devolucion", "retiro"].includes(D.tipo) && !row.socio_id ? "Elegí el socio" : D.tipo === "transferencia" && row.cuenta_id === row.cuenta_destino_id ? "Elegí cuentas distintas" : ["entrada", "gasto"].includes(D.tipo) && !row.detalle ? "Escribí un detalle corto" : box ? `Elegí los ${(prodPor(box.id) || {}).promo_cant || 5} sabores de ${box.nombre}` : null;
+      const msg = !(v > 0) ? "Poné un monto" : ["aporte", "devolucion", "retiro"].includes(D.tipo) && !row.socio_id ? "Elegí el socio" : D.tipo === "transferencia" && row.cuenta_id === row.cuenta_destino_id ? "Elegí cuentas distintas" : CONCAT.includes(D.tipo) && !row.detalle ? "Escribí un detalle corto" : D.tipo === "inversion" && !row.categoria_id ? "Elegí en qué se invirtió" : box ? `Elegí los ${(prodPor(box.id) || {}).promo_cant || 5} sabores de ${box.nombre}` : null;
       if (msg) { er.textContent = msg; er.hidden = false; return; }
       btn.disabled = true;
       try {
@@ -573,7 +665,7 @@
         if (mesDe(row.fecha) !== S.mes && !editId) S.mes = mesDe(row.fecha);
         if (S.view === "retiros" && row.tipo === "retiro") S.r.ref = row.fecha;
         await loadAll(); render();
-      } catch (err) { er.textContent = /items/.test(err.message) ? "Falta instalar en la base la carga por productos (migración 048)." : err.message; er.hidden = false; btn.disabled = false; }
+      } catch (err) { er.textContent = /items/.test(err.message) ? "Falta instalar en la base la carga por productos (migración 048)." : /tipo_check|caja_mov_forma/.test(err.message) && D.tipo === "inversion" ? "Falta instalar la inversión en la base (migración 069)." : err.message; er.hidden = false; btn.disabled = false; }
     };
   }
 
@@ -582,7 +674,7 @@
     const m = movPorId(id); if (!m) return;
     const t = TIPOS[m.tipo], an = m.estado === "anulado", im = impacto(m);
     const rows = [["Tipo", t.l], ["Fecha", diaNombre(m.fecha) + (m.fecha !== hoy() ? "" : "")], m.cuenta_id ? ["Cuenta", cuentaN(m.cuenta_id) + (m.cuenta_destino_id ? " → " + cuentaN(m.cuenta_destino_id) : "")] : null,
-      m.socio_id ? [m.tipo === "gasto" ? "Pagó" : "Socio", socioN(m.socio_id)] : null, ["entrada", "gasto"].includes(m.tipo) ? ["Categoría", catN(m.categoria_id)] : null,
+      m.socio_id ? [DEPAGO.includes(m.tipo) ? "Pagó" : "Socio", socioN(m.socio_id)] : null, CONCAT.includes(m.tipo) ? ["Categoría", catN(m.categoria_id)] : null,
       ["Cargó", `${m.registro} · ${cuando(m.created_at)}`], an ? ["Anulado", `${m.anulado_por || ""}${m.anulado_at ? " · " + cuando(m.anulado_at) : ""}${m.anulado_motivo ? " · " + m.anulado_motivo : ""}`] : null].filter(Boolean);
     openSheet(`<div class="sh"><h3>${esc(m.detalle || t.l)}</h3><button class="x" data-close aria-label="Cerrar">×</button></div>
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px"><span class="bigamt num ${an ? "" : ""}" style="${an ? "text-decoration:line-through;color:var(--tachado)" : ""}">${im.txt}</span><span class="muted">${esc(im.sub)}</span></div>
@@ -949,16 +1041,17 @@
     const b = e.target.closest("button"); if (!b) return;
     const d = b.dataset;
     if (d.close !== undefined) { closeSheet(); return; }
-    if (d.go) return go(d.go);
+    if (d.go) { if (d.go === "costos" && d.ktab && costos) costos.tab(d.ktab); return go(d.go); }
     if (d.who !== undefined) return whoSheet();
     if (d.iam) { S.me = d.iam; localStorage.setItem("setto-caja-yo", S.me); closeSheet(); render(); toast(`Hola, ${S.me}`); return; }
-    if (d.new !== undefined) return movForm(S.view === "retiros" ? { tipo: "retiro", socio_id: S.r.socio === "todos" ? null : S.r.socio } : {});
+    if (d.new !== undefined) return movForm(S.view === "retiros" ? { tipo: "retiro", socio_id: S.r.socio === "todos" ? null : S.r.socio } : S.view === "inversion" ? { tipo: "inversion" } : {});
+    if (d.inew) return movForm({ tipo: d.inew });
     if (d.mes) { S.mes = mesMov(S.mes, +d.mes); return render(); }
     if (d.contar) return contarSheet(d.contar);
     if (d.devolver) { const dd = S.deudas.find((x) => x.id === d.devolver); return movForm({ tipo: "devolucion", socio_id: d.devolver, monto: String(Number(dd.le_debemos)).replace(".", ","), detalle: "Devolución a " + dd.nombre }); }
     if (d.mov) return movDetail(d.mov);
-    if (d.edit) { const m = movPorId(d.edit); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, fecha: m.fecha, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja", items: m.items, _touched: true }, m.id); }
-    if (d.dup) { const m = movPorId(d.dup); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, pagador: m.tipo === "gasto" && m.socio_id ? m.socio_id : "caja", items: m.items }); }
+    if (d.edit) { const m = movPorId(d.edit); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, fecha: m.fecha, pagador: DEPAGO.includes(m.tipo) && m.socio_id ? m.socio_id : "caja", items: m.items, _touched: true }, m.id); }
+    if (d.dup) { const m = movPorId(d.dup); closeSheet(); return movForm({ tipo: m.tipo, monto: String(Number(m.monto)).replace(".", ","), detalle: m.detalle, cuenta_id: m.cuenta_id || (S.cuentas[0] || {}).id, cuenta_destino_id: m.cuenta_destino_id, socio_id: m.socio_id, categoria_id: m.categoria_id, pagador: DEPAGO.includes(m.tipo) && m.socio_id ? m.socio_id : "caja", items: m.items }); }
     if (d.anular) { closeSheet(); return anularSheet(d.anular); }
     if (d.f) { S.f[d.f] = d.v; return render(); }
     if (d.rf) { S.r[d.rf] = d.v; return render(); }
@@ -967,6 +1060,7 @@
     if (d.rhoy !== undefined) { S.r.ref = hoy(); return render(); }
     if (d.rnew !== undefined) return movForm({ tipo: "retiro", socio_id: S.r.socio === "todos" ? null : S.r.socio });
     if (d.rcsv !== undefined) return csvRetiros();
+    if (d.icsv !== undefined) return csvInversion();
     if (d.anul !== undefined) { S.f.anul = !S.f.anul; return render(); }
     if (d.csv !== undefined) return csvMes();
     /* stock */

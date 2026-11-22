@@ -101,12 +101,12 @@ a.ptab{text-decoration:none}
 .pago-tag{font-size:.74rem;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--bg-2);color:var(--ink)}
 .pago-tag.si{background:var(--menta)}
 .pagobox{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1.5px dashed color-mix(in srgb,var(--turquesa) 45%,transparent);border-radius:12px;padding:10px 12px;font-size:.9rem}
-.pagobox span{display:grid;gap:2px}.pagobox small{font-size:.78rem;color:var(--ink-2)}
+.pagobox span{display:flex;gap:2px 8px;align-items:baseline;flex-wrap:wrap}.pagobox small{font-size:.78rem;color:var(--ink-2)}
+.pagobox.si{padding:6px 12px}.pagobox.si .linkbtn{padding:0;font-size:.8rem;flex:none}
 .pagobox.si{border-style:solid;background:color-mix(in srgb,var(--menta) 45%,transparent)}
 .falta-tag{font-size:.74rem;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--coral-2);color:var(--ink)}
 .estado{border:1.5px solid color-mix(in srgb,var(--turquesa) 35%,transparent);border-radius:16px;padding:12px;display:grid;gap:10px}
-.estado-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
-.estado-h b{font-size:.92rem}
+.estado-l{font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2)}
 .pasos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;position:relative}
 .paso{display:grid;justify-items:center;gap:4px;background:none;border:0;padding:4px 2px;cursor:pointer;color:var(--ink-2);font:inherit;font-size:.78rem;font-weight:600;line-height:1.15;text-align:center;position:relative}
 .paso i{font-style:normal;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:2px solid color-mix(in srgb,var(--turquesa) 35%,transparent);background:var(--card);color:var(--ink-2);font-weight:700;font-size:.85rem;position:relative;z-index:1}
@@ -123,7 +123,10 @@ a.ptab{text-decoration:none}
 .aviso-t b{font-size:.88rem}
 .aviso-t small{font-size:.78rem;color:var(--ink-2);overflow-wrap:anywhere}
 .aviso.pend{background:var(--coral-2);border-left:4px solid var(--coral)}
-.aviso.ok{background:var(--bg)}
+.aviso.ok{background:none;padding:2px 2px 0;border-top:1px dashed color-mix(in srgb,var(--turquesa) 30%,transparent);border-radius:0;padding-top:8px;flex-wrap:nowrap}
+.aviso.ok .aviso-t{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.aviso.ok .linkbtn{padding:0}
+.aviso.pend{padding:8px 10px}
 .aviso.ok b{color:var(--turquesa)}
 .aviso .btn.wa{padding:9px 16px;font-size:.88rem;white-space:nowrap}
 .justdel{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:#e6f0ef;border:1.5px solid #296A67;border-radius:18px;padding:14px 16px;margin:14px 0}.justdel>div{display:grid;flex:1 1 220px}.justdel span{font-size:.85rem;color:#4a4a4a}
@@ -134,6 +137,7 @@ a.ptab{text-decoration:none}
 .faltabox,.cambiobox{border-radius:12px;padding:10px 12px;font-size:.88rem;display:grid;gap:6px;margin-top:4px}
 .faltabox{border:1.5px dashed var(--turquesa,#296A67);background:color-mix(in srgb,var(--turquesa,#296A67) 6%,transparent)}
 .faltabox .frow{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.faltabox .frow label{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--ink)}.faltabox .frow label input{width:auto;margin:0;accent-color:var(--turquesa)}
 .faltabox label{display:flex;align-items:center;gap:8px;font-weight:600}
 .faltabox small{color:var(--ink-2);font-weight:500}
 .stepper.sm button{width:26px;height:26px}
@@ -469,3 +473,46 @@ div.citem.toprow:hover{border-color:color-mix(in srgb,var(--turquesa) 25%,transp
 .topoc{font-size:.7rem;font-weight:700;color:#9b2c2c;background:color-mix(in srgb,var(--coral) 30%,transparent);border-radius:999px;padding:2px 8px;white-space:nowrap}
 .pcard.topweb label.topshow{display:flex;align-items:center;gap:8px;font-size:.84rem}
 .pcard.topweb label.topshow input[type=checkbox]{width:auto}
+
+/* Pedidos en celu: tarjeta compacta (menos texto, mismo diseño) */
+.estado{gap:8px;padding:10px 12px}
+.paso span{white-space:nowrap}
+.cphone{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:.84rem;color:var(--ink-2)}
+.cphone b{color:var(--ink);font-weight:600}
+.cphone .linkbtn{padding:0;flex:none}
+.confirm .acts{column-gap:14px}
+@media (max-width:700px){
+  .pcard[data-oid]{gap:10px;padding:14px;grid-template-columns:minmax(0,1fr)}
+  .pcard[data-oid] .meta{display:flex;flex-wrap:wrap;gap:2px 14px}
+  .pcard[data-oid] .ohead .st.pendiente{display:none} /* ya estás en Pendientes */
+  .pasos{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .paso{grid-template-columns:auto minmax(0,auto);grid-auto-flow:column;justify-content:center;align-items:center;gap:4px;font-size:.74rem;min-width:0}
+  .paso span{overflow:hidden;text-overflow:ellipsis}
+  .paso i{display:none}
+  .paso.done span::before{content:"✓ ";color:var(--turquesa)}
+  .paso.now{color:var(--turquesa);font-weight:700}
+  .confirm .acts{align-items:center;column-gap:10px}
+  .confirm .acts .btn{white-space:nowrap;padding-inline:12px}
+  .confirm .acts .linkbtn{font-size:.8rem}
+  .confirm .acts .linkbtn,.aviso-t b{white-space:nowrap}
+  .pagobox.si span{flex-wrap:nowrap;white-space:nowrap;min-width:0;overflow:hidden}.pagobox.si small{overflow:hidden;text-overflow:ellipsis}
+  .aviso-t{flex:1 1 auto}
+  .pagobox.si{flex-wrap:nowrap}
+  .paso:not(:last-child)::after{display:none}
+  .pasos{gap:4px;background:var(--bg);border-radius:999px;padding:4px}
+  .paso{border-radius:999px;padding:4px 2px}
+  .paso.now{background:var(--card);box-shadow:0 1px 0 color-mix(in srgb,var(--turquesa) 25%,transparent)}
+  .confirm{padding:10px 12px;gap:8px}
+  .aviso .btn.wa{padding:7px 12px;font-size:.8rem}
+  .aviso.pend{background:none;border:0;padding:0}.aviso.pend .aviso-t{display:none}.aviso.pend .btn.wa{flex:1;text-align:center;justify-content:center;padding-block:10px;font-size:.88rem}
+}
+
+/* Piso de margen en descuentos y premios (costos de la Caja) */
+.pmargen{margin:0;font-size:.82rem;line-height:1.35}
+.pmargen span{display:block;border-radius:10px;padding:7px 10px}
+.pmargen .pm-ok{background:#e3f1df;color:#1d6b3a}
+.pmargen .pm-piso{background:#f6e2b8;color:#7a5414}
+.pmargen .pm-perdida{background:#f3c9c4;color:#7a2a22}
+/* Horarios: aviso de que el dashboard se mudó a la Caja */
+.dashmove{display:grid;gap:4px;text-decoration:none;color:var(--ink);margin-bottom:14px}
+.dashmove:hover{border-color:var(--turquesa)}
