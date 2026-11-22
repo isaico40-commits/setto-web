@@ -1029,6 +1029,25 @@
     $("#gchBuy").dataset.gcpick = ds[0];
     $("#gchCards").innerHTML = ds.slice(0, 3).map((k, i) => gcardHtml(k, 0, "button", `data-gcpick="${k}" style="--i:${i}" aria-label="Gift card ${esc(gnombre(k))}"`)).join("");
   }
+  /* Premios del podio (los mismos códigos que manda la automática "Premio del Top N del mes" el día 1; migración 068).
+     Si cambian los premios en Panel → Campañas, cambiarlos acá también. */
+  const PREMIO_TOP_MIN = 5500;
+  // foto: la del más vendido de la carta (pedidos entregados al 17/11: Caramel Vanilla Dirty y mochi de Oreo); si no está, el primero disponible
+  const PREMIOS_TOP = {
+    1: { txt: "Bebida de regalo", foto: () => fotoPremio(DIRTY, "dirty-caramel", "img/dirty-caramel.webp") },
+    2: { txt: "Mochi de regalo", foto: () => fotoPremio(MOCHIS, "mochi-oreo", "img/mochi-oreo.webp") },
+    3: { txt: "Descuento en tu pedido", pct: "10%" },
+  };
+  function fotoPremio(lista, id, porDefecto) {
+    const ok = (x) => x && x.img && !x.agotado;
+    const p = [lista.find((x) => x.id === id), ...lista].find(ok);
+    return IMG(p ? p.img : porDefecto, 160);
+  }
+  function premioTopHtml(pos) {
+    const p = PREMIOS_TOP[pos]; if (!p) return "";
+    const ic = p.foto ? `<img src="${esc(p.foto())}" alt="" loading="lazy" decoding="async">` : `<b>${p.pct}</b>`;
+    return `<span class="tpremio"><span class="tpic${p.foto ? "" : " pct"}">${ic}</span><span class="tptx"><small>Premio</small>${p.txt}</span></span>`;
+  }
   /* Top del mes del Club: la base solo devuelve nombre corto, compras y sellos (nunca plata ni celular) */
   async function renderTopClub() {
     const sec = $("#topclub"); if (!sec || !API.topClubPublico) return;
@@ -1040,7 +1059,9 @@
     $("#topList").innerHTML = l.map((x) => `<li class="topit${x.pos <= 3 ? " p" + x.pos : ""}">
       ${x.pos === 1 ? '<img class="tmochi" src="img/mochito-campeon.png" alt="" loading="lazy" decoding="async">' : ""}<span class="tpos" aria-label="Puesto ${x.pos}">${x.pos}</span>
       <span class="tname">${esc(x.nombre)}</span>${x.gastado_aprox ? `<span class="tgasto">$${Math.round(x.gastado_aprox / 1000).toLocaleString("es-AR")} mil</span>` : ""}
-      <span class="tmeta">${x.compras} ${x.compras === 1 ? "compra" : "compras"} · ${x.sellos}/${meta} sellos</span></li>`).join("");
+      <span class="tmeta">${x.compras} ${x.compras === 1 ? "compra" : "compras"} · ${x.sellos}/${meta} sellos</span>${premioTopHtml(x.pos)}</li>`).join("");
+    const prox = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString("es-AR", { month: "long" });
+    $("#topPremioNota").textContent = `El 1 de ${prox}, el podio recibe su premio por WhatsApp: un código personal para pedir en la web, válido 7 días. Para usar la bebida o el mochi de regalo, sumá ${money(PREMIO_TOP_MIN)} en otros productos.`;
     sec.hidden = false;
     $("#dTopTit").textContent = `Top de ${mes}`;
     const TOPN = 5; // en la tarjeta se ven los primeros 5; el resto, en "Ver ranking completo"
