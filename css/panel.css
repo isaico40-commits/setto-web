@@ -506,3 +506,13 @@ div.citem.toprow:hover{border-color:color-mix(in srgb,var(--turquesa) 25%,transp
   .aviso .btn.wa{padding:7px 12px;font-size:.8rem}
   .aviso.pend{background:none;border:0;padding:0}.aviso.pend .aviso-t{display:none}.aviso.pend .btn.wa{flex:1;text-align:center;justify-content:center;padding-block:10px;font-size:.88rem}
 }
+
+/* Piso de margen en descuentos y premios (costos de la Caja) */
+.pmargen{margin:0;font-size:.82rem;line-height:1.35}
+.pmargen span{display:block;border-radius:10px;padding:7px 10px}
+.pmargen .pm-ok{background:#e3f1df;color:#1d6b3a}
+.pmargen .pm-piso{background:#f6e2b8;color:#7a5414}
+.pmargen .pm-perdida{background:#f3c9c4;color:#7a2a22}
+/* Horarios: aviso de que el dashboard se mudó a la Caja */
+.dashmove{display:grid;gap:4px;text-decoration:none;color:var(--ink);margin-bottom:14px}
+.dashmove:hover{border-color:var(--turquesa)}
