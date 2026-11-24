@@ -1043,10 +1043,16 @@
     const p = [lista.find((x) => x.id === id), ...lista].find(ok);
     return IMG(p ? p.img : porDefecto, 160);
   }
+  // el texto del premio sale de Panel → Club → Top (settings.top_club.premios); si está vacío, el de PREMIOS_TOP
+  function premioTopTxt(pos) {
+    const t = String((((S.top_club || {}).premios) || [])[pos - 1] || "").trim();
+    return t || (PREMIOS_TOP[pos] || {}).txt || "";
+  }
   function premioTopHtml(pos) {
     const p = PREMIOS_TOP[pos]; if (!p) return "";
-    const ic = p.foto ? `<img src="${esc(p.foto())}" alt="" loading="lazy" decoding="async">` : `<b>${p.pct}</b>`;
-    return `<span class="tpremio"><span class="tpic${p.foto ? "" : " pct"}">${ic}</span><span class="tptx"><small>Premio</small>${p.txt}</span></span>`;
+    const txt = premioTopTxt(pos), pct = (txt.match(/\d+\s*%/) || [p.pct])[0];
+    const ic = p.foto ? `<img src="${esc(p.foto())}" alt="" loading="lazy" decoding="async">` : `<b>${esc(pct)}</b>`;
+    return `<span class="tpremio"><span class="tpic${p.foto ? "" : " pct"}">${ic}</span><span class="tptx"><small>Premio</small>${esc(txt.charAt(0).toUpperCase() + txt.slice(1))}</span></span>`;
   }
   /* Top del mes del Club: la base solo devuelve nombre corto, compras y sellos (nunca plata ni celular) */
   async function renderTopClub() {
@@ -1067,7 +1073,7 @@
     const TOPN = 5; // en la tarjeta se ven los primeros 5; el resto, en "Ver ranking completo"
     $("#dTopList").innerHTML = l.slice(0, TOPN).map((x) => `<li class="dt${x.pos <= 3 ? " d" + x.pos : ""}">
       <span class="dtpos" aria-label="Puesto ${x.pos}">${x.pos === 1 ? '<img src="img/mochito-campeon.png" alt="" loading="lazy" decoding="async">' : x.pos}</span>
-      <span class="dtn"><b>${esc(x.nombre)}</b><small>${x.compras} ${x.compras === 1 ? "compra" : "compras"} · ${x.sellos}/${meta} sellos</small></span>
+      <span class="dtn"><b>${esc(x.nombre)}</b>${x.pos <= 3 && premioTopTxt(x.pos) ? `<small class="dtpr">🎁 Gana ${esc(premioTopTxt(x.pos).charAt(0).toLowerCase() + premioTopTxt(x.pos).slice(1))}</small>` : ""}</span>
       ${x.gastado_aprox ? `<span class="dtg">$${Math.round(x.gastado_aprox / 1000).toLocaleString("es-AR")} mil</span>` : ""}</li>`).join("");
     $("#dTopMas").hidden = l.length <= TOPN;
     $("#dTop").hidden = false; renderDestacados();
@@ -1077,7 +1083,9 @@
     $("#club").hidden = c.activo === false;
     const spp = c.sellos_por_pedido ?? 1;
     $("#clubTit").textContent = `${spp === 1 ? "1 sello" : spp + " sellos"} por pedido`;
-    $("#clubPremio").textContent = `Con ${c.meta || 8} sellos, tu pedido viene con ${premioTxt()}.` + (c.minimo > 0 ? ` Suman los pedidos desde ${money(c.minimo)}.` : "");
+    // el premio en negrita: "un set de regalo" y el "% off"
+    const premio = esc(premioTxt()).replace("un set de regalo", "<b>un set de regalo</b>").replace(/(\d+% off)/, "<b>$1</b>");
+    $("#clubPremio").innerHTML = `Con ${c.meta || 8} sellos, tu pedido viene con ${premio}.` + (c.minimo > 0 ? ` Suman los pedidos desde ${esc(money(c.minimo))}.` : "");
     renderValor();
 
     renderBeneficios();
