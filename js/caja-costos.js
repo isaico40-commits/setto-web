@@ -123,6 +123,13 @@ window.CajaCostos = function (K) {
     return { cost: c.faltan.size && !c.total ? null : c.unit, faltan: c.faltan, sinReceta: [], receta: r, partes: c.partes, rinde: Number(r.rinde) * (1 - (Number(r.merma) || 0) / 100) };
   }
   const TF = () => (window.CostosCalc && C.fijos ? CostosCalc.tasaFijos(C.fijos, C.ventas, hoyISO()) : { total: 0, tasa: 0 });
+  // cuánto del costo es packaging (insumos de tipo packaging, contando preparaciones adentro)
+  function packDe(p, tam) {
+    if (esSet(p)) { const b = p.set_bebida && prodPor(p.set_bebida), m = p.set_mochi && prodPor(p.set_mochi); return (b ? packDe(b, tam) : 0) + (m ? packDe(m, null) : 0); }
+    const r = recDe(p.id, tam); if (!r) return 0;
+    const acc = {}; aporte(r.id, 1, acc);
+    return Object.keys(acc).reduce((a, k) => a + ((insPor(k) || {}).tipo === "packaging" ? acc[k] : 0), 0);
+  }
   function filasProductos(sinFijos) {
     const t0 = TF(), tf = !sinFijos && C.conF && t0.tasa > 0 ? t0.tasa : 0;
     return C.prods.filter((p) => p.activo && ["mochi", "dirty", "especial", "set"].includes(p.categoria)).map((p) => ({
@@ -130,7 +137,8 @@ window.CajaCostos = function (K) {
       sizes: tamanos(p).map((t) => { const c0 = costoProd(p, t), pr = precioDe(p, t), ok = !c0.sinReceta.length && !c0.faltan.size && c0.cost != null;
         // con "Sumar costos fijos": al costo de la receta se le suma el % de fijos sobre el precio
         const fijo = tf > 0 && pr > 0 ? pr * tf : 0, c = fijo && c0.cost != null ? Object.assign({}, c0, { cost: c0.cost + fijo, mp: c0.cost, fijo }) : c0;
-        return { t, c, pr, m: pr > 0 && c.cost != null ? (pr - c.cost) / pr : null, ok }; }),
+        const pk = c0.cost != null ? Math.min(packDe(p, t), c0.cost) : 0;
+        return { t, c, pr, m: pr > 0 && c.cost != null ? (pr - c.cost) / pr : null, ok, ins: c0.cost != null ? c0.cost - pk : null, pk, fijo }; }),
     }));
   }
 
@@ -170,6 +178,7 @@ window.CajaCostos = function (K) {
       ${TF().tasa > 0 ? `<div class="filters kfij"><button class="chip" data-kcf aria-pressed="${C.conF}">${C.conF ? "✓ " : ""}Sumar costos fijos (${pct(TF().tasa)} del precio)</button><button class="linkbtn" data-kt="fijos">Editar fijos ›</button></div>` : C.fijos ? `<p class="kpinote">¿Querés sumar alquiler, luz, gas y demás al costo de cada producto? <button class="linkbtn" data-kt="fijos">Cargá los costos fijos ›</button></p>` : ""}
       ${sinPrecio ? `<p class="note kfalta">Faltan precios: los costos de abajo están incompletos. <button class="linkbtn" data-kt="insumos">Cargar precios ›</button></p>` : ""}
       <div class="filters" style="margin-top:14px">${chip("todos", "Todos")}${chip("mochis", "Mochis")}${chip("bebidas", "Bebidas")}${chip("sets", "Sets")}</div>
+      <div class="kleg4"><span><i class="ci"></i>Insumos</span><span><i class="cp"></i>Packaging</span>${C.conF && TF().tasa > 0 ? `<span><i class="cf"></i>Fijos</span>` : ""}<span><i class="cq"></i>Te queda</span></div>
       <div class="kprods">${ver.map(cardProd).join("") || `<div class="emptyc"><span>No hay productos en la carta.</span></div>`}</div>
       <p class="kpinote kleyenda"><span class="kdot kd-ok"></span>65% o más <span class="kdot kd-mid"></span>50 a 65% <span class="kdot kd-low"></span>menos de 50%. Margen = (precio − costo) / precio. ${C.conF && TF().tasa > 0 ? `Costo = materia prima y packaging + ${pct(TF().tasa)} del precio en costos fijos (alquiler, servicios…).` : "Solo materia prima y packaging: no incluye mano de obra, alquiler ni comisiones."}</p>`;
   }
@@ -180,7 +189,18 @@ window.CajaCostos = function (K) {
       if (s.c.cost == null) return `<span class="kpill kt-na">${s.c.sinReceta.length ? "Sin receta" : "Sin precios"}</span>`;
       return `<span class="kpill kt-${s.ok ? tono(s.m) : "na"}">${s.ok ? pct(s.m) : "incompleto"}</span>`;
     };
-    const fila = (s) => `<span class="ksz">${s.t ? `<b>${esc(s.t)}</b>` : ""}<span class="kc"><small>Costo</small>${s.c.cost == null ? "—" : (s.ok ? "" : "~") + fmtC(s.c.cost)}${s.c.fijo ? `<em class="kfj">+${fmtC(s.c.fijo)} fijos</em>` : ""}</span><span class="kc"><small>Precio</small>${s.pr ? fmtC(s.pr) : "—"}</span>${pill(s)}</span>`;
+    // precio repartido en una barra: insumos · packaging · fijos · lo que queda
+    const fila = (s) => {
+      const base = `<span class="kszh">${s.t ? `<b>${esc(s.t)}</b>` : ""}<span class="kpr">${s.pr ? fmtC(s.pr) : "—"}</span>${pill(s)}</span>`;
+      if (s.c.cost == null || !(s.pr > 0)) return `<span class="ksz2">${base}</span>`;
+      const w = (v) => Math.max(0, Math.min(100, (v / s.pr) * 100)).toFixed(1) + "%", q = s.pr - s.c.cost;
+      const seg = (cls, v) => (v > 0 ? `<i class="${cls}" style="width:${w(v)}"></i>` : "");
+      const val = (cls, v, t) => (v > 0 ? `<span class="${cls}" title="${t}">${fmtC(v)}</span>` : "");
+      const queda = `<span class="kvals kq"><span class="${q < 0 ? "cn" : "cq"}" title="Te queda">${q < 0 ? "−" : ""}${fmtC(Math.abs(q))}</span></span>`;
+      return `<span class="ksz2">${base.replace(`<span class="kpill`, queda + `<span class="kpill`)}
+        <span class="kstk">${seg("ci", s.ins)}${seg("cp", s.pk)}${seg("cf", s.fijo)}${seg(q < 0 ? "cn" : "cq", Math.abs(q))}</span>
+        <span class="kvals">${val("ci", s.ins, "Insumos")}${val("cp", s.pk, "Packaging")}${val("cf", s.fijo, "Costos fijos")}</span></span>`;
+    };
     return `<button class="kprod" data-kp="${esc(p.id)}">
       ${p.img ? `<img class="kth" src="${esc(p.img)}" alt="" loading="lazy">` : `<span class="kth ph">${esc(p.nombre[0])}</span>`}
       <span class="kpb"><span class="kpn"><b>${esc(p.nombre)}</b><small>${{ mochis: p.categoria === "especial" ? "Especial" : "Mochi", bebidas: p.categoria === "especial" ? "Especial" : "Bebida", sets: "Set · bebida + mochi" }[f.g]}</small></span>
