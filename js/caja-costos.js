@@ -12,7 +12,7 @@ window.CajaCostos = function (K) {
   const UNL = { g: "Gramos (g)", ml: "Mililitros (ml / cc)", u: "Unidades" };
   const PARTES = ["Masa", "Relleno", "Bebida", "Foam", "Packaging", "Otros"];
   const VIEJO = 30; // días: un precio más viejo se muestra en gris
-  const C = { conF: true, fijos: [], ventas: [], an: { g: "todos", t: "12 oz", si: null, sf: 0.2 }, ok: false, loading: null, err: "", tab: "productos", filtro: "todos", qi: "", fi: "todos", ins: [], pre: {}, rec: [], lin: [], prods: [], lug: [] };
+  const C = { conF: false, fijos: [], ventas: [], an: { g: "todos", t: "12 oz", si: null, sf: 0.2 }, ok: false, loading: null, err: "", tab: "productos", filtro: "todos", qi: "", fi: "todos", ins: [], pre: {}, rec: [], lin: [], prods: [], lug: [] };
   {
     const t = (location.hash.split("/")[1] || "");
     if (["productos", "preps", "insumos", "graficos", "fijos"].includes(t)) C.tab = t;
@@ -123,6 +123,13 @@ window.CajaCostos = function (K) {
     return { cost: c.faltan.size && !c.total ? null : c.unit, faltan: c.faltan, sinReceta: [], receta: r, partes: c.partes, rinde: Number(r.rinde) * (1 - (Number(r.merma) || 0) / 100) };
   }
   const TF = () => (window.CostosCalc && C.fijos ? CostosCalc.tasaFijos(C.fijos, C.ventas, hoyISO()) : { total: 0, tasa: 0 });
+  // punto de equilibrio: cuánto hay que facturar para cubrir los fijos con el margen promedio de la carta
+  function EQ() {
+    const T = TF(), ok = filasProductos(true).flatMap((f) => f.sizes).filter((s) => s.ok && s.m != null && s.m > 0);
+    const mg = ok.length ? ok.reduce((a, s) => a + s.m, 0) / ok.length : null, pr = ok.length ? ok.reduce((a, s) => a + s.pr, 0) / ok.length : null;
+    const mes = T.total > 0 && mg ? T.total / mg : null;
+    return { T, mg, pr, mes, dia: mes ? mes / 30 : null, uDia: mes && pr ? Math.ceil(mes / 30 / pr) : null, ganMes: mes && T.mes ? T.mes * mg - T.total : null };
+  }
   // cuánto del costo es packaging (insumos de tipo packaging, contando preparaciones adentro)
   function packDe(p, tam) {
     if (esSet(p)) { const b = p.set_bebida && prodPor(p.set_bebida), m = p.set_mochi && prodPor(p.set_mochi); return (b ? packDe(b, tam) : 0) + (m ? packDe(m, null) : 0); }
@@ -175,12 +182,12 @@ window.CajaCostos = function (K) {
         <div class="kpi"><div class="k">Con receta</div><div class="v num">${conRec} de ${filas.length}</div></div>
         <button class="kpi ${sinPrecio ? "warn" : "res"}" data-kt="insumos"><div class="k">Sin precio</div><div class="v num">${sinPrecio ? sinPrecio + " insumo" + (sinPrecio > 1 ? "s" : "") : "Ninguno"}</div></button>
       </div>
-      ${TF().tasa > 0 ? `<div class="filters kfij"><button class="chip" data-kcf aria-pressed="${C.conF}">${C.conF ? "✓ " : ""}Sumar costos fijos (${pct(TF().tasa)} del precio)</button><button class="linkbtn" data-kt="fijos">Editar fijos ›</button></div>` : C.fijos ? `<p class="kpinote">¿Querés sumar alquiler, luz, gas y demás al costo de cada producto? <button class="linkbtn" data-kt="fijos">Cargá los costos fijos ›</button></p>` : ""}
+      ${(() => { const E = EQ(); return E.dia ? `<p class="kpinote keqn">Para cubrir ${fmtC(E.T.total)} de fijos por mes necesitás facturar <b>${fmtC(E.dia)} por día</b>. <button class="linkbtn" data-kt="fijos">Ver punto de equilibrio ›</button></p>` : C.fijos ? `<p class="kpinote">¿Cuánto tenés que vender para cubrir alquiler, luz y gas? <button class="linkbtn" data-kt="fijos">Cargá los costos fijos ›</button></p>` : ""; })()}
       ${sinPrecio ? `<p class="note kfalta">Faltan precios: los costos de abajo están incompletos. <button class="linkbtn" data-kt="insumos">Cargar precios ›</button></p>` : ""}
       <div class="filters" style="margin-top:14px">${chip("todos", "Todos")}${chip("mochis", "Mochis")}${chip("bebidas", "Bebidas")}${chip("sets", "Sets")}</div>
-      <div class="kleg4"><span><i class="ci"></i>Insumos</span><span><i class="cp"></i>Packaging</span>${C.conF && TF().tasa > 0 ? `<span><i class="cf"></i>Fijos</span>` : ""}<span><i class="cq"></i>Te queda</span></div>
+      <div class="kleg4"><span><i class="ci"></i>Insumos</span><span><i class="cp"></i>Packaging</span><span><i class="cq"></i>Te queda</span></div>
       <div class="kprods">${ver.map(cardProd).join("") || `<div class="emptyc"><span>No hay productos en la carta.</span></div>`}</div>
-      <p class="kpinote kleyenda"><span class="kdot kd-ok"></span>65% o más <span class="kdot kd-mid"></span>50 a 65% <span class="kdot kd-low"></span>menos de 50%. Margen = (precio − costo) / precio. ${C.conF && TF().tasa > 0 ? `Costo = materia prima y packaging + ${pct(TF().tasa)} del precio en costos fijos (alquiler, servicios…).` : "Solo materia prima y packaging: no incluye mano de obra, alquiler ni comisiones."}</p>`;
+      <p class="kpinote kleyenda"><span class="kdot kd-ok"></span>65% o más <span class="kdot kd-mid"></span>50 a 65% <span class="kdot kd-low"></span>menos de 50%. Margen = (precio − costo) / precio. Costo = materia prima y packaging. Alquiler y servicios no van por producto: se cubren con volumen (Fijos → punto de equilibrio).</p>`;
   }
   function cardProd(f) {
     const { p } = f;
@@ -199,7 +206,7 @@ window.CajaCostos = function (K) {
       const queda = `<span class="kvals kq"><span class="${q < 0 ? "cn" : "cq"}" title="Te queda">${q < 0 ? "−" : ""}${fmtC(Math.abs(q))}</span></span>`;
       return `<span class="ksz2">${base.replace(`<span class="kpill`, queda + `<span class="kpill`)}
         <span class="kstk">${seg("ci", s.ins)}${seg("cp", s.pk)}${seg("cf", s.fijo)}${seg(q < 0 ? "cn" : "cq", Math.abs(q))}</span>
-        <span class="kvals">${val("ci", s.ins, "Insumos")}${val("cp", s.pk, "Packaging")}${val("cf", s.fijo, "Costos fijos")}</span></span>`;
+        <span class="kvals">${val("ci", s.ins, "Insumos")}${val("cp", s.pk, "Packaging")}${val("cf", s.fijo, "Costos fijos")}<span class="ktot" title="Costo total">Costo <b>${fmtC(s.c.cost)}</b></span></span></span>`;
     };
     return `<button class="kprod" data-kp="${esc(p.id)}">
       ${p.img ? `<img class="kth" src="${esc(p.img)}" alt="" loading="lazy">` : `<span class="kth ph">${esc(p.nombre[0])}</span>`}
@@ -211,21 +218,28 @@ window.CajaCostos = function (K) {
   const SUG = ["Alquiler", "Luz", "Gas", "Agua", "Internet", "Sueldos", "Monotributo / impuestos", "Contador", "Seguro"];
   function vFijos() {
     if (!C.fijos) { $("#kbody").innerHTML = `<p class="note">Falta instalar los costos fijos en la base: corré supabase/migrations/072_costos_fijos.sql en el SQL Editor de Supabase.</p>`; return; }
-    const T = TF(), filas = filasProductos(true);
-    const ej = filas.flatMap((f) => f.sizes.filter((s) => s.ok && s.pr > 0 && (!s.t || s.t === "12 oz")).map((s) => ({ f, s }))).slice(0, 40)
-      .sort((a, b) => b.s.pr - a.s.pr).filter((x, i, a) => i === 0 || i === a.length - 1 || i === Math.floor(a.length / 2));
+    const E = EQ(), T = E.T;
     const fila = (x) => `<form class="kfrow" data-kfid="${esc(x.id)}">
         <input name="nombre" value="${esc(x.nombre)}" maxlength="60" aria-label="Nombre" required>
         <span class="kfm"><span>$</span><input name="monto" inputmode="decimal" value="${fmtIn(x.monto)}" aria-label="Por mes" required></span>
         <button type="button" class="kfdel" data-kfdel="${esc(x.id)}" aria-label="Borrar ${esc(x.nombre)}">×</button></form>`;
     const usados = new Set(C.fijos.map((x) => x.nombre.toLowerCase()));
     $("#kbody").innerHTML = `
-      <p class="kpinote">Cargá lo que te sale <b>por mes</b> en promedio: alquiler, luz, gas, internet, sueldos, impuestos… Se reparte entre las ventas como un % del precio: cada venta se lleva su parte.</p>
+      <p class="kpinote">Cargá lo que te sale <b>por mes</b> en promedio: alquiler, luz, gas, internet, sueldos, impuestos… Con eso y el margen de la carta se calcula cuánto tenés que vender para cubrirlos.</p>
       <div class="kpis kk">
         <div class="kpi"><div class="k">Fijos por mes</div><div class="v num">${fmtC(T.total)}</div><div class="dsub">${C.fijos.length} concepto${C.fijos.length === 1 ? "" : "s"} · ${fmtC(T.total / 30)} por día</div></div>
-        <div class="kpi"><div class="k">Facturás por mes</div><div class="v num">${T.mes ? fmtC(T.mes) : "—"}</div><div class="dsub">${T.mes ? `promedio de ${T.dias} día${T.dias > 1 ? "s" : ""}` : "sin ventas en la Caja"}</div></div>
-        <div class="kpi ${T.tasa > 0.3 ? "warn" : "res"}"><div class="k">De cada venta</div><div class="v num">${T.tasa != null && T.total ? pct(T.tasa) : "—"}</div><div class="dsub">${T.tasa > 0 ? `de cada $1.000 vendidos, ${fmtC(1000 * T.tasa)} van a fijos` : ""}</div></div>
+        <div class="kpi"><div class="k">Margen de la carta</div><div class="v num">${E.mg ? pct(E.mg) : "—"}</div><div class="dsub">${E.mg ? "promedio, sin fijos" : "faltan recetas o precios"}</div></div>
+        <div class="kpi res"><div class="k">Punto de equilibrio</div><div class="v num">${E.mes ? fmtC(E.mes) : "—"}</div><div class="dsub">${E.mes ? "por mes para no perder" : ""}</div></div>
       </div>
+      ${E.mes ? (() => { const pos = T.mes ? Math.min(100, (T.mes / Math.max(T.mes, E.mes * 1.25)) * 100) : 0, eqx = Math.min(100, (E.mes / Math.max(T.mes || 0, E.mes * 1.25)) * 100), dif = T.mes ? T.mes - E.mes : null;
+        return `<section class="kfbox keq">
+        <b>Para cubrir los fijos</b>
+        <div class="keqn3"><span><small>Por mes</small><b class="num">${fmtC(E.mes)}</b></span><span><small>Por día</small><b class="num">${fmtC(E.dia)}</b></span><span><small>Productos por día</small><b class="num">≈ ${E.uDia}</b></span></div>
+        ${T.mes ? `<div class="keqbar"><i class="${dif >= 0 ? "eok" : "elow"}" style="width:${pos.toFixed(1)}%"></i><em style="left:${eqx.toFixed(1)}%"></em></div>
+        <div class="keqlab"><span>Hoy facturás <b class="num">${fmtC(T.mes)}</b> por mes <small>(últimos ${T.dias} días)</small></span><span>equilibrio ${fmtC(E.mes)}</span></div>
+        <p class="keqres ${dif >= 0 ? "eok" : "elow"}">${dif >= 0 ? `Estás <b>${fmtC(dif)}</b> arriba del equilibrio: te quedan unos <b>${fmtC(E.ganMes)} por mes</b> después de recetas y fijos.` : `Te faltan <b>${fmtC(-dif)} por mes</b> (${fmtC(-dif / 30)} por día) para cubrir los fijos. Hoy perdés unos ${fmtC(-E.ganMes)} por mes.`}</p>` : `<p class="hintp">Cuando haya ventas cargadas en la Caja vas a ver cuánto te falta o cuánto estás arriba.</p>`}
+        <p class="hintp">Cuenta: fijos ÷ margen de la carta = ${fmtC(T.total)} ÷ ${pct(E.mg)}. Productos por día con precio promedio de ${fmtC(E.pr)}. Cada peso que vendés arriba del equilibrio te deja ${pct(E.mg)} de ganancia.</p>
+      </section>`; })() : ""}
       <section class="kfbox">
         <div class="kfhead"><span>Concepto</span><span>Por mes</span></div>
         ${C.fijos.map(fila).join("") || `<p class="hintp">Todavía no cargaste ninguno.</p>`}
@@ -236,12 +250,7 @@ window.CajaCostos = function (K) {
         <datalist id="kfsug">${SUG.filter((x) => !usados.has(x.toLowerCase())).map((x) => `<option value="${esc(x)}">`).join("")}</datalist>
         <p class="hintp">Los cambios se guardan solos al salir de cada casillero.</p>
       </section>
-      ${T.tasa > 0 && ej.length ? `<section class="kfbox"><b>Cómo queda en la carta</b>
-        ${ej.map(({ f, s }) => { const fj = s.pr * T.tasa, q = s.pr - s.c.cost - fj;
-          return `<div class="kfej"><span><b>${esc(f.p.nombre)}</b>${s.t ? ` <small>${esc(s.t)}</small>` : ""}</span>
-            <span class="num">${fmtC(s.pr)} − ${fmtC(s.c.cost)} materia prima − ${fmtC(fj)} fijos = <b class="${q < 0 ? "kneg" : ""}">${fmtC(q)}</b> <span class="kpill kt-${tono(q / s.pr)}">${pct(q / s.pr)}</span></span></div>`; }).join("")}
-        <p class="hintp">Con "Sumar costos fijos" prendido en Productos, todos los márgenes se calculan así. En el Dashboard aparece la Ganancia final.</p></section>` : ""}
-      ${T.tasa === null && T.total ? `<p class="note">No hay ventas cargadas en la Caja en los últimos 28 días: no se puede calcular el %.</p>` : ""}`;
+`;
   }
   async function guardarFijo(form) {
     if (!needMe()) return;
