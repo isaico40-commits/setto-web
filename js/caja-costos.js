@@ -199,7 +199,7 @@ window.CajaCostos = function (K) {
       const queda = `<span class="kvals kq"><span class="${q < 0 ? "cn" : "cq"}" title="Te queda">${q < 0 ? "−" : ""}${fmtC(Math.abs(q))}</span></span>`;
       return `<span class="ksz2">${base.replace(`<span class="kpill`, queda + `<span class="kpill`)}
         <span class="kstk">${seg("ci", s.ins)}${seg("cp", s.pk)}${seg("cf", s.fijo)}${seg(q < 0 ? "cn" : "cq", Math.abs(q))}</span>
-        <span class="kvals">${val("ci", s.ins, "Insumos")}${val("cp", s.pk, "Packaging")}${val("cf", s.fijo, "Costos fijos")}</span></span>`;
+        <span class="kvals">${val("ci", s.ins, "Insumos")}${val("cp", s.pk, "Packaging")}${val("cf", s.fijo, "Costos fijos")}<span class="ktot" title="Costo total">Costo <b>${fmtC(s.c.cost)}</b></span></span></span>`;
     };
     return `<button class="kprod" data-kp="${esc(p.id)}">
       ${p.img ? `<img class="kth" src="${esc(p.img)}" alt="" loading="lazy">` : `<span class="kth ph">${esc(p.nombre[0])}</span>`}

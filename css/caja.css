@@ -583,6 +583,7 @@ body.caja.consel{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 .kvals .ci::before{background:var(--turquesa)}.kvals .cp::before{background:#c9a46a}.kvals .cf::before{background:#e07a70}.kvals .cq::before{background:#9fd3b0}.kvals .cn::before{background:#9b2c2c}
 .kvals .cq{color:#1d6b3a;font-weight:700}.kvals .cn{color:#9b2c2c;font-weight:700}
 .kvals.kq{font-size:.86rem}
+.kvals .ktot{margin-left:auto;color:var(--ink-2);font-weight:600}.kvals .ktot::before{display:none}.kvals .ktot b{color:var(--ink);font-weight:800}
 .kleg4{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:.76rem;color:var(--ink-2);margin:12px 0 8px}
 .kleg4 span{display:inline-flex;align-items:center;gap:6px}
 .kleg4 i{width:12px;height:10px;border-radius:3px;display:inline-block}
