@@ -234,18 +234,19 @@ window.CajaDash = function (K) {
     const bar = (v, cls) => `<span class="dnb"><i class="${cls}" style="width:${v == null ? 0 : Math.max(v > 0 ? 2 : 0, (Math.abs(v) / max) * 100)}%"></i></span>`;
     const cifra = (lbl, v, c, cls, bc, sub, inv) => `<div class="dnc ${cls}"><span class="k">${lbl}</span><b class="num">${v == null ? "—" : money(v)}</b>${bar(v, bc)}<span class="dns">${sub}${c != null ? ` <small class="${!c ? "" : (c > 0) !== !!inv ? "dsub-up" : "dsub-down"}">${c > 0 ? "▲ +" : c < 0 ? "▼ " : "= "}${c}%</small>` : ""}</span></div>`;
     const cats = orden(A.gasCat), est = A.rc > 0 && A.rc < A.ent * 0.995;
-    // Ganancia final = ganancia neta − la parte de costos fijos que se lleva cada venta (alquiler, luz, gas…)
-    const tf = D.fijos && D.fijos.tasa > 0 ? D.fijos.tasa : 0, fA = A.ent * tf, gf = gn == null ? null : gn - fA, gfP = gnP == null || !Ap ? null : gnP - Ap.ent * tf;
+    // Ganancia final = ganancia neta − los costos fijos del período (lo del mes prorrateado por los días que van: alquiler, luz, gas…)
+    const fdia = D.fijos && D.fijos.total > 0 ? D.fijos.total / 30 : 0, tf = fdia > 0, nd = Object.keys(A.dias).length, fA = fdia * nd;
+    const gf = gn == null ? null : gn - fA, gfP = gnP == null || !Ap ? null : gnP - fdia * Object.keys(Ap.dias).length;
     return `<div class="dneto">
         <div class="dncs ${tf ? "d6" : ""}">
           ${cifra("Facturado (bruto)", A.ent, Ap ? cmp(A.ent, Ap.ent) : null, "f", "n0", "todo lo que entró")}
           ${cifra("Ganancia neta", gn, Ap ? cmp(gn, gnP) : null, gn != null && gn < 0 ? "q neg" : "q", gn != null && gn < 0 ? "n3" : "n2", cM == null ? "sin ventas con productos" : `− ${money(cM)} de mercadería${est ? "*" : ""}`)}
-          ${tf ? `${cifra("Costos fijos", fA, null, "fx", "n1", `${pct(tf)} de cada venta`)}
+          ${tf ? `${cifra("Costos fijos", fA, null, "fx", "n1", nd === 1 ? "lo de un día" : `${nd} días × ${money(fdia)}`)}
           ${cifra("Ganancia final", gf, Ap ? cmp(gf, gfP) : null, gf != null && gf < 0 ? "q neg" : "q", gf != null && gf < 0 ? "n3" : "n2", "neta − fijos")}` : ""}
           ${cifra("Gastado", A.gas, Ap ? cmp(A.gas, Ap.gas) : null, "g", "n1", "gastos de la Caja", true)}
           ${cifra("Te queda en caja", neto, Ap && netoP > 0 ? cmp(neto, netoP) : null, neto < 0 ? "c neg" : "c", neto < 0 ? "n3" : "n2", "facturado − gastado")}
         </div>
-        <p class="dncat">${cats.length ? `Gastado en: ${cats.map(([c, v]) => `${esc(c)} <b>${money(v)}</b>`).join(" · ")}` : "Sin gastos cargados."}${est ? `<br>* Mercadería = insumos y packaging de lo vendido, según las recetas. Estimada en parte: ${money(A.sinDet)} se cargó sin productos y se calcula con el mismo % de costo que el resto (${pct(A.cost / A.rc)}).` : ""}${tf ? `<br>Costos fijos: ${money(D.fijos.total)} por mes (Costos → Fijos), repartidos como ${pct(tf)} de lo que se factura. Son estimados: si alquiler o servicios también están cargados como gasto, Te queda en caja ya los descuenta.` : D.fijos ? `<br>¿Querés ver la ganancia final con alquiler, luz y gas? <button type="button" class="linkbtn" data-go="costos" data-ktab="fijos">Cargá los costos fijos ›</button>` : ""}${Ap ? `<br>Flechas: ${vs}.` : ""}</p>
+        <p class="dncat">${cats.length ? `Gastado en: ${cats.map(([c, v]) => `${esc(c)} <b>${money(v)}</b>`).join(" · ")}` : "Sin gastos cargados."}${est ? `<br>* Mercadería = insumos y packaging de lo vendido, según las recetas. Estimada en parte: ${money(A.sinDet)} se cargó sin productos y se calcula con el mismo % de costo que el resto (${pct(A.cost / A.rc)}).` : ""}${tf ? `<br>Costos fijos: ${money(D.fijos.total)} por mes (Costos → Fijos), ${money(fdia)} por cada día del período, vendas lo que vendas. Si alquiler o servicios también están cargados como gasto, Te queda en caja ya los descuenta.` : D.fijos ? `<br>¿Querés ver la ganancia final con alquiler, luz y gas? <button type="button" class="linkbtn" data-go="costos" data-ktab="fijos">Cargá los costos fijos ›</button>` : ""}${Ap ? `<br>Flechas: ${vs}.` : ""}</p>
       </div>`;
   }
   // dos barras por día (facturado y gastado) con lo que quedó arriba
