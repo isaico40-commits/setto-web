@@ -12,10 +12,10 @@ window.CajaCostos = function (K) {
   const UNL = { g: "Gramos (g)", ml: "Mililitros (ml / cc)", u: "Unidades" };
   const PARTES = ["Masa", "Relleno", "Bebida", "Foam", "Packaging", "Otros"];
   const VIEJO = 30; // días: un precio más viejo se muestra en gris
-  const C = { an: { g: "todos", t: "12 oz", si: null, sf: 0.2 }, ok: false, loading: null, err: "", tab: "productos", filtro: "todos", qi: "", fi: "todos", ins: [], pre: {}, rec: [], lin: [], prods: [], lug: [] };
+  const C = { conF: true, fijos: [], ventas: [], an: { g: "todos", t: "12 oz", si: null, sf: 0.2 }, ok: false, loading: null, err: "", tab: "productos", filtro: "todos", qi: "", fi: "todos", ins: [], pre: {}, rec: [], lin: [], prods: [], lug: [] };
   {
     const t = (location.hash.split("/")[1] || "");
-    if (["productos", "preps", "insumos", "graficos"].includes(t)) C.tab = t;
+    if (["productos", "preps", "insumos", "graficos", "fijos"].includes(t)) C.tab = t;
   }
 
   /* ---------- formatos ---------- */
@@ -57,6 +57,13 @@ window.CajaCostos = function (K) {
       sb.from("costo_lugares").select("nombre").eq("activo", true).order("nombre"),
     ]);
     const [ins, pre, rec, lin, prods, lug] = r.map(fail);
+    // costos fijos (migración 072) y lo facturado en los últimos 28 días para repartirlos entre las ventas
+    const d28 = new Date(hoyISO() + "T12:00:00"); d28.setDate(d28.getDate() - 29);
+    const [fj, vt] = await Promise.all([
+      sb.from("costo_fijos").select("*").eq("activo", true).order("orden").order("created_at"),
+      sb.from("caja_movimientos").select("fecha, monto").eq("tipo", "entrada").eq("estado", "activo").gte("fecha", d28.toISOString().slice(0, 10)).limit(5000),
+    ]);
+    C.fijos = fj.error ? null : fj.data || []; C.ventas = vt.error ? [] : vt.data || [];
     C.lug = lug.map((l) => l.nombre);
     C.ins = ins; C.pre = {}; pre.forEach((p) => (C.pre[p.insumo_id] = p));
     C.rec = rec; C.lin = lin; C.prods = prods; C.ok = true; C.err = "";
@@ -115,11 +122,23 @@ window.CajaCostos = function (K) {
     const c = recUnit(r.id, []);
     return { cost: c.faltan.size && !c.total ? null : c.unit, faltan: c.faltan, sinReceta: [], receta: r, partes: c.partes, rinde: Number(r.rinde) * (1 - (Number(r.merma) || 0) / 100) };
   }
-  function filasProductos() {
+  const TF = () => (window.CostosCalc && C.fijos ? CostosCalc.tasaFijos(C.fijos, C.ventas, hoyISO()) : { total: 0, tasa: 0 });
+  // cuánto del costo es packaging (insumos de tipo packaging, contando preparaciones adentro)
+  function packDe(p, tam) {
+    if (esSet(p)) { const b = p.set_bebida && prodPor(p.set_bebida), m = p.set_mochi && prodPor(p.set_mochi); return (b ? packDe(b, tam) : 0) + (m ? packDe(m, null) : 0); }
+    const r = recDe(p.id, tam); if (!r) return 0;
+    const acc = {}; aporte(r.id, 1, acc);
+    return Object.keys(acc).reduce((a, k) => a + ((insPor(k) || {}).tipo === "packaging" ? acc[k] : 0), 0);
+  }
+  function filasProductos(sinFijos) {
+    const t0 = TF(), tf = !sinFijos && C.conF && t0.tasa > 0 ? t0.tasa : 0;
     return C.prods.filter((p) => p.activo && ["mochi", "dirty", "especial", "set"].includes(p.categoria)).map((p) => ({
       p, g: grupo(p),
-      sizes: tamanos(p).map((t) => { const c = costoProd(p, t), pr = precioDe(p, t), ok = !c.sinReceta.length && !c.faltan.size && c.cost != null;
-        return { t, c, pr, m: pr > 0 && c.cost != null ? (pr - c.cost) / pr : null, ok }; }),
+      sizes: tamanos(p).map((t) => { const c0 = costoProd(p, t), pr = precioDe(p, t), ok = !c0.sinReceta.length && !c0.faltan.size && c0.cost != null;
+        // con "Sumar costos fijos": al costo de la receta se le suma el % de fijos sobre el precio
+        const fijo = tf > 0 && pr > 0 ? pr * tf : 0, c = fijo && c0.cost != null ? Object.assign({}, c0, { cost: c0.cost + fijo, mp: c0.cost, fijo }) : c0;
+        const pk = c0.cost != null ? Math.min(packDe(p, t), c0.cost) : 0;
+        return { t, c, pr, m: pr > 0 && c.cost != null ? (pr - c.cost) / pr : null, ok, ins: c0.cost != null ? c0.cost - pk : null, pk, fijo }; }),
     }));
   }
 
@@ -136,9 +155,9 @@ window.CajaCostos = function (K) {
     el.innerHTML = `<button class="back" data-go="inicio">‹ Inicio</button>
       <h1 class="h1">Costos</h1>
       <p class="muted kintro">Cuánto cuesta hacer cada producto en materia prima y packaging, y cuánto queda del precio de la carta.</p>
-      <div class="seg ktabs">${tab("productos", "Productos")}${tab("preps", "Preparaciones")}${tab("insumos", "Insumos")}${tab("graficos", "Gráficos")}</div>
+      <div class="seg ktabs">${tab("productos", "Productos")}${tab("preps", "Preparaciones")}${tab("insumos", "Insumos")}${tab("graficos", "Gráficos")}${tab("fijos", "Fijos")}</div>
       <div id="kbody"></div>`;
-    ({ productos: vProductos, preps: vPreps, insumos: vInsumos, graficos: vGraficos }[C.tab] || vProductos)();
+    ({ productos: vProductos, preps: vPreps, insumos: vInsumos, graficos: vGraficos, fijos: vFijos }[C.tab] || vProductos)();
   }
   function setTab(t) { C.tab = t; history.replaceState(null, "", "#costos" + (t === "productos" ? "" : "/" + t)); view(); window.scrollTo(0, 0); }
 
@@ -156,10 +175,12 @@ window.CajaCostos = function (K) {
         <div class="kpi"><div class="k">Con receta</div><div class="v num">${conRec} de ${filas.length}</div></div>
         <button class="kpi ${sinPrecio ? "warn" : "res"}" data-kt="insumos"><div class="k">Sin precio</div><div class="v num">${sinPrecio ? sinPrecio + " insumo" + (sinPrecio > 1 ? "s" : "") : "Ninguno"}</div></button>
       </div>
+      ${TF().tasa > 0 ? `<div class="filters kfij"><button class="chip" data-kcf aria-pressed="${C.conF}">${C.conF ? "✓ " : ""}Sumar costos fijos (${pct(TF().tasa)} del precio)</button><button class="linkbtn" data-kt="fijos">Editar fijos ›</button></div>` : C.fijos ? `<p class="kpinote">¿Querés sumar alquiler, luz, gas y demás al costo de cada producto? <button class="linkbtn" data-kt="fijos">Cargá los costos fijos ›</button></p>` : ""}
       ${sinPrecio ? `<p class="note kfalta">Faltan precios: los costos de abajo están incompletos. <button class="linkbtn" data-kt="insumos">Cargar precios ›</button></p>` : ""}
       <div class="filters" style="margin-top:14px">${chip("todos", "Todos")}${chip("mochis", "Mochis")}${chip("bebidas", "Bebidas")}${chip("sets", "Sets")}</div>
+      <div class="kleg4"><span><i class="ci"></i>Insumos</span><span><i class="cp"></i>Packaging</span>${C.conF && TF().tasa > 0 ? `<span><i class="cf"></i>Fijos</span>` : ""}<span><i class="cq"></i>Te queda</span></div>
       <div class="kprods">${ver.map(cardProd).join("") || `<div class="emptyc"><span>No hay productos en la carta.</span></div>`}</div>
-      <p class="kpinote kleyenda"><span class="kdot kd-ok"></span>65% o más <span class="kdot kd-mid"></span>50 a 65% <span class="kdot kd-low"></span>menos de 50%. Margen = (precio − costo) / precio. Solo materia prima y packaging: no incluye mano de obra, alquiler ni comisiones.</p>`;
+      <p class="kpinote kleyenda"><span class="kdot kd-ok"></span>65% o más <span class="kdot kd-mid"></span>50 a 65% <span class="kdot kd-low"></span>menos de 50%. Margen = (precio − costo) / precio. ${C.conF && TF().tasa > 0 ? `Costo = materia prima y packaging + ${pct(TF().tasa)} del precio en costos fijos (alquiler, servicios…).` : "Solo materia prima y packaging: no incluye mano de obra, alquiler ni comisiones."}</p>`;
   }
   function cardProd(f) {
     const { p } = f;
@@ -168,12 +189,90 @@ window.CajaCostos = function (K) {
       if (s.c.cost == null) return `<span class="kpill kt-na">${s.c.sinReceta.length ? "Sin receta" : "Sin precios"}</span>`;
       return `<span class="kpill kt-${s.ok ? tono(s.m) : "na"}">${s.ok ? pct(s.m) : "incompleto"}</span>`;
     };
-    const fila = (s) => `<span class="ksz">${s.t ? `<b>${esc(s.t)}</b>` : ""}<span class="kc"><small>Costo</small>${s.c.cost == null ? "—" : (s.ok ? "" : "~") + fmtC(s.c.cost)}</span><span class="kc"><small>Precio</small>${s.pr ? fmtC(s.pr) : "—"}</span>${pill(s)}</span>`;
+    // precio repartido en una barra: insumos · packaging · fijos · lo que queda
+    const fila = (s) => {
+      const base = `<span class="kszh">${s.t ? `<b>${esc(s.t)}</b>` : ""}<span class="kpr">${s.pr ? fmtC(s.pr) : "—"}</span>${pill(s)}</span>`;
+      if (s.c.cost == null || !(s.pr > 0)) return `<span class="ksz2">${base}</span>`;
+      const w = (v) => Math.max(0, Math.min(100, (v / s.pr) * 100)).toFixed(1) + "%", q = s.pr - s.c.cost;
+      const seg = (cls, v) => (v > 0 ? `<i class="${cls}" style="width:${w(v)}"></i>` : "");
+      const val = (cls, v, t) => (v > 0 ? `<span class="${cls}" title="${t}">${fmtC(v)}</span>` : "");
+      const queda = `<span class="kvals kq"><span class="${q < 0 ? "cn" : "cq"}" title="Te queda">${q < 0 ? "−" : ""}${fmtC(Math.abs(q))}</span></span>`;
+      return `<span class="ksz2">${base.replace(`<span class="kpill`, queda + `<span class="kpill`)}
+        <span class="kstk">${seg("ci", s.ins)}${seg("cp", s.pk)}${seg("cf", s.fijo)}${seg(q < 0 ? "cn" : "cq", Math.abs(q))}</span>
+        <span class="kvals">${val("ci", s.ins, "Insumos")}${val("cp", s.pk, "Packaging")}${val("cf", s.fijo, "Costos fijos")}</span></span>`;
+    };
     return `<button class="kprod" data-kp="${esc(p.id)}">
       ${p.img ? `<img class="kth" src="${esc(p.img)}" alt="" loading="lazy">` : `<span class="kth ph">${esc(p.nombre[0])}</span>`}
       <span class="kpb"><span class="kpn"><b>${esc(p.nombre)}</b><small>${{ mochis: p.categoria === "especial" ? "Especial" : "Mochi", bebidas: p.categoria === "especial" ? "Especial" : "Bebida", sets: "Set · bebida + mochi" }[f.g]}</small></span>
       ${f.sizes.map(fila).join("")}</span><span class="kgo">›</span></button>`;
   }
+
+  /* ---------- costos fijos ---------- */
+  const SUG = ["Alquiler", "Luz", "Gas", "Agua", "Internet", "Sueldos", "Monotributo / impuestos", "Contador", "Seguro"];
+  function vFijos() {
+    if (!C.fijos) { $("#kbody").innerHTML = `<p class="note">Falta instalar los costos fijos en la base: corré supabase/migrations/072_costos_fijos.sql en el SQL Editor de Supabase.</p>`; return; }
+    const T = TF(), filas = filasProductos(true);
+    const ej = filas.flatMap((f) => f.sizes.filter((s) => s.ok && s.pr > 0 && (!s.t || s.t === "12 oz")).map((s) => ({ f, s }))).slice(0, 40)
+      .sort((a, b) => b.s.pr - a.s.pr).filter((x, i, a) => i === 0 || i === a.length - 1 || i === Math.floor(a.length / 2));
+    const fila = (x) => `<form class="kfrow" data-kfid="${esc(x.id)}">
+        <input name="nombre" value="${esc(x.nombre)}" maxlength="60" aria-label="Nombre" required>
+        <span class="kfm"><span>$</span><input name="monto" inputmode="decimal" value="${fmtIn(x.monto)}" aria-label="Por mes" required></span>
+        <button type="button" class="kfdel" data-kfdel="${esc(x.id)}" aria-label="Borrar ${esc(x.nombre)}">×</button></form>`;
+    const usados = new Set(C.fijos.map((x) => x.nombre.toLowerCase()));
+    $("#kbody").innerHTML = `
+      <p class="kpinote">Cargá lo que te sale <b>por mes</b> en promedio: alquiler, luz, gas, internet, sueldos, impuestos… Se reparte entre las ventas como un % del precio: cada venta se lleva su parte.</p>
+      <div class="kpis kk">
+        <div class="kpi"><div class="k">Fijos por mes</div><div class="v num">${fmtC(T.total)}</div><div class="dsub">${C.fijos.length} concepto${C.fijos.length === 1 ? "" : "s"} · ${fmtC(T.total / 30)} por día</div></div>
+        <div class="kpi"><div class="k">Facturás por mes</div><div class="v num">${T.mes ? fmtC(T.mes) : "—"}</div><div class="dsub">${T.mes ? `promedio de ${T.dias} día${T.dias > 1 ? "s" : ""}` : "sin ventas en la Caja"}</div></div>
+        <div class="kpi ${T.tasa > 0.3 ? "warn" : "res"}"><div class="k">De cada venta</div><div class="v num">${T.tasa != null && T.total ? pct(T.tasa) : "—"}</div><div class="dsub">${T.tasa > 0 ? `de cada $1.000 vendidos, ${fmtC(1000 * T.tasa)} van a fijos` : ""}</div></div>
+      </div>
+      <section class="kfbox">
+        <div class="kfhead"><span>Concepto</span><span>Por mes</span></div>
+        ${C.fijos.map(fila).join("") || `<p class="hintp">Todavía no cargaste ninguno.</p>`}
+        <form class="kfrow kfnew" data-kfid="">
+          <input name="nombre" placeholder="Ej. Alquiler" maxlength="60" list="kfsug" aria-label="Nombre" required>
+          <span class="kfm"><span>$</span><input name="monto" inputmode="decimal" placeholder="0" aria-label="Por mes" required></span>
+          <button class="btn solid" type="submit">Agregar</button></form>
+        <datalist id="kfsug">${SUG.filter((x) => !usados.has(x.toLowerCase())).map((x) => `<option value="${esc(x)}">`).join("")}</datalist>
+        <p class="hintp">Los cambios se guardan solos al salir de cada casillero.</p>
+      </section>
+      ${T.tasa > 0 && ej.length ? `<section class="kfbox"><b>Cómo queda en la carta</b>
+        ${ej.map(({ f, s }) => { const fj = s.pr * T.tasa, q = s.pr - s.c.cost - fj;
+          return `<div class="kfej"><span><b>${esc(f.p.nombre)}</b>${s.t ? ` <small>${esc(s.t)}</small>` : ""}</span>
+            <span class="num">${fmtC(s.pr)} − ${fmtC(s.c.cost)} materia prima − ${fmtC(fj)} fijos = <b class="${q < 0 ? "kneg" : ""}">${fmtC(q)}</b> <span class="kpill kt-${tono(q / s.pr)}">${pct(q / s.pr)}</span></span></div>`; }).join("")}
+        <p class="hintp">Con "Sumar costos fijos" prendido en Productos, todos los márgenes se calculan así. En el Dashboard aparece la Ganancia final.</p></section>` : ""}
+      ${T.tasa === null && T.total ? `<p class="note">No hay ventas cargadas en la Caja en los últimos 28 días: no se puede calcular el %.</p>` : ""}`;
+  }
+  async function guardarFijo(form) {
+    if (!needMe()) return;
+    const id = form.dataset.kfid, nombre = form.nombre.value.trim(), monto = num(form.monto.value);
+    if (!nombre || !(monto >= 0)) return toast("Poné un nombre y un monto");
+    const fila = { nombre, monto, registro: K.me(), updated_at: new Date().toISOString() };
+    if (!id) fila.orden = C.fijos.length;
+    const q = id ? sb.from("costo_fijos").update(fila).eq("id", id) : sb.from("costo_fijos").insert(fila);
+    const { error } = await q;
+    if (error) return toast(error.message);
+    await reload(); if (K.view() === "costos") view();
+    toast(id ? "Guardado" : "Agregado");
+    if (!id) { const n = document.querySelector(".kfnew input[name=nombre]"); if (n) n.focus(); }
+  }
+  async function borrarFijo(id) {
+    if (!needMe()) return;
+    const x = C.fijos.find((f) => f.id === id); if (!x || !confirm(`¿Borrar "${x.nombre}"?`)) return;
+    const { error } = await sb.from("costo_fijos").delete().eq("id", id);
+    if (error) return toast(error.message);
+    await reload(); if (K.view() === "costos") view(); toast("Borrado");
+  }
+  document.addEventListener("submit", (e) => {
+    const f = e.target.closest && e.target.closest(".kfrow"); if (!f || K.view() !== "costos") return;
+    e.preventDefault(); guardarFijo(f);
+  });
+  document.addEventListener("change", (e) => {
+    const f = e.target.closest && e.target.closest(".kfrow"); if (!f || !f.dataset.kfid || K.view() !== "costos") return;
+    const x = C.fijos.find((y) => y.id === f.dataset.kfid); if (!x) return;
+    if (f.nombre.value.trim() === x.nombre && num(f.monto.value) === Number(x.monto)) return;
+    guardarFijo(f);
+  });
 
   /* ---------- gráficos ---------- */
   // cuánto pone cada insumo en 1 unidad de una receta (entra en las preparaciones)
@@ -673,6 +772,8 @@ window.CajaCostos = function (K) {
     if (enHoja && !d.kp) return; // dentro de una hoja lo maneja la hoja (salvo abrir un producto desde un set)
     if (d.kt) return setTab(d.kt);
     if (d.kf) { C.filtro = d.kf; return view(); }
+    if (d.kcf !== undefined) { C.conF = !C.conF; return view(); }
+    if (d.kfdel) return borrarFijo(d.kfdel);
     if (d.kfi) { C.fi = d.kfi; return view(); }
     if (d.kag) { C.an.g = d.kag; return view(); }
     if (d.kat) { C.an.t = d.kat; return view(); }
@@ -696,6 +797,6 @@ window.CajaCostos = function (K) {
     view,
     linkHTML: () => `<button class="kentry" data-go="costos"><span class="kei">${ICO.calc}</span><span class="ket"><b>Costos de producción</b><small>Cuánto cuesta hacer cada producto y cuánto te queda</small></span><span class="kgo">›</span></button>`,
     invalidar: () => { C.ok = false; },
-    tab: (t) => { if (["productos", "preps", "insumos", "graficos"].includes(t)) C.tab = t; },
+    tab: (t) => { if (["productos", "preps", "insumos", "graficos", "fijos"].includes(t)) C.tab = t; },
   };
 };

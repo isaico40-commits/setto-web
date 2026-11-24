@@ -542,3 +542,47 @@ body.caja.consel{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 .dcolch.dense.dpar .dpb i{width:45%;border-radius:2px 2px 0 0}
 .dcol.fut .dcl{opacity:.35}
 @media (max-width:699px){.dcolch.mdense .dcv{visibility:hidden;font-size:.5rem}}
+/* Dashboard: 6 cifras cuando hay costos fijos */
+@media (min-width:700px){.dncs.d6{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.dnc.fx b{color:#9b2c2c}
+/* Costos → Fijos */
+.kfij{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.kfj{display:block;font-style:normal;font-size:.64rem;font-weight:600;color:var(--ink-2);white-space:nowrap}
+.ktabs{overflow-x:auto;scrollbar-width:none}.ktabs::-webkit-scrollbar{display:none}
+@media (max-width:420px){.ktabs button{font-size:.76rem}}
+.kfbox{background:var(--card);border:1.5px solid color-mix(in srgb,var(--turquesa) 22%,transparent);border-radius:18px;padding:12px 14px;display:grid;gap:8px;margin-top:12px}
+.kfhead{display:grid;grid-template-columns:minmax(0,1fr) 128px 34px;gap:8px;font-size:.74rem;font-weight:600;color:var(--ink-2)}
+.kfhead span:last-child{grid-column:2}
+.kfrow{display:grid;grid-template-columns:minmax(0,1fr) 128px 34px;gap:8px;align-items:center}
+.kfrow.kfnew{grid-template-columns:minmax(0,1fr) 128px auto;border-top:1px dashed color-mix(in srgb,var(--turquesa) 30%,transparent);padding-top:10px;margin-top:2px}
+.kfrow input{font:inherit;font-size:.95rem;color:var(--ink);background:var(--bg);border:1.5px solid color-mix(in srgb,var(--turquesa) 30%,transparent);border-radius:12px;padding:9px 10px;width:100%;min-width:0}
+.kfrow input:focus{outline:none;border-color:var(--turquesa);background:var(--card)}
+.kfm{position:relative;display:block}
+.kfm>span{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--ink-2);font-size:.9rem}
+.kfm input{padding-left:22px;text-align:right;font-variant-numeric:tabular-nums}
+.kfdel{width:34px;height:34px;border-radius:50%;border:0;background:var(--bg-2);color:#9b2c2c;font-size:1.2rem;line-height:1}
+.kfrow .btn{margin:0;padding:9px 14px}
+.kfej{display:grid;gap:2px;font-size:.84rem;padding:6px 0;border-top:1px solid color-mix(in srgb,var(--turquesa) 12%,transparent)}
+.kfej:first-of-type{border-top:0}
+.kfej .num{color:var(--ink-2);font-size:.8rem}.kfej .num b{color:var(--ink)}.kfej .kneg{color:#9b2c2c}
+@media (max-width:420px){.kfrow,.kfhead{grid-template-columns:minmax(0,1fr) 108px 34px}.kfrow.kfnew{grid-template-columns:minmax(0,1fr) 108px}.kfrow.kfnew .btn{grid-column:1/-1}}
+/* Costos → Productos: precio repartido (insumos · packaging · fijos · te queda) */
+.ksz2{display:grid;gap:5px;padding:6px 0;border-top:1px solid color-mix(in srgb,var(--turquesa) 10%,transparent)}
+.kpn+.ksz2{border-top:0;padding-top:2px}
+.kszh{display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums}
+.kszh>b{font-size:.74rem;font-weight:700;color:var(--ink-2);min-width:36px}
+.kszh .kpr{font-weight:700;font-size:.95rem;margin-right:auto}
+.kszh .kpill{padding:2px 9px;font-size:.78rem}
+.kstk{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--bg-2)}
+.kstk i{display:block;height:100%}
+.kstk i+i{box-shadow:inset 1.5px 0 0 var(--card)}
+.ci{background:var(--turquesa)}.cp{background:#c9a46a}.cf{background:#e07a70}.cq{background:#9fd3b0}.cn{background:repeating-linear-gradient(45deg,#9b2c2c 0 3px,#e8b4ae 3px 6px)}
+.kvals{display:flex;gap:4px 12px;flex-wrap:wrap;font-size:.76rem;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink)}
+.kvals span{display:inline-flex;align-items:center;gap:5px;background:none}
+.kvals span::before{content:"";width:8px;height:8px;border-radius:2px;flex:none}
+.kvals .ci::before{background:var(--turquesa)}.kvals .cp::before{background:#c9a46a}.kvals .cf::before{background:#e07a70}.kvals .cq::before{background:#9fd3b0}.kvals .cn::before{background:#9b2c2c}
+.kvals .cq{color:#1d6b3a;font-weight:700}.kvals .cn{color:#9b2c2c;font-weight:700}
+.kvals.kq{font-size:.86rem}
+.kleg4{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:.76rem;color:var(--ink-2);margin:12px 0 8px}
+.kleg4 span{display:inline-flex;align-items:center;gap:6px}
+.kleg4 i{width:12px;height:10px;border-radius:3px;display:inline-block}

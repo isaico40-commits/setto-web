@@ -125,5 +125,21 @@
   // precio que recupera un margen: costo / (1 − m), redondeado para arriba a $100
   const precioPara = (costo, m) => Math.ceil(costo / (1 - m) / 100) * 100;
 
-  window.CostosCalc = { crear, margen, precioPara, esSet, esBebida, tamanos, precioDe, enCarta, NO_PROD };
+  // Costos fijos (alquiler, luz, gas…): cuánto % de cada venta se los lleva.
+  //   fijos: [{monto, activo}] por mes · ventas: [{fecha 'AAAA-MM-DD', monto}] entradas de la Caja · hoy: 'AAAA-MM-DD'
+  //   Facturación del mes = promedio por día de los últimos 28 días (sin contar hoy, y desde el primer día con ventas) × 30.
+  function tasaFijos(fijos, ventas, hoy) {
+    const total = (fijos || []).filter((f) => f.activo !== false).reduce((a, f) => a + (Number(f.monto) || 0), 0);
+    const d = new Date(hoy + "T12:00:00"); d.setDate(d.getDate() - 28);
+    const desde = d.toISOString().slice(0, 10);
+    const vs = (ventas || []).filter((v) => v.fecha >= desde && v.fecha < hoy);
+    if (!total) return { total: 0, mes: null, tasa: 0, dias: 0 };
+    if (!vs.length) return { total, mes: null, tasa: null, dias: 0 };
+    const ini = vs.reduce((a, v) => (v.fecha < a ? v.fecha : a), hoy);
+    const dias = Math.max(1, Math.round((new Date(hoy + "T12:00:00") - new Date(ini + "T12:00:00")) / 864e5));
+    const mes = (vs.reduce((a, v) => a + (Number(v.monto) || 0), 0) / dias) * 30;
+    return { total, mes, tasa: mes > 0 ? total / mes : null, dias };
+  }
+
+  window.CostosCalc = { crear, margen, precioPara, esSet, esBebida, tamanos, precioDe, enCarta, NO_PROD, tasaFijos };
 })();
