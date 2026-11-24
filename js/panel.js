@@ -109,7 +109,7 @@
         <input class="inp" data-fnota placeholder="Nota para el cliente (opcional)" maxlength="140" value="${esc(F.nota || "")}">
         <div class="acts"><button class="btn solid" data-fsend ${Object.keys(F.sel).length ? "" : "disabled"}>Pedir cambio al cliente</button><button class="linkbtn" data-fx>Cancelar</button></div></div>`;
     }
-    if (!c) return o.status === "pendiente" ? `<button class="linkbtn" data-falta>¿Falta algo? Pedile un cambio al cliente</button>` : "";
+    if (!c) return ""; // el "¿Falta algo?" vive en la fila de acciones de abajo (Entregado · ¿Falta algo? · Cancelar)
     if (c.estado === "esperando") return `<div class="cambiobox wait"><b>⏳ Esperando que el cliente elija</b><span>Falta: ${esc(faltanTxt(c))}${c.nota ? ` · “${esc(c.nota)}”` : ""}</span>
         ${(o.avisos || {}).cambio && (o.avisos || {}).cambio === c.at ? `<span>✓ Le avisamos por WhatsApp</span>` : ""}
         <div class="acts"><a class="btn ${(o.avisos || {}).cambio === c.at ? "" : "solid"}" target="_blank" rel="noopener" href="https://wa.me/${esc(o.wa_phone || o.phone)}?text=${encodeURIComponent(cambioTxt(o))}">${(o.avisos || {}).cambio === c.at ? "Reenviar" : "Mandar el aviso por WhatsApp"}</a><button class="linkbtn" data-fquitar>Quitar aviso (lo arreglamos por chat)</button></div></div>`;
@@ -137,6 +137,7 @@
   const avisosLocal = () => { try { return JSON.parse(localStorage.getItem(AVK) || "{}"); } catch (_) { return {}; } };
   const avisadoEn = (o, e) => (o.avisos || {})[e] || avisosLocal()[o.id + ":" + e] || null;
   const faltaAvisar = (o) => o.status === "pendiente" && !avisadoEn(o, o.etapa || "recibido");
+  const etapaCorta = (o, e) => (e === "listo" ? (o.modo === "envio" ? "En camino" : "Listo") : e === "preparando" ? "Preparando" : "Recibido"); // para el stepper
   const etapaNom = (o, e) => (e === "listo" ? (o.modo === "envio" ? "En camino" : "Listo para retirar") : e === "preparando" ? "En preparación" : "Recibido");
   // pagado: lo marca el equipo a mano cuando llega la transferencia. Solo en pendientes por transferencia:
   // el efectivo se cobra al retirar y lo entregado ya está en la Caja. El cliente no lo ve.
@@ -154,17 +155,17 @@
   function pagoBox(o) {
     if (!conPago(o)) return "";
     return o.pagado_at
-      ? `<div class="pagobox si"><span><b>✓ Pagado</b><small>${esc(o.pago || "")}${o.pago ? " · " : ""}marcado ${ago(o.pagado_at)}</small></span><button class="linkbtn" data-pagado="0">Desmarcar</button></div>`
+      ? `<div class="pagobox si"><span><b>✓ Pagado</b><small>${ago(o.pagado_at)}</small></span><button class="linkbtn" data-pagado="0">Desmarcar</button></div>`
       : `<div class="pagobox"><span><b>Sin pagar</b><small>${esc(o.pago || "Forma de pago a confirmar")}</small></span><button class="btn solid" data-pagado="1">Marcar pagado</button></div>`;
   }
   function estadoBox(o) {
     const et = o.etapa || "recibido", orden = ["recibido", "preparando", "listo"], idx = orden.indexOf(et), av = avisadoEn(o, et);
     const wa = `https://wa.me/${esc(o.wa_phone || o.phone)}?text=${encodeURIComponent(avisoTxt(o))}`;
     return `<div class="estado">
-      <div class="estado-h"><b>Estado que ve el cliente</b><span class="hintp">Se actualiza solo en su celular y le llega por WhatsApp</span></div>
-      <div class="pasos">${orden.map((k, i) => `<button class="paso ${i < idx ? "done" : i === idx ? "now" : ""}" data-etapa="${k}" aria-pressed="${i === idx}"><i>${i < idx ? "✓" : i + 1}</i><span>${etapaNom(o, k)}</span></button>`).join("")}</div>
-      ${av ? `<div class="aviso ok"><span class="aviso-t"><b>✓ Ya le avisamos por WhatsApp</b><small>“${esc(etapaNom(o, et))}” · ${ago(av)}</small></span><a class="linkbtn" target="_blank" rel="noopener" data-aviso="${et}" href="${wa}">Reenviar</a></div>`
-        : `<div class="aviso pend"><span class="aviso-t"><b>💬 Falta avisarle: “${esc(etapaNom(o, et))}”</b><small>Sale solo si te escribió en las últimas 24 h. Si no, mandalo vos.</small></span><a class="btn solid wa" target="_blank" rel="noopener" data-aviso="${et}" href="${wa}">Enviar WhatsApp</a></div>`}
+      <b class="estado-l" title="Se actualiza solo en su celular y le llega por WhatsApp">Estado que ve el cliente</b>
+      <div class="pasos">${orden.map((k, i) => `<button class="paso ${i < idx ? "done" : i === idx ? "now" : ""}" data-etapa="${k}" aria-pressed="${i === idx}" aria-label="${etapaNom(o, k)}"><i>${i < idx ? "✓" : i + 1}</i><span>${etapaCorta(o, k)}</span></button>`).join("")}</div>
+      ${av ? `<div class="aviso ok"><span class="aviso-t"><b>✓ Avisado</b><small>${ago(av)}</small></span><a class="linkbtn" target="_blank" rel="noopener" data-aviso="${et}" href="${wa}">Reenviar</a></div>`
+        : `<div class="aviso pend" title="Sale solo si te escribió en las últimas 24 h. Si no, mandalo vos."><span class="aviso-t"><b>💬 Falta avisarle</b></span><a class="btn solid wa" target="_blank" rel="noopener" data-aviso="${et}" href="${wa}">💬 Avisarle por WhatsApp</a></div>`}
     </div>`;
   }
 
@@ -451,9 +452,9 @@
         ${cambioBox(o)}
         ${o.status === "pendiente" ? estadoBox(o) : ""}
         ${o.status === "pendiente" ? `<div class="confirm">
-            <label>Número del chat de WhatsApp<input class="inp" data-cphone value="${esc(c.phone)}" inputmode="tel"></label>
-            ${c.n ? "" : `<span class="hintp">${club.activo === false ? "El Club está apagado: no suma sello." : "No llega al mínimo del Club: no suma sello."}</span>`}
-            <div class="acts"><button class="btn solid" data-deliver>Entregado ✓</button><button class="linkbtn warn" data-cancel>${P.cancelArm === o.id ? "¿Seguro? Tocá de nuevo para cancelar" : "Cancelar pedido"}</button></div>
+            ${P.cphEdit === o.id ? `<label>Número del chat de WhatsApp<input class="inp" data-cphone value="${esc(c.phone)}" inputmode="tel"></label>`
+              : `<div class="cphone"><span>${c.n ? "Sello para" : club.activo === false ? "Club apagado, no suma sello ·" : "No llega al mínimo, no suma sello ·"} <b class="num">${esc(c.phone)}</b></span><button class="linkbtn" data-cphedit>Cambiar</button></div>`}
+            <div class="acts"><button class="btn solid" data-deliver>Entregado ✓</button>${o.cambio || P.falta[o.id] ? "" : `<button class="linkbtn" data-falta>¿Falta algo?</button>`}<button class="linkbtn warn" data-cancel>${P.cancelArm === o.id ? "¿Seguro? Tocá de nuevo" : "Cancelar"}</button></div>
           </div>` : o.status === "entregado" ? `<p class="hintp">Entregado ${o.closed_at ? ago(o.closed_at) : ""} · ${o.sellos || 0} sello(s) sumado(s) a ${esc(pretty(o.phone))} · <a class="tocaja" href="caja.html#movs">Cobro en la Caja →</a></p>
             ${(o.avisos || {}).resena ? `<p class="hintp">✓ Le pedimos la reseña por WhatsApp ${ago(o.avisos.resena)}</p>` : `<a class="btn solid" style="margin-top:8px" target="_blank" rel="noopener" href="https://wa.me/${esc(o.wa_phone || o.phone)}?text=${encodeURIComponent(resenaTxt(o))}">Pedir reseña por WhatsApp</a>`}` : ""}
       </article>`;
@@ -2115,6 +2116,7 @@
         catch (err) { toast(err.message); b.disabled = false; }
         return;
       }
+      if (b.dataset.cphedit !== undefined) { P.cphEdit = id; drawOrders(); const i = document.querySelector(`[data-oid="${id}"] [data-cphone]`); if (i) i.focus(); return; }
       if (b.dataset.pagoedit !== undefined) { P.editPago = P.editPago === id ? null : id; drawOrders(); return; }
       if (b.dataset.pagoset !== undefined) {
         const o = P.orders.find((x) => x.id === id), nuevo = b.dataset.pagoset;
