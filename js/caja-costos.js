@@ -12,7 +12,7 @@ window.CajaCostos = function (K) {
   const UNL = { g: "Gramos (g)", ml: "Mililitros (ml / cc)", u: "Unidades" };
   const PARTES = ["Masa", "Relleno", "Bebida", "Foam", "Packaging", "Otros"];
   const VIEJO = 30; // días: un precio más viejo se muestra en gris
-  const C = { conF: false, fijos: [], ventas: [], an: { g: "todos", t: "12 oz", si: null, sf: 0.2 }, ok: false, loading: null, err: "", tab: "productos", filtro: "todos", qi: "", fi: "todos", ins: [], pre: {}, rec: [], lin: [], prods: [], lug: [] };
+  const C = { conF: false, fijos: [], ventas: [], gp: "mes", an: { g: "todos", t: "12 oz", si: null, sf: 0.2 }, ok: false, loading: null, err: "", tab: "productos", filtro: "todos", qi: "", fi: "todos", ins: [], pre: {}, rec: [], lin: [], prods: [], lug: [] };
   {
     const t = (location.hash.split("/")[1] || "");
     if (["productos", "preps", "insumos", "graficos", "fijos"].includes(t)) C.tab = t;
@@ -59,11 +59,15 @@ window.CajaCostos = function (K) {
     const [ins, pre, rec, lin, prods, lug] = r.map(fail);
     // costos fijos (migración 072) y lo facturado en los últimos 28 días para repartirlos entre las ventas
     const d28 = new Date(hoyISO() + "T12:00:00"); d28.setDate(d28.getDate() - 29);
-    const [fj, vt] = await Promise.all([
+    const ini2 = hoyISO().slice(0, 8) + "01", pm = new Date(ini2 + "T12:00:00"); pm.setMonth(pm.getMonth() - 5);
+    const [fj, vt, mv] = await Promise.all([
       sb.from("costo_fijos").select("*").eq("activo", true).order("orden").order("created_at"),
       sb.from("caja_movimientos").select("fecha, monto").eq("tipo", "entrada").eq("estado", "activo").gte("fecha", d28.toISOString().slice(0, 10)).limit(5000),
+      // para Gráficos → Ganancias: lo que entró y se gastó en los últimos 6 meses
+      sb.from("caja_movimientos").select("fecha, tipo, monto").in("tipo", ["entrada", "gasto"]).eq("estado", "activo").gte("fecha", pm.toISOString().slice(0, 8) + "01").limit(20000),
     ]);
     C.fijos = fj.error ? null : fj.data || []; C.ventas = vt.error ? [] : vt.data || [];
+    C.movs = mv.error ? null : mv.data || [];
     C.lug = lug.map((l) => l.nombre);
     C.ins = ins; C.pre = {}; pre.forEach((p) => (C.pre[p.insumo_id] = p));
     C.rec = rec; C.lin = lin; C.prods = prods; C.ok = true; C.err = "";
@@ -214,6 +218,70 @@ window.CajaCostos = function (K) {
       ${f.sizes.map(fila).join("")}</span><span class="kgo">›</span></button>`;
   }
 
+  /* ---------- ganancias: facturado, gastos y ganancia neta en el tiempo ---------- */
+  // Plata real de la Caja: facturado (bruta) − gastos cargados − costos fijos (lo del mes ÷ 30 por cada día) = ganancia neta.
+  const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const addD = (k, n) => { const d = new Date(k + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+  function tramos(gp) {
+    const h = hoyISO(), out = [];
+    if (gp === "dia") for (let i = 29; i >= 0; i--) { const k = addD(h, -i); const dd = new Date(k + "T12:00:00"); out.push({ ini: k, fin: k, lbl: String(Number(k.slice(8))), nom: dd.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }), corto: dd.toLocaleDateString("es-AR", { weekday: "short", day: "numeric" }).replace(".", "") }); }
+    else if (gp === "semana") { const dow = (new Date(h + "T12:00:00").getDay() + 6) % 7, lun = addD(h, -dow);
+      for (let i = 7; i >= 0; i--) { const ini = addD(lun, -7 * i), fin = addD(ini, 6); out.push({ ini, fin, lbl: `${Number(ini.slice(8))}/${Number(ini.slice(5, 7))}`, nom: i ? `semana del ${Number(ini.slice(8))}/${Number(ini.slice(5, 7))}` : "esta semana", corto: i ? `sem. ${Number(ini.slice(8))}/${Number(ini.slice(5, 7))}` : "esta semana" }); } }
+    else for (let i = 5; i >= 0; i--) { const d = new Date(h.slice(0, 8) + "01T12:00:00"); d.setMonth(d.getMonth() - i); const ini = d.toISOString().slice(0, 10), e = new Date(d); e.setMonth(e.getMonth() + 1); e.setDate(0);
+      out.push({ ini, fin: e.toISOString().slice(0, 10), lbl: MESES[d.getMonth()].slice(0, 3), nom: MESES[d.getMonth()] }); }
+    const fdia = (C.fijos || []).reduce((a, f) => a + (Number(f.monto) || 0), 0) / 30;
+    // los fijos corren desde el primer movimiento cargado en la Caja; antes no había negocio andando
+    const pri = C.movs.reduce((a, m) => (m.fecha < a ? m.fecha : a), h);
+    const res = out.filter((t, i) => t.fin >= pri || i === out.length - 1);
+    res.forEach((t) => {
+      const desde = t.ini > pri ? t.ini : pri, hasta = t.fin < h ? t.fin : h, nd = Math.max(0, Math.round((new Date(hasta + "T12:00:00") - new Date(desde + "T12:00:00")) / 864e5) + 1);
+      t.curso = t.fin >= h; t.ent = 0; t.gas = 0;
+      C.movs.forEach((m) => { if (m.fecha >= t.ini && m.fecha <= t.fin) t[m.tipo === "entrada" ? "ent" : "gas"] += Number(m.monto) || 0; });
+      t.fij = fdia * nd; t.cos = t.gas + t.fij; t.net = t.ent - t.cos;
+    });
+    return res;
+  }
+  // curva suave que pasa por todos los puntos
+  const curva = (pts) => pts.length < 2 ? "" : pts.reduce((d, p, i) => { if (!i) return `M${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+    const p0 = pts[i - 2] || pts[i - 1], p1 = pts[i - 1], p3 = pts[i + 1] || p, k = pts.length > 12 ? 0.06 : 0.18;
+    return d + ` C${(p1[0] + (p[0] - p0[0]) * k).toFixed(1)},${(p1[1] + (p[1] - p0[1]) * k).toFixed(1)} ${(p[0] - (p3[0] - p1[0]) * k).toFixed(1)},${(p[1] - (p3[1] - p1[1]) * k).toFixed(1)} ${p[0].toFixed(1)},${p[1].toFixed(1)}`; }, "");
+  function gananciasHTML() {
+    if (!C.movs) return "";
+    const T = tramos(C.gp), act = T[T.length - 1], pre = T[T.length - 2];
+    const p = (v) => (act.ent > 0 ? pct(v / act.ent) : "—"), cmp = (a, b) => (b ? Math.round(((a - b) / Math.abs(b)) * 100) : null);
+    const fl = (c, inv) => (c == null ? "" : ` <small class="${!c ? "" : (c > 0) !== !!inv ? "kup" : "kdn"}">${c > 0 ? "▲ +" : c < 0 ? "▼ " : "= "}${c}%</small>`);
+    const w = (v) => (act.ent > 0 ? Math.max(0, Math.min(100, (v / act.ent) * 100)).toFixed(1) : 0) + "%";
+    // gráfico
+    const W = 640, H = 220, L = 8, Rr = 8, Tp = 14, B = 26, n = T.length;
+    const vals = T.flatMap((t) => [t.ent, t.cos, t.net]), mx = Math.max(1, ...vals), mn = Math.min(0, ...vals);
+    const x = (i) => L + (n === 1 ? 0 : (i * (W - L - Rr)) / (n - 1)), y = (v) => Tp + ((mx - v) * (H - Tp - B)) / (mx - mn || 1);
+    // el último tramo, si va en curso, se dibuja punteado (todavía no terminó)
+    const serie = (k, cls) => { const P = T.map((t, i) => [x(i), y(t[k])]), cur = act.curso && n > 1;
+      return `<path class="kgl ${cls}" d="${curva(cur ? P.slice(0, -1) : P)}"/>${cur ? `<path class="kgl kgcur ${cls}" d="M${P[n - 2][0].toFixed(1)},${P[n - 2][1].toFixed(1)} L${P[n - 1][0].toFixed(1)},${P[n - 1][1].toFixed(1)}"/>` : ""}` + T.map((t, i) => `<circle class="kgd ${cls}" cx="${x(i).toFixed(1)}" cy="${y(t[k]).toFixed(1)}" r="${n > 12 ? 2 : 3.5}"><title>${esc(t.nom)}: ${fmtC(t[k])}</title></circle>`).join(""); };
+    const paso = n > 12 ? 5 : 1;
+    const etq = T.map((t, i) => (i % paso === 0 || i === n - 1) && !(i !== n - 1 && n - 1 - i < paso) ? `<text x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="${i === 0 ? "start" : i === n - 1 ? "end" : "middle"}">${esc(t.lbl)}</text>` : "").join("");
+    const seg = (k, l) => `<button type="button" data-kgp="${k}" aria-pressed="${C.gp === k}">${l}</button>`;
+    const nomP = { mes: "mes", semana: "semana", dia: "día" }[C.gp];
+    return `<section class="kchart kgan"><h3 class="kch">Ganancias</h3>
+      <div class="seg kgpseg">${seg("dia", "Día")}${seg("semana", "Semana")}${seg("mes", "Mes")}</div>
+      <p class="kpinote">${esc(act.nom[0].toUpperCase() + act.nom.slice(1))}${act.curso && C.gp !== "dia" ? " (va en curso)" : ""}. Plata real de la Caja${pre ? `; flechas vs. ${esc(pre.nom)}` : ""}.</p>
+      <div class="kgc">
+        <div class="kgcard"><span class="k">Ganancia bruta</span><b class="num">${fmtC(act.ent)}</b><span class="s">todo lo facturado${fl(cmp(act.ent, pre && pre.ent))}</span></div>
+        <div class="kgcard rj"><span class="k">Gastos</span><b class="num">${fmtC(act.cos)}</b><span class="s">${p(act.cos)} de lo facturado${fl(cmp(act.cos, pre && pre.cos), true)}</span></div>
+        <div class="kgcard ${act.net < 0 ? "rj" : "vd"}"><span class="k">Ganancia neta</span><b class="num">${act.net < 0 ? "−" : ""}${fmtC(Math.abs(act.net))}</b><span class="s">${p(act.net)} de lo facturado${fl(cmp(act.net, pre && pre.net))}</span></div>
+      </div>
+      <div class="kgstk"><i class="ci" style="width:${w(act.gas)}"></i><i class="cf" style="width:${w(act.fij)}"></i><i class="cq" style="width:${w(Math.max(0, act.net))}"></i></div>
+      <div class="kvals kgv"><span class="ci">Gastos cargados ${fmtC(act.gas)} · ${p(act.gas)}</span><span class="cf">Costos fijos ${fmtC(act.fij)} · ${p(act.fij)}</span><span class="${act.net < 0 ? "cn" : "cq"}">Ganancia neta ${p(act.net)}</span></div>
+      <div class="klegend kgleg"><span><i class="ke"></i>Ganancia bruta</span><span><i class="kc"></i>Gastos</span><span><i class="kn"></i>Ganancia neta</span>${act.curso && n > 1 ? `<span><i class="kcur"></i>en curso</span>` : ""}</div>
+      <svg class="kgsvg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Ganancia bruta, gastos y ganancia neta por ${nomP}">
+        ${mn < 0 ? `<line class="kg0" x1="${L}" x2="${W - Rr}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}"/>` : ""}
+        ${serie("ent", "ke")}${serie("cos", "kc")}${serie("net", "kn")}
+        <g class="kgx">${etq}</g></svg>
+      <div class="kgtab">${T.slice().reverse().slice(0, C.gp === "dia" ? 7 : T.length).map((t) => `<div><span>${esc(t.corto || t.nom)}${t.curso && C.gp !== "dia" ? " <small>en curso</small>" : ""}</span><span class="num">${fmtC(t.ent)}</span><span class="num rj">−${fmtC(t.cos)}</span><b class="num ${t.net < 0 ? "rj" : "vd"}">${t.net < 0 ? "−" : ""}${fmtC(Math.abs(t.net))}</b></div>`).join("")}</div>
+      <p class="hintp">Gastos = todo lo cargado como gasto en la Caja (insumos, packaging, publicidad…) + costos fijos (${fmtC((C.fijos || []).reduce((a, f) => a + (Number(f.monto) || 0), 0))} por mes, ${fmtC((C.fijos || []).reduce((a, f) => a + (Number(f.monto) || 0), 0) / 30)} por día). La inversión y los retiros no son gastos. Si el alquiler también lo cargás como gasto, sacalo de Fijos para no contarlo dos veces.</p>
+    </section>`;
+  }
+
   /* ---------- costos fijos ---------- */
   const SUG = ["Alquiler", "Luz", "Gas", "Agua", "Internet", "Sueldos", "Monotributo / impuestos", "Contador", "Seguro"];
   function vFijos() {
@@ -344,7 +412,7 @@ window.CajaCostos = function (K) {
             <span class="side kside"><span class="kpill kt-${tono(x.m1)}">${pct(x.m0)} → ${pct(x.m1)}</span></span></div>`).join("")}</div>`
         : `<p class="hintp">Ese insumo no está en ningún producto con costo completo.</p>`}`;
     }
-    $("#kbody").innerHTML = `
+    $("#kbody").innerHTML = `${gananciasHTML()}
       <section class="kchart"><h3 class="kch">Costo y lo que te queda</h3>
         <p class="kpinote">Cada barra es el precio de la carta: la parte gris es el costo y la de color lo que te queda. Ordenado de mayor a menor margen.</p>
         <div class="filters">${chip("todos", "Todos")}${chip("mochis", "Mochis")}${chip("bebidas", "Bebidas")}${chip("sets", "Sets")}</div>
@@ -782,6 +850,7 @@ window.CajaCostos = function (K) {
     if (d.kt) return setTab(d.kt);
     if (d.kf) { C.filtro = d.kf; return view(); }
     if (d.kcf !== undefined) { C.conF = !C.conF; return view(); }
+    if (d.kgp !== undefined) { C.gp = d.kgp; return view(); }
     if (d.kfdel) return borrarFijo(d.kfdel);
     if (d.kfi) { C.fi = d.kfi; return view(); }
     if (d.kag) { C.an.g = d.kag; return view(); }
