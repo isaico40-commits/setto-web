@@ -12,7 +12,7 @@ window.CajaCostos = function (K) {
   const UNL = { g: "Gramos (g)", ml: "Mililitros (ml / cc)", u: "Unidades" };
   const PARTES = ["Masa", "Relleno", "Bebida", "Foam", "Packaging", "Otros"];
   const VIEJO = 30; // días: un precio más viejo se muestra en gris
-  const C = { conF: false, fijos: [], ventas: [], an: { g: "todos", t: "12 oz", si: null, sf: 0.2 }, ok: false, loading: null, err: "", tab: "productos", filtro: "todos", qi: "", fi: "todos", ins: [], pre: {}, rec: [], lin: [], prods: [], lug: [] };
+  const C = { conF: false, fijos: [], ventas: [], rep: 0, an: { g: "todos", t: "12 oz", si: null, sf: 0.2 }, ok: false, loading: null, err: "", tab: "productos", filtro: "todos", qi: "", fi: "todos", ins: [], pre: {}, rec: [], lin: [], prods: [], lug: [] };
   {
     const t = (location.hash.split("/")[1] || "");
     if (["productos", "preps", "insumos", "graficos", "fijos"].includes(t)) C.tab = t;
@@ -59,11 +59,16 @@ window.CajaCostos = function (K) {
     const [ins, pre, rec, lin, prods, lug] = r.map(fail);
     // costos fijos (migración 072) y lo facturado en los últimos 28 días para repartirlos entre las ventas
     const d28 = new Date(hoyISO() + "T12:00:00"); d28.setDate(d28.getDate() - 29);
-    const [fj, vt] = await Promise.all([
+    const ini2 = hoyISO().slice(0, 8) + "01", pm = new Date(ini2 + "T12:00:00"); pm.setMonth(pm.getMonth() - 1);
+    const [fj, vt, mv, so] = await Promise.all([
       sb.from("costo_fijos").select("*").eq("activo", true).order("orden").order("created_at"),
       sb.from("caja_movimientos").select("fecha, monto").eq("tipo", "entrada").eq("estado", "activo").gte("fecha", d28.toISOString().slice(0, 10)).limit(5000),
+      // para "Para repartir": lo que entró, se gastó y se retiró este mes y el anterior
+      sb.from("caja_movimientos").select("fecha, tipo, monto, socio_id").in("tipo", ["entrada", "gasto", "retiro"]).eq("estado", "activo").gte("fecha", pm.toISOString().slice(0, 8) + "01").limit(10000),
+      sb.from("caja_socios").select("id, nombre, activo").order("orden"),
     ]);
     C.fijos = fj.error ? null : fj.data || []; C.ventas = vt.error ? [] : vt.data || [];
+    C.movs = mv.error ? null : mv.data || []; C.socios = so.error ? [] : (so.data || []).filter((x) => x.activo !== false);
     C.lug = lug.map((l) => l.nombre);
     C.ins = ins; C.pre = {}; pre.forEach((p) => (C.pre[p.insumo_id] = p));
     C.rec = rec; C.lin = lin; C.prods = prods; C.ok = true; C.err = "";
@@ -187,6 +192,7 @@ window.CajaCostos = function (K) {
       <div class="filters" style="margin-top:14px">${chip("todos", "Todos")}${chip("mochis", "Mochis")}${chip("bebidas", "Bebidas")}${chip("sets", "Sets")}</div>
       <div class="kleg4"><span><i class="ci"></i>Insumos</span><span><i class="cp"></i>Packaging</span><span><i class="cq"></i>Te queda</span></div>
       <div class="kprods">${ver.map(cardProd).join("") || `<div class="emptyc"><span>No hay productos en la carta.</span></div>`}</div>
+      ${repartirHTML()}
       <p class="kpinote kleyenda"><span class="kdot kd-ok"></span>65% o más <span class="kdot kd-mid"></span>50 a 65% <span class="kdot kd-low"></span>menos de 50%. Margen = (precio − costo) / precio. Costo = materia prima y packaging. Alquiler y servicios no van por producto: se cubren con volumen (Fijos → punto de equilibrio).</p>`;
   }
   function cardProd(f) {
@@ -212,6 +218,36 @@ window.CajaCostos = function (K) {
       ${p.img ? `<img class="kth" src="${esc(p.img)}" alt="" loading="lazy">` : `<span class="kth ph">${esc(p.nombre[0])}</span>`}
       <span class="kpb"><span class="kpn"><b>${esc(p.nombre)}</b><small>${{ mochis: p.categoria === "especial" ? "Especial" : "Mochi", bebidas: p.categoria === "especial" ? "Especial" : "Bebida", sets: "Set · bebida + mochi" }[f.g]}</small></span>
       ${f.sizes.map(fila).join("")}</span><span class="kgo">›</span></button>`;
+  }
+
+  /* ---------- para repartir: plata real del mes ---------- */
+  // Facturado − gastos cargados en la Caja − fijos del mes (Costos → Fijos) = ganancia del mes; menos lo ya retirado = libre.
+  function repartirHTML() {
+    if (!C.movs) return "";
+    const MES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    const h = hoyISO(), d = new Date(h.slice(0, 8) + "01T12:00:00"); d.setMonth(d.getMonth() - C.rep);
+    const ym = d.toISOString().slice(0, 7), enCurso = C.rep === 0;
+    const ms = C.movs.filter((m) => m.fecha.slice(0, 7) === ym), sum = (t) => ms.filter((m) => m.tipo === t).reduce((a, m) => a + (Number(m.monto) || 0), 0);
+    const ent = sum("entrada"), gas = sum("gasto"), ret = sum("retiro"), fij = C.fijos ? C.fijos.reduce((a, f) => a + (Number(f.monto) || 0), 0) : 0;
+    const gan = ent - gas - fij, libre = gan - ret, n = C.socios.length || 1;
+    const porSoc = C.socios.map((so) => { const r = ms.filter((m) => m.tipo === "retiro" && m.socio_id === so.id).reduce((a, m) => a + (Number(m.monto) || 0), 0); return { so, r }; });
+    // retiros sin socio asignado: se descuentan en partes iguales, así la suma de lo de cada uno da justo lo libre
+    const sinSocio = ret - porSoc.reduce((a, x) => a + x.r, 0), ss = sinSocio > 0.5 ? sinSocio / n : 0;
+    porSoc.forEach((x) => (x.queda = gan / n - x.r - ss));
+    const lin = (l, v, cls, sub) => `<div class="krl ${cls || ""}"><span>${l}${sub ? `<small>${sub}</small>` : ""}</span><b class="num">${v < 0 ? "−" : ""}${fmtC(Math.abs(v))}</b></div>`;
+    return `<section class="krep">
+      <div class="krephd"><b>Para repartir</b><span class="filters"><button class="chip" data-krep="0" aria-pressed="${C.rep === 0}">Este mes</button><button class="chip" data-krep="1" aria-pressed="${C.rep === 1}">${MES[(new Date(h.slice(0, 8) + "01T12:00:00").getMonth() + 11) % 12]}</button></span></div>
+      <p class="hintp">${MES[d.getMonth()]}${enCurso ? `, al ${Number(h.slice(8))} (va en curso)` : ", mes completo"}. Plata real de la Caja, no estimada.</p>
+      ${lin("Facturado", ent, "", "todo lo que entró")}
+      ${lin("− Gastos cargados", -gas, "neg", "insumos, packaging, publicidad, servicios…")}
+      ${lin("− Costos fijos del mes", -fij, "neg", C.fijos && C.fijos.length ? C.fijos.map((f) => esc(f.nombre)).join(", ") : "no cargaste fijos")}
+      ${lin("= Ganancia del mes", gan, gan < 0 ? "tot neg" : "tot")}
+      ${lin("− Ya retirado", -ret, "neg", "retiros de ganancias del mes")}
+      ${lin("= Libre para repartir", libre, libre < 0 ? "big neg" : "big")}
+      ${C.socios.length ? `<div class="krsoc">${porSoc.map((x) => `<div><span>${esc(x.so.nombre)}</span><b class="num ${x.queda < 0 ? "kneg" : ""}">${x.queda < 0 ? "−" : ""}${fmtC(Math.abs(x.queda))}</b><small>le toca ${fmtC(gan / n)}${x.r ? ` · ya sacó ${fmtC(x.r)}` : ""}${ss ? ` · −${fmtC(ss)} sin asignar` : ""}</small></div>`).join("")}</div>` : ""}
+      ${sinSocio > 0.5 ? `<p class="hintp">Hay ${fmtC(sinSocio)} de retiros sin socio asignado: se descuentan en partes iguales (${fmtC(ss)} a cada uno).</p>` : ""}
+      <p class="hintp">${gan / n > 0 ? `En partes iguales entre ${n}. ` : ""}${enCurso ? "Los fijos van completos aunque el mes no terminó, para que el alquiler quede guardado. " : ""}Si el alquiler o la luz ya los cargás como gasto en la Caja, sacalos de Fijos para no restarlos dos veces. La inversión (heladeras, obra) va aparte y no se resta.</p>
+    </section>`;
   }
 
   /* ---------- costos fijos ---------- */
@@ -782,6 +818,7 @@ window.CajaCostos = function (K) {
     if (d.kt) return setTab(d.kt);
     if (d.kf) { C.filtro = d.kf; return view(); }
     if (d.kcf !== undefined) { C.conF = !C.conF; return view(); }
+    if (d.krep !== undefined) { C.rep = +d.krep; return view(); }
     if (d.kfdel) return borrarFijo(d.kfdel);
     if (d.kfi) { C.fi = d.kfi; return view(); }
     if (d.kag) { C.an.g = d.kag; return view(); }
