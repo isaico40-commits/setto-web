@@ -20,6 +20,7 @@
       ...r,
       desc: r.descripcion || "",
       precios: { "12 oz": r.precio_12, "16 oz": r.precio_16 },
+      lista: { "12 oz": r.antes_12, "16 oz": r.antes_16 }, listaU: r.antes,
       bebida: r.set_bebida, mochi: r.set_mochi,
       foto: !!r.img && !String(r.img).startsWith("img/"),
     });
@@ -115,7 +116,9 @@
   const esPromoDia = () => ESPC().tipo === "promo";
   // precio normal de un producto en promo: el de la carta (mismo tamaño); un set del Especial sin promo compara contra bebida + mochi
   const baseDe = (p) => (p && p.categoria === "especial" && p.oferta_de ? [...SETS, ...DIRTY, ...MOCHIS].find((x) => x.id === p.oferta_de) || null : null);
-  const antesDe = (p, sz = "12 oz") => { const b = baseDe(p); if (b) return Number(bebida(b) ? b.precios[sz] : b.precio) || 0; return fmt(p) === "set" ? suelto(p, sz) : 0; };
+  // precio de carta tachado de un dirty o mochi con promo propia (Panel → Carta → "Ponerle precio de promo"); 0 = sin promo
+  const cartaAntes = (p, sz = "12 oz") => { if (!p || !["dirty", "mochi"].includes(p.categoria)) return 0; const a = Number(unit(p) ? p.listaU : (p.lista || {})[sz]) || 0, v = Number(priceOf(p, sz)) || 0; return a > v && v > 0 ? a : 0; };
+  const antesDe = (p, sz = "12 oz") => { const b = baseDe(p); if (b) return cartaAntes(b, sz) || Number(bebida(b) ? b.precios[sz] : b.precio) || 0; return fmt(p) === "set" ? suelto(p, sz) : 0; };
   const antesProg = () => prog() && dropFase() === "antes";
   // la foto va esmerilada (solo en la edición especial): en un drop programado, hasta el lanzamiento; en modo manual, según cada producto
   const VER_ESP = new URLSearchParams(location.search).has("ver-especial"); // vista previa desde el panel: tarjetas destapadas
@@ -991,9 +994,10 @@
     $("#cartaEyebrow").textContent = tab === "dirty" ? "Fríos · Elegí tu leche y personalizalo" : "Por unidad · Algunos sabores son rotativos";
     $("#grid").innerHTML = list.map((p) => {
       const agot = p.agotado;
-      const precio = tab === "dirty" ? `<span class="from num">Desde<b>${money(p.precios["12 oz"])}</b>${rateTag(p)}</span>` : `<span class="from num">Unidad<b>${money(p.precio)}</b>${rateTag(p)}</span>`;
+      const ca = cartaAntes(p), tach = ca ? `<s>${money(ca)}</s>` : "", pcto = ca ? Math.round(((ca - priceOf(p, "12 oz")) / ca) * 100) : 0;
+      const precio = tab === "dirty" ? `<span class="from num">Desde<b>${money(p.precios["12 oz"])}${tach}</b>${rateTag(p)}</span>` : `<span class="from num">Unidad<b>${money(p.precio)}${tach}</b>${rateTag(p)}</span>`;
       const sb = tab === "mochi" ? stockBadge(p) : "";
-      const badge = agot ? '<span class="badge">Agotado</span>' : sb ? sb : p.rotativo ? '<span class="badge">Rotativo</span>' : "";
+      const badge = agot ? '<span class="badge">Agotado</span>' : sb ? sb : pcto > 0 ? `<span class="badge num">Promo −${pcto}%</span>` : p.rotativo ? '<span class="badge">Rotativo</span>' : "";
       return `<article class="item">
         <button class="ph ${p.foto ? "foto" : ""}" data-open="${p.id}" aria-label="Ver ${esc(nameOf(p))}">${badge}${picsHtml(p, tab === "dirty" ? p.nombre + " en vaso transparente" : "Mochi de " + p.nombre + " entero y cortado", "img/mochito-lie.png")}</button>
         <h3>${esc(p.nombre)}</h3><p class="desc">${esc(p.desc)}</p>${tab === "mochi" ? stockLine(p) : ""}
@@ -1276,7 +1280,7 @@
     const custom = persOn(p) ? `${leches().length ? `<div><span class="eyebrow">Leche${fmt(p) === "set" ? " de la bebida" : ""}</span><div class="chips lechas" style="margin-top:8px">${leches().map((l) => `<button data-leche="${esc(l.nombre)}" aria-pressed="${l.nombre === leche}">${esc(l.nombre)}${Number(l.precio) > 0 ? ` <span class="num">+${money(l.precio)}</span>` : ""}</button>`).join("")}</div></div>` : ""}
       ${sinOpts().length ? sinHtml(sin) : ""}` : "";
     const opts = unit(p) ? "" : `<div><span class="eyebrow">Tamaño</span><div class="opts" style="margin-top:8px">${["12 oz", "16 oz"].map((oz) => {
-      const sv = k === "set" ? suelto(p, oz) : k === "premium" ? antesDe(p, oz) : 0, pv = p.precios[oz];
+      const sv = k === "set" ? suelto(p, oz) : k === "premium" ? antesDe(p, oz) : cartaAntes(p, oz), pv = p.precios[oz];
       const pr = sv > pv ? `<s>${money(sv)}</s>${money(pv)} <em class="pct">−${Math.round(((sv - pv) / sv) * 100)}%</em>` : money(pv);
       return `<button class="opt" data-sz="${oz}" aria-pressed="${oz === sz}"><span class="rd"></span><b>${oz.toUpperCase()}</b><span class="pp num">${pr}</span></button>`;
     }).join("")}</div></div>`;
@@ -1285,7 +1289,7 @@
     const blocked = p.agotado || sinSt || (k === "premium" && (!espOpen() || !(Number(bebida(p) ? p.precios[sz || "12 oz"] : p.precio) > 0))) || (esPromo(p) && !(Number(p.precio) > 0));
     $("#sheet").innerHTML = `<div class="sph"><img src="${esc(IMG(tapado(p) ? "img/mochito-lie.png" : p.img || "img/mochito-lie.png", 600))}" alt=""><button class="x" data-close aria-label="Cerrar">✕</button></div>
       <div class="sb">
-        ${k === "premium" ? `<span class="eyebrow">${esPromoDia() ? esc(ESPC().titulo || "Promo") : "Edición especial"}${espOpen() ? "" : " · próximamente"}</span>${unit(p) && antesDe(p) > Number(p.precio) && Number(p.precio) > 0 ? `<p class="s-antes num">Precio normal <s>${money(antesDe(p))}</s> · hoy ${money(p.precio)} <em class="pct">−${Math.round(((antesDe(p) - p.precio) / antesDe(p)) * 100)}%</em></p>` : ""}` : esPromo(p) ? `<span class="eyebrow">Promo ✦ ${promoCant(p)} mochis en box</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}
+        ${k === "premium" ? `<span class="eyebrow">${esPromoDia() ? esc(ESPC().titulo || "Promo") : "Edición especial"}${espOpen() ? "" : " · próximamente"}</span>${unit(p) && antesDe(p) > Number(p.precio) && Number(p.precio) > 0 ? `<p class="s-antes num">Precio normal <s>${money(antesDe(p))}</s> · hoy ${money(p.precio)} <em class="pct">−${Math.round(((antesDe(p) - p.precio) / antesDe(p)) * 100)}%</em></p>` : ""}` : esPromo(p) ? `<span class="eyebrow">Promo ✦ ${promoCant(p)} mochis en box</span>` : k === "set" ? `<span class="eyebrow">${esc(p.codigo || "")}${p.tema ? " ✦ " + esc(p.tema) : ""}</span>` : p.rotativo ? '<span class="eyebrow">Rotativo · consultá disponibilidad</span>' : ""}${k === "mochi" && cartaAntes(p) ? `<p class="s-antes num">Precio normal <s>${money(cartaAntes(p))}</s> · hoy ${money(p.precio)} <em class="pct">−${Math.round(((cartaAntes(p) - p.precio) / cartaAntes(p)) * 100)}%</em></p>` : ""}
         <h3 id="sTitle">${esc(nameOf(p))}</h3>
         <div class="s-row">${sheetRate(p)}<div class="qty" style="margin:0" ${esPromo(p) ? "hidden" : ""}><button data-sq="-1" aria-label="Restar uno">−</button><span class="num" style="min-width:18px;text-align:center">${qty}</span><button data-sq="1" aria-label="Sumar uno">+</button></div></div>
         <div class="s-rv" id="sRv" ${sheetState.rvOpen ? "" : "hidden"}>${sheetState.rvOpen ? sheetRvHtml(p) : ""}</div>
