@@ -1545,9 +1545,42 @@
     if (!be || !m) return null;
     return { "12": (Number(be.precio_12) || 0) + mp, "16": (Number(be.precio_16) || 0) + mp };
   }
+  // tamaños de un producto de la sección: [etiqueta, campo, clave en espNormal]
+  const espTams = (p) => ((p.formato || "mochi") === "mochi" ? [["Unidad", "precio", "u"]] : [["12 oz", "precio_12", "12"], ["16 oz", "precio_16", "16"]]);
+  const espBase = (p) => (p.oferta_de && P.products.find((x) => x.id === p.oferta_de)) || null;
+  // ¿lleva precio de promo? lo que tildó Isa, o si algún precio guardado es distinto al de la carta
+  function espPromoOn(p) {
+    if (p._promo !== undefined) return !!p._promo;
+    const n = espNormal(p); if (!n) return true;
+    return espTams(p).some(([, f, k]) => { const v = parseInt(p[f], 10) || 0; return v > 0 && v !== n[k]; });
+  }
+  // tamaños donde la promo quedó igual o más cara que la carta
+  const espMalos = (p) => { const n = espNormal(p); if (!n || !espPromoOn(p)) return []; return espTams(p).filter(([, f, k]) => { const v = parseInt(p[f], 10) || 0; return n[k] > 0 && v > 0 && v >= n[k]; }); };
+  // bloque de precios de un producto que es promo de uno de la carta: precio de carta fijo, promo opcional y lo que ve el cliente
+  function espPrecios(p) {
+    const b = espBase(p), n = espNormal(p), on = espPromoOn(p), T = espTams(p), m3 = 'min="0" step="100" inputmode="numeric"';
+    const cat = { set: "Sets", dirty: "Dirty lattes", mochi: "Mochis" }[b.categoria] || "la carta";
+    return `<div class="precbox">
+      <div class="pb-row"><span class="pb-lab">Precio de carta</span><span class="pb-val">${T.map(([l, , k]) => `${T.length > 1 ? l + " " : ""}<b>${money(n[k])}</b>`).join(" · ")}</span></div>
+      <span class="hintp">Es el de <b>${esc(String(b.nombre).trim())}</b> en ${cat}. <button class="linkbtn" data-gobase>Cambiarlo ahí ↓</button></span>
+      <label class="pb-sw"><input type="checkbox" data-promoon ${on ? "checked" : ""}> <span><b>Ponerle precio de promo</b><small>Opcional. Si no lo tildás, se cobra el precio de carta.</small></span></label>
+      ${on ? `<div class="${T.length > 1 ? "row2" : ""} pb-promo">${T.map(([l, f]) => `<label>Promo ${T.length > 1 ? l : "por unidad"}<input data-f="${f}" type="number" value="${esc(p[f] ?? "")}" ${m3}></label>`).join("")}</div>
+        <span class="pctrow">o aplicá <input type="number" min="1" max="90" step="1" inputmode="numeric" data-pctv placeholder="%"> % off <button class="linkbtn" data-pctgo>Calcular</button></span>` : ""}
+      ${espCalc(p)}
+    </div>`;
+  }
   function espCalc(p) {
     const n = espNormal(p); if (!n) return `<div data-calc></div>`;
-    const fila = (lab, sv, pr) => { const a = sv - pr; return `${lab}precio normal ${money(sv)} → promo ${money(pr)} · ${pr > 0 && a > 0 ? `${Math.round((a / sv) * 100)}% off (la web lo muestra tachado)` : "sin descuento"}`; };
+    if (espBase(p)) { // lo que ve el cliente en la web
+      const on = espPromoOn(p), malos = espMalos(p).map(([, f]) => f), T = espTams(p);
+      const fila = ([l, f, k]) => { const sv = n[k], pr = on ? parseInt(p[f], 10) || 0 : sv, lab = T.length > 1 ? `<span>${l}</span>` : "";
+        if (malos.includes(f)) return `<div class="pb-f">${lab}<b>${money(pr)}</b><em class="pb-x">${pr === sv ? "igual que la carta" : `más caro que la carta (${money(sv)})`}</em></div>`;
+        if (pr > 0 && pr < sv) return `<div class="pb-f">${lab}<s>${money(sv)}</s> <b>${money(pr)}</b><em class="pb-pct">−${Math.round(((sv - pr) / sv) * 100)}%</em></div>`;
+        return `<div class="pb-f">${lab}<b>${money(pr > 0 ? pr : sv)}</b></div>`; };
+      return `<div class="pb-cli ${malos.length ? "bad" : ""}" data-calc><small>Lo que ve el cliente</small>${T.map(fila).join("")}
+        ${malos.length ? `<span class="pb-warn">Así no se muestra descuento. Bajá la promo o destildala. Si querés subir el precio, cambialo en la carta.</span>` : ""}</div>`;
+    }
+    const fila = (lab, sv, pr) => { const a = sv - pr; return `${lab}por separado ${money(sv)} → acá ${money(pr)} · ${pr > 0 && a > 0 ? `${Math.round((a / sv) * 100)}% off (la web lo muestra tachado)` : "sin descuento"}`; };
     const rows = n.u !== undefined ? [fila("", n.u, parseInt(p.precio, 10) || 0)] : [fila("12 OZ: ", n["12"], parseInt(p.precio_12, 10) || 0), fila("16 OZ: ", n["16"], parseInt(p.precio_16, 10) || 0)];
     return `<div class="calc" data-calc>${rows.join("<br>")}
       <span class="pctrow">Aplicar <input type="number" min="1" max="90" step="1" inputmode="numeric" data-pctv placeholder="%"> % off <button class="linkbtn" data-pctgo>Calcular precios</button></span></div>`;
@@ -1572,7 +1605,7 @@
         ${p._new ? "" : `<br><button class="linkbtn" data-copylink title="Link que abre la ficha de este producto en la web">🔗 Copiar link</button>`}</div>
         ${p.img ? `<div class="p2">${p.img2 ? `<img src="${esc(p.img2)}" alt="">` : ""}<label class="up">${p.img2 ? "Cambiar 2ª foto" : "+ 2ª foto (opcional)"}<input type="file" accept="image/*" data-photo2></label>${p.img2 ? `<button class="linkbtn" data-nophoto2>Quitar</button>` : ""}</div>` : ""}</div>
       ${c === "especial" ? `<label>Es promo de (opcional)<select data-f="oferta_de"><option value="">— Producto propio de la sección —</option>${[["set", "Sets"], ["dirty", "Dirty lattes"], ["mochi", "Mochis"]].map(([k, l]) => `<optgroup label="${l}">${opts(k, p.oferta_de)}</optgroup>`).join("")}</select></label>
-        <span class="hintp">Elegí un producto de la carta y se copian nombre, foto, descripción y tipo. Vos ponés el precio con descuento; la web muestra el precio normal tachado. Los mochis descuentan del stock del mochi de la carta.</span>` : ""}
+        <span class="hintp">Elegí un producto de la carta y se copian nombre, foto, descripción, tipo y precio. Si va con descuento, tildá "Ponerle precio de promo": la web muestra el de carta tachado. Los mochis descuentan del stock del mochi de la carta.</span>` : ""}
       ${inp("nombre", "Nombre")}
       ${c === "especial" ? `<label>Tipo<select data-f="formato">${[["mochi", "Mochi (precio por unidad)"], ["dirty", "Dirty / latte (12 y 16 oz, leche y extras)"], ["set", "Set (bebida + mochi, 12 y 16 oz)"]].map(([v, l]) => `<option value="${v}" ${F === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
       ${c === "especial" && F === "set" ? `<label>Mochi que incluye (para el stock)<select data-f="set_mochi"><option value="">—</option>${opts("mochi", p.set_mochi)}${P.products.filter((x) => x.categoria === "especial" && (x.formato || "mochi") === "mochi").map((x) => `<option value="${esc(x.id)}" ${x.id === p.set_mochi ? "selected" : ""}>${esc(x.nombre)} (especial)</option>`).join("")}</select></label>
@@ -1580,10 +1613,11 @@
       ${c === "set" ? `<div class="row2">${inp("codigo", "Código (ej: Set 04)")}${inp("tema", "Tema (ej: Matcha & cereza)")}</div>
         <div class="row2"><label>Bebida<select data-f="set_bebida">${opts("dirty", p.set_bebida)}</select></label><label>Mochi<select data-f="set_mochi">${opts("mochi", p.set_mochi)}</select></label></div>`
         : `<label>Descripción<textarea data-f="descripcion">${esc(p.descripcion || "")}</textarea></label>`}
-      ${c === "promo" ? `<div class="row3">${inp("precio", "Precio de la promo", "number", money3)}${inp("promo_cant", "Mochis que trae", "number", 'min="2" max="20" step="1" inputmode="numeric"')}${inp("orden", "Orden", "number")}</div>`
+      ${c === "especial" && espBase(p) ? `${espPrecios(p)}<div class="row2">${inp("orden", "Orden", "number")}</div>`
+        : c === "promo" ? `<div class="row3">${inp("precio", "Precio de la promo", "number", money3)}${inp("promo_cant", "Mochis que trae", "number", 'min="2" max="20" step="1" inputmode="numeric"')}${inp("orden", "Orden", "number")}</div>`
         : c === "set" || c === "dirty" || (c === "especial" && F !== "mochi") ? `<div class="row3">${inp("precio_12", "Precio 12 oz", "number", money3)}${inp("precio_16", "Precio 16 oz", "number", money3)}${inp("orden", "Orden", "number")}</div>`
         : `<div class="row2">${inp("precio", c === "especial" ? "Precio (0 = a confirmar)" : "Precio por unidad", "number", money3)}${inp("orden", "Orden", "number")}</div>`}
-      ${c === "set" ? setCalc(p) : c === "promo" ? promoCalc(p) : c === "especial" ? espCalc(p) : ""}
+      ${c === "set" ? setCalc(p) : c === "promo" ? promoCalc(p) : c === "especial" && !espBase(p) ? espCalc(p) : ""}
       <div class="checks">${chk("activo", "Visible en la web")}${chk("agotado", "Agotado")}${c === "mochi" ? chk("rotativo", "Rotativo") : ""}${c === "especial" ? chk("esmerilado", "Esmerilado (tapa la foto)") : ""}</div>
       <div class="savebar"><button class="linkbtn warn" data-delp>${P.cancelArm === "del-" + p.id ? "¿Seguro? Tocá de nuevo" : "Eliminar"}</button>
         <span>${dirty ? `<button class="linkbtn" data-undo>Descartar</button> ` : ""}<button class="btn solid" data-savep>Guardar</button></span></div>
@@ -2262,6 +2296,12 @@
         if (d.set_bebida === "") d.set_bebida = null;
         if (d.oferta_de === "" || d.categoria !== "especial") delete d.oferta_de;
         if (d.categoria === "especial" && !("oferta_de" in d) && base && base.oferta_de) d.oferta_de = null;
+        if (d.categoria === "especial" && espBase(d)) {
+          const n = espNormal(d), malos = espMalos(d);
+          if (malos.length) return toast(`La promo de ${malos.map(([l]) => l).join(" y ")} no es más barata que la carta. Bajala o destildá "Ponerle precio de promo"`);
+          if (n && !espPromoOn(d)) espTams(d).forEach(([, f, k]) => (d[f] = n[k])); // sin promo: se cobra el de carta
+        }
+        delete d._promo;
         if (d.categoria === "promo" && !((parseInt(d.promo_cant, 10) || 0) >= 2 && parseInt(d.promo_cant, 10) <= 20)) return toast("Los mochis de la promo van de 2 a 20");
         ["precio", "precio_12", "precio_16", "orden", "promo_cant"].forEach((k) => { if (d[k] !== null && d[k] !== undefined && d[k] !== "") d[k] = parseInt(d[k], 10) || 0; });
         b.disabled = true;
@@ -2283,7 +2323,13 @@
         if (!(pct > 0 && pct < 91) || !n) return toast("Poné un % entre 1 y 90");
         const r = (x) => Math.round((x * (100 - pct)) / 100 / 100) * 100; // redondeado a $100
         if (n.u !== undefined) d.precio = r(n.u); else { d.precio_12 = r(n["12"]); d.precio_16 = r(n["16"]); }
+        if (espBase(d)) d._promo = true;
         redrawCard(id); return;
+      }
+      if (b.dataset.gobase !== undefined) {
+        const d = P.drafts[id] || base, el = document.querySelector(`[data-pid="${CSS.escape(d.oferta_de || "")}"]`);
+        if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); }
+        return;
       }
       if (b.dataset.nophoto !== undefined) { P.drafts[id] = { ...(P.drafts[id] || base), img: "" }; redrawCard(id); }
       if (b.dataset.nophoto2 !== undefined) { P.drafts[id] = { ...(P.drafts[id] || base), img2: null }; redrawCard(id); }
@@ -2300,7 +2346,13 @@
     if (t.id === "oq") { P.q = t.value; drawOrders(); return; }
     if (t.matches("[data-cphone]")) { P.confirm[t.closest("[data-oid]").dataset.oid].phone = t.value; return; }
     if (t.matches("[data-fnota]")) { const F = P.falta[t.closest("[data-oid]").dataset.oid]; if (F) F.nota = t.value; return; }
-    const pc = t.closest("[data-pid]"); if (!pc || !t.dataset.f) return;
+    const pc = t.closest("[data-pid]");
+    if (pc && t.matches("[data-promoon]")) { // promo opcional: al destildar vuelve al precio de carta
+      const id = pc.dataset.pid, d = P.drafts[id] || (P.drafts[id] = { ...P.products.find((x) => x.id === id) }), n = espNormal(d);
+      d._promo = t.checked; if (!t.checked && n) espTams(d).forEach(([, f, k]) => (d[f] = n[k]));
+      redrawCard(id); return;
+    }
+    if (!pc || !t.dataset.f) return;
     const id = pc.dataset.pid, base = P.products.find((x) => x.id === id);
     const d = P.drafts[id] || (P.drafts[id] = { ...base });
     d[t.dataset.f] = t.type === "checkbox" ? t.checked : t.value;
@@ -2313,7 +2365,7 @@
         Object.assign(d, { nombre: b.categoria === "set" ? b.nombre : b.nombre.trim(), descripcion: b.descripcion || d.descripcion || "", img: b.img || d.img || "", img2: b.img2 || null,
           set_bebida: b.categoria === "set" ? b.set_bebida : null, set_mochi: b.categoria === "set" ? b.set_mochi : null,
           precio: d.formato === "mochi" ? b.precio : 0, precio_12: d.formato === "mochi" ? null : b.precio_12, precio_16: d.formato === "mochi" ? null : b.precio_16 });
-        redrawCard(id); toast("Copiado de la carta: ahora poné el precio con descuento"); return;
+        d._promo = false; redrawCard(id); toast("Copiado de la carta con su precio. Si va con descuento, tildá Ponerle precio de promo"); return;
       }
     }
     if (d.categoria === "set" || d.categoria === "promo" || d.categoria === "especial") { const c = pc.querySelector("[data-calc]"); if (c) c.outerHTML = d.categoria === "set" ? setCalc(d) : d.categoria === "promo" ? promoCalc(d) : espCalc(d); }
