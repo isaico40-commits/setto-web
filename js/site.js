@@ -824,7 +824,7 @@
     navEsp.forEach((a) => (a.textContent = E.titulo || "Edición especial"));
     $("#espIntro").textContent = (open && E.intro_post) || E.intro || "";
     const hideN = antesProg() && !!E.ocultar_nombres, hideP = antesProg() && !!E.ocultar_precios;
-    // misma tarjeta que Sets (foto, título, descripción, línea fina, Desde $, +, estrellas, badges); el rosado la diferencia
+    // misma tarjeta que Sets (foto, título, descripción, línea fina, Desde $, +, estrellas, badges); el fondo rosa de la foto la diferencia
     $("#espGrid").innerHTML = items.map((p, i) => {
       const beb = bebida(p), base = beb ? Number(p.precios["12 oz"]) : Number(p.precio);
       const antes = antesDe(p), ahorro = base > 0 && antes > base ? antes - base : 0, pct = ahorro ? Math.round((ahorro / antes) * 100) : 0;
