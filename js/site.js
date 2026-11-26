@@ -12,7 +12,7 @@
 
   let S = {}; // ajustes
   let SETS = [], DIRTY = [], MOCHIS = [], ESP = [], PROMOS = [];
-  // Finde de Sets (settings.finde): sus sets se ven y se piden solo entre "desde" y "hasta"; fuera de eso, como si estuvieran ocultos
+  // Setto Weekend (settings.finde): sus sets se ven y se piden solo entre "desde" y "hasta"; fuera de eso, como si estuvieran ocultos
   const FINDE = () => S.finde || {};
   const findeIds = () => (Array.isArray(FINDE().sets) ? FINDE().sets : []);
   const esFinde = (p) => !!p && findeIds().includes(p.id);
@@ -950,14 +950,14 @@
     const n = setsCarta().length; $("#setsGrid").style.setProperty("--cols", n <= 4 ? Math.max(n, 2) : n % 4 === 0 || n % 4 === 3 ? 4 : 3);
     dots("setsGrid");
   }
-  /* Finde de Sets: misma tarjeta que Sets, con el ahorro en pesos y los dos tamaños a la vista; se oculta sola al llegar el "hasta" */
+  /* Setto Weekend: misma tarjeta que Sets, con el ahorro en pesos y los dos tamaños a la vista; se oculta sola al llegar el "hasta" */
   const findeHora = (iso) => { const d = new Date(iso); if (isNaN(d)) return ""; return "a las " + d.toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false }); };
   const findeFin = (iso) => { const d = new Date(iso); if (isNaN(d)) return ""; return d.toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", weekday: "long", day: "numeric", month: "numeric" }); };
   function renderFinde() {
     const sec = $("#finde"); if (!sec) return;
     const F = FINDE(); findeUlt = findeFase(); const items = findeUlt === "abierto" ? on(SETS).filter(esFinde) : [];
     const nav = document.querySelectorAll('header nav a[href$="#finde"]');
-    const tit = F.titulo || "Finde de Sets";
+    const tit = F.titulo || "Setto Weekend";
     nav.forEach((a) => { a.hidden = !items.length; a.textContent = tit; });
     sec.hidden = !items.length; if (!items.length) { $("#findeGrid").innerHTML = ""; return; }
     $("#t-finde").textContent = tit;

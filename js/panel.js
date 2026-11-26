@@ -1514,7 +1514,7 @@
       <div class="savebar"><button class="linkbtn warn" data-espocultar>Ocultar todos los productos</button><button class="btn solid" data-saveesp>Guardar sección</button></div>
       <span class="hintp">Los productos de la sección son los de abajo marcados como Visible. Para una promo, tocá "+ Agregar producto en promo" y elegí de qué producto de la carta es.</span></div>`;
   }
-  /* ---------- Finde de Sets: sección propia arriba de Sets, con fechas; al llegar el "Hasta" se oculta sola ---------- */
+  /* ---------- Setto Weekend: sección propia arriba de Sets, con fechas; al llegar el "Hasta" se oculta sola ---------- */
   function findeStateTxt(F) {
     const f = API.findeEstado(F), n = (F.sets || []).filter((id) => { const x = P.products.find((p) => p.id === id); return x && x.activo !== false; }).length;
     const sin = F.visible !== false && !n ? " · <b>Ojo:</b> no elegiste ningún set visible" : "";
@@ -1527,10 +1527,10 @@
     const sets = byCat("set"), sel = F.sets || [];
     const t = (k, label, ph = "", max = 80) => `<label>${label}<input data-fin="${k}" value="${esc(F[k] || "")}" placeholder="${esc(ph)}" maxlength="${max}"></label>`;
     return `<div class="pcard" id="findeCfg" style="margin-bottom:16px">
-      <b>Finde de Sets (sección propia, arriba de Sets)</b>
+      <b>Setto Weekend (sección propia, arriba de Sets)</b>
       <p class="dropst" id="findeState">${findeStateTxt(F)}</p>
       <label class="espsw"><input type="checkbox" data-fin="visible" ${F.visible !== false && sel.length ? "checked" : ""}> <span>Mostrar la sección en la web</span></label>
-      ${t("titulo", "Título de la sección", "Finde de Sets")}
+      ${t("titulo", "Título de la sección", "Setto Weekend")}
       <div class="row2"><label>Desde (día y hora de Argentina)<input type="datetime-local" data-fin="desde" value="${aLocal(F.desde)}"></label>
         <label>Hasta<input type="datetime-local" data-fin="hasta" value="${aLocal(F.hasta)}"></label></div>
       <span class="hintp"><button class="linkbtn" data-findefinde>Este finde: viernes 00:00 a domingo 23:59</button> · Al llegar el "Hasta" la sección y sus sets se ocultan solos.</span>

@@ -50,7 +50,7 @@
   const guardarTicket = () => ls.set("setto-local-ticket", S.ticket);
 
   /* ---------- productos (mismas reglas que la web: js/site.js) ---------- */
-  // los sets del Finde de Sets (settings.finde) se venden solo dentro de sus fechas, igual que en la web
+  // los sets del Setto Weekend (settings.finde) se venden solo dentro de sus fechas, igual que en la web
   const findeFuera = (p) => {
     const F = S.finde || {}; if (!Array.isArray(F.sets) || !F.sets.includes(p.id)) return false;
     const now = Date.now(), ini = Date.parse(F.desde || ""), fin = Date.parse(F.hasta || ""); // misma regla que findeEstado() en js/api.js

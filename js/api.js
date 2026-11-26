@@ -73,7 +73,7 @@
     if (!ini || now < ini) return "antes";
     return fin && now >= fin ? "terminado" : "abierto";
   }
-  /* Sección "Finde de Sets" (settings.finde): sets con precio de finde que se ven solo entre "desde" y "hasta".
+  /* Sección "Setto Weekend" (settings.finde): sets con precio de finde que se ven solo entre "desde" y "hasta".
      { visible, titulo, chip, intro, desde, hasta, sets: [ids] }. Fuera de la ventana esos sets no se ven ni se pueden pedir. */
   function findeEstado(F, now = Date.now()) {
     F = F || {};

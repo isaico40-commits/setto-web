@@ -183,7 +183,7 @@ section.blk{padding-block:72px}
 .set{transition:box-shadow .2s}
 .set:hover{box-shadow:5px 5px 0 color-mix(in srgb,var(--turquesa) 55%,#fff)}
 .set:hover .off{box-shadow:0 0 0 2px var(--card),0 0 22px 5px color-mix(in srgb,var(--turquesa) 45%,transparent)}
-/* Finde de Sets: fondo turquesa suave para separarla del Especial y de Sets; precio de cada tamaño con el separado tachado */
+/* Setto Weekend: fondo turquesa suave para separarla del Especial y de Sets; precio de cada tamaño con el separado tachado */
 #finde{background:color-mix(in srgb,var(--turquesa) 9%,var(--bg))}
 #finde .chip{background:var(--turquesa);color:#FFFDF8}
 #finde .set .ph::before{background:color-mix(in srgb,var(--turquesa) 22%,var(--bg))}
