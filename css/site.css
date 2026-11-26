@@ -158,7 +158,9 @@ section.blk{padding-block:72px}
   .rail{overflow-y:hidden;overscroll-behavior-x:contain;touch-action:pan-x pan-y}
   .rail::-webkit-scrollbar{display:none}
   .rail>*{scroll-snap-align:start}
-  .rail.pocos{grid-template-columns:none;grid-auto-columns:84%;justify-content:center}
+  /* pocas tarjetas (Edición especial): una centrada y se asoma la de al lado. Sin justify-content:center: con el carril desbordado, centrar deja la primera tarjeta cortada a la izquierda y no se puede volver */
+  .rail.pocos{grid-template-columns:none;grid-auto-columns:100%;justify-content:start;padding-inline:40px;scroll-padding-inline:0}
+  .rail.pocos>*{scroll-snap-align:center}
   .rail.pocos[style*="--n: 1"]{overflow-x:visible}
   .hint{display:flex;align-items:center;gap:10px}
   .dots{display:flex;gap:6px}
