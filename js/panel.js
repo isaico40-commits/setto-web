@@ -1436,7 +1436,7 @@
   /* =================== CARTA =================== */
   const CATS = [["especial", "Sección destacada (promos del día o drops)"], ["set", "Sets"], ["promo", "Promos"], ["dirty", "Dirty lattes"], ["mochi", "Mochis"]];
   const byCat = (c) => P.products.filter((p) => p.categoria === c).sort((a, b) => (a.orden || 0) - (b.orden || 0));
-  const draftOf = (p) => P.drafts[p.id] || p;
+  const draftOf = (p) => P.drafts[p.id] || uiOf(p);
   function viewCarta() {
     const E = P.settings.especial || {};
     $("#view").innerHTML = `<h1 class="ph1">Carta</h1>
@@ -1539,7 +1539,7 @@
   // producto de la sección destacada: precio normal (el de la carta, o bebida + mochi en un set) contra el de la promo
   function espNormal(p) {
     const F = p.formato || "mochi", b = p.oferta_de && P.products.find((x) => x.id === p.oferta_de);
-    if (b) return F === "mochi" ? { u: Number(b.precio) || 0 } : { "12": Number(b.precio_12) || 0, "16": Number(b.precio_16) || 0 };
+    if (b) return F === "mochi" ? { u: Number(b.antes || b.precio) || 0 } : { "12": Number(b.antes_12 || b.precio_12) || 0, "16": Number(b.antes_16 || b.precio_16) || 0 };
     if (F !== "set") return null;
     const be = P.products.find((x) => x.id === p.set_bebida), m = P.products.find((x) => x.id === p.set_mochi), mp = m ? Number(m.precio) || 0 : 0;
     if (!be || !m) return null;
@@ -1568,6 +1568,37 @@
         <span class="pctrow">o aplicá <input type="number" min="1" max="90" step="1" inputmode="numeric" data-pctv placeholder="%"> % off <button class="linkbtn" data-pctgo>Calcular</button></span>` : ""}
       ${espCalc(p)}
     </div>`;
+  }
+  /* promo opcional de un producto de la carta (dirty y mochis). En la base: precio_x = lo que se cobra, antes_x = precio de carta mientras hay promo.
+     En el panel la tarjeta edita precio_x = precio de carta y promo_x = precio de promo; se convierte al abrir y al guardar. */
+  const conPromoCarta = (c) => c === "dirty" || c === "mochi";
+  const cartaTams = (p) => (p.categoria === "mochi" ? [["Unidad", "precio", "antes", "promo"]] : [["12 oz", "precio_12", "antes_12", "promo_12"], ["16 oz", "precio_16", "antes_16", "promo_16"]]);
+  function uiOf(row) {
+    if (!row || !conPromoCarta(row.categoria)) return row;
+    const T = cartaTams(row), on = T.some(([, f, a]) => Number(row[a]) > 0);
+    const d = { ...row, _promo: on };
+    T.forEach(([, f, a, pr]) => { d[pr] = on ? row[f] : ""; if (on && Number(row[a]) > 0) d[f] = row[a]; });
+    return d;
+  }
+  const cartaMalos = (p) => (p._promo ? cartaTams(p).filter(([, f, , pr]) => { const n = parseInt(p[f], 10) || 0, v = parseInt(p[pr], 10) || 0; return !(v > 0 && v < n); }) : []);
+  function cartaPrecios(p) {
+    const T = cartaTams(p), on = !!p._promo, m3 = 'min="0" step="100" inputmode="numeric"', inp = (f, l) => `<label>${l}<input data-f="${f}" type="number" value="${esc(p[f] ?? "")}" ${m3}></label>`;
+    return `<div class="precbox">
+      <div class="row3 pb-promo">${T.map(([l, f]) => inp(f, T.length > 1 ? `Precio de carta ${l}` : "Precio de carta")).join("")}<label>Orden<input data-f="orden" type="number" value="${esc(p.orden ?? "")}"></label></div>
+      <label class="pb-sw"><input type="checkbox" data-promoon ${on ? "checked" : ""}> <span><b>Ponerle precio de promo</b><small>Opcional. La web muestra el de carta tachado y el de promo. Destildalo para terminar la promo.</small></span></label>
+      ${on ? `<div class="${T.length > 1 ? "row2" : ""} pb-promo">${T.map(([l, , , pr]) => inp(pr, T.length > 1 ? `Promo ${l}` : "Promo por unidad")).join("")}</div>
+        <span class="pctrow">o aplicá <input type="number" min="1" max="90" step="1" inputmode="numeric" data-pctv placeholder="%"> % off <button class="linkbtn" data-pctgo>Calcular</button></span>` : ""}
+      ${cartaCli(p)}
+    </div>`;
+  }
+  function cartaCli(p) {
+    const T = cartaTams(p), on = !!p._promo, malos = cartaMalos(p).map(([, f]) => f);
+    const fila = ([l, f, , pr]) => { const sv = parseInt(p[f], 10) || 0, v = on ? parseInt(p[pr], 10) || 0 : sv, lab = T.length > 1 ? `<span>${l}</span>` : "";
+      if (malos.includes(f)) return `<div class="pb-f">${lab}<b>${v ? money(v) : "—"}</b><em class="pb-x">${v ? (v === sv ? "igual que la carta" : `más caro que la carta (${money(sv)})`) : "falta el precio de promo"}</em></div>`;
+      if (on && v < sv) return `<div class="pb-f">${lab}<s>${money(sv)}</s> <b>${money(v)}</b><em class="pb-pct">−${Math.round(((sv - v) / sv) * 100)}%</em></div>`;
+      return `<div class="pb-f">${lab}<b>${money(sv)}</b></div>`; };
+    return `<div class="pb-cli ${malos.length ? "bad" : ""}" data-calc><small>Lo que ve el cliente</small>${T.map(fila).join("")}
+      ${malos.length ? `<span class="pb-warn">La promo tiene que ser más barata que el precio de carta.</span>` : ""}</div>`;
   }
   function espCalc(p) {
     const n = espNormal(p); if (!n) return `<div data-calc></div>`;
@@ -1614,6 +1645,7 @@
         <div class="row2"><label>Bebida<select data-f="set_bebida">${opts("dirty", p.set_bebida)}</select></label><label>Mochi<select data-f="set_mochi">${opts("mochi", p.set_mochi)}</select></label></div>`
         : `<label>Descripción<textarea data-f="descripcion">${esc(p.descripcion || "")}</textarea></label>`}
       ${c === "especial" && espBase(p) ? `${espPrecios(p)}<div class="row2">${inp("orden", "Orden", "number")}</div>`
+        : conPromoCarta(c) ? cartaPrecios(p)
         : c === "promo" ? `<div class="row3">${inp("precio", "Precio de la promo", "number", money3)}${inp("promo_cant", "Mochis que trae", "number", 'min="2" max="20" step="1" inputmode="numeric"')}${inp("orden", "Orden", "number")}</div>`
         : c === "set" || c === "dirty" || (c === "especial" && F !== "mochi") ? `<div class="row3">${inp("precio_12", "Precio 12 oz", "number", money3)}${inp("precio_16", "Precio 16 oz", "number", money3)}${inp("orden", "Orden", "number")}</div>`
         : `<div class="row2">${inp("precio", c === "especial" ? "Precio (0 = a confirmar)" : "Precio por unidad", "number", money3)}${inp("orden", "Orden", "number")}</div>`}
@@ -2290,7 +2322,7 @@
     if (pc) {
       const id = pc.dataset.pid, base = P.products.find((x) => x.id === id);
       if (b.dataset.savep !== undefined) {
-        const d = { ...(P.drafts[id] || base) }; delete d._new;
+        const d = { ...(P.drafts[id] || uiOf(base)) }; delete d._new;
         if (!String(d.nombre || "").trim()) return toast("Falta el nombre");
         if (d.set_mochi === "") d.set_mochi = null;
         if (d.set_bebida === "") d.set_bebida = null;
@@ -2300,6 +2332,11 @@
           const n = espNormal(d), malos = espMalos(d);
           if (malos.length) return toast(`La promo de ${malos.map(([l]) => l).join(" y ")} no es más barata que la carta. Bajala o destildá "Ponerle precio de promo"`);
           if (n && !espPromoOn(d)) espTams(d).forEach(([, f, k]) => (d[f] = n[k])); // sin promo: se cobra el de carta
+        }
+        if (conPromoCarta(d.categoria)) {
+          const malos = d._promo ? cartaMalos(d) : [];
+          if (malos.length) return toast(`La promo de ${malos.map(([l]) => l).join(" y ")} tiene que ser más barata que el precio de carta. Corregila o destildá "Ponerle precio de promo"`);
+          cartaTams(d).forEach(([, f, a, pr]) => { if (d._promo) { d[a] = parseInt(d[f], 10) || 0; d[f] = parseInt(d[pr], 10) || 0; } else if (a in d) d[a] = null; delete d[pr]; });
         }
         delete d._promo;
         if (d.categoria === "promo" && !((parseInt(d.promo_cant, 10) || 0) >= 2 && parseInt(d.promo_cant, 10) <= 20)) return toast("Los mochis de la promo van de 2 a 20");
@@ -2319,7 +2356,13 @@
         return;
       }
       if (b.dataset.pctgo !== undefined) {
-        const pct = parseInt(pc.querySelector("[data-pctv]").value, 10), d = P.drafts[id] || (P.drafts[id] = { ...base }), n = espNormal(d);
+        const pct = parseInt(pc.querySelector("[data-pctv]").value, 10), d = P.drafts[id] || (P.drafts[id] = uiOf(base));
+        if (conPromoCarta(d.categoria)) {
+          if (!(pct > 0 && pct < 91)) return toast("Poné un % entre 1 y 90");
+          cartaTams(d).forEach(([, f, , pr]) => { d[pr] = Math.round(((parseInt(d[f], 10) || 0) * (100 - pct)) / 100 / 100) * 100; });
+          d._promo = true; redrawCard(id); return;
+        }
+        const n = espNormal(d);
         if (!(pct > 0 && pct < 91) || !n) return toast("Poné un % entre 1 y 90");
         const r = (x) => Math.round((x * (100 - pct)) / 100 / 100) * 100; // redondeado a $100
         if (n.u !== undefined) d.precio = r(n.u); else { d.precio_12 = r(n["12"]); d.precio_16 = r(n["16"]); }
@@ -2331,8 +2374,8 @@
         if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); }
         return;
       }
-      if (b.dataset.nophoto !== undefined) { P.drafts[id] = { ...(P.drafts[id] || base), img: "" }; redrawCard(id); }
-      if (b.dataset.nophoto2 !== undefined) { P.drafts[id] = { ...(P.drafts[id] || base), img2: null }; redrawCard(id); }
+      if (b.dataset.nophoto !== undefined) { P.drafts[id] = { ...(P.drafts[id] || uiOf(base)), img: "" }; redrawCard(id); }
+      if (b.dataset.nophoto2 !== undefined) { P.drafts[id] = { ...(P.drafts[id] || uiOf(base)), img2: null }; redrawCard(id); }
       if (b.dataset.delp !== undefined) {
         const used = P.products.find((x) => x.categoria === "set" && (x.set_bebida === id || x.set_mochi === id));
         if (used) return toast(`No se puede: lo usa ${used.nombre}. Ocultalo con "Visible en la web".`);
@@ -2348,13 +2391,15 @@
     if (t.matches("[data-fnota]")) { const F = P.falta[t.closest("[data-oid]").dataset.oid]; if (F) F.nota = t.value; return; }
     const pc = t.closest("[data-pid]");
     if (pc && t.matches("[data-promoon]")) { // promo opcional: al destildar vuelve al precio de carta
-      const id = pc.dataset.pid, d = P.drafts[id] || (P.drafts[id] = { ...P.products.find((x) => x.id === id) }), n = espNormal(d);
-      d._promo = t.checked; if (!t.checked && n) espTams(d).forEach(([, f, k]) => (d[f] = n[k]));
+      const id = pc.dataset.pid, d = P.drafts[id] || (P.drafts[id] = uiOf(P.products.find((x) => x.id === id)));
+      d._promo = t.checked;
+      if (conPromoCarta(d.categoria)) { if (t.checked && cartaTams(d).every(([, , , pr]) => !d[pr])) cartaTams(d).forEach(([, f, , pr]) => (d[pr] = d[f])); }
+      else { const n = espNormal(d); if (!t.checked && n) espTams(d).forEach(([, f, k]) => (d[f] = n[k])); }
       redrawCard(id); return;
     }
     if (!pc || !t.dataset.f) return;
     const id = pc.dataset.pid, base = P.products.find((x) => x.id === id);
-    const d = P.drafts[id] || (P.drafts[id] = { ...base });
+    const d = P.drafts[id] || (P.drafts[id] = uiOf(base));
     d[t.dataset.f] = t.type === "checkbox" ? t.checked : t.value;
     pc.classList.add("dirty");
     if (!pc.querySelector("[data-undo]")) { const sp = pc.querySelector("[data-savep]").parentElement; sp.insertAdjacentHTML("afterbegin", '<button class="linkbtn" data-undo>Descartar</button> '); }
@@ -2368,7 +2413,7 @@
         d._promo = false; redrawCard(id); toast("Copiado de la carta con su precio. Si va con descuento, tildá Ponerle precio de promo"); return;
       }
     }
-    if (d.categoria === "set" || d.categoria === "promo" || d.categoria === "especial") { const c = pc.querySelector("[data-calc]"); if (c) c.outerHTML = d.categoria === "set" ? setCalc(d) : d.categoria === "promo" ? promoCalc(d) : espCalc(d); }
+    if (["set", "promo", "especial", "dirty", "mochi"].includes(d.categoria)) { const c = pc.querySelector("[data-calc]"); if (c) c.outerHTML = d.categoria === "set" ? setCalc(d) : d.categoria === "promo" ? promoCalc(d) : d.categoria === "especial" ? espCalc(d) : cartaCli(d); }
     if (t.dataset.f === "activo") pc.classList.toggle("oculto", !t.checked);
     if (t.dataset.f === "formato" || (t.dataset.f === "set_bebida" && d.categoria === "especial") || (t.dataset.f === "set_mochi" && d.categoria === "especial")) redrawCard(id);
   });
@@ -2404,13 +2449,13 @@
     if (t.matches("[data-photo2]") && t.files && t.files[0]) {
       const id = t.closest("[data-pid]").dataset.pid, base = P.products.find((x) => x.id === id);
       toast("Subiendo foto…");
-      try { const blob = await squareBlob(t.files[0]); const url = await API.uploadPhoto(blob, id + "-2"); P.drafts[id] = { ...(P.drafts[id] || base), img2: url }; redrawCard(id); toast("2ª foto lista · tocá Guardar para publicarla"); }
+      try { const blob = await squareBlob(t.files[0]); const url = await API.uploadPhoto(blob, id + "-2"); P.drafts[id] = { ...(P.drafts[id] || uiOf(base)), img2: url }; redrawCard(id); toast("2ª foto lista · tocá Guardar para publicarla"); }
       catch (err) { toast(err.message || "No se pudo subir la foto"); }
     }
     if (t.matches("[data-photo]") && t.files && t.files[0]) {
       const id = t.closest("[data-pid]").dataset.pid, base = P.products.find((x) => x.id === id);
       toast("Subiendo foto…");
-      try { const blob = await squareBlob(t.files[0]); const url = await API.uploadPhoto(blob, id); P.drafts[id] = { ...(P.drafts[id] || base), img: url }; redrawCard(id); toast("Foto lista · tocá Guardar para publicarla"); }
+      try { const blob = await squareBlob(t.files[0]); const url = await API.uploadPhoto(blob, id); P.drafts[id] = { ...(P.drafts[id] || uiOf(base)), img: url }; redrawCard(id); toast("Foto lista · tocá Guardar para publicarla"); }
       catch (err) { toast(err.message || "No se pudo subir la foto"); }
     }
   });
