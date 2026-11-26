@@ -50,7 +50,13 @@
   const guardarTicket = () => ls.set("setto-local-ticket", S.ticket);
 
   /* ---------- productos (mismas reglas que la web: js/site.js) ---------- */
-  const on = (p) => p.activo !== false;
+  // los sets del Setto Weekend (settings.finde) se venden solo dentro de sus fechas, igual que en la web
+  const findeFuera = (p) => {
+    const F = S.finde || {}; if (!Array.isArray(F.sets) || !F.sets.includes(p.id)) return false;
+    const now = Date.now(), ini = Date.parse(F.desde || ""), fin = Date.parse(F.hasta || ""); // misma regla que findeEstado() en js/api.js
+    return F.visible === false || (ini && now < ini) || (fin && now >= fin);
+  };
+  const on = (p) => p.activo !== false && !findeFuera(p);
   const find = (id) => S.prods.find((p) => p.id === id);
   const fmtP = (p) => (p.categoria === "especial" ? p.formato || "mochi" : p.categoria);
   const esBebida = (p) => ["set", "dirty"].includes(fmtP(p));
@@ -83,12 +89,14 @@
 
   /* ---------- carga ---------- */
   async function loadBase() {
-    const [prods, pers, socios, lprods] = await Promise.all([
+    const [prods, pers, socios, lprods, finde] = await Promise.all([
       sb.from("products").select("id,categoria,nombre,formato,precio,precio_12,precio_16,set_bebida,set_mochi,promo_cant,activo,agotado,orden,img").eq("activo", true).order("orden"),
       sb.from("settings").select("value").eq("key", "personalizacion").maybeSingle(),
       sb.from("caja_socios").select("nombre,activo").order("orden"),
       sb.from("local_productos").select("id,nombre,precio,orden").eq("activo", true).order("orden"),
+      sb.from("settings").select("value").eq("key", "finde").maybeSingle(),
     ]);
+    S.finde = ((finde && finde.data) || {}).value || {};
     S.falta062 = !!lprods.error; S.lprods = lprods.error ? [] : lprods.data || [];
     S.prods = fail(prods) || []; S.pers = (fail(pers) || {}).value || {}; S.socios = (fail(socios) || []).filter((s) => s.activo);
     // el borrador guardado se limpia si cambió la carta

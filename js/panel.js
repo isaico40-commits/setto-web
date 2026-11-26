@@ -1443,6 +1443,7 @@
       <p class="muted">Cada tarjeta se guarda por separado con su botón <b>Guardar</b>. Los cambios se ven en la web al instante. Las tarjetas con borde rosa tienen cambios sin guardar.</p>
       ${CATS.map(([c, l]) => `<section class="sec"><h2>${l}</h2>
         ${c === "especial" ? espCfgHtml(E) : ""}
+        ${c === "set" ? findeCfgHtml(P.settings.finde || {}) : ""}
         ${c === "promo" ? `<p class="hintp" style="margin-bottom:12px">Una box de mochis a precio fijo: el cliente elige los sabores entre los mochis visibles de la carta. El cartel de ahorro se calcula solo con el precio del mochi suelto.</p>` : ""}
         <div class="pgrid">${byCat(c).map(cardP).join("")}</div>
         <button class="btn" data-addp="${c}" style="margin-top:14px">+ Agregar ${l === "Sets" ? "set" : l === "Promos" ? "promo" : l === "Mochis" ? "mochi" : l === "Dirty lattes" ? "dirty" : "producto en promo"}</button>
@@ -1512,6 +1513,33 @@
       <label class="esp-drop">Texto debajo del título (cuando sale, opcional)<textarea data-esp="intro_post" placeholder="Si lo dejás vacío se usa el de arriba">${esc(E.intro_post || "")}</textarea></label>
       <div class="savebar"><button class="linkbtn warn" data-espocultar>Ocultar todos los productos</button><button class="btn solid" data-saveesp>Guardar sección</button></div>
       <span class="hintp">Los productos de la sección son los de abajo marcados como Visible. Para una promo, tocá "+ Agregar producto en promo" y elegí de qué producto de la carta es.</span></div>`;
+  }
+  /* ---------- Setto Weekend: sección propia arriba de Sets, con fechas; al llegar el "Hasta" se oculta sola ---------- */
+  function findeStateTxt(F) {
+    const f = API.findeEstado(F), n = (F.sets || []).filter((id) => { const x = P.products.find((p) => p.id === id); return x && x.activo !== false; }).length;
+    const sin = F.visible !== false && !n ? " · <b>Ojo:</b> no elegiste ningún set visible" : "";
+    if (f === "apagado") return "⚫ Apagada: no se ve, y los sets elegidos no aparecen en ningún lado de la web" + sin;
+    if (f === "antes") return `⏳ Arranca el ${fechaTxt(F.desde)} (faltan ${faltaTxt(Date.parse(F.desde) - Date.now())}). Hasta entonces sus sets no se ven`;
+    if (f === "abierto") return `🟢 Activa: se puede pedir${F.hasta ? ` hasta el ${fechaTxt(F.hasta)}` : " (sin fin: apagala a mano)"}`;
+    return `⏹ Terminó el ${fechaTxt(F.hasta)}: la sección y sus sets están ocultos`;
+  }
+  function findeCfgHtml(F) {
+    const sets = byCat("set"), sel = F.sets || [];
+    const t = (k, label, ph = "", max = 80) => `<label>${label}<input data-fin="${k}" value="${esc(F[k] || "")}" placeholder="${esc(ph)}" maxlength="${max}"></label>`;
+    return `<div class="pcard" id="findeCfg" style="margin-bottom:16px">
+      <b>Setto Weekend (sección propia, arriba de Sets)</b>
+      <p class="dropst" id="findeState">${findeStateTxt(F)}</p>
+      <label class="espsw"><input type="checkbox" data-fin="visible" ${F.visible !== false && sel.length ? "checked" : ""}> <span>Mostrar la sección en la web</span></label>
+      ${t("titulo", "Título de la sección", "Setto Weekend")}
+      <div class="row2"><label>Desde (día y hora de Argentina)<input type="datetime-local" data-fin="desde" value="${aLocal(F.desde)}"></label>
+        <label>Hasta<input type="datetime-local" data-fin="hasta" value="${aLocal(F.hasta)}"></label></div>
+      <span class="hintp"><button class="linkbtn" data-findefinde>Este finde: viernes 00:00 a domingo 23:59</button> · Al llegar el "Hasta" la sección y sus sets se ocultan solos.</span>
+      <div class="row2">${t("chip", "Etiqueta de arriba (opcional)", "Si la dejás vacía dice \"Hasta el domingo…\"")}</div>
+      <label>Texto debajo del título<textarea data-fin="intro" placeholder="Ej: Bebida + mochi a precio de finde, de viernes a domingo o hasta que se terminen los mochis.">${esc(F.intro || "")}</textarea></label>
+      <b class="dsub">Sets de la sección</b>
+      <div class="checks">${sets.map((x) => `<label><input type="checkbox" data-finset="${esc(x.id)}" ${sel.includes(x.id) ? "checked" : ""}> ${esc(x.nombre)}${x.activo === false ? " (oculto)" : ""}</label>`).join("") || '<span class="muted">Primero creá el set abajo con "+ Agregar set".</span>'}</div>
+      <span class="hintp">Los sets que tildes salen de la lista de Sets y se ven solo acá, mientras la sección esté activa. El cartel dice "Ahorrás $X" contra bebida + mochi por separado.</span>
+      <div class="savebar"><button class="btn solid" data-savefinde>Guardar sección</button></div></div>`;
   }
   // mismo criterio que nombreDrop() en supabase/functions/_shared/crm.ts
   function waNombreDrop(E) {
@@ -2289,6 +2317,20 @@
         avisar_auto: on("avisar_auto"), push_titulo: v("push_titulo"), push_texto: v("push_texto"), wa_nombre: v("wa_nombre"),
         chip: v("chip"), chip_post: v("chip_post"), intro: v("intro"), intro_post: v("intro_post") };
       try { await API.saveSetting("especial", E); await loadBase(); toast(!E.visible ? "Guardada: la sección quedó apagada" : prog && API.dropEstado(E) === "antes" ? "Drop programado" : "Guardado"); $("#dropState").innerHTML = dropStateTxt(E); } catch (err) { toast(err.message); }
+    }
+    if (b.dataset.savefinde !== undefined) {
+      const box = $("#findeCfg"), el = (k) => box.querySelector(`[data-fin="${k}"]`), v = (k) => el(k).value.trim(), iso = (k) => (v(k) ? new Date(v(k)).toISOString() : "");
+      const sets = [...box.querySelectorAll("[data-finset]:checked")].map((i) => i.dataset.finset), desde = iso("desde"), hasta = iso("hasta");
+      if (el("visible").checked && !sets.length) return toast("Elegí al menos un set");
+      if (desde && hasta && hasta <= desde) return toast('El "Hasta" tiene que ser después del "Desde"');
+      const F = { visible: el("visible").checked, titulo: v("titulo"), chip: v("chip"), intro: v("intro"), desde, hasta, sets };
+      try { await API.saveSetting("finde", F); await loadBase(); toast(!F.visible ? "Guardada: la sección quedó apagada" : API.findeEstado(F) === "antes" ? "Programada" : "Guardada"); viewCarta(); } catch (err) { toast(err.message); }
+      return;
+    }
+    if (b.dataset.findefinde !== undefined) {
+      const d = new Date(), dow = d.getDay(), vie = new Date(d); vie.setDate(d.getDate() + (dow === 0 ? -2 : dow === 6 ? -1 : 5 - dow)); vie.setHours(0, 0, 0, 0);
+      const dom = new Date(vie); dom.setDate(vie.getDate() + 2); dom.setHours(23, 59, 0, 0);
+      $('#findeCfg [data-fin="desde"]').value = aLocal(vie.toISOString()); $('#findeCfg [data-fin="hasta"]').value = aLocal(dom.toISOString()); return;
     }
     if (b.dataset.esphoy !== undefined) {
       const d = new Date(); d.setHours(23, 59, 0, 0); const i = $('#espCfg [data-esp="p_hasta"]'); if (i) i.value = aLocal(d.toISOString()); return;
