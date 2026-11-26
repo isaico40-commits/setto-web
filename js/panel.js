@@ -1518,10 +1518,10 @@
   function findeStateTxt(F) {
     const f = API.findeEstado(F), n = (F.sets || []).filter((id) => { const x = P.products.find((p) => p.id === id); return x && x.activo !== false; }).length;
     const sin = F.visible !== false && !n ? " · <b>Ojo:</b> no elegiste ningún set visible" : "";
-    if (f === "apagado") return "⚫ Apagada: no se ve, y los sets elegidos no aparecen en ningún lado de la web" + sin;
-    if (f === "antes") return `⏳ Arranca el ${fechaTxt(F.desde)} (faltan ${faltaTxt(Date.parse(F.desde) - Date.now())}). Hasta entonces sus sets no se ven`;
-    if (f === "abierto") return `🟢 Activa: se puede pedir${F.hasta ? ` hasta el ${fechaTxt(F.hasta)}` : " (sin fin: apagala a mano)"}`;
-    return `⏹ Terminó el ${fechaTxt(F.hasta)}: la sección y sus sets están ocultos`;
+    if (f === "apagado") return "⚫ Apagada: no se ve, y los sets siguen en Sets con su precio normal" + sin;
+    if (f === "antes") return `⏳ Arranca el ${fechaTxt(F.desde)} (faltan ${faltaTxt(Date.parse(F.desde) - Date.now())}). Hasta entonces los sets siguen en Sets con su precio normal`;
+    if (f === "abierto") return `🟢 Activa: los sets tildados se ven acá con su precio de finde${F.hasta ? ` hasta el ${fechaTxt(F.hasta)}` : " (sin fin: apagala a mano)"}`;
+    return `⏹ Terminó el ${fechaTxt(F.hasta)}: la sección no se ve y los sets volvieron a Sets con su precio normal`;
   }
   function findeCfgHtml(F) {
     const sets = byCat("set"), sel = F.sets || [];
@@ -1533,12 +1533,14 @@
       ${t("titulo", "Título de la sección", "Setto Weekend")}
       <div class="row2"><label>Desde (día y hora de Argentina)<input type="datetime-local" data-fin="desde" value="${aLocal(F.desde)}"></label>
         <label>Hasta<input type="datetime-local" data-fin="hasta" value="${aLocal(F.hasta)}"></label></div>
-      <span class="hintp"><button class="linkbtn" data-findefinde>Este finde: viernes 00:00 a domingo 23:59</button> · Al llegar el "Hasta" la sección y sus sets se ocultan solos.</span>
+      <span class="hintp"><button class="linkbtn" data-findefinde>Este finde: viernes 00:00 a domingo 23:59</button> · Al llegar el "Hasta" la sección se oculta sola y los sets vuelven a Sets con su precio normal.</span>
       <div class="row2">${t("chip", "Etiqueta de arriba (opcional)", "Si la dejás vacía dice \"Hasta el domingo…\"")}</div>
       <label>Texto debajo del título<textarea data-fin="intro" placeholder="Ej: Bebida + mochi a precio de finde, de viernes a domingo o hasta que se terminen los mochis.">${esc(F.intro || "")}</textarea></label>
       <b class="dsub">Sets de la sección</b>
-      <div class="checks">${sets.map((x) => `<label><input type="checkbox" data-finset="${esc(x.id)}" ${sel.includes(x.id) ? "checked" : ""}> ${esc(x.nombre)}${x.activo === false ? " (oculto)" : ""}</label>`).join("") || '<span class="muted">Primero creá el set abajo con "+ Agregar set".</span>'}</div>
-      <span class="hintp">Los sets que tildes salen de la lista de Sets y se ven solo acá, mientras la sección esté activa. El cartel dice "Ahorrás $X" contra bebida + mochi por separado.</span>
+      <div class="finsets">${sets.map((x) => { const pr = (F.precios || {})[x.id] || {}, n = (k, v) => `<label>${k === "p12" ? "12 oz" : "16 oz"} de finde<input type="number" min="0" step="100" inputmode="numeric" data-finp="${k}" value="${pr[k] > 0 ? pr[k] : ""}" placeholder="${v > 0 ? "Normal " + money(v) : "—"}"></label>`;
+        return `<div class="finset" data-finrow="${esc(x.id)}"><label class="finchk"><input type="checkbox" data-finset="${esc(x.id)}" ${sel.includes(x.id) ? "checked" : ""}> <b>${esc(x.nombre)}</b>${x.activo === false ? " (oculto)" : ""} <span class="muted">· normal ${money(x.precio_12)} / ${money(x.precio_16)}</span></label>
+          <div class="row2">${n("p12", x.precio_12)}${n("p16", x.precio_16)}</div></div>`; }).join("") || '<span class="muted">Primero creá el set abajo con "+ Agregar set".</span>'}</div>
+      <span class="hintp">Tildá los sets que entran y ponele el precio de finde. Mientras la sección está activa salen de Sets, se ven acá y se cobran a ese precio (web y local). Si dejás el precio vacío, se cobra el normal. El cartel dice "Ahorrás $X" contra bebida + mochi por separado.</span>
       <div class="savebar"><button class="btn solid" data-savefinde>Guardar sección</button></div></div>`;
   }
   // mismo criterio que nombreDrop() en supabase/functions/_shared/crm.ts
@@ -2323,7 +2325,14 @@
       const sets = [...box.querySelectorAll("[data-finset]:checked")].map((i) => i.dataset.finset), desde = iso("desde"), hasta = iso("hasta");
       if (el("visible").checked && !sets.length) return toast("Elegí al menos un set");
       if (desde && hasta && hasta <= desde) return toast('El "Hasta" tiene que ser después del "Desde"');
-      const F = { visible: el("visible").checked, titulo: v("titulo"), chip: v("chip"), intro: v("intro"), desde, hasta, sets };
+      const precios = {};
+      for (const id of sets) {
+        const row = box.querySelector(`[data-finrow="${CSS.escape(id)}"]`), x = P.products.find((p) => p.id === id) || {}, q = (k) => Math.round(Number(row.querySelector(`[data-finp="${k}"]`).value) || 0);
+        const p12 = q("p12"), p16 = q("p16");
+        if ((p12 && p12 >= Number(x.precio_12)) || (p16 && p16 >= Number(x.precio_16))) return toast(`${x.nombre || "El set"}: el precio de finde tiene que ser menor al normal`);
+        if (p12 || p16) precios[id] = { p12: p12 || null, p16: p16 || null };
+      }
+      const F = { visible: el("visible").checked, titulo: v("titulo"), chip: v("chip"), intro: v("intro"), desde, hasta, sets, precios };
       try { await API.saveSetting("finde", F); await loadBase(); toast(!F.visible ? "Guardada: la sección quedó apagada" : API.findeEstado(F) === "antes" ? "Programada" : "Guardada"); viewCarta(); } catch (err) { toast(err.message); }
       return;
     }

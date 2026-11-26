@@ -50,13 +50,14 @@
   const guardarTicket = () => ls.set("setto-local-ticket", S.ticket);
 
   /* ---------- productos (mismas reglas que la web: js/site.js) ---------- */
-  // los sets del Setto Weekend (settings.finde) se venden solo dentro de sus fechas, igual que en la web
-  const findeFuera = (p) => {
-    const F = S.finde || {}; if (!Array.isArray(F.sets) || !F.sets.includes(p.id)) return false;
+  // Setto Weekend (settings.finde): dentro de sus fechas los sets tildados valen su precio de finde, igual que en la web y en finde_precio() de la base
+  const findePrecio = (p, sz) => {
+    const F = S.finde || {}; if (p.categoria !== "set" || F.visible === false || !Array.isArray(F.sets) || !F.sets.includes(p.id)) return 0;
     const now = Date.now(), ini = Date.parse(F.desde || ""), fin = Date.parse(F.hasta || ""); // misma regla que findeEstado() en js/api.js
-    return F.visible === false || (ini && now < ini) || (fin && now >= fin);
+    if ((ini && now < ini) || (fin && now >= fin)) return 0;
+    const x = (F.precios || {})[p.id] || {}, v = Number(sz === "16 oz" ? x.p16 : x.p12); return v > 0 ? Math.round(v) : 0;
   };
-  const on = (p) => p.activo !== false && !findeFuera(p);
+  const on = (p) => p.activo !== false;
   const find = (id) => S.prods.find((p) => p.id === id);
   const fmtP = (p) => (p.categoria === "especial" ? p.formato || "mochi" : p.categoria);
   const esBebida = (p) => ["set", "dirty"].includes(fmtP(p));
@@ -67,7 +68,7 @@
   const lechePrecio = (n) => { const l = leches().find((x) => x.nombre === n); return l ? Number(l.precio) || 0 : 0; };
   const bebOpts = (p) => (p.categoria === "especial" && fmtP(p) === "set" && !p.set_bebida ? S.prods.filter((x) => on(x) && !x.agotado && x.categoria === "especial" && fmtP(x) === "dirty" && Number(x.precio_12) > 0) : []);
   const mochisSabores = () => S.prods.filter((m) => on(m) && !m.agotado && m.categoria === "mochi" && Number(m.precio) > 0);
-  const precioBase = (p, sz) => (esBebida(p) ? Number(sz === "16 oz" ? p.precio_16 : p.precio_12) : Number(p.precio)) || 0;
+  const precioBase = (p, sz) => (esBebida(p) ? findePrecio(p, sz || "12 oz") || Number(sz === "16 oz" ? p.precio_16 : p.precio_12) : Number(p.precio)) || 0;
   const nombreDe = (p) => (esBebida(p) || esPromo(p) ? p.nombre.trim() : "Mochi " + p.nombre.trim());
   const sinTxt = (x) => String(x).replace(/^\s*sin\s+/i, "");
   const vendible = (p) => on(p) && !p.agotado && (esBebida(p) ? Number(p.precio_12) > 0 || Number(p.precio_16) > 0 : Number(p.precio) > 0);
@@ -175,7 +176,7 @@
 
   /* ---------- TICKEAR ---------- */
   function tileHtml(p) {
-    const pr = esBebida(p) ? Number(p.precio_12) || Number(p.precio_16) : Number(p.precio);
+    const pr = esBebida(p) ? precioBase(p, "12 oz") || precioBase(p, "16 oz") : Number(p.precio);
     const q = S.ticket.filter((l) => l.id === p.id).reduce((a, l) => a + l.qty, 0);
     const img = IMG(p.img || "img/mochito-cup.png");
     return `<button class="tile${p.agotado ? " off" : ""}" data-p="${esc(p.id)}" ${vendible(p) ? "" : "disabled"}>
