@@ -1466,3 +1466,5 @@ body[data-page="listo"] .benef{grid-template-columns:minmax(0,520px);justify-con
   .bcard.dmaq .bpasos{grid-row:auto}
   .maqcard.mini{grid-column:1;grid-row:auto;justify-self:center}
 }
+#finde.previa .ph{cursor:default}
+#finde.previa .fsello{animation:none}
