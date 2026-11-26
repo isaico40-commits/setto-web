@@ -53,8 +53,8 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;backgroun
 .top .logo,.top .wacta,.top .cartbtn,.top .wacta svg{flex-shrink:0}
 .top .wrap>nav{gap:16px;font-size:.875rem}
 /* WhatsApp solo con el ícono cuando los links no entran: compu chica, o con la Edición especial prendida (8 links) */
-.top .wrap:has(>nav a[href$="#especial"]:not([hidden])) .wacta{width:42px;height:42px;padding:0;border-radius:50%;justify-content:center}
-.top .wrap:has(>nav a[href$="#especial"]:not([hidden])) .wacta span{display:none}
+.top .wrap:has(>nav a[href$="#especial"]:not([hidden])) .wacta,.top .wrap:has(>nav a[href$="#finde"]:not([hidden])) .wacta{width:42px;height:42px;padding:0;border-radius:50%;justify-content:center}
+.top .wrap:has(>nav a[href$="#especial"]:not([hidden])) .wacta span,.top .wrap:has(>nav a[href$="#finde"]:not([hidden])) .wacta span{display:none}
 @media (max-width:1180px){.top .wrap>nav{gap:13px;font-size:.875rem}.top .wacta{width:42px;height:42px;padding:0;border-radius:50%;justify-content:center}.top .wacta span{display:none}}
 @media (max-width:760px){.top .wrap>nav{display:none}.top .cartbtn{margin-left:auto}}
 
@@ -183,6 +183,16 @@ section.blk{padding-block:72px}
 .set{transition:box-shadow .2s}
 .set:hover{box-shadow:5px 5px 0 color-mix(in srgb,var(--turquesa) 55%,#fff)}
 .set:hover .off{box-shadow:0 0 0 2px var(--card),0 0 22px 5px color-mix(in srgb,var(--turquesa) 45%,transparent)}
+/* Finde de Sets: fondo turquesa suave para separarla del Especial y de Sets; precio de cada tamaño con el separado tachado */
+#finde{background:color-mix(in srgb,var(--turquesa) 9%,var(--bg))}
+#finde .chip{background:var(--turquesa);color:#FFFDF8}
+#finde .set .ph::before{background:color-mix(in srgb,var(--turquesa) 22%,var(--bg))}
+.fset .ftams{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:6px}
+.fset .ftams li{display:flex;align-items:baseline;gap:8px;font-size:.9375rem}
+.fset .ftams li span{font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);min-width:46px}
+.fset .ftams li b{font-size:1.25rem;color:var(--ink)}
+.fset .ftams li s{font-size:.875rem;color:var(--ink-2)}
+.fset .foot{justify-content:space-between;margin-top:14px}
 .setsnote{margin:22px auto 0;font-size:.875rem;color:var(--ink-2);max-width:60ch;text-align:center}
 /* edición especial */
 /* el Especial usa la misma tarjeta que Sets (.set); acá solo lo propio: foto sin recortar, "Foto en camino" y precio pendiente */

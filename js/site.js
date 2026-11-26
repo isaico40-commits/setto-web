@@ -12,7 +12,14 @@
 
   let S = {}; // ajustes
   let SETS = [], DIRTY = [], MOCHIS = [], ESP = [], PROMOS = [];
-  const on = (list) => list.filter((x) => x.activo !== false);
+  // Finde de Sets (settings.finde): sus sets se ven y se piden solo entre "desde" y "hasta"; fuera de eso, como si estuvieran ocultos
+  const FINDE = () => S.finde || {};
+  const findeIds = () => (Array.isArray(FINDE().sets) ? FINDE().sets : []);
+  const esFinde = (p) => !!p && findeIds().includes(p.id);
+  const findeFase = () => (window.SettoAPI && window.SettoAPI.findeEstado ? window.SettoAPI.findeEstado(FINDE(), ahora()) : "apagado");
+  const findeFuera = (p) => esFinde(p) && findeFase() !== "abierto";
+  let findeUlt = null; // fase con la que se dibujó la sección
+  const on = (list) => list.filter((x) => x.activo !== false && !findeFuera(x));
 
   /* filas de la base → forma que usa la página */
   function adapt(rows) {
@@ -213,7 +220,7 @@
   const eligeBeb = (p) => bebOpts(p).length > 0;
   function syncCart() { // si cambió la carta, actualiza precios y saca lo que ya no existe
     cart = cart.filter((c) => {
-      const p = find(c.id); if (!p || p.activo === false || (p.categoria === "especial" && !espOpen())) return false; const pr = priceOf(p, c.size); if (!(pr > 0)) return false;
+      const p = find(c.id); if (!p || p.activo === false || findeFuera(p) || (p.categoria === "especial" && !espOpen())) return false; const pr = priceOf(p, c.size); if (!(pr > 0)) return false;
       if (persOn(p)) {
         if (c.leche && !leches().some((l) => l.nombre === c.leche)) c.leche = (leches()[0] || {}).nombre || "";
         c.sin = (c.sin || []).filter((x) => sinOpts().includes(x));
@@ -231,6 +238,7 @@
   const px = (name, data) => { if (window.SettoPixel) window.SettoPixel.track(name, data); };
   const pxCarrito = () => ({ content_type: "product", content_ids: [...new Set(cart.map((c) => c.id))], contents: cart.map((c) => ({ id: c.id, quantity: c.qty, item_price: c.precio })), num_items: units() });
   function addItem(p, sz, qty = 1, leche = "", sin = [], beb = "", mochis = []) {
+    if (findeFuera(p)) { toast((FINDE().titulo || "Esta promo") + " ya no está disponible"); return false; }
     if (eligeBeb(p) && !bebOpts(p).some((x) => x.id === beb)) { if (!sheetState || sheetState.p !== p) openSheet(p.id); toast("Elegí la bebida del set"); return false; }
     if (esPromo(p) && (mochis || []).length !== promoCant(p)) { if (!sheetState || sheetState.p !== p) openSheet(p.id); toast(`Elegí los ${promoCant(p)} mochis de la box`); return false; }
     if (!eligeBeb(p)) beb = "";
@@ -922,8 +930,10 @@
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([ics], { type: "text/calendar" })); a.download = "setto-drop.ics";
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
+  const setsCarta = () => on(SETS).filter((s) => !esFinde(s));
   function renderSets() {
-    $("#setsGrid").innerHTML = on(SETS).map((s) => {
+    renderFinde();
+    $("#setsGrid").innerHTML = setsCarta().map((s) => {
       const ahora = s.precios["12 oz"], antes = suelto(s, "12 oz"), ahorro = antes - ahora, pct = antes > 0 ? Math.round((ahorro / antes) * 100) : 0;
       return `<article class="set">
         <button class="ph ${s.foto ? "foto" : ""}" data-open="${s.id}" aria-label="Ver ${esc(s.nombre)}">${picsHtml(s, descOf(s), "img/mochito-lie.png", 180)}</button>
@@ -935,11 +945,42 @@
         ${sinStock(s) ? "" : `<button class="add" data-open="${s.id}" aria-label="Elegir tamaño de ${esc(s.nombre)}">+</button>`}</div>
       </article>`;
     }).join("");
-    $("#sets").hidden = on(SETS).length === 0;
+    $("#sets").hidden = setsCarta().length === 0;
     // Columnas en compu según cuántos sets hay, para que nunca quede uno solo en la última fila (4 → 4 juntos, 5 → 3+2…)
-    const n = on(SETS).length; $("#setsGrid").style.setProperty("--cols", n <= 4 ? Math.max(n, 2) : n % 4 === 0 || n % 4 === 3 ? 4 : 3);
+    const n = setsCarta().length; $("#setsGrid").style.setProperty("--cols", n <= 4 ? Math.max(n, 2) : n % 4 === 0 || n % 4 === 3 ? 4 : 3);
     dots("setsGrid");
   }
+  /* Finde de Sets: misma tarjeta que Sets, con el ahorro en pesos y los dos tamaños a la vista; se oculta sola al llegar el "hasta" */
+  const findeFin = (iso) => { const d = new Date(iso); if (isNaN(d)) return ""; return d.toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", weekday: "long", day: "numeric", month: "numeric" }); };
+  function renderFinde() {
+    const sec = $("#finde"); if (!sec) return;
+    const F = FINDE(); findeUlt = findeFase(); const items = findeUlt === "abierto" ? on(SETS).filter(esFinde) : [];
+    const nav = document.querySelectorAll('header nav a[href$="#finde"]');
+    const tit = F.titulo || "Finde de Sets";
+    nav.forEach((a) => { a.hidden = !items.length; a.textContent = tit; });
+    sec.hidden = !items.length; if (!items.length) { $("#findeGrid").innerHTML = ""; return; }
+    $("#t-finde").textContent = tit;
+    const chip = F.chip || (F.hasta ? "Hasta el " + findeFin(F.hasta) : "");
+    $("#findeChip").textContent = chip; $("#findeChip").hidden = !chip;
+    $("#findeIntro").textContent = F.intro || ""; $("#findeIntro").hidden = !F.intro;
+    $("#findeGrid").innerHTML = items.map((s) => {
+      const tams = ["12 oz", "16 oz"].filter((oz) => Number(s.precios[oz]) > 0);
+      const ah = (oz) => Math.max(0, suelto(s, oz) - Number(s.precios[oz])), max = Math.max(0, ...tams.map(ah));
+      return `<article class="set fset">
+        <button class="ph ${s.foto ? "foto" : ""}" data-open="${s.id}" aria-label="Ver ${esc(s.nombre)}">${picsHtml(s, descOf(s), "img/mochito-lie.png", 180)}</button>
+        ${max > 0 ? `<span class="off num">Ahorrás ${[...new Set(tams.map(ah).filter((x) => x > 0))].map(money).join(" / ")}</span>` : ""}${stockBadge(s)}
+        <h3>${esc(s.nombre)}</h3>
+        <p class="combo">${esc(descOf(s))}</p>${stockLine(s)}
+        <ul class="ftams">${tams.map((oz) => `<li><span>${oz}</span><b class="num">${money(s.precios[oz])}</b>${ah(oz) > 0 ? `<s class="num">${money(suelto(s, oz))}</s>` : ""}</li>`).join("")}</ul>
+        <div class="foot"><span class="from num">${rateTag(s)}</span>
+        ${sinStock(s) ? "" : `<button class="add" data-open="${s.id}" aria-label="Elegir tamaño de ${esc(s.nombre)}">+</button>`}</div>
+      </article>`;
+    }).join("");
+    const g = $("#findeGrid"); g.style.setProperty("--cols", 3); g.style.setProperty("--n", items.length); g.classList.toggle("pocos", items.length < 3);
+    dots("findeGrid");
+  }
+  // la ventana se revisa sola: al llegar el "desde" aparece y al llegar el "hasta" se va (también del carrito), sin recargar
+  setInterval(() => { if (S.finde && findeUlt !== null && findeFase() !== findeUlt) { syncCart(); renderSets(); renderCarta(); renderBadge(); } }, 15000);
   /* Promos: pestaña de la carta con la misma tarjeta que Sets; el cartel dice cuánto ahorrás contra los mochis sueltos */
   const promosOn = () => promoSabores().length > 0 ? on(PROMOS) : [];
   function promoCard(p) {
@@ -1139,7 +1180,7 @@
     if (!p) return; // puede llegar en la carta nueva (la guardada es vieja): se prueba de nuevo
     prodAlCargar = "";
     try { history.replaceState(null, "", location.pathname + location.search.replace(/([?&])producto=[^&]*&?/, "$1").replace(/[?&]$/, "") + location.hash); } catch (_) {} // el origen ya se guardó (js/origen.js corre antes)
-    const sec = p.categoria === "set" ? "#sets" : p.categoria === "especial" ? "#especial" : "#carta";
+    const sec = esFinde(p) ? "#finde" : p.categoria === "set" ? "#sets" : p.categoria === "especial" ? "#especial" : "#carta";
     if (sec === "#carta" && ["dirty", "mochi", "promo"].includes(p.categoria)) { tab = p.categoria; renderCarta(); }
     const el = $(sec); if (el) el.scrollIntoView({ block: "start" });
     if (!p.agotado) setTimeout(() => openSheet(p.id), 250);
@@ -1234,7 +1275,7 @@
   /* ---------- hoja de producto ---------- */
   let sheetState = null;
   function openSheet(id) {
-    const p = find(id); if (!p) return;
+    const p = find(id); if (!p || findeFuera(p)) return;
     sheetState = { p, sz: unit(p) ? "" : "12 oz", qty: 1, leche: persOn(p) ? (leches()[0] || {}).nombre || "" : "", sin: [], beb: bebOpts(p).length === 1 ? bebOpts(p)[0].id : "", mochis: {}, rvOpen: false, sinOpen: false, ingOpen: false };
     drawSheet();
     px("ViewContent", { content_type: "product", content_ids: [p.id], content_name: nameOf(p), value: Number(priceOf(p, sheetState.sz)) || 0 });
@@ -1281,7 +1322,7 @@
       ${sinOpts().length ? sinHtml(sin) : ""}` : "";
     const opts = unit(p) ? "" : `<div><span class="eyebrow">Tamaño</span><div class="opts" style="margin-top:8px">${["12 oz", "16 oz"].map((oz) => {
       const sv = k === "set" ? suelto(p, oz) : k === "premium" ? antesDe(p, oz) : cartaAntes(p, oz), pv = p.precios[oz];
-      const pr = sv > pv ? `<s>${money(sv)}</s>${money(pv)} <em class="pct">−${Math.round(((sv - pv) / sv) * 100)}%</em>` : money(pv);
+      const pr = sv > pv ? `<s>${money(sv)}</s>${money(pv)} <em class="pct">${esFinde(p) ? "Ahorrás " + money(sv - pv) : "−" + Math.round(((sv - pv) / sv) * 100) + "%"}</em>` : money(pv);
       return `<button class="opt" data-sz="${oz}" aria-pressed="${oz === sz}"><span class="rd"></span><b>${oz.toUpperCase()}</b><span class="pp num">${pr}</span></button>`;
     }).join("")}</div></div>`;
     const box = esPromo(p) ? promoPickHtml(p) : "", falta = esPromo(p) ? promoCant(p) - boxList().length : 0;

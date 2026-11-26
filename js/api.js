@@ -73,6 +73,15 @@
     if (!ini || now < ini) return "antes";
     return fin && now >= fin ? "terminado" : "abierto";
   }
+  /* Sección "Finde de Sets" (settings.finde): sets con precio de finde que se ven solo entre "desde" y "hasta".
+     { visible, titulo, chip, intro, desde, hasta, sets: [ids] }. Fuera de la ventana esos sets no se ven ni se pueden pedir. */
+  function findeEstado(F, now = Date.now()) {
+    F = F || {};
+    if (F.visible === false || !Array.isArray(F.sets) || !F.sets.length) return "apagado";
+    const ini = Date.parse(F.desde || ""), fin = Date.parse(F.hasta || "");
+    if (ini && now < ini) return "antes";
+    return fin && now >= fin ? "terminado" : "abierto";
+  }
   function prettyPhone(p) {
     const d = normPhone(p) || String(p || "");
     if (d.length !== 13) return d;
@@ -963,5 +972,5 @@
     },
   };
 
-  window.SettoAPI = Object.assign({ DEMO, normPhone, prettyPhone, dropEstado }, DEMO ? demo : live);
+  window.SettoAPI = Object.assign({ DEMO, normPhone, prettyPhone, dropEstado, findeEstado }, DEMO ? demo : live);
 })();
