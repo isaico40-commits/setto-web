@@ -951,6 +951,7 @@
     dots("setsGrid");
   }
   /* Finde de Sets: misma tarjeta que Sets, con el ahorro en pesos y los dos tamaños a la vista; se oculta sola al llegar el "hasta" */
+  const findeHora = (iso) => { const d = new Date(iso); if (isNaN(d)) return ""; return "a las " + d.toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false }); };
   const findeFin = (iso) => { const d = new Date(iso); if (isNaN(d)) return ""; return d.toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", weekday: "long", day: "numeric", month: "numeric" }); };
   function renderFinde() {
     const sec = $("#finde"); if (!sec) return;
@@ -963,22 +964,35 @@
     const chip = F.chip || (F.hasta ? "Hasta el " + findeFin(F.hasta) : "");
     $("#findeChip").textContent = chip; $("#findeChip").hidden = !chip;
     $("#findeIntro").textContent = F.intro || ""; $("#findeIntro").hidden = !F.intro;
+    $("#findeCd").hidden = !Date.parse(F.hasta || ""); tickFinde();
     $("#findeGrid").innerHTML = items.map((s) => {
       const tams = ["12 oz", "16 oz"].filter((oz) => Number(s.precios[oz]) > 0);
       const ah = (oz) => Math.max(0, suelto(s, oz) - Number(s.precios[oz])), max = Math.max(0, ...tams.map(ah));
+      // sello grande de descuento: el ahorro del tamaño chico bien grande y el del grande abajo
+      const ahs = tams.filter((oz) => ah(oz) > 0), pct = ahs.length ? Math.round((ah(ahs[0]) / suelto(s, ahs[0])) * 100) : 0;
+      const sello = max > 0 ? `<span class="fsello num" aria-label="Ahorrás ${ahs.map((oz) => money(ah(oz)) + " en " + oz).join(" y ")}"><small>Ahorrás</small><b>${money(ah(ahs[0]))}</b>${ahs[1] && ah(ahs[1]) !== ah(ahs[0]) ? `<em>${money(ah(ahs[1]))} en ${ahs[1]}</em>` : ""}</span>` : "";
       return `<article class="set fset">
         <button class="ph ${s.foto ? "foto" : ""}" data-open="${s.id}" aria-label="Ver ${esc(s.nombre)}">${picsHtml(s, descOf(s), "img/mochito-lie.png", 180)}</button>
-        ${max > 0 ? `<span class="off num">Ahorrás ${[...new Set(tams.map(ah).filter((x) => x > 0))].map(money).join(" / ")}</span>` : ""}${stockBadge(s)}
+        ${sello}${pct >= 5 ? `<span class="fpct num">−${pct}%</span>` : ""}${stockBadge(s)}
         <h3>${esc(s.nombre)}</h3>
         <p class="combo">${esc(descOf(s))}</p>${stockLine(s)}
         <ul class="ftams">${tams.map((oz) => `<li><span>${oz}</span><b class="num">${money(s.precios[oz])}</b>${ah(oz) > 0 ? `<s class="num">${money(suelto(s, oz))}</s>` : ""}</li>`).join("")}</ul>
-        <div class="foot"><span class="from num">${rateTag(s)}</span>
+        <div class="foot"><span class="furg">${F.hasta ? "⏳ Solo hasta el " + esc(new Date(F.hasta).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", weekday: "long" })) + " " + esc(findeHora(F.hasta).replace("a las ", "")) : "⏳ Solo este finde"}</span>
         ${sinStock(s) ? "" : `<button class="add" data-open="${s.id}" aria-label="Elegir tamaño de ${esc(s.nombre)}">+</button>`}</div>
       </article>`;
     }).join("");
     const g = $("#findeGrid"); g.style.setProperty("--cols", 3); g.style.setProperty("--n", items.length); g.classList.toggle("pocos", items.length < 3);
     dots("findeGrid");
   }
+  // cuenta regresiva hasta el "hasta" (con la hora del servidor, como la del drop)
+  function tickFinde() {
+    const box = $("#findeCd"); if (!box || box.hidden || $("#finde").hidden) return;
+    const ms = Math.max(0, Date.parse(FINDE().hasta || "") - ahora()), t = { d: Math.floor(ms / 864e5), h: Math.floor(ms / 36e5) % 24, m: Math.floor(ms / 6e4) % 60, s: Math.floor(ms / 1e3) % 60 };
+    box.querySelectorAll("[data-fcd]").forEach((el) => { const k = el.dataset.fcd, v = k === "d" ? String(t.d) : String(t[k]).padStart(2, "0"); if (el.textContent !== v) el.textContent = v; });
+    box.classList.toggle("ult", ms < 6 * 36e5); // últimas 6 horas: en coral
+    box.querySelector("[data-fcd=d]").parentElement.hidden = t.d === 0;
+  }
+  setInterval(tickFinde, 1000);
   // la ventana se revisa sola: al llegar el "desde" aparece y al llegar el "hasta" se va (también del carrito), sin recargar
   setInterval(() => { if (S.finde && findeUlt !== null && findeFase() !== findeUlt) { syncCart(); renderSets(); renderCarta(); renderBadge(); } }, 15000);
   /* Promos: pestaña de la carta con la misma tarjeta que Sets; el cartel dice cuánto ahorrás contra los mochis sueltos */
