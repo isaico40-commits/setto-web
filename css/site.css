@@ -194,10 +194,12 @@ section.blk{padding-block:72px}
 .fset .ftams li s{font-size:.875rem;color:var(--ink-2)}
 .fset .foot{justify-content:space-between;margin-top:14px}
 /* urgencia: sello de ahorro grande, % chico, cuenta regresiva y "solo hasta" */
-.fsello{position:absolute;top:22px;left:22px;z-index:2;display:grid;justify-items:center;gap:0;background:var(--coral);color:var(--ink);border-radius:20px;padding:10px 16px 11px;transform:rotate(-6deg);box-shadow:0 0 0 3px var(--card),0 8px 20px -6px rgba(31,28,24,.35);animation:fsello 2.4s ease-in-out infinite}
+.fsello{position:absolute;top:-16px;left:-14px;z-index:2;display:grid;justify-items:center;gap:0;background:var(--coral);color:var(--ink);border-radius:20px;padding:10px 16px 11px;transform:rotate(-6deg);box-shadow:0 0 0 3px var(--card),0 8px 20px -6px rgba(31,28,24,.35);animation:fsello 2.4s ease-in-out infinite}
 .fsello small{font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
 .fsello b{font-family:var(--display);font-weight:400;font-size:2rem;line-height:1}
 .fsello em{font-style:normal;font-size:.75rem;font-weight:600;margin-top:2px}
+#findeGrid{padding-top:22px;padding-inline:16px} /* lugar para el sello que sobresale de la tarjeta */
+@media (max-width:760px){#findeGrid{padding-top:24px;padding-left:34px;scroll-padding-inline:34px}}
 @keyframes fsello{0%,100%{transform:rotate(-6deg) scale(1)}50%{transform:rotate(-6deg) scale(1.05)}}
 @media (prefers-reduced-motion:reduce){.fsello{animation:none}}
 .fpct{position:absolute;top:28px;right:28px;z-index:2;background:var(--turquesa);color:#FFFDF8;border-radius:var(--pill);font-size:1rem;font-weight:800;padding:6px 12px;box-shadow:0 0 0 2px var(--card)}
