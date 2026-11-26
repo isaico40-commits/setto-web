@@ -32,6 +32,12 @@ main.pmain{padding-block:24px 80px}
 .checks{display:flex;gap:14px;flex-wrap:wrap}
 .checks label{display:flex;gap:6px;align-items:center;font-size:.86rem;color:var(--ink);font-weight:500}
 .checks input{width:auto}
+.finsets{display:grid;gap:10px}
+.finset{border:var(--line);border-radius:12px;padding:10px 12px}
+.finset .finchk{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:.88rem;margin:0}
+.finset .finchk input{width:auto}
+.finset .row2{margin-top:8px}
+.finset:not(:has([data-finset]:checked)) .row2{display:none}
 .ohead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .ocode{font-family:var(--display);font-size:1.7rem;color:var(--ink)}
 .ago{font-size:.8rem;color:var(--ink-2)}
