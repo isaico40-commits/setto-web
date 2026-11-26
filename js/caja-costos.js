@@ -563,9 +563,13 @@ window.CajaCostos = function (K) {
     }
     function pickHTML() {
       const q = E.q.trim().toLowerCase();
-      const usados = new Set(D.L.map((l) => l.insumo_id || l.sub_id));
-      const ins = C.ins.filter((i) => i.activo && !usados.has(i.id) && (!q || i.nombre.toLowerCase().includes(q)));
-      const subs = C.rec.filter((r) => r.tipo === "base" && r.id !== D.id && !usados.has(r.id) && (!q || r.nombre.toLowerCase().includes(q)));
+      // En un producto el mismo insumo puede ir en grupos distintos (ej: leche en Bebida y en Foam):
+      // solo se oculta lo que ya está en el grupo elegido en "Va en".
+      const esProd = D.d.tipo === "producto", grupoDe = (i) => (i && i.tipo === "packaging" ? "Packaging" : E.parte || "Otros");
+      const usados = new Set(D.L.map((l) => (l.insumo_id || l.sub_id) + (esProd ? "|" + (l.parte || "Otros") : "")));
+      const ya = (id, i) => usados.has(id + (esProd ? "|" + grupoDe(i) : ""));
+      const ins = C.ins.filter((i) => i.activo && !ya(i.id, i) && (!q || i.nombre.toLowerCase().includes(q)));
+      const subs = C.rec.filter((r) => r.tipo === "base" && r.id !== D.id && !ya(r.id, null) && (!q || r.nombre.toLowerCase().includes(q)));
       const sec = (t, xs) => xs.length ? `<small class="kpk-h">${t}</small>${xs.slice(0, 30).map((i) => `<button type="button" class="chip" data-kadd="i:${i.id}">${esc(i.nombre)}</button>`).join("")}` : "";
       return `${subs.length ? `<small class="kpk-h">Preparaciones</small>${subs.slice(0, 12).map((r) => `<button type="button" class="chip" data-kadd="s:${r.id}">${esc(r.nombre)}</button>`).join("")}` : ""}
         ${sec("Insumos", ins.filter((i) => i.tipo !== "packaging"))}
@@ -663,7 +667,7 @@ window.CajaCostos = function (K) {
       if (d.kx !== undefined) { if (E.seguroX) return closeSheet(); E.seguroX = true; toast("Tenés cambios sin guardar. Tocá × de nuevo para descartarlos."); return; }
       if (d.ksz) { if (E.dirty) return toast("Guardá los cambios antes de cambiar de tamaño"); return abrirProd(ctx.p.id, d.ksz); }
       if (d.kpick !== undefined) { leer(); E.pick = !E.pick; E.q = ""; draw(); if (E.pick) sh().querySelector("#kpq").focus(); return; }
-      if (d.kparte) { E.parte = d.kparte; sh().querySelectorAll("[data-kparte]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.kparte === E.parte)); return; }
+      if (d.kparte) { E.parte = d.kparte; sh().querySelectorAll("[data-kparte]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.kparte === E.parte)); const pk = sh().querySelector("#kpk"); if (pk) pk.innerHTML = pickHTML(); return; }
       if (d.kadd) {
         leer(); const [k, id] = d.kadd.split(":");
         const it = k === "i" ? insPor(id) : null;
@@ -710,8 +714,16 @@ window.CajaCostos = function (K) {
       if (D.d.tipo !== "producto" || !D.d.tamano || !p || tamanos(p).length < 2) return "";
       const t = tamanos(p).find((x) => x !== D.d.tamano);
       const al = (L) => L.map((l) => aTam(l, t)), k = (l) => (l.insumo_id ? "i:" + l.insumo_id : "s:" + l.sub_id);
-      const antes = new Set(al(ORIG).map(k)), ahora = al(D.L), ahoraK = new Set(ahora.map(k));
-      const sumar = ahora.filter((l) => !antes.has(k(l))), sacar = [...antes].filter((x) => !ahoraK.has(x));
+      const pa = (l) => l.parte || "Otros", cuenta = (L) => L.reduce((m, l) => m.set(k(l), (m.get(k(l)) || 0) + 1), new Map());
+      // Un insumo puede repetirse en grupos distintos: se compara cuántas veces aparece cada uno, no solo si está.
+      // "sobran(A, B)": las líneas de A que no tienen pareja (mismo insumo y grupo, o mismo insumo en otro grupo) en B.
+      const sobran = (A, B) => {
+        const libres = B.slice(), out = [];
+        A.forEach((l) => { let j = libres.findIndex((x) => k(x) === k(l) && pa(x) === pa(l)); if (j < 0) out.push(l); else libres.splice(j, 1); });
+        return out.filter((l) => { const j = libres.findIndex((x) => k(x) === k(l)); if (j < 0) return true; libres.splice(j, 1); return false; });
+      };
+      const viejo = al(ORIG), ahora = al(D.L), cN = cuenta(ahora);
+      const sumar = sobran(ahora, viejo), sacar = sobran(viejo, ahora);
       const otra = recDe(p.id, t);
       if (!otra) {
         if (!D.L.length || !(precioDe(p, t) > 0)) return "";
@@ -720,13 +732,21 @@ window.CajaCostos = function (K) {
       }
       if (!sumar.length && !sacar.length) return "";
       const L2 = lineasDe(otra.id).map((l) => ({ insumo_id: l.insumo_id, sub_id: l.sub_id, cantidad: Number(l.cantidad), parte: l.parte || "" }));
-      const L2k = new Set(L2.map(k));
-      const nuevaL = L2.filter((l) => !sacar.includes(k(l))).concat(sumar.filter((l) => !L2k.has(k(l))));
-      const cambios = nuevaL.length !== L2.length || sumar.some((l) => !L2k.has(k(l)));
-      if (!cambios) return "";
+      const nuevaL = L2.slice();
+      let n = 0, m = 0;
+      sacar.forEach((l) => {
+        const c2 = nuevaL.filter((x) => k(x) === k(l)).length; if (c2 <= (cN.get(k(l)) || 0)) return;
+        let j = -1; nuevaL.forEach((x, ix) => { if (k(x) === k(l) && pa(x) === pa(l)) j = ix; });
+        if (j < 0) nuevaL.forEach((x, ix) => { if (k(x) === k(l)) j = ix; });
+        nuevaL.splice(j, 1); m++;
+      });
+      sumar.forEach((l) => {
+        if (nuevaL.filter((x) => k(x) === k(l)).length >= cN.get(k(l))) return;
+        const ult = nuevaL.map(pa).lastIndexOf(pa(l)); nuevaL.splice(ult >= 0 ? ult + 1 : nuevaL.length, 0, l); n++;
+      });
+      if (!n && !m) return "";
       fail(await sb.rpc("costo_receta_guardar", { p_id: otra.id, p_datos: { nombre: otra.nombre, tipo: otra.tipo, product_id: otra.product_id, tamano: otra.tamano, rinde: Number(otra.rinde), rinde_unidad: otra.rinde_unidad, merma: Number(otra.merma), nota: otra.nota || "", activo: true }, p_lineas: nuevaL.map(lin), p_por: K.me() }));
       await reload();
-      const n = sumar.filter((l) => !L2k.has(k(l))).length, m = L2.length - (nuevaL.length - n);
       return `. En ${t}: ${[n ? `+${n} ingrediente${n > 1 ? "s" : ""} (ajustá la cantidad)` : "", m ? `−${m}` : ""].filter(Boolean).join(", ")}`;
     }
     const lin = (l) => ({ insumo_id: l.insumo_id, sub_id: l.sub_id, cantidad: l.cantidad, parte: l.parte || null });
