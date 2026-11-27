@@ -7,7 +7,7 @@
   const PAGE = (() => { const q = new URLSearchParams(location.search).get("p"); const p = (q || location.pathname.replace(/\/+$/, "").split("/").pop() || "").replace(/\.html$/, ""); return ["gift-cards", "armar", "listo"].includes(p) ? p : "home"; })();
   document.body.dataset.page = PAGE;
   if (PAGE === "gift-cards") document.title = "Gift cards · Setto"; if (PAGE === "armar") document.title = "Cómo armar tu bebida · Setto"; if (PAGE === "listo") document.title = "¡Llegó tu Setto! · Setto";
-  const irA = (hash) => { if (PAGE === "home") location.hash = hash; else location.href = "/" + hash; };
+  const irA = (hash) => { if (hash === "#sets" && findeTapa()) hash = "#finde"; if (PAGE === "home") location.hash = hash; else location.href = "/" + hash; };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   let S = {}; // ajustes
@@ -19,6 +19,8 @@
   const esFinde = (p) => !!p && findeIds().includes(p.id);
   const findeFase = () => (window.SettoAPI && window.SettoAPI.findeEstado ? window.SettoAPI.findeEstado(FINDE(), ahora()) : "apagado");
   const enFinde = (p) => esFinde(p) && findeFase() === "abierto";
+  // mientras el Setto Weekend está abierto, Sets se oculta entera y los links a #sets van a #finde
+  const findeTapa = () => findeFase() === "abierto" && SETS.some((x) => x.activo !== false && esFinde(x));
   const findePrecio = (id, sz) => { const x = (FINDE().precios || {})[id] || {}, v = Number(sz === "16 oz" ? x.p16 : x.p12); return v > 0 ? Math.round(v) : 0; };
   let findeUlt = null; // fase con la que se dibujó la sección
   const on = (list) => list.filter((x) => x.activo !== false);
@@ -933,7 +935,7 @@
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([ics], { type: "text/calendar" })); a.download = "setto-drop.ics";
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
-  const setsCarta = () => on(SETS).filter((s) => !enFinde(s));
+  const setsCarta = () => (findeTapa() ? [] : on(SETS).filter((s) => !enFinde(s)));
   function renderSets() {
     renderFinde();
     $("#setsGrid").innerHTML = setsCarta().map((s) => {
@@ -949,6 +951,7 @@
       </article>`;
     }).join("");
     $("#sets").hidden = setsCarta().length === 0;
+    document.querySelectorAll('header nav a[href$="#sets"]').forEach((a) => { a.hidden = findeTapa(); });
     // Columnas en compu según cuántos sets hay, para que nunca quede uno solo en la última fila (4 → 4 juntos, 5 → 3+2…)
     const n = setsCarta().length; $("#setsGrid").style.setProperty("--cols", n <= 4 ? Math.max(n, 2) : n % 4 === 0 || n % 4 === 3 ? 4 : 3);
     dots("setsGrid");
@@ -1001,6 +1004,7 @@
     box.querySelector("[data-fcd=d]").parentElement.hidden = t.d === 0;
   }
   setInterval(tickFinde, 1000);
+  document.addEventListener("click", (e) => { const a = e.target.closest && e.target.closest('a[href$="#sets"]'); if (a && findeTapa()) { e.preventDefault(); irA("#finde"); } }, true);
   // la ventana se revisa sola: al llegar el "desde" aparece y al llegar el "hasta" se va (también del carrito), sin recargar
   setInterval(() => { if (S.finde && findeUlt !== null && findeFase() !== findeUlt) { syncCart(); renderSets(); renderCarta(); renderBadge(); } }, 15000);
   /* Promos: pestaña de la carta con la misma tarjeta que Sets; el cartel dice cuánto ahorrás contra los mochis sueltos */
