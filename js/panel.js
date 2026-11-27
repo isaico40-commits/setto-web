@@ -1519,7 +1519,7 @@
     const f = API.findeEstado(F), n = (F.sets || []).filter((id) => { const x = P.products.find((p) => p.id === id); return x && x.activo !== false; }).length;
     const sin = F.visible !== false && !n ? " · <b>Ojo:</b> no elegiste ningún set visible" : "";
     if (f === "apagado") return "⚫ Apagada: no se ve, y los sets siguen en Sets con su precio normal" + sin;
-    if (f === "antes") return `⏳ Arranca el ${fechaTxt(F.desde)} (faltan ${faltaTxt(Date.parse(F.desde) - Date.now())}). Hasta entonces los sets siguen en Sets con su precio normal`;
+    if (f === "antes") return `⏳ Arranca el ${fechaTxt(F.desde)} (faltan ${faltaTxt(Date.parse(F.desde) - Date.now())}).${F.previa ? " Ya se ve como \"Arranca el…\" con los precios de finde, pero no se puede pedir." : ""} Hasta entonces los sets se piden en Sets con su precio normal`;
     if (f === "abierto") return `🟢 Activa: los sets tildados se ven acá con su precio de finde${F.hasta ? ` hasta el ${fechaTxt(F.hasta)}` : " (sin fin: apagala a mano)"}`;
     return `⏹ Terminó el ${fechaTxt(F.hasta)}: la sección no se ve y los sets volvieron a Sets con su precio normal`;
   }
@@ -1530,6 +1530,7 @@
       <b>Setto Weekend (sección propia, arriba de Sets)</b>
       <p class="dropst" id="findeState">${findeStateTxt(F)}</p>
       <label class="espsw"><input type="checkbox" data-fin="visible" ${F.visible !== false && sel.length ? "checked" : ""}> <span>Mostrar la sección en la web</span></label>
+      <label class="espsw"><input type="checkbox" data-fin="previa" ${F.previa ? "checked" : ""}> <span>Mostrarla desde ya como "Arranca el…" (se ven los precios, pero no se puede pedir hasta el "Desde")</span></label>
       ${t("titulo", "Título de la sección", "Setto Weekend")}
       <div class="row2"><label>Desde (día y hora de Argentina)<input type="datetime-local" data-fin="desde" value="${aLocal(F.desde)}"></label>
         <label>Hasta<input type="datetime-local" data-fin="hasta" value="${aLocal(F.hasta)}"></label></div>
@@ -2332,7 +2333,7 @@
         if ((p12 && p12 >= Number(x.precio_12)) || (p16 && p16 >= Number(x.precio_16))) return toast(`${x.nombre || "El set"}: el precio de finde tiene que ser menor al normal`);
         if (p12 || p16) precios[id] = { p12: p12 || null, p16: p16 || null };
       }
-      const F = { visible: el("visible").checked, titulo: v("titulo"), chip: v("chip"), intro: v("intro"), desde, hasta, sets, precios };
+      const F = { visible: el("visible").checked, previa: el("previa").checked, titulo: v("titulo"), chip: v("chip"), intro: v("intro"), desde, hasta, sets, precios };
       try { await API.saveSetting("finde", F); await loadBase(); toast(!F.visible ? "Guardada: la sección quedó apagada" : API.findeEstado(F) === "antes" ? "Programada" : "Guardada"); viewCarta(); } catch (err) { toast(err.message); }
       return;
     }
